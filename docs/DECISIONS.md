@@ -4,6 +4,10 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Releases without a language tag count as the original language of the movie or series (from TMDB) | Same as Radarr; English scene releases carry no tag |
+| 2026-10-17 | Ranking: quality first, then PROPER/REPACK, then dual language | Same order as Radarr without custom formats; a German.DL WEB-1080p does not beat a German Bluray-1080p |
+| 2026-10-17 | A file in the wrong language is always replaced by a release in the profile language, even past the cutoff | A GermanSubbed or English file in a "Deutsch" profile is not finished |
+| 2026-10-17 | Release parser: Sonarr episode patterns and Radarr movie patterns in one parser; clear SxxEyy wins, ambiguous patterns lose to a movie | Indexer searches mix both; names like "Blade.Runner.2049.2017" must stay movies |
 | 2026-10-17 | Logo: same as CloudZH (monogram Z in front of H, Zurich red #C0202A, Outfit wordmark) with «Stream» in place of «Cloud» | StreamZH is part of the CloudZH family; one brand system, generator in `tools/brand` |
 | 2026-10-17 | Quality and language ids identical to Radarr | Profiles and history can be imported from Radarr/Sonarr later (0.8) |
 | 2026-10-17 | One quality profile model for all media types, with required language and "prefer dual language" | German scene releases (German.DL) are the main use case of the first user |

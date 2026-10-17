@@ -1,0 +1,348 @@
+.back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--text);
+}
+
+/* Settings page card */
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
+.cardText {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.cardText h2 {
+  margin-bottom: 4px;
+}
+
+.cardSummary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cardSummary strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Servers page */
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.panelHead h2 {
+  margin-bottom: 2px;
+}
+
+.summary {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 640px;
+  padding: 8px 0 4px;
+  color: var(--text-muted);
+}
+
+.empty p {
+  margin: 0;
+}
+
+.empty strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Columns shared by the header line and the rows. */
+.head,
+.row {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) minmax(150px, 1fr) 90px 100px 72px;
+  column-gap: 18px;
+  align-items: center;
+}
+
+.head {
+  padding: 8px 14px 8px 17px;
+  font-size: 12px;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  position: relative;
+  row-gap: 6px;
+  padding: 12px 14px 12px 17px;
+  border-bottom: 1px solid var(--line);
+}
+
+.row:has(button) {
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+/* Status bar on the left edge. */
+.row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--state);
+}
+
+.enabled {
+  --state: var(--ok);
+}
+
+.disabled {
+  --state: var(--text-faint);
+}
+
+.failing {
+  --state: #ef6b6b;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nameLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.name {
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  margin-right: 2px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+button.name {
+  cursor: pointer;
+}
+
+button.name:hover {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  text-underline-offset: 3px;
+}
+
+button.name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.disabled .name {
+  color: var(--text-muted);
+}
+
+.hostLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.host {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.ssl,
+.noSsl {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.ssl {
+  color: var(--ok);
+}
+
+.noSsl {
+  color: var(--warn);
+}
+
+.cell {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cellLabel {
+  display: none;
+}
+
+.connections {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.connections strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.meter {
+  display: block;
+  width: 100%;
+  max-width: 140px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ok);
+  transition: width 0.4s ease;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lastError {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.failing .lastError {
+  color: #ef9a9a;
+}
+
+/* Test result, save error and hints on separate lines when they do not fit on one. */
+.messages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* Number with its unit on the same line, also on phones. */
+.withUnit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.unitInput {
+  width: 140px;
+}
+
+@media (max-width: 860px) {
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .main {
+    grid-column: 1;
+  }
+
+  .actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .cell {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .cellLabel {
+    display: inline;
+    flex: none;
+    width: 86px;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .connections {
+    flex: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .panelHead > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .row {
+    padding: 12px 4px 12px 13px;
+  }
+
+  .card > a {
+    width: 100%;
+    justify-content: center;
+  }
+}

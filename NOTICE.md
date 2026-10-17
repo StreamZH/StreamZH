@@ -21,6 +21,8 @@ here with the source path, so every change can be traced back.
 | Dapper | Apache-2.0 |
 | FluentMigrator | Apache-2.0 |
 | Microsoft.Data.Sqlite / SQLite | MIT / Public Domain |
+| MailKit, MimeKit (email notifications) | MIT |
+| BouncyCastle.Cryptography (used by MimeKit) | MIT |
 | React, React Router, TanStack Query | MIT |
 | @microsoft/signalr | MIT |
 | Geist, Geist Mono | SIL Open Font License 1.1 |

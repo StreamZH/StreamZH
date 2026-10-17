@@ -288,7 +288,15 @@ function ReleaseRow({ release }: { release: Release }) {
       )}
       {grab.isSuccess && (
         <p className={styles.rowNote}>
-          Saved as <code>{grab.data.fileName}</code> in the NZB folder.
+          {grab.data.folder.replaceAll('\\', '/').endsWith('nzb-queue') ? (
+            <>
+              Added to the download queue. Follow it under <a href="/activity">Activity</a>.
+            </>
+          ) : (
+            <>
+              Saved as <code>{grab.data.fileName}</code> in the NZB folder.
+            </>
+          )}
         </p>
       )}
       {grab.error && <p className={`${ui.error} ${styles.rowNote}`}>{grab.error.message}</p>}

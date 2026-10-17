@@ -279,8 +279,8 @@ function Results({
       <div className={styles.empty}>
         <p className={styles.emptyTitle}>Find any release</p>
         <p className={ui.muted}>
-          Type a title or a release name and press Search. Narrow it down by type, category or indexer. Results can be grabbed straight into the NZB
-          folder.
+          Type a title or a release name and press Search. Narrow it down by type, category or indexer. Grabbed results go to the download queue
+          (Activity).
         </p>
       </div>
     )

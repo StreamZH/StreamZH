@@ -1,4 +1,4 @@
-import { ApiError, request, unauthorizedEvent } from './client'
+import { ApiError, apiUrl, request, unauthorizedEvent } from './client'
 import type { MediaType } from './library'
 
 export type DownloadStatus =
@@ -119,7 +119,7 @@ async function upload(file: File, title?: string, category?: DownloadCategory): 
   form.set('file', file)
   if (title) form.set('title', title)
   if (category) form.set('category', category)
-  const response = await fetch('/api/v1/download', { method: 'POST', credentials: 'same-origin', body: form })
+  const response = await fetch(apiUrl('/download'), { method: 'POST', credentials: 'same-origin', body: form })
   if (response.status === 401) window.dispatchEvent(new Event(unauthorizedEvent))
   if (!response.ok) {
     let problem: { title?: string; detail?: string; errors?: Record<string, string[]> } = {}

@@ -28,15 +28,8 @@ export function formatElapsed(ms: number): string {
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
 }
 
-export function relativeTime(value: string | null | undefined): string {
-  if (!value) return ''
-  const seconds = (Date.now() - new Date(value).getTime()) / 1000
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h ago`
-  const date = new Date(value)
-  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
-}
+/** "3 min ago"; follows Settings → UI (see lib/format). */
+export { relativeTime } from '../lib/format'
 
 export function joinParts(...parts: (string | null | undefined | false)[]): string {
   return parts.filter(Boolean).join(' · ')

@@ -1,3 +1,5 @@
+import { withBase } from '../lib/urlBase'
+
 export interface SystemStatus {
   appName: string
   version: string
@@ -19,17 +21,9 @@ export interface AuthState {
   authenticated: boolean
   user: UserInfo | null
   instanceName: string
+  /** False for sessions without a sign-in cookie (Basic, External, local network): no "Sign out". */
+  canSignOut: boolean
 }
-
-export interface GeneralSettings {
-  instanceName: string
-  logLevel: string
-  apiKey: string
-  dataDirectory: string
-  logDirectory: string
-}
-
-export const logLevels = ['Trace', 'Debug', 'Information', 'Warning', 'Error'] as const
 
 /** Error from the API, with field errors for validation problems (400). */
 export class ApiError extends Error {
@@ -43,11 +37,16 @@ export class ApiError extends Error {
   }
 }
 
+/** Path of an API resource below the URL base, for links and downloads: apiUrl('/system/logs/files/x'). */
+export function apiUrl(path: string): string {
+  return withBase(`/api/v1${path}`)
+}
+
 /** Fired when a request comes back 401, so the app can show the login page. */
 export const unauthorizedEvent = 'streamzh:unauthorized'
 
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, {
+  const response = await fetch(apiUrl(path), {
     method,
     credentials: 'same-origin',
     headers: {
@@ -75,11 +74,9 @@ export async function request<T>(method: string, path: string, body?: unknown): 
     throw new ApiError(response.status, message, problem.errors ?? {})
   }
 
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  return (await response.json()) as T
+  // 204, or 202 Accepted without a body (restart, shutdown).
+  const text = response.status === 204 ? '' : await response.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 export const api = {
@@ -90,10 +87,4 @@ export const api = {
   logout: () => request<void>('POST', '/auth/logout'),
 
   systemStatus: () => request<SystemStatus>('GET', '/system/status'),
-  logs: (lines = 300) => request<{ lines: string[] }>('GET', `/system/logs?lines=${lines}`),
-
-  generalSettings: () => request<GeneralSettings>('GET', '/settings/general'),
-  saveGeneralSettings: (instanceName: string, logLevel: string) =>
-    request<void>('PUT', '/settings/general', { instanceName, logLevel }),
-  regenerateApiKey: () => request<{ apiKey: string }>('POST', '/settings/apikey'),
 }

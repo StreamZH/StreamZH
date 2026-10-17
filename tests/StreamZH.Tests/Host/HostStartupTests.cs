@@ -106,6 +106,50 @@ public sealed class HostStartupTests : IDisposable
     }
 
     [Fact]
+    public async Task A_restart_returns_the_state_for_the_next_run_and_a_busy_port_falls_back()
+    {
+        var port = FreePort();
+        _config.Set(ConfigKeys.BindAddress, "127.0.0.1");
+        _config.Set(ConfigKeys.Port, port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var first = Build(null, out var running);
+        var lifecycle = first.Services.GetRequiredService<AppLifecycle>();
+        var run = first.RunUntilStoppedAsync(running, new MemoryStream());
+        Assert.True(lifecycle.Restart("test"));
+        Assert.False(lifecycle.Shutdown("test"));
+        var next = await run.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.NotNull(next);
+        Assert.False(next.UseLastGood);
+        Assert.Equal(port, next.LastGood.Port);
+
+        // The new port is taken: the next run gives up on it and starts again with the last good values.
+        using var blocker = new TcpListener(IPAddress.Loopback, 0);
+        blocker.Start();
+        _config.Set(ConfigKeys.Port, ((IPEndPoint)blocker.LocalEndpoint).Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var second = Build(next, out running);
+        var fallback = await second.RunUntilStoppedAsync(running, new MemoryStream()).WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.NotNull(fallback);
+        Assert.True(fallback.UseLastGood);
+        Assert.Equal(port, fallback.LastGood.Port);
+        Assert.Contains("Could not listen", fallback.BindError, StringComparison.Ordinal);
+
+        var third = Build(fallback, out running);
+        Assert.True(running.Fallback);
+        Assert.Equal(port, running.Values.Port);
+        await third.DisposeAsync();
+    }
+
+    private WebApplication Build(RestartState? previous, out RunningHost running)
+    {
+        var builder = WebApplication.CreateBuilder();
+        running = builder.UseStreamZhHost(_config, previous);
+        builder.Services.AddSingleton<AppLifecycle>();
+        return builder.Build();
+    }
+
+    [Fact]
     public void Index_page_gets_the_url_base()
     {
         const string html = "<!doctype html><html><head><meta charset=\"UTF-8\" /></head><body></body></html>";

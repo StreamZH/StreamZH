@@ -22,7 +22,7 @@ import form from '../indexers/Form.module.css'
 import { Advanced, AdvancedHint, AdvancedToggle } from '../lib/Advanced'
 import { SettingsPage } from '../settings/SettingsKit'
 import { advancedLabel, setAdvanced } from '../lib/advancedMode'
-import { formatDate } from '../lib/format'
+import { formatDate, formatTime } from '../lib/format'
 import page from './Page.module.css'
 import styles from './UsenetServers.module.css'
 
@@ -178,10 +178,6 @@ function ServerList({ canEdit }: { canEdit: boolean }) {
       {view.kind === 'form' && <ServerForm key={view.server.id} server={view.server} canEdit={canEdit} onClose={close} />}
     </section>
   )
-}
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
 function ServerRow({

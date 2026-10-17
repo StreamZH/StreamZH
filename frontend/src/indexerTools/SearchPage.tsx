@@ -17,7 +17,7 @@ import {
 } from '../api/search'
 import ui from '../components/ui.module.css'
 import page from '../pages/Page.module.css'
-import { formatBytes } from '../lib/format'
+import { formatBytes, formatDateTime } from '../lib/format'
 import MultiSelect, { type MultiOption } from './MultiSelect'
 import Toasts, { type ToastMessage } from './Toast'
 import styles from './IndexerTools.module.css'
@@ -458,7 +458,7 @@ function ReleaseRow({
         {release.title}
       </span>
       <span className={styles.metaCells}>
-        <span role="cell" className={`${styles.cell} ${styles.num}`} title={new Date(release.publishDate).toLocaleString()}>
+        <span role="cell" className={`${styles.cell} ${styles.num}`} title={formatDateTime(release.publishDate)}>
           {formatAgeHours(release.ageHours)}
         </span>
         <span role="cell" className={`${styles.cell} ${styles.num}`}>

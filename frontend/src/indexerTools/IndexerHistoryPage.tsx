@@ -10,6 +10,7 @@ import {
 } from '../api/indexerActivity'
 import { indexerKeys, indexersApi } from '../api/indexers'
 import ui from '../components/ui.module.css'
+import { formatDateTime, relativeTime } from '../lib/format'
 import page from '../pages/Page.module.css'
 import styles from './IndexerTools.module.css'
 
@@ -55,15 +56,6 @@ function EventIcon({ type }: { type: IndexerEventType }) {
       {eventIcons[type] ?? eventIcons.query}
     </svg>
   )
-}
-
-function relativeDate(value: string): string {
-  const seconds = (Date.now() - new Date(value).getTime()) / 1000
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h ago`
-  const date = new Date(value)
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatElapsed(ms: number): string {
@@ -206,8 +198,8 @@ function HistoryRow({ record }: { record: IndexerHistoryRecord }) {
   const status = record.successful ? 'Successful' : `Failed: ${record.error ?? 'unknown error'}`
   return (
     <div className={`${styles.historyRow} ${record.successful ? '' : styles.failedRow}`} role="row">
-      <span role="cell" className={styles.dateCell} title={new Date(record.date).toLocaleString()}>
-        {relativeDate(record.date)}
+      <span role="cell" className={styles.dateCell} title={formatDateTime(record.date)}>
+        {relativeTime(record.date)}
       </span>
       <span role="cell" className={styles.historyIndexer}>
         {record.indexer}

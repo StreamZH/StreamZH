@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { indexerActivityApi, indexerActivityKeys, type IndexerStats, type IndexerStatsRow } from '../api/indexerActivity'
 import ui from '../components/ui.module.css'
+import { formatDayMonth } from '../lib/format'
 import page from '../pages/Page.module.css'
 import styles from './IndexerTools.module.css'
 
@@ -36,7 +37,7 @@ function fillDays(stats: IndexerStats, days: number): { date: string; queries: n
 }
 
 function shortDate(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return formatDayMonth(date)
 }
 
 /** How often each indexer was asked, how often it delivered and how fast it answers (like Prowlarr's Stats). */

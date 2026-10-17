@@ -171,10 +171,13 @@ public static class HostStartup
         ArgumentNullException.ThrowIfNull(running);
         ArgumentNullException.ThrowIfNull(logs);
         RestartState? next = null;
+
+        // RunAsync disposes the services when it ends; ask for the lifecycle before.
+        var lifecycle = app.Services.GetRequiredService<AppLifecycle>();
         try
         {
             await app.RunAsync();
-            if (app.Services.GetRequiredService<AppLifecycle>().RestartRequested)
+            if (lifecycle.RestartRequested)
             {
                 next = new RestartState(running.Run, running.Values, false, null);
             }

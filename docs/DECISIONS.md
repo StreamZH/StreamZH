@@ -4,6 +4,9 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Quality and language ids identical to Radarr | Profiles and history can be imported from Radarr/Sonarr later (0.8) |
+| 2026-10-17 | One quality profile model for all media types, with required language and "prefer dual language" | German scene releases (German.DL) are the main use case of the first user |
+| 2026-10-17 | Default profile "Deutsch 1080p" in the test phase | Matches the owner's library; public 1.0 will default to "HD-1080p" with original language |
 | 2026-10-17 | TMDB is the single metadata source for movies and series; each user brings their own free TMDB key | One source for both types, no proxy server to run; TVDB id is still stored for compatibility |
 | 2026-10-17 | Removing an item from the library never deletes files; file deletion becomes an explicit option later | Safe default while the app is young |
 | 2026-10-17 | Posters load directly from the TMDB image CDN; local image cache later | Keeps 0.2 small; cache needed for offline use and privacy |

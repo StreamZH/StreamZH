@@ -5,7 +5,7 @@ export interface HistoryRecord {
   id: number
   date: string
   eventType: 'Grabbed'
-  mediaType: MediaType
+  mediaType: MediaType | null
   movieId: number | null
   seriesId: number | null
   episodeIds: number[]

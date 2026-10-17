@@ -24,7 +24,8 @@ public sealed record HistoryItem
     public int Id { get; init; }
     public DateTime Date { get; init; }
     public HistoryEventType EventType { get; init; }
-    public MediaType MediaType { get; init; }
+    /// <summary>Null for a grab from the Search page that belongs to no library item (stored as 0).</summary>
+    public MediaType? MediaType { get; init; }
     public int? MovieId { get; init; }
     public int? SeriesId { get; init; }
     public IReadOnlyList<int> EpisodeIds { get; init; } = [];
@@ -57,7 +58,7 @@ public sealed class HistoryRepository(Database database)
             {
                 item.Date,
                 EventType = (int)item.EventType,
-                MediaType = (int)item.MediaType,
+                MediaType = item.MediaType is { } mediaType ? (int)mediaType : 0,
                 item.MovieId,
                 item.SeriesId,
                 EpisodeIds = item.EpisodeIds.Count == 0 ? null : JoinIds(item.EpisodeIds),
@@ -134,7 +135,7 @@ public sealed class HistoryRepository(Database database)
             Id = (int)Id,
             Date = DateTime.SpecifyKind(Date, DateTimeKind.Utc),
             EventType = (HistoryEventType)EventType,
-            MediaType = (MediaType)MediaType,
+            MediaType = MediaType == 0 ? null : (MediaType)MediaType,
             MovieId = MovieId is { } m ? (int)m : null,
             SeriesId = SeriesId is { } s ? (int)s : null,
             EpisodeIds = SplitIds(EpisodeIds),

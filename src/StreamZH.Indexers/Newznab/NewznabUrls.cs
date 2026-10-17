@@ -38,7 +38,12 @@ public static partial class NewznabUrls
 
         if (categories is not null)
         {
-            url.Append("&cat=").Append(string.Join(',', categories.Distinct().Select(c => c.ToString(CultureInfo.InvariantCulture))));
+            // No categories (a free text search over everything): leave cat= out, an empty one confuses some indexers.
+            if (categories.Count > 0)
+            {
+                url.Append("&cat=").Append(string.Join(',', categories.Distinct().Select(c => c.ToString(CultureInfo.InvariantCulture))));
+            }
+
             url.Append("&extended=1");
         }
 

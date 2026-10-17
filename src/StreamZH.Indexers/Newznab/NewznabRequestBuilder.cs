@@ -138,6 +138,37 @@ public static partial class NewznabRequestBuilder
         return Plans(suffixes.Select(suffix => Tiers(TvIdQueries(criteria, categories, caps, suffix), TvTitleQueries(criteria, categories, caps, suffix))));
     }
 
+    /// <summary>
+    /// Free text search (the Search page): t=search, t=movie or t=tvsearch with q= as typed (no title cleaning).
+    /// Movie and TV fall back to t=search when the indexer has no text search for them. One plan with one query.
+    /// </summary>
+    /// <param name="defaultCategories">Used when the criteria name no categories; empty means no category filter.</param>
+    public static IReadOnlyList<NewznabSearchPlan> ForText(TextSearchCriteria criteria, IReadOnlyList<int> defaultCategories, NewznabCaps caps)
+    {
+        ArgumentNullException.ThrowIfNull(criteria);
+        var query = criteria.Query.Trim();
+        var hasQuery = query.Length > 0;
+
+        bool Usable(IReadOnlyList<string>? parameters) => parameters is not null && (!hasQuery || NewznabCaps.Supports(parameters, "q"));
+
+        var function = criteria.Type switch
+        {
+            TextSearchType.Movie when Usable(caps.MovieSearchParams) => "movie",
+            TextSearchType.Tv when Usable(caps.TvSearchParams) => "tvsearch",
+            _ when Usable(caps.SearchParams) => "search",
+            _ => null,
+        };
+
+        if (function is null)
+        {
+            return [];
+        }
+
+        var categories = criteria.Categories.Count > 0 ? criteria.Categories : defaultCategories;
+        var parameters = hasQuery ? $"&q={Uri.EscapeDataString(query)}" : string.Empty;
+        return [new NewznabSearchPlan([[new NewznabQuery(function, [.. categories.Distinct()], parameters)]])];
+    }
+
     /// <summary>The newest releases (RSS): t=search without a query.</summary>
     public static NewznabQuery Recent(IReadOnlyList<int> categories) => new("search", categories, string.Empty);
 

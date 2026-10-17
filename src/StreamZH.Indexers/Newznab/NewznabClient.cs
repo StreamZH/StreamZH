@@ -25,6 +25,12 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
 
     public const int MaxResultsPerQuery = 1000;
 
+    /// <summary>
+    /// Pages per free text query (Search page). Fewer than for a library search: a broad term would otherwise spend
+    /// ten API hits per indexer on results nobody scrolls to. Without a query (newest releases) only one page is read.
+    /// </summary>
+    public const int MaxPagesPerTextQuery = 3;
+
     public const long MaxNzbBytes = 50L * 1024 * 1024;
 
     public const long MaxApiResponseBytes = 16L * 1024 * 1024;
@@ -52,6 +58,7 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
         {
             MovieSearchCriteria movie => NewznabRequestBuilder.ForMovie(movie, indexer.Categories, caps),
             EpisodeSearchCriteria episode => NewznabRequestBuilder.ForEpisodes(episode, indexer.TvCategories, caps),
+            TextSearchCriteria text => NewznabRequestBuilder.ForText(text, TextDefaultCategories(indexer, text.Type), caps),
             _ => throw new ArgumentException($"Unsupported search criteria {criteria.GetType().Name}.", nameof(criteria)),
         };
 
@@ -61,6 +68,13 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
             return [];
         }
 
+        var maxPages = criteria switch
+        {
+            TextSearchCriteria { Query: var q } when string.IsNullOrWhiteSpace(q) => 1,
+            TextSearchCriteria => MaxPagesPerTextQuery,
+            _ => MaxPagesPerQuery,
+        };
+
         var results = new List<ReleaseInfo>();
         foreach (var plan in plans)
         {
@@ -69,7 +83,7 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
                 var found = false;
                 foreach (var query in tier)
                 {
-                    var releases = await RunQueryAsync(indexer, query, caps.PageSize, MaxPagesPerQuery, cancellationToken);
+                    var releases = await RunQueryAsync(indexer, query, caps.PageSize, maxPages, cancellationToken);
                     results.AddRange(releases);
                     found |= releases.Count > 0;
                 }
@@ -415,6 +429,13 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
 
     private static bool HasApiKey(Uri url) =>
         url.Query.Contains("apikey=", StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<int> TextDefaultCategories(IndexerDefinition indexer, TextSearchType type) => type switch
+    {
+        TextSearchType.Movie => indexer.Categories,
+        TextSearchType.Tv => indexer.TvCategories,
+        _ => [],
+    };
 
     private static List<ReleaseInfo> Finish(IndexerDefinition indexer, IEnumerable<ReleaseInfo> releases)
     {

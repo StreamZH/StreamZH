@@ -28,6 +28,10 @@ import UiPage from './settings/UiPage'
 import QualityPage from './settings/QualityPage'
 import SettingsOverview from './settings/SettingsOverview'
 import LogsPage from './system/LogsPage'
+import CalendarPage from './calendar/CalendarPage'
+import WantedPage from './wanted/WantedPage'
+import FileRenamerPage from './tools/FileRenamerPage'
+import ImportListsPage from './settings/ImportListsPage'
 import BackupPage from './system/BackupPage'
 import StatusPage from './system/StatusPage'
 import TasksPage from './system/TasksPage'
@@ -55,6 +59,12 @@ createRoot(document.getElementById('root')!).render(
             <Route path="library/series" element={<LibraryPage key="series" type="Series" />} />
             <Route path="library/series/:id" element={<SeriesDetail />} />
             <Route path="library/import" element={<ImportPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="wanted" element={<Navigate to="/wanted/missing" replace />} />
+            <Route path="wanted/missing" element={<WantedPage key="missing" />} />
+            <Route path="wanted/cutoff" element={<WantedPage key="cutoff" />} />
+            <Route path="tools" element={<Navigate to="/tools/renamer" replace />} />
+            <Route path="tools/renamer" element={<FileRenamerPage />} />
             <Route path="activity" element={<ActivityPage />} />
             <Route path="indexers" element={<Indexers />} />
             <Route path="indexers/search" element={<SearchPage />} />
@@ -62,6 +72,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="indexers/history" element={<IndexerHistoryPage />} />
             <Route path="settings" element={<SettingsOverview />} />
             <Route path="settings/media-management" element={<MediaManagementPage />} />
+            <Route path="settings/import-lists" element={<ImportListsPage />} />
             <Route path="settings/profiles" element={<Profiles />} />
             <Route path="settings/quality" element={<QualityPage />} />
             <Route path="settings/indexers" element={<IndexerOptionsPage />} />

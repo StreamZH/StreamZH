@@ -8,6 +8,7 @@ export interface SettingsArea {
 
 export const settingsAreas: SettingsArea[] = [
   { to: '/settings/media-management', label: 'Media Management', description: 'Root folders, naming, importing, file handling and permissions.' },
+  { to: '/settings/import-lists', label: 'Import lists', description: 'Add movies and series automatically from TMDB lists, Trakt, Plex watchlists and more.' },
   { to: '/settings/profiles', label: 'Profiles', description: 'Quality profiles: which qualities and languages to grab and until when to upgrade.' },
   { to: '/settings/quality', label: 'Quality', description: 'File size limits per quality.' },
   { to: '/settings/indexers', label: 'Indexers', description: 'Release rules for all indexers: minimum age, retention, size, RSS sync and release profiles.' },

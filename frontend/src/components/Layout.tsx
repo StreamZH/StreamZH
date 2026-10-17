@@ -31,6 +31,16 @@ const sections: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: '/library/movies', label: 'Movies', icon: 'movies', color: 'var(--movies)', count: 'movies' },
       { to: '/library/series', label: 'Series', icon: 'series', color: 'var(--series)', count: 'series' },
+      { to: '/calendar', label: 'Calendar', icon: 'calendar' },
+      {
+        to: '/wanted',
+        label: 'Wanted',
+        icon: 'wanted',
+        children: [
+          { to: '/wanted/missing', label: 'Missing' },
+          { to: '/wanted/cutoff', label: 'Cutoff unmet' },
+        ],
+      },
     ],
   },
   {
@@ -49,6 +59,7 @@ const sections: { title?: string; items: NavItem[] }[] = [
         ],
       },
       { to: '/settings', label: 'Settings', icon: 'settings', children: settingsAreas.map(({ to, label }) => ({ to, label })) },
+      { to: '/tools', label: 'Tools', icon: 'tools', children: [{ to: '/tools/renamer', label: 'File renamer' }] },
       { to: '/system', label: 'System', icon: 'system', children: systemAreas.map(({ to, label }) => ({ to, label })) },
     ],
   },

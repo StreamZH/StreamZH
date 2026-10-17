@@ -184,7 +184,7 @@ public sealed class SearchTestBed : IDisposable
     public void UseBuiltInClient() => Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BuiltInValue);
 
     public AutomaticSearchService Automatic() =>
-        new(Search(), Grab(), Movies, Series, History, Events, NullLogger<AutomaticSearchService>.Instance, Time);
+        new(Search(), Grab(), Movies, Series, History, Downloads, Events, NullLogger<AutomaticSearchService>.Instance, Engine, Time);
 
     public IndexerDefinition AddIndexer(int id, string name, int priority = 25)
     {

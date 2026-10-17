@@ -8,6 +8,14 @@ import ReleaseSearchModal from './ReleaseSearchModal'
 
 export type FinishedEvent = SearchFinished & { at: number }
 
+function finishedNote(done: SearchFinished): { text: string; ok?: boolean } {
+  if (done.grabbed > 0) return { text: `Grabbed ${done.grabbed} release${done.grabbed === 1 ? '' : 's'}`, ok: true }
+  if ((done.skipped ?? 0) > 0 && done.skipReason === 'inQueue') return { text: 'Already in the download queue, see Activity', ok: true }
+  if ((done.skipped ?? 0) > 0 && done.skipReason === 'recentlyGrabbed')
+    return { text: 'Grabbed in the last 12 hours, not searched again. Use Manual search to grab another release.' }
+  return { text: 'Search done, nothing suitable found' }
+}
+
 /**
  * "Search" queues an automatic search (best release is grabbed in the background) and shows how it went;
  * "Manual search" opens the release table.
@@ -38,7 +46,7 @@ export default function SearchButtons(props: {
 
   let note: { text: string; ok?: boolean } | null = null
   if (run.error) note = { text: run.error.message }
-  else if (done) note = done.grabbed > 0 ? { text: `Grabbed ${done.grabbed} release${done.grabbed === 1 ? '' : 's'}`, ok: true } : { text: 'Search done, nothing suitable found' }
+  else if (done) note = finishedNote(done)
   else if (run.isSuccess) note = { text: run.data.queued > 0 ? 'Searching in the background…' : 'A search is already queued' }
 
   const size = props.small ? ` ${styles.small}` : ''

@@ -106,6 +106,9 @@ export interface SearchFinished {
   id: number | null
   searched: number
   grabbed: number
+  /** Items not searched: already in the download queue, or (NZB folder) grabbed in the last 12 hours. */
+  skipped?: number
+  skipReason?: 'inQueue' | 'recentlyGrabbed' | null
 }
 
 function searchQuery(target: SearchTarget): string {

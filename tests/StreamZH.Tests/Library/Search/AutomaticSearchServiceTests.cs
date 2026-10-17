@@ -131,6 +131,51 @@ public sealed class AutomaticSearchServiceTests : IDisposable
         Assert.Equal(3, _bed.NzbFiles().Length);
     }
 
+    [Fact]
+    public async Task With_the_built_in_engine_only_a_movie_in_the_queue_is_skipped()
+    {
+        _bed.UseBuiltInClient();
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Returns(1, _bed.Release("Dune.2021.German.DL.1080p.BluRay.x264-GRP", 12));
+
+        Assert.Equal(1, await _bed.Automatic().SearchMoviesAsync([_bed.Dune.Id]));
+        Assert.Single(_bed.Engine.Active());
+
+        // Still in the queue: no new search, and the button can say why.
+        _bed.Finished.Clear();
+        Assert.Equal(0, await _bed.Automatic().SearchMoviesAsync([_bed.Dune.Id]));
+        Assert.Single(_bed.Client.Searches);
+        var skipped = Assert.Single(_bed.Finished);
+        Assert.Equal((1, AutomaticSearchService.SkipInQueue), (skipped.Skipped, skipped.SkipReason));
+
+        // Removed from the queue (or it went to the old NZB folder): a grab minutes ago no longer blocks the search.
+        await _bed.Engine.DeleteAsync(_bed.Engine.Active().Single().Id, deleteFiles: true);
+        Assert.Equal(1, await _bed.Automatic().SearchMoviesAsync([_bed.Dune.Id]));
+        Assert.Equal(2, _bed.Client.Searches.Count);
+    }
+
+    [Fact]
+    public async Task With_the_built_in_engine_episodes_in_the_queue_are_skipped()
+    {
+        _bed.UseBuiltInClient();
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Handlers[1] = (criteria, _) =>
+        {
+            var episode = (EpisodeSearchCriteria)criteria;
+            return Task.FromResult<IReadOnlyList<ReleaseInfo>>(
+                [.. episode.EpisodeNumbers.Select(e => _bed.Release($"Breaking.Bad.S{episode.SeasonNumber:00}E{e:00}.German.DL.1080p.WEB.h264-GRP", 2))]);
+        };
+        var e2 = _bed.Episode(1, 2).Id;
+        var e3 = _bed.Episode(1, 3).Id;
+
+        Assert.Equal(1, await _bed.Automatic().SearchEpisodesAsync(_bed.Show.Id, [e2]));
+        _bed.Finished.Clear();
+        Assert.Equal(1, await _bed.Automatic().SearchEpisodesAsync(_bed.Show.Id, [e2, e3]));
+        Assert.Equal(2, _bed.Engine.Active().Count);
+        var finished = Assert.Single(_bed.Finished);
+        Assert.Equal((1, AutomaticSearchService.SkipInQueue), (finished.Skipped, finished.SkipReason));
+    }
+
     private static (MediaType, int?, int, int) Fields(AutomaticSearchFinished e) => (e.MediaType, e.Id, e.Searched, e.Grabbed);
 
     public void Dispose() => _bed.Dispose();

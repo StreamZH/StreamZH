@@ -37,7 +37,9 @@ public sealed record GrabResult(string Title, string Indexer, string NzbPath);
 public sealed record ReleaseGrabbed(MediaType? MediaType, int? MovieId, int? SeriesId, string Title, string Indexer) : IAppEvent;
 
 /// <summary>An automatic search job finished. <see cref="Id"/> is the movie or series id, null for "all missing movies".</summary>
-public sealed record AutomaticSearchFinished(MediaType MediaType, int? Id, int Searched, int Grabbed) : IAppEvent;
+/// <param name="Skipped">Items not searched because they are already downloading (or, with the blackhole folder, were grabbed recently).</param>
+/// <param name="SkipReason">"inQueue" or "recentlyGrabbed" (see <see cref="AutomaticSearchService"/>), null when nothing was skipped.</param>
+public sealed record AutomaticSearchFinished(MediaType MediaType, int? Id, int Searched, int Grabbed, int Skipped = 0, string? SkipReason = null) : IAppEvent;
 
 /// <summary>
 /// The latest search results for 30 minutes, so the UI can grab a release by (indexer id, guid)

@@ -5,6 +5,7 @@
 
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
 using StreamZH.Core.Indexers;
 using StreamZH.Core.Media;
@@ -24,17 +25,64 @@ public sealed class AutomaticSearchService(
     MovieRepository movies,
     SeriesRepository series,
     HistoryRepository history,
+    DownloadSettings downloadSettings,
     IEventBus events,
     ILogger<AutomaticSearchService> logger,
+    IDownloadQueue? queue = null,
     TimeProvider? timeProvider = null)
 {
     /// <summary>
-    /// Items grabbed this recently are not searched again. A placeholder until the download queue (0.5)
-    /// can tell whether a grab is still downloading.
+    /// With the blackhole folder StreamZH cannot see whether a grab is still downloading: items grabbed this recently are
+    /// not searched again. With the built-in engine only items that are in its queue are skipped (like Radarr's "already
+    /// in the queue"), so a grab that went to the folder, failed or was removed does not block a new search.
     /// </summary>
     public static readonly TimeSpan RecentGrabWindow = TimeSpan.FromHours(12);
 
+    public const string SkipInQueue = "inQueue";
+    public const string SkipRecentlyGrabbed = "recentlyGrabbed";
+
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
+    // Items of the current run that were skipped, and why (for the "Search" button's note).
+    private int _skipped;
+    private string? _skipReason;
+
+    private bool UsesQueue => downloadSettings.Client == DownloadClientKind.BuiltIn && queue is not null;
+
+    private string? MovieSkipReason(int movieId)
+    {
+        if (UsesQueue)
+        {
+            return queue!.Active().Any(d => d.Link.MovieId == movieId) ? SkipInQueue : null;
+        }
+
+        return history.MovieHasEventSince(movieId, HistoryEventType.Grabbed, Since()) ? SkipRecentlyGrabbed : null;
+    }
+
+    /// <summary>Episodes of the series that are not searched now: in the queue (built-in engine) or grabbed recently (folder).</summary>
+    private IReadOnlySet<int> BlockedEpisodes(int seriesId)
+    {
+        if (UsesQueue)
+        {
+            return queue!.Active().Where(d => d.Link.SeriesId == seriesId).SelectMany(d => d.Link.EpisodeIds).ToHashSet();
+        }
+
+        return history.EpisodesWithEventSince(seriesId, HistoryEventType.Grabbed, Since());
+    }
+
+    private void Skip(string reason, int count = 1)
+    {
+        _skipped += count;
+        _skipReason = reason;
+    }
+
+    private AutomaticSearchFinished Finished(MediaType type, int? id, int searched, int grabbed)
+    {
+        var finished = new AutomaticSearchFinished(type, id, searched, grabbed, _skipped, _skipReason);
+        _skipped = 0;
+        _skipReason = null;
+        return finished;
+    }
 
     /// <summary>Searches the movies and grabs the best release for each. Returns how many were grabbed.</summary>
     public async Task<int> SearchMoviesAsync(IReadOnlyCollection<int> movieIds, CancellationToken cancellationToken = default)
@@ -46,7 +94,7 @@ public sealed class AutomaticSearchService(
             grabbed += await SearchMovieCoreAsync(id, cancellationToken) ? 1 : 0;
         }
 
-        await events.PublishAsync(new AutomaticSearchFinished(MediaType.Movie, movieIds.Count == 1 ? movieIds.First() : null, movieIds.Count, grabbed), cancellationToken);
+        await events.PublishAsync(Finished(MediaType.Movie, movieIds.Count == 1 ? movieIds.First() : null, movieIds.Count, grabbed), cancellationToken);
         return grabbed;
     }
 
@@ -67,7 +115,7 @@ public sealed class AutomaticSearchService(
             grabbed += await SearchMovieCoreAsync(id, cancellationToken) ? 1 : 0;
         }
 
-        await events.PublishAsync(new AutomaticSearchFinished(MediaType.Movie, null, missing.Count, grabbed), cancellationToken);
+        await events.PublishAsync(Finished(MediaType.Movie, null, missing.Count, grabbed), cancellationToken);
         return grabbed;
     }
 
@@ -81,7 +129,7 @@ public sealed class AutomaticSearchService(
             .ToHashSet();
 
         var grabbed = await SearchEpisodesCoreAsync(seriesId, seasonNumber, null, wanted, cancellationToken);
-        await events.PublishAsync(new AutomaticSearchFinished(MediaType.Series, seriesId, wanted.Count, grabbed), cancellationToken);
+        await events.PublishAsync(Finished(MediaType.Series, seriesId, wanted.Count, grabbed), cancellationToken);
         return grabbed;
     }
 
@@ -96,15 +144,24 @@ public sealed class AutomaticSearchService(
             grabbed += await SearchEpisodesCoreAsync(seriesId, season.Key, ids, ids.ToHashSet(), cancellationToken);
         }
 
-        await events.PublishAsync(new AutomaticSearchFinished(MediaType.Series, seriesId, episodes.Count, grabbed), cancellationToken);
+        await events.PublishAsync(Finished(MediaType.Series, seriesId, episodes.Count, grabbed), cancellationToken);
         return grabbed;
     }
 
     private async Task<bool> SearchMovieCoreAsync(int movieId, CancellationToken cancellationToken)
     {
-        if (history.MovieHasEventSince(movieId, HistoryEventType.Grabbed, Since()))
+        if (MovieSkipReason(movieId) is { } reason)
         {
-            logger.LogInformation("Movie {Id} was grabbed in the last {Hours} hours, skipping the search", movieId, RecentGrabWindow.TotalHours);
+            if (reason == SkipInQueue)
+            {
+                logger.LogInformation("Movie {Id} is already in the download queue, skipping the search", movieId);
+            }
+            else
+            {
+                logger.LogInformation("Movie {Id} was grabbed in the last {Hours} hours, skipping the search", movieId, RecentGrabWindow.TotalHours);
+            }
+
+            Skip(reason);
             return false;
         }
 
@@ -132,11 +189,19 @@ public sealed class AutomaticSearchService(
     private async Task<int> SearchEpisodesCoreAsync(
         int seriesId, int seasonNumber, IReadOnlyCollection<int>? episodeIds, IReadOnlySet<int> wanted, CancellationToken cancellationToken)
     {
-        var done = history.EpisodesWithEventSince(seriesId, HistoryEventType.Grabbed, Since());
+        var done = BlockedEpisodes(seriesId);
         var open = wanted.Where(id => !done.Contains(id)).ToHashSet();
+        var blocked = wanted.Count - open.Count;
+        if (blocked > 0)
+        {
+            Skip(UsesQueue ? SkipInQueue : SkipRecentlyGrabbed, blocked);
+        }
+
         if (open.Count == 0)
         {
-            logger.LogInformation("Nothing to search in season {Season} of series {Id} (no wanted episodes or all grabbed recently)", seasonNumber, seriesId);
+            logger.LogInformation(
+                "Nothing to search in season {Season} of series {Id} (no wanted episodes, or all {Reason})",
+                seasonNumber, seriesId, UsesQueue ? "in the download queue" : "grabbed recently");
             return 0;
         }
 

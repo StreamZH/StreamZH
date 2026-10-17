@@ -36,10 +36,13 @@ export function useLiveConnection(): boolean {
       queryClient.setQueryData(queryKeys.jobs, status)
     })
 
-    connection.on('releaseGrabbed', () => void queryClient.invalidateQueries({ queryKey: historyKeys.all }))
-    connection.on('searchFinished', (event: SearchFinished) =>
-      queryClient.setQueryData(releaseKeys.searchFinished(event.mediaType, event.id), { ...event, at: Date.now() }),
-    )
+    // Handlers must not return a value: SignalR treats a return value as a client result and logs an error.
+    connection.on('releaseGrabbed', () => {
+      void queryClient.invalidateQueries({ queryKey: historyKeys.all })
+    })
+    connection.on('searchFinished', (event: SearchFinished) => {
+      queryClient.setQueryData(releaseKeys.searchFinished(event.mediaType, event.id), { ...event, at: Date.now() })
+    })
 
     connection.onreconnecting(() => setConnected(false))
     connection.onreconnected(() => {

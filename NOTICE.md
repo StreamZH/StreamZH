@@ -9,9 +9,9 @@ here with the source path, so every change can be traced back.
 
 | Project | License | Used for | Files in StreamZH |
 |---|---|---|---|
-| [Radarr](https://github.com/Radarr/Radarr) | GPL-3.0 | Quality and language definitions (same ids), quality, language and release-group parser, movie release parser, decision rules, parser test fixtures | `src/StreamZH.Core/Quality/*`, `src/StreamZH.Parsing/*Parser.cs`, `src/StreamZH.Parsing/Internal/*`, `src/StreamZH.Parsing/Releases/*`, `src/StreamZH.Core/Decisions/*`, `tests/StreamZH.Tests/Parsing/*` |
-| [Sonarr](https://github.com/Sonarr/Sonarr) | GPL-3.0 | Episode release parser (SxxEyy, packs, daily, absolute), title normalisation, decision rules, parser test fixtures | `src/StreamZH.Parsing/Releases/*`, `src/StreamZH.Core/Decisions/*`, `tests/StreamZH.Tests/Parsing/*` |
-| [Prowlarr](https://github.com/Prowlarr/Prowlarr) | GPL-3.0 | planned: Newznab capabilities handling | none yet |
+| [Radarr](https://github.com/Radarr/Radarr) | GPL-3.0 | Quality and language definitions (same ids), quality, language and release-group parser, movie release parser, decision rules, Newznab client (caps, requests, RSS parser), release search, parser and indexer test fixtures | `src/StreamZH.Core/Quality/*`, `src/StreamZH.Indexers/Newznab/*`, `src/StreamZH.Library/Search/*`, `tests/StreamZH.Tests/Indexers/*`, `src/StreamZH.Parsing/*Parser.cs`, `src/StreamZH.Parsing/Internal/*`, `src/StreamZH.Parsing/Releases/*`, `src/StreamZH.Core/Decisions/*`, `tests/StreamZH.Tests/Parsing/*` |
+| [Sonarr](https://github.com/Sonarr/Sonarr) | GPL-3.0 | Episode release parser (SxxEyy, packs, daily, absolute), title normalisation, decision rules, TV search requests, episode/season matching | `src/StreamZH.Parsing/Releases/*`, `src/StreamZH.Indexers/Newznab/*`, `src/StreamZH.Library/Search/*`, `src/StreamZH.Core/Decisions/*`, `tests/StreamZH.Tests/Parsing/*` |
+| [Prowlarr](https://github.com/Prowlarr/Prowlarr) | GPL-3.0 | Indexer health back-off (escalation steps) | `src/StreamZH.Library/Indexers/*` |
 
 ## Runtime dependencies
 

@@ -56,7 +56,7 @@ public static class SearchEndpoints
 
             try
             {
-                var result = await search.GrabAsync(request.IndexerId, request.Guid, ct);
+                var result = await search.GrabAsync(request.IndexerId, request.Guid, ct, request.Category);
                 return Results.Ok(new GrabResource(result.Title, result.Indexer, Path.GetFileName(result.NzbPath), Path.GetDirectoryName(result.NzbPath) ?? string.Empty));
             }
             catch (IndexerException ex)

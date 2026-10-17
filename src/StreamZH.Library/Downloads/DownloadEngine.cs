@@ -5,6 +5,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Channels;
 using System.Xml;
 using Microsoft.Extensions.Hosting;
@@ -16,6 +18,7 @@ using StreamZH.Data;
 using StreamZH.Library.Search;
 using StreamZH.Parsing.Releases;
 using StreamZH.Usenet.Nzb;
+using StreamZH.Usenet.Pool;
 
 namespace StreamZH.Library.Downloads;
 
@@ -43,6 +46,12 @@ public enum DownloadActionResult
 /// to cover the missing bytes), or when post-processing reports "Not enough recovery blocks" while volumes are still
 /// held back (then all of them, and post-processing runs once more).
 /// </summary>
+/// <remarks>
+/// The switches of Settings → Downloads act here: categories (folder, priority, post-processing), pause on start,
+/// pre-check (STAT), the number of downloads that get articles at once, propagation delay, duplicate detection,
+/// automatic sorting, unwanted extensions, password-protected RAR files, all par2 volumes at once, paused categories
+/// (scheduler), post-processing workers, the temporary "_UNPACK_" folder and the history cleanup.
+/// </remarks>
 public sealed class DownloadEngine(
     DownloadRepository repository,
     HistoryRepository history,
@@ -53,11 +62,17 @@ public sealed class DownloadEngine(
     IEventBus events,
     IFreeSpaceProvider freeSpace,
     DownloadEngineOptions options,
-    ILogger<DownloadEngine> logger) : BackgroundService, IDownloadQueue
+    ILogger<DownloadEngine> logger,
+    DownloadCategoryService? categoryService = null) : BackgroundService, IDownloadQueue
 {
+    private readonly DownloadCategoryService categories = categoryService
+        ?? new DownloadCategoryService(new DownloadCategoryRepository(repository.Database), settings, Microsoft.Extensions.Logging.Abstractions.NullLogger<DownloadCategoryService>.Instance);
+
     public const int MinPriority = -1;
     public const int MaxPriority = 2;
     private const int MaxWorkers = 500;
+    private const int MaxPreCheckConnections = 50;
+    private const string TemporaryPrefix = "_UNPACK_";
 
     /// <summary>Start of the post-processor's error when the par2 volumes in the work folder cannot repair the damage.</summary>
     public const string NotEnoughRecoveryBlocks = "Not enough recovery blocks";
@@ -72,7 +87,9 @@ public sealed class DownloadEngine(
     private readonly HashSet<ActiveDownload> _dirty = [];
     private readonly ConcurrentQueue<IAppEvent> _outbox = new();
     private readonly ConcurrentQueue<HistoryItem> _historyOutbox = new();
-    private readonly Channel<int> _postProcess = Channel.CreateUnbounded<int>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<int> _postProcess = Channel.CreateUnbounded<int>(new UnboundedChannelOptions { SingleReader = false });
+    private readonly HashSet<string> _pausedCategories = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<Task> _background = [];
     private readonly AsyncPulse _work = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly List<Task> _workers = [];
@@ -81,6 +98,10 @@ public sealed class DownloadEngine(
     private bool _loaded;
     private bool _saveNow;
     private bool _userPaused;
+    private bool _scheduledPause;
+    private bool _pausedOnStart;
+    private int _preChecking;
+    private CancellationToken _stopping = CancellationToken.None;
     private bool _diskPaused;
     private string? _diskMessage;
     private long? _freeBytes;
@@ -162,7 +183,9 @@ public sealed class DownloadEngine(
             }
             else if (_userPaused)
             {
-                message = null;
+                message = _scheduledPause ? "Paused by the scheduler (Settings → Downloads → Scheduling)."
+                    : _pausedOnStart ? "Paused at startup (Settings → Downloads → Queue)."
+                    : null;
             }
             else if (connections == 0 && _order.Any(d => d.IsDownloadPhase))
             {
@@ -179,8 +202,12 @@ public sealed class DownloadEngine(
 
     // ---------------------------------------------------------------- commands
 
-    /// <summary>Parses and stores the NZB and puts it at the end of the queue (within its priority).</summary>
-    /// <exception cref="LibraryException">The NZB is empty or invalid, or it could not be stored.</exception>
+    /// <summary>
+    /// Parses and stores the NZB and puts it at the end of the queue (within its priority), or where automatic sorting
+    /// puts it. The category gives the priority (unless the request has one) and may add it paused; duplicate detection
+    /// and unwanted extensions may tag, pause or fail it right away (a failed one goes to the history as usual).
+    /// </summary>
+    /// <exception cref="LibraryException">The NZB is empty or invalid, the category is unknown, or the NZB could not be stored.</exception>
     public async Task<DownloadItem> AddAsync(DownloadRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -188,7 +215,72 @@ public sealed class DownloadEngine(
         var nzb = ParseNzb(request.Nzb);
         var title = request.Title.Trim() is { Length: > 0 } t ? t
             : nzb.Meta.TryGetValue("title", out var metaTitle) && metaTitle.Length > 0 ? metaTitle : "Download";
-        var priority = Math.Clamp(request.Priority, MinPriority, MaxPriority);
+        DownloadCategoryDefinition category;
+        DownloadCategory kind;
+        if (!string.IsNullOrWhiteSpace(request.CategoryName))
+        {
+            category = categories.Find(request.CategoryName)
+                ?? throw new LibraryException($"There is no download category \"{request.CategoryName.Trim()}\".", LibraryError.Invalid);
+            kind = DownloadCategoryService.KindOf(category.Name);
+        }
+        else
+        {
+            category = categories.Resolve(request.Category, null);
+            kind = request.Category;
+        }
+
+        var startPaused = category.Priority == DownloadCategoryService.PausedPriority;
+        var categoryPriority = category.Priority is { } p && p != DownloadCategoryService.PausedPriority ? p : 0;
+        var priority = Math.Clamp(request.Priority ?? categoryPriority, MinPriority, MaxPriority);
+        var hash = Fingerprint(nzb);
+        var notes = new List<string>();
+        string? failure = null;
+        var duplicate = false;
+
+        if (settings.DuplicateAction != DuplicateAction.Off && FindDuplicate(title, hash) is { } original)
+        {
+            switch (settings.DuplicateAction)
+            {
+                case DuplicateAction.Fail:
+                    failure = $"Duplicate: {original}. Duplicate detection is set to fail (Settings → Downloads); retry to download it anyway.";
+                    break;
+                case DuplicateAction.Pause:
+                    duplicate = true;
+                    startPaused = true;
+                    notes.Add($"Paused, duplicate: {original}.");
+                    break;
+                default:
+                    duplicate = true;
+                    notes.Add($"Duplicate: {original}.");
+                    break;
+            }
+
+            logger.LogInformation("'{Title}' is a duplicate ({Original}), {Action}", title, original, DownloadOptionValues.Of(settings.DuplicateAction));
+        }
+
+        if (settings.UnwantedAction != UnwantedAction.Off && failure is null)
+        {
+            var unwanted = nzb.Files.Select(f => f.FileName).Where(n => settings.UnwantedExtensions.Contains(Path.GetExtension(n).ToLowerInvariant())).Distinct().ToList();
+            if (unwanted.Count > 0)
+            {
+                var list = string.Join(", ", unwanted.Take(5));
+                switch (settings.UnwantedAction)
+                {
+                    case UnwantedAction.Fail:
+                        failure = $"Unwanted files in the NZB: {list}.";
+                        break;
+                    case UnwantedAction.Pause:
+                        startPaused = true;
+                        notes.Add($"Paused, unwanted files: {list}.");
+                        break;
+                    default:
+                        notes.Add($"Unwanted files: {list}.");
+                        break;
+                }
+
+                logger.LogWarning("'{Title}' contains unwanted files: {Files}", title, list);
+            }
+        }
 
         await _addLock.WaitAsync(cancellationToken);
         try
@@ -200,7 +292,7 @@ public sealed class DownloadEngine(
             }
 
             var names = UniqueFileNames(nzb.Files);
-            var onlyRecovery = nzb.Files.All(f => f.Kind == NzbFileKind.Par2Recovery);
+            var allRecovery = settings.DownloadAllPar2 || nzb.Files.All(f => f.Kind == NzbFileKind.Par2Recovery);
             var fileRecords = nzb.Files.Select((f, i) => new DownloadFileRecord
             {
                 FileIndex = i,
@@ -208,7 +300,7 @@ public sealed class DownloadEngine(
                 Kind = (int)f.Kind,
                 TotalBytes = f.Bytes,
                 Segments = f.Segments.Count,
-                Wanted = onlyRecovery || f.Kind != NzbFileKind.Par2Recovery,
+                Wanted = allRecovery || f.Kind != NzbFileKind.Par2Recovery,
                 Done = SegmentBits.Create(f.Segments.Count),
                 Missing = SegmentBits.Create(f.Segments.Count),
             }).ToList();
@@ -217,8 +309,12 @@ public sealed class DownloadEngine(
                 new DownloadRecord
                 {
                     Title = title,
-                    Category = request.Category,
-                    Status = DownloadStatus.Queued,
+                    Category = kind,
+                    CategoryName = category.Name,
+                    NzbHash = hash,
+                    Duplicate = duplicate,
+                    StatusMessage = notes.Count > 0 ? string.Join(" ", notes) : null,
+                    Status = startPaused ? DownloadStatus.Paused : DownloadStatus.Queued,
                     Priority = priority,
                     TotalBytes = fileRecords.Where(f => f.Wanted).Sum(f => f.TotalBytes),
                     Indexer = request.Indexer,
@@ -246,20 +342,38 @@ public sealed class DownloadEngine(
             }
 
             repository.SetPaths(record.Id, nzbPath, workFolder);
+            BackUpNzb(title, request.Nzb);
             var download = Activate(record with { NzbPath = nzbPath }, nzb, repository.Files(record.Id));
 
             DownloadItem item;
+            List<(int, int)>? orders = null;
             lock (_lock)
             {
                 _items[download.Id] = download;
+                if (settings.AutoSort != QueueSort.Off)
+                {
+                    orders = AutoSort(settings.AutoSort);
+                }
+
                 Resort();
                 MarkChanged(download);
                 _outbox.Enqueue(new OngoingChanged());
+                if (failure is not null)
+                {
+                    Fail(download, failure);
+                }
+
                 item = download.ToItem();
             }
 
+            if (orders is not null)
+            {
+                repository.SetSortOrders(orders);
+            }
+
             logger.LogInformation(
-                "Queued download {Id} '{Title}' ({Files} files, {Bytes} bytes) from {Indexer}", item.Id, title, nzb.Files.Count, item.TotalBytes, request.Indexer ?? "upload");
+                "Queued download {Id} '{Title}' ({Files} files, {Bytes} bytes) from {Indexer} in category {Category}",
+                item.Id, title, nzb.Files.Count, item.TotalBytes, request.Indexer ?? "upload", category.Name);
             _work.Pulse();
             await FlushAsync();
             return item;
@@ -324,17 +438,20 @@ public sealed class DownloadEngine(
     }
 
     /// <summary>Pauses the whole queue (kept over restarts). Articles being fetched right now still finish.</summary>
-    public async Task PauseAllAsync()
+    /// <param name="bySchedule">Paused by a scheduler rule: the status says so.</param>
+    public async Task PauseAllAsync(bool bySchedule = false)
     {
         EnsureLoaded();
         lock (_lock)
         {
             _userPaused = true;
+            _scheduledPause = bySchedule;
             QueueChanged();
         }
 
         config.Set(ConfigKeys.DownloadsPaused, "true");
-        logger.LogInformation("Download queue paused");
+        config.Set(ConfigKeys.DownloadPausedBySchedule, bySchedule ? "true" : "false");
+        logger.LogInformation("Download queue paused{By}", bySchedule ? " by the scheduler" : string.Empty);
         await FlushAsync();
     }
 
@@ -344,11 +461,93 @@ public sealed class DownloadEngine(
         lock (_lock)
         {
             _userPaused = false;
+            _scheduledPause = false;
+            _pausedOnStart = false;
             QueueChanged();
         }
 
         config.Set(ConfigKeys.DownloadsPaused, "false");
+        config.Set(ConfigKeys.DownloadPausedBySchedule, "false");
         logger.LogInformation("Download queue resumed");
+        _work.Pulse();
+        await FlushAsync();
+    }
+
+    /// <summary>True while the whole queue is paused by a scheduler rule.</summary>
+    public bool PausedBySchedule
+    {
+        get
+        {
+            EnsureLoaded();
+            lock (_lock)
+            {
+                return _userPaused && _scheduledPause;
+            }
+        }
+    }
+
+    /// <summary>True while the queue is paused because of "Pause downloading on start" (until resumed).</summary>
+    public bool PausedOnStart
+    {
+        get
+        {
+            EnsureLoaded();
+            lock (_lock)
+            {
+                return _userPaused && _pausedOnStart;
+            }
+        }
+    }
+
+    /// <summary>Categories whose downloads do not get articles (scheduler), sorted by name.</summary>
+    public IReadOnlyList<string> PausedCategories
+    {
+        get
+        {
+            EnsureLoaded();
+            lock (_lock)
+            {
+                return [.. _pausedCategories.Order(StringComparer.OrdinalIgnoreCase)];
+            }
+        }
+    }
+
+    /// <summary>Stops (or lets again) the downloads of one category from getting articles; kept over restarts.</summary>
+    public async Task SetCategoryPausedAsync(string category, bool paused)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+        EnsureLoaded();
+        string stored;
+        lock (_lock)
+        {
+            var changed = paused ? _pausedCategories.Add(category.Trim()) : _pausedCategories.Remove(category.Trim());
+            if (!changed)
+            {
+                return;
+            }
+
+            stored = string.Join(',', _pausedCategories);
+            foreach (var d in _order.Where(d => string.Equals(d.CategoryName, category.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                if (paused && d.Status == DownloadStatus.Downloading)
+                {
+                    // Back in the queue: articles being fetched are handed back, the rest waits for the category.
+                    d.Status = DownloadStatus.Queued;
+                    CancelInFlight(d);
+                    d.Speed.Reset();
+                    MarkChanged(d);
+                }
+                else
+                {
+                    _outbox.Enqueue(new DownloadChanged(d.Id));
+                }
+            }
+
+            QueueChanged();
+        }
+
+        config.Set(ConfigKeys.DownloadPausedCategories, stored);
+        logger.LogInformation("Downloads of category '{Category}' {State}", category, paused ? "paused" : "resumed");
         _work.Pulse();
         await FlushAsync();
     }
@@ -419,9 +618,19 @@ public sealed class DownloadEngine(
     /// Changes priority, category and/or position (0 = top of the queue; the order applies within a priority).
     /// Null when the download is not in the queue (unknown, completed or failed).
     /// </summary>
-    public async Task<DownloadItem?> UpdateAsync(int id, int? priority, DownloadCategory? category, int? position)
+    /// <param name="categoryName">A category by name (wins over <paramref name="category"/>); it must exist.</param>
+    /// <param name="password">The archive password ("" removes it).</param>
+    /// <exception cref="LibraryException">The category does not exist.</exception>
+    public async Task<DownloadItem?> UpdateAsync(
+        int id, int? priority, DownloadCategory? category, int? position, string? categoryName = null, string? password = null)
     {
         EnsureLoaded();
+        DownloadCategoryDefinition? named = null;
+        if (!string.IsNullOrWhiteSpace(categoryName))
+        {
+            named = categories.Find(categoryName) ?? throw new LibraryException($"There is no download category \"{categoryName.Trim()}\".", LibraryError.Invalid);
+        }
+
         DownloadItem item;
         List<(int, int)>? orders = null;
         lock (_lock)
@@ -436,9 +645,20 @@ public sealed class DownloadEngine(
                 d.Priority = Math.Clamp(p, MinPriority, MaxPriority);
             }
 
-            if (category is { } c)
+            if (named is not null)
+            {
+                d.Category = DownloadCategoryService.KindOf(named.Name);
+                d.CategoryName = named.Name;
+            }
+            else if (category is { } c)
             {
                 d.Category = c;
+                d.CategoryName = DownloadCategoryService.DefaultName(c);
+            }
+
+            if (password is not null)
+            {
+                d.Password = password.Length == 0 ? null : password;
             }
 
             Resort();
@@ -530,7 +750,9 @@ public sealed class DownloadEngine(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         EnsureLoaded();
-        var postProcessing = Task.Run(() => PostProcessLoopAsync(stoppingToken), CancellationToken.None);
+        _stopping = stoppingToken;
+        var postProcessing = Task.WhenAll(Enumerable.Range(0, DownloadSettings.MaxPostProcessWorkers)
+            .Select(index => Task.Run(() => PostProcessLoopAsync(index, stoppingToken), CancellationToken.None)));
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -553,7 +775,7 @@ public sealed class DownloadEngine(
             Task[] running;
             lock (_lock)
             {
-                running = [.. _workers, postProcessing];
+                running = [.. _workers, .. _background, postProcessing];
             }
 
             try
@@ -608,11 +830,19 @@ public sealed class DownloadEngine(
                 _work.Pulse();
             }
 
+            var utcNow = options.Time.GetUtcNow();
             foreach (var d in _order.ToList())
             {
                 if (d.Status == DownloadStatus.Downloading)
                 {
                     d.Speed.Sample(now, d.ReceivedBytes);
+                }
+
+                var reason = d.Status == DownloadStatus.Queued ? WaitReason(d, utcNow) : null;
+                if (reason != d.WaitReason)
+                {
+                    d.WaitReason = reason;
+                    _outbox.Enqueue(new DownloadChanged(d.Id));
                 }
 
                 if (d.IsDownloadPhase && !d.Closed)
@@ -688,13 +918,54 @@ public sealed class DownloadEngine(
         }
     }
 
+    /// <summary>Why a queued download may not get articles yet, or null.</summary>
+    private string? WaitReason(ActiveDownload d, DateTimeOffset now)
+    {
+        if (_pausedCategories.Contains(d.CategoryName))
+        {
+            return $"Category {d.CategoryName} is paused by the scheduler";
+        }
+
+        if (d.PreCheck == PreCheckState.Running)
+        {
+            return "Pre-check: checking that all articles are available";
+        }
+
+        var delay = settings.PropagationDelay;
+        if (delay > TimeSpan.Zero && d.Posted > DateTimeOffset.MinValue && d.Posted + delay > now)
+        {
+            var minutes = Math.Max(1, (int)Math.Ceiling((d.Posted + delay - now).TotalMinutes));
+            return $"Propagation delay: starts in {minutes.ToString(CultureInfo.InvariantCulture)} min";
+        }
+
+        return null;
+    }
+
     private Work? TakeSegment()
     {
+        var now = options.Time.GetUtcNow();
+        var limit = settings.MaxActiveDownloads;
+        var downloading = limit > 0 ? _order.Count(d => d.Status == DownloadStatus.Downloading && !d.Closed) : 0;
         foreach (var d in _order)
         {
             if (!d.IsDownloadPhase || d.Closed)
             {
                 continue;
+            }
+
+            if (d.Status == DownloadStatus.Queued)
+            {
+                // Only downloads that have not started wait; one that is downloading keeps going.
+                if (WaitReason(d, now) is not null || (limit > 0 && downloading >= limit))
+                {
+                    continue;
+                }
+
+                if (NeedsPreCheck(d))
+                {
+                    StartPreCheck(d);
+                    continue;
+                }
             }
 
             d.Pending ??= BuildPendingFor(d);
@@ -781,6 +1052,147 @@ public sealed class DownloadEngine(
         }
 
         Finish(d, file, index, article.CrcOk ? SegmentResult.Done : SegmentResult.Damaged, article.Data.Length);
+        if (article.Offset == 0 && !d.EncryptionChecked && RarInspector.IsRar(article.Data))
+        {
+            CheckEncryption(d, article.Data);
+        }
+    }
+
+    /// <summary>"Action when encrypted RAR is downloaded": pause or fail as soon as a volume's header shows a password and none is known.</summary>
+    private void CheckEncryption(ActiveDownload d, byte[] firstArticle)
+    {
+        var action = settings.EncryptedAction;
+        lock (_lock)
+        {
+            if (d.EncryptionChecked || d.Closed || !_items.ContainsKey(d.Id))
+            {
+                return;
+            }
+
+            d.EncryptionChecked = true;
+            if (action == EncryptedAction.Off || !string.IsNullOrEmpty(d.Password) || RarInspector.IsEncrypted(firstArticle) != true || !d.IsDownloadPhase)
+            {
+                return;
+            }
+
+            logger.LogWarning("Download {Id} '{Title}' is password protected and no password is known", d.Id, d.Title);
+            if (action == EncryptedAction.Fail)
+            {
+                Fail(d, "The archive is password protected and no password is known. Add it to the title as {{password}} and grab it again, or try another release.");
+                return;
+            }
+
+            d.Status = DownloadStatus.Paused;
+            d.StatusMessage = "Paused: the archive is password protected. Set the password, then resume.";
+            CancelInFlight(d);
+            d.Speed.Reset();
+            MarkChanged(d);
+        }
+    }
+
+    /// <summary>The pre-check is on, the source can check articles, and nothing of the download was fetched yet.</summary>
+    private bool NeedsPreCheck(ActiveDownload d) =>
+        settings.PreCheck && d.PreCheck == PreCheckState.Pending && articles is IArticleChecker && d.DownloadedBytes == 0 && _preChecking == 0;
+
+    /// <summary>Starts STAT for every article of the download in the background (under the lock).</summary>
+    private void StartPreCheck(ActiveDownload d)
+    {
+        d.PreCheck = PreCheckState.Running;
+        _preChecking = d.Id;
+        d.WaitReason = WaitReason(d, options.Time.GetUtcNow());
+        MarkChanged(d);
+        var token = d.Cancellation.Token;
+        _background.RemoveAll(t => t.IsCompleted);
+        _background.Add(Task.Run(() => PreCheckAsync(d, (IArticleChecker)articles, token), CancellationToken.None));
+    }
+
+    private async Task PreCheckAsync(ActiveDownload d, IArticleChecker checker, CancellationToken token)
+    {
+        var segments = d.Files.SelectMany(f => Enumerable.Range(0, f.Segments).Select(i => (File: f, Index: i))).ToList();
+        var missingBytes = new ConcurrentDictionary<ActiveFile, long>();
+        var missing = 0;
+        string? serverProblem = null;
+        logger.LogInformation("Pre-check of download {Id} '{Title}': {Count} articles", d.Id, d.Title, segments.Count);
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopping);
+            await Parallel.ForEachAsync(
+                segments,
+                new ParallelOptions { MaxDegreeOfParallelism = Math.Clamp(articles.MaxConnections, 1, MaxPreCheckConnections), CancellationToken = linked.Token },
+                async (item, ct) =>
+                {
+                    var segment = item.File.Nzb.Segments[item.Index];
+                    bool exists;
+                    try
+                    {
+                        exists = await checker.ExistsAsync(segment.MessageId, item.File.Nzb.Date, ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException and not UsenetServerException)
+                    {
+                        exists = false;
+                    }
+
+                    if (!exists)
+                    {
+                        Interlocked.Increment(ref missing);
+                        missingBytes.AddOrUpdate(item.File, segment.Bytes, (_, bytes) => bytes + segment.Bytes);
+                    }
+                });
+        }
+        catch (OperationCanceledException)
+        {
+            serverProblem = string.Empty; // paused, deleted or shutting down: check again later
+        }
+        catch (UsenetServerException ex)
+        {
+            serverProblem = ex.Message;
+            ServerUnavailable(ex);
+        }
+
+        lock (_lock)
+        {
+            _preChecking = 0;
+            if (d.Closed || !_items.ContainsKey(d.Id))
+            {
+                return;
+            }
+
+            if (serverProblem is not null)
+            {
+                d.PreCheck = PreCheckState.Pending;
+                d.WaitReason = null;
+                _outbox.Enqueue(new DownloadChanged(d.Id));
+            }
+            else
+            {
+                var dataBytes = d.Files.Where(f => f.Kind != NzbFileKind.Par2Recovery).Sum(f => f.Bytes);
+                var dataMissing = missingBytes.Where(m => m.Key.Kind != NzbFileKind.Par2Recovery).Sum(m => m.Value);
+                var recovery = d.Files.Where(f => f.Kind == NzbFileKind.Par2Recovery).ToList();
+                var repairable = recovery.Count > 0
+                    ? recovery.Sum(f => f.Bytes) - missingBytes.Where(m => m.Key.Kind == NzbFileKind.Par2Recovery).Sum(m => m.Value)
+                    : (long)(dataBytes * options.MaxMissingRatioWithoutPar2);
+                d.PreCheck = PreCheckState.Done;
+                d.WaitReason = null;
+                logger.LogInformation("Pre-check of download {Id}: {Missing} of {Count} articles missing", d.Id, missing, segments.Count);
+                if (dataMissing > repairable)
+                {
+                    var percent = dataBytes == 0 ? "100" : (100.0 * dataMissing / dataBytes).ToString("0.#", CultureInfo.InvariantCulture);
+                    Fail(d, $"Pre-check: {missing} of {segments.Count} articles are missing ({percent} % of the data), more than par2 can repair. The release is incomplete or was taken down; try another one.");
+                }
+                else
+                {
+                    if (missing > 0)
+                    {
+                        d.StatusMessage = $"Pre-check: {missing} articles missing, par2 can repair them";
+                    }
+
+                    MarkChanged(d);
+                }
+            }
+        }
+
+        _work.Pulse();
+        await FlushAsync();
     }
 
     private static void Write(ActiveDownload d, ActiveFile file, DecodedArticle article)
@@ -981,13 +1393,28 @@ public sealed class DownloadEngine(
 
     // ---------------------------------------------------------------- post-processing
 
-    private async Task PostProcessLoopAsync(CancellationToken stoppingToken)
+    /// <summary>One post-processing worker; only the first "post-processing workers" (setting) take jobs, the others idle.</summary>
+    private async Task PostProcessLoopAsync(int index, CancellationToken stoppingToken)
     {
         try
         {
-            await foreach (var id in _postProcess.Reader.ReadAllAsync(stoppingToken))
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await PostProcessAsync(id, stoppingToken);
+                if (index >= settings.PostProcessWorkers)
+                {
+                    await Task.Delay(options.Tick, stoppingToken);
+                    continue;
+                }
+
+                if (!await _postProcess.Reader.WaitToReadAsync(stoppingToken))
+                {
+                    break;
+                }
+
+                if (index < settings.PostProcessWorkers && _postProcess.Reader.TryRead(out var id))
+                {
+                    await PostProcessAsync(id, stoppingToken);
+                }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -1000,25 +1427,49 @@ public sealed class DownloadEngine(
         ActiveDownload? d;
         PostProcessJob job;
         CancellationToken token;
+        string finalFolder;
+        string categoryFolder;
         var keepFiles = settings.KeepFiles;
         lock (_lock)
         {
-            if (!_items.TryGetValue(id, out d) || !d.IsPostProcessing || d.Closed)
+            if (!_items.TryGetValue(id, out d) || !d.IsPostProcessing || d.Closed || d.PostProcessRunning)
             {
                 return;
             }
 
+            d.PostProcessRunning = true;
             d.Status = DownloadStatus.Verifying;
             d.StatusMessage = "Verifying";
             d.StepProgress = 0;
             MarkChanged(d);
-            var target = UniqueFolder(Path.Combine(settings.CompleteFolder, CategoryFolder(d.Category)), d.Title, [], onlyIfNotEmpty: true);
-            job = new PostProcessJob(d.Id, d.Title, d.WorkFolder, target, d.Password, keepFiles);
+            var category = categories.Resolve(d.Category, d.CategoryName);
+            categoryFolder = categories.FolderOf(category);
+            finalFolder = UniqueFolder(categoryFolder, d.Title, [], onlyIfNotEmpty: true);
+            var target = settings.TemporaryFolderName ? UniqueFolder(categoryFolder, TemporaryPrefix + d.Title, [], onlyIfNotEmpty: true) : finalFolder;
+            var moreRecovery = d.Files.Any(f => !f.Wanted && f.Kind == NzbFileKind.Par2Recovery);
+            job = new PostProcessJob(
+                d.Id, d.Title, d.WorkFolder, target, d.Password, keepFiles, category.PostProcessing, ContinueWhenUnverified: !settings.OnlyVerified && !moreRecovery);
             token = d.Cancellation.Token;
         }
 
+        try
+        {
+            await PostProcessAsync(d, job, token, finalFolder, keepFiles, stoppingToken);
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                d.PostProcessRunning = false;
+            }
+        }
+    }
+
+    private async Task PostProcessAsync(ActiveDownload d, PostProcessJob job, CancellationToken token, string finalFolder, bool keepFiles, CancellationToken stoppingToken)
+    {
+        var id = d.Id;
         await FlushAsync();
-        logger.LogInformation("Post-processing download {Id} '{Title}' into {Target}", id, job.Title, job.TargetFolder);
+        logger.LogInformation("Post-processing download {Id} '{Title}' into {Target} ({Level})", id, job.Title, job.TargetFolder, job.Level);
 
         PostProcessResult result;
         using (var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, token))
@@ -1037,6 +1488,11 @@ public sealed class DownloadEngine(
                 logger.LogError(ex, "Post-processing of download {Id} crashed", id);
                 result = new PostProcessResult(false, $"Post-processing failed: {ex.Message}", job.TargetFolder, [], false);
             }
+        }
+
+        if (result.Success && !PathComparer.Instance.Equals(job.TargetFolder, finalFolder))
+        {
+            result = result with { OutputFolder = RenameToFinal(result.OutputFolder, finalFolder, job.Title) };
         }
 
         if (result.Success)
@@ -1067,7 +1523,8 @@ public sealed class DownloadEngine(
                 d.Completed = DateTime.UtcNow;
                 d.StepProgress = null;
                 d.Error = null;
-                d.StatusMessage = result.Repaired ? "Repaired with par2" : null;
+                var notes = new[] { result.Repaired ? "Repaired with par2" : null, result.Warning }.Where(n => n is not null).ToList();
+                d.StatusMessage = notes.Count > 0 ? string.Join("; ", notes) : null;
                 d.Closed = true;
                 _items.Remove(d.Id);
                 _order.Remove(d);
@@ -1144,6 +1601,19 @@ public sealed class DownloadEngine(
 
             _loaded = true;
             _userPaused = string.Equals(config.Get(ConfigKeys.DownloadsPaused), "true", StringComparison.OrdinalIgnoreCase);
+            _scheduledPause = _userPaused && string.Equals(config.Get(ConfigKeys.DownloadPausedBySchedule), "true", StringComparison.OrdinalIgnoreCase);
+            if (!_userPaused && settings.PauseOnStart)
+            {
+                _userPaused = true;
+                _pausedOnStart = true;
+                logger.LogInformation("Download queue paused at startup (Pause downloading on start)");
+            }
+
+            foreach (var name in (config.Get(ConfigKeys.DownloadPausedCategories) ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                _pausedCategories.Add(name);
+            }
+
             foreach (var record in repository.Unfinished())
             {
                 try
@@ -1205,6 +1675,10 @@ public sealed class DownloadEngine(
             OutputPath = record.OutputPath,
             Added = record.Added,
             Completed = record.Completed,
+            CategoryName = record.CategoryName ?? DownloadCategoryService.DefaultName(record.Category),
+            Duplicate = record.Duplicate,
+            NzbHash = record.NzbHash,
+            Posted = nzb.Files.Count > 0 ? nzb.Files.Min(f => f.Date) : DateTimeOffset.MinValue,
         };
 
         foreach (var file in files)
@@ -1213,6 +1687,140 @@ public sealed class DownloadEngine(
         }
 
         return d;
+    }
+
+    /// <summary>Post-processing wrote into "_UNPACK_…": the folder gets its final name (or keeps the temporary one when that fails).</summary>
+    private string RenameToFinal(string temporary, string final, string title)
+    {
+        try
+        {
+            var parent = Path.GetDirectoryName(final)!;
+            var target = UniqueFolder(parent, title, [], onlyIfNotEmpty: true);
+            if (Directory.Exists(target))
+            {
+                Directory.Delete(target); // empty
+            }
+
+            Directory.Move(temporary, target);
+            return target;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Could not rename {Folder} to its final name: {Message}", temporary, ex.Message);
+            return temporary;
+        }
+    }
+
+    /// <summary>A fingerprint of the release: SHA-256 of its sorted article ids (the same release from two indexers matches).</summary>
+    internal static string Fingerprint(NzbDocument nzb)
+    {
+        var ids = nzb.Files.SelectMany(f => f.Segments.Select(s => s.MessageId)).Order(StringComparer.Ordinal);
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', ids)));
+        return Convert.ToHexStringLower(bytes)[..32];
+    }
+
+    /// <summary>The name for duplicate detection: letters and digits only, lower case ("Dune.2021.1080p" = "dune 2021 1080p").</summary>
+    internal static string NameKey(string title) => new([.. title.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant)]);
+
+    /// <summary>"'X' in the queue" / "'X' in the history" for a download with the same name or NZB, or null. Failed ones do not count.</summary>
+    private string? FindDuplicate(string title, string hash)
+    {
+        var key = NameKey(title);
+        lock (_lock)
+        {
+            if (_items.Values.FirstOrDefault(d => d.NzbHash == hash || NameKey(d.Title) == key) is { } queued)
+            {
+                return $"'{queued.Title}' is in the queue";
+            }
+        }
+
+        var match = repository.Summaries().FirstOrDefault(s => s.Status != DownloadStatus.Failed && (s.NzbHash == hash || NameKey(s.Title) == key));
+        return match is null ? null
+            : match.Status == DownloadStatus.Completed ? $"'{match.Title}' was downloaded on {match.Completed?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "an earlier day"}"
+            : $"'{match.Title}' is in the queue";
+    }
+
+    /// <summary>"NZB backup folder": a copy of every added NZB, named after the download.</summary>
+    private void BackUpNzb(string title, byte[] content)
+    {
+        if (settings.NzbBackupFolder is not { } folder)
+        {
+            return;
+        }
+
+        try
+        {
+            NzbFileNames.WriteNew(folder, title, content);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Could not copy the NZB of '{Title}' to the backup folder {Folder}: {Message}", title, folder, ex.Message);
+        }
+    }
+
+    /// <summary>New sort orders for the whole queue by the given key (the priority still comes first). Under the lock.</summary>
+    private List<(int, int)> AutoSort(QueueSort sort)
+    {
+        IEnumerable<ActiveDownload> all = _items.Values;
+        var items = sort switch
+        {
+            QueueSort.Oldest => all.OrderBy(d => d.Posted),
+            QueueSort.Newest => all.OrderByDescending(d => d.Posted),
+            QueueSort.Smallest => all.OrderBy(d => d.TotalBytes),
+            QueueSort.Largest => all.OrderByDescending(d => d.TotalBytes),
+            _ => all.OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase),
+        };
+        var orders = new List<(int, int)>();
+        var position = 0;
+        foreach (var d in items.ThenBy(d => d.Id))
+        {
+            d.SortOrder = ++position;
+            orders.Add((d.Id, d.SortOrder));
+        }
+
+        return orders;
+    }
+
+    // ---------------------------------------------------------------- history cleanup
+
+    /// <summary>
+    /// "Keep history": removes completed downloads older than the days or beyond the number set (failed ones too unless
+    /// they are kept). Files of removed failed downloads (the incomplete folder) are deleted; completed ones keep theirs.
+    /// </summary>
+    /// <returns>How many downloads were removed.</returns>
+    public async Task<int> CleanupHistoryAsync()
+    {
+        EnsureLoaded();
+        var days = settings.HistoryKeepDays;
+        var keep = settings.HistoryKeepItems;
+        if (days == 0 && keep == 0)
+        {
+            return 0;
+        }
+
+        Checkpoint();
+        var cutoff = options.Time.GetUtcNow().UtcDateTime.AddDays(-days);
+        var finished = repository.Summaries().Where(s => s.Status is DownloadStatus.Completed or DownloadStatus.Failed);
+        var candidates = (settings.HistoryKeepFailed ? finished.Where(s => s.Status == DownloadStatus.Completed) : finished).ToList();
+        var removed = 0;
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            var entry = candidates[i];
+            if ((keep > 0 && i >= keep) || (days > 0 && (entry.Completed ?? entry.Added) < cutoff))
+            {
+                if (await DeleteAsync(entry.Id, deleteFiles: entry.Status == DownloadStatus.Failed) == DownloadActionResult.Ok)
+                {
+                    removed++;
+                }
+            }
+        }
+
+        if (removed > 0)
+        {
+            logger.LogInformation("History cleanup removed {Count} downloads", removed);
+        }
+
+        return removed;
     }
 
     private static Queue<(ActiveFile File, int Segment)> BuildPendingFor(ActiveDownload d)
@@ -1459,6 +2067,7 @@ public sealed class DownloadEngine(
                 ["error"] = d.Error,
                 ["missingArticles"] = d.MissingArticles.ToString(CultureInfo.InvariantCulture),
                 ["category"] = d.Category.ToString(),
+                ["categoryName"] = d.CategoryName,
             },
         };
     }
@@ -1480,6 +2089,8 @@ public sealed class DownloadEngine(
         OutputPath = r.OutputPath,
         Added = new DateTimeOffset(r.Added, TimeSpan.Zero),
         Completed = r.Completed is { } c ? new DateTimeOffset(c, TimeSpan.Zero) : null,
+        CategoryName = r.CategoryName ?? DownloadCategoryService.DefaultName(r.Category),
+        Duplicate = r.Duplicate,
     };
 
     private static NzbDocument ParseNzb(byte[]? content)

@@ -120,14 +120,17 @@ public sealed record MediaLink(MediaType? MediaType, int? MovieId, int? SeriesId
 }
 
 /// <summary>A new download: the NZB file plus where it came from.</summary>
+/// <param name="Priority">-1 low … 2 force; null = the priority of the category (normal when it has none).</param>
+/// <param name="CategoryName">A download category by name (Settings → Downloads → Categories); null = the default one of <paramref name="Category"/>.</param>
 public sealed record DownloadRequest(
     byte[] Nzb,
     string Title,
     DownloadCategory Category,
     MediaLink Link,
-    int Priority = 0,
+    int? Priority = null,
     string? Indexer = null,
-    string? Password = null);
+    string? Password = null,
+    string? CategoryName = null);
 
 /// <summary>The state of one download as the UI and the status window see it.</summary>
 public sealed record DownloadItem
@@ -162,6 +165,12 @@ public sealed record DownloadItem
     public DateTimeOffset Added { get; init; }
     public DateTimeOffset? Completed { get; init; }
 
+    /// <summary>Name of the download category ("movies", "series", "other" or a custom one); its folder holds the result.</summary>
+    public string? CategoryName { get; init; }
+
+    /// <summary>Duplicate detection found the same release in the queue or the history (only when it is set to "tag" or "pause").</summary>
+    public bool Duplicate { get; init; }
+
     public double Progress => TotalBytes <= 0 ? 0 : Math.Clamp((double)DownloadedBytes / TotalBytes, 0, 1);
 }
 
@@ -169,7 +178,33 @@ public sealed record DownloadItem
 /// <param name="WorkFolder">Folder with the downloaded files (par2, rar, mkv …).</param>
 /// <param name="TargetFolder">Where the final files go (created if needed).</param>
 /// <param name="KeepFiles">After success, leave the work folder (par2, archives, nfo …) instead of deleting it.</param>
-public sealed record PostProcessJob(int DownloadId, string Title, string WorkFolder, string TargetFolder, string? Password, bool KeepFiles = false);
+/// <param name="Level">What is done (the category's post-processing): nothing, repair, repair + unpack, or all of it plus cleanup.</param>
+/// <param name="ContinueWhenUnverified">Unpack and complete even when par2 cannot verify or repair the files.</param>
+public sealed record PostProcessJob(
+    int DownloadId,
+    string Title,
+    string WorkFolder,
+    string TargetFolder,
+    string? Password,
+    bool KeepFiles = false,
+    PostProcessLevel Level = PostProcessLevel.Full,
+    bool ContinueWhenUnverified = false);
+
+/// <summary>Post-processing of a category, like SABnzbd's "+Repair", "+Unpack" and "+Delete".</summary>
+public enum PostProcessLevel
+{
+    /// <summary>Files are moved to the completed folder as they are.</summary>
+    None,
+
+    /// <summary>Verify and repair with par2; archives and par2 files are moved along.</summary>
+    Repair,
+
+    /// <summary>Repair and unpack; the archives and par2 files stay next to the unpacked files.</summary>
+    Unpack,
+
+    /// <summary>Repair, unpack and delete archives, par2 and the cleanup list (the default).</summary>
+    Full,
+}
 
 public enum PostProcessStage
 {
@@ -182,4 +217,5 @@ public enum PostProcessStage
 public sealed record PostProcessProgress(PostProcessStage Stage, double Progress, string? Message);
 
 /// <param name="Repaired">Blocks were repaired with par2.</param>
-public sealed record PostProcessResult(bool Success, string? Error, string OutputFolder, IReadOnlyList<string> Files, bool Repaired);
+/// <param name="Warning">Something the user should know about a successful run (unverified files, unwanted files left out).</param>
+public sealed record PostProcessResult(bool Success, string? Error, string OutputFolder, IReadOnlyList<string> Files, bool Repaired, string? Warning = null);

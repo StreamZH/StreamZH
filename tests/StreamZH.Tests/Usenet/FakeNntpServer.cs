@@ -208,6 +208,13 @@ public sealed class FakeNntpServer : IAsyncDisposable
                                 }
 
                                 break;
+                            case "STAT" when !loggedIn:
+                                await WriteAsync(stream, "480 Authentication required", token);
+                                break;
+                            case "STAT" when parts.Length >= 2:
+                                var statId = parts[1].Trim('<', '>');
+                                await WriteAsync(stream, _articles.ContainsKey(statId) ? $"223 0 <{statId}>" : "430 No such article", token);
+                                break;
                             case "DATE":
                                 await WriteAsync(stream, "111 20261017120000", token);
                                 break;

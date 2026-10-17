@@ -116,13 +116,34 @@ internal sealed class ActiveDownload
     public double? StepProgress { get; set; }
     public string? Indexer { get; init; }
     public MediaLink Link { get; init; } = MediaLink.None;
-    public string? Password { get; init; }
+    public string? Password { get; set; }
     public required string NzbPath { get; init; }
     public required string WorkFolder { get; init; }
     public string? OutputPath { get; set; }
     public DateTime Added { get; init; }
     public DateTime? Completed { get; set; }
     public List<ActiveFile> Files { get; } = [];
+
+    /// <summary>Download category by name (resolved: never empty).</summary>
+    public required string CategoryName { get; set; }
+
+    public bool Duplicate { get; set; }
+
+    public string? NzbHash { get; init; }
+
+    /// <summary>When the release was posted (oldest file of the NZB), for the propagation delay and sorting by age.</summary>
+    public DateTimeOffset Posted { get; init; }
+
+    public PreCheckState PreCheck { get; set; }
+
+    /// <summary>The first article of a RAR volume was looked at for a password (once per download).</summary>
+    public bool EncryptionChecked { get; set; }
+
+    /// <summary>A post-processing worker has it (several workers may run).</summary>
+    public bool PostProcessRunning { get; set; }
+
+    /// <summary>Why a queued download does not start yet (propagation delay, category paused, pre-check); shown instead of <see cref="StatusMessage"/>. Not saved.</summary>
+    public string? WaitReason { get; set; }
 
     /// <summary>Segments to fetch, in order. Built when the download first gets a connection.</summary>
     public Queue<(ActiveFile File, int Segment)>? Pending { get; set; }
@@ -192,7 +213,7 @@ internal sealed class ActiveDownload
             SpeedBps = speed,
             Eta = speed > 0 ? TimeSpan.FromSeconds(remaining / (double)speed) : null,
             StepProgress = StepProgress,
-            StatusMessage = StatusMessage,
+            StatusMessage = IsDownloadPhase && Status != DownloadStatus.Downloading ? WaitReason ?? StatusMessage : StatusMessage,
             MissingArticles = MissingArticles,
             Error = Error,
             Indexer = Indexer,
@@ -200,6 +221,8 @@ internal sealed class ActiveDownload
             OutputPath = OutputPath,
             Added = new DateTimeOffset(Added, TimeSpan.Zero),
             Completed = Completed is { } c ? new DateTimeOffset(c, TimeSpan.Zero) : null,
+            CategoryName = CategoryName,
+            Duplicate = Duplicate,
         };
     }
 
@@ -227,6 +250,9 @@ internal sealed class ActiveDownload
         Added = Added,
         Completed = Completed,
         SortOrder = SortOrder,
+        CategoryName = CategoryName,
+        NzbHash = NzbHash,
+        Duplicate = Duplicate,
     };
 
     private static int Rank(ActiveFile file) => file.Kind switch
@@ -246,4 +272,12 @@ internal sealed class ActiveDownload
             }
         }
     }
+}
+
+/// <summary>Where a download is with the "pre-check" (STAT before downloading).</summary>
+internal enum PreCheckState
+{
+    Pending,
+    Running,
+    Done,
 }

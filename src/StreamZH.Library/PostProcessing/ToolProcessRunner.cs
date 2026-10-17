@@ -24,9 +24,29 @@ public interface IToolProcessRunner
         CancellationToken cancellationToken);
 }
 
-public sealed class ToolProcessRunner : IToolProcessRunner
+/// <summary>Runs the tools with the process priority from the settings (normal, below normal or idle).</summary>
+public sealed class ToolProcessRunner(IPostProcessSwitches? switches = null) : IToolProcessRunner
 {
     private const int MaxKeptOutput = 64 * 1024;
+
+    /// <summary>Lowers the priority of a started process; "nice" 10 or 19 on Linux and macOS. Never throws.</summary>
+    public static void ApplyPriority(Process process, Downloads.ToolPriority priority)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        if (priority == Downloads.ToolPriority.Normal)
+        {
+            return;
+        }
+
+        try
+        {
+            process.PriorityClass = priority == Downloads.ToolPriority.Idle ? ProcessPriorityClass.Idle : ProcessPriorityClass.BelowNormal;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or PlatformNotSupportedException or NotSupportedException)
+        {
+            // Exited already, or the system does not allow it: the tool runs at normal priority.
+        }
+    }
 
     public async Task<ToolProcessResult> RunAsync(
         string fileName,
@@ -54,6 +74,7 @@ public sealed class ToolProcessRunner : IToolProcessRunner
 
         using var process = new Process { StartInfo = start };
         process.Start();
+        ApplyPriority(process, switches?.PostProcess.ToolPriority ?? Downloads.ToolPriority.Normal);
 
         // Nothing is ever typed in: a tool that asks (e.g. for a password) gets end of input instead of hanging.
         process.StandardInput.Close();

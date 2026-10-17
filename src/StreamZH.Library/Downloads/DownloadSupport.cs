@@ -19,6 +19,9 @@ public sealed class DownloadEngineOptions
 
     /// <summary>Without par2 recovery files, a download fails once more than this share of its bytes is missing.</summary>
     public double MaxMissingRatioWithoutPar2 { get; set; } = 0.10;
+
+    /// <summary>The clock for the propagation delay and the history cleanup; tests use a fake one.</summary>
+    public TimeProvider Time { get; set; } = TimeProvider.System;
 }
 
 /// <summary>Free bytes on the volume of a folder; null when unknown. Replaced in tests.</summary>

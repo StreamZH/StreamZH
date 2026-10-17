@@ -203,6 +203,53 @@ public sealed class NntpConnection : IAsyncDisposable
         return new DecodedArticle(part.Name, part.FileSize, part.Offset, part.Data, part.IsValid);
     }
 
+    /// <summary>STAT &lt;message-id&gt;: true when the server has the article (223), false when not (430/423). Nothing is downloaded.</summary>
+    /// <exception cref="NntpException">Any other answer or failure.</exception>
+    public async Task<bool> StatAsync(string messageId, CancellationToken cancellationToken)
+    {
+        await SendStatAsync(messageId, cancellationToken);
+        return await ReceiveStatAsync(cancellationToken);
+    }
+
+    /// <summary>Pipelining, first half of <see cref="StatAsync"/>: sends STAT without waiting for the answer.</summary>
+    public async Task SendStatAsync(string messageId, CancellationToken cancellationToken)
+    {
+        var id = NormalizeMessageId(messageId);
+        ThrowIfUnusable();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        try
+        {
+            await WriteLineAsync($"STAT <{id}>", timeout);
+        }
+        catch (Exception ex)
+        {
+            throw Fail(ex, cancellationToken);
+        }
+    }
+
+    /// <summary>Pipelining, second half of <see cref="StatAsync"/>: reads the answer to the oldest STAT.</summary>
+    public async Task<bool> ReceiveStatAsync(CancellationToken cancellationToken)
+    {
+        ThrowIfUnusable();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        try
+        {
+            var response = await ReadResponseAsync(timeout);
+            return response.Code switch
+            {
+                223 => true,
+                430 or 423 => false,
+                480 => throw new NntpException($"{Endpoint} wants a login: {response}", NntpErrorKind.Auth, response.Code),
+                400 => throw new NntpException($"{Endpoint} is not available: {response}", NntpErrorKind.Busy, response.Code),
+                _ => throw new NntpException($"{Endpoint} refused STAT: {response}", NntpErrorKind.Protocol, response.Code),
+            };
+        }
+        catch (Exception ex)
+        {
+            throw Fail(ex, cancellationToken);
+        }
+    }
+
     /// <summary>DATE (111): the server's clock in UTC. A cheap command to check that the connection works.</summary>
     public async Task<DateTimeOffset> DateAsync(CancellationToken cancellationToken)
     {

@@ -5,16 +5,26 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Downloads;
+using StreamZH.Library.Downloads;
 
 namespace StreamZH.Library.PostProcessing;
 
 /// <summary>
 /// Verify (native par2 reader, with deobfuscation) → repair (external par2, only when needed) → extract (external 7-Zip)
 /// → move the wanted files to the target and delete the work folder (unless <see cref="PostProcessJob.KeepFiles"/>).
-/// On failure the work folder is kept as it is.
+/// On failure the work folder is kept as it is. <see cref="PostProcessJob.Level"/> stops earlier (SABnzbd's +Repair,
+/// +Unpack); the global switches (samples, cleanup list, nested archives, extra tool parameters …) come from
+/// <see cref="IPostProcessSwitches"/>.
 /// </summary>
-public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRunner runner, ILogger<PostProcessor> logger) : IPostProcessor
+public sealed partial class PostProcessor(
+    PostProcessTools tools,
+    IToolProcessRunner runner,
+    ILogger<PostProcessor> logger,
+    IPostProcessSwitches? switches = null) : IPostProcessor
 {
+    /// <summary>Archives inside archives are unpacked this deep when recursive unpacking is on.</summary>
+    public const int MaxNestedLevels = 3;
+
     /// <summary>Files with "sample" in the name below this size are dropped (same idea as Sonarr).</summary>
     public const long SampleMaxBytes = 50L * 1024 * 1024;
 
@@ -23,15 +33,17 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
 
     private const string StagingPrefix = ".streamzh-unpack-";
 
-    /// <summary>Never moved to the target: release info, checksums, index files and anything executable.</summary>
-    private static readonly HashSet<string> JunkExtensions = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>Never moved to the target, whatever the settings: anything executable (and links to it).</summary>
+    private static readonly HashSet<string> ExecutableExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".nfo", ".sfv", ".srr", ".srs", ".nzb", ".par2", ".md5", ".url", ".lnk", ".db",
-        ".exe", ".scr", ".bat", ".cmd", ".com", ".pif", ".vbs", ".js", ".jar", ".msi", ".ps1",
+        ".exe", ".scr", ".bat", ".cmd", ".com", ".pif", ".vbs", ".js", ".jar", ".msi", ".ps1", ".lnk",
     };
 
     public async Task<PostProcessResult> RunAsync(PostProcessJob job, IProgress<PostProcessProgress> progress, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(progress);
+        var options = (switches ?? FixedPostProcessSwitches.Default).PostProcess;
         var work = Path.GetFullPath(job.WorkFolder);
         var target = Path.GetFullPath(job.TargetFolder);
         var staging = Path.Combine(target, StagingPrefix + job.DownloadId);
@@ -51,27 +63,56 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
 
         try
         {
-            var verify = await VerifyAndRepairAsync(job, work, progress, cancellationToken).ConfigureAwait(false);
+            var warnings = new List<string>();
+            var verify = job.Level == PostProcessLevel.None
+                ? new VerifyOutcome(null, false, new HashSet<string>(StringComparer.Ordinal))
+                : await VerifyAndRepairAsync(job, work, options, progress, cancellationToken).ConfigureAwait(false);
             if (verify.Error is not null)
             {
-                return Failed(job, verify.Error);
+                if (!job.ContinueWhenUnverified || verify.Error == Par2MissingError)
+                {
+                    return Failed(job, verify.Error);
+                }
+
+                logger.LogWarning("{Title}: not verified ({Error}), unpacking anyway", job.Title, verify.Error);
+                warnings.Add($"Not verified: {verify.Error}");
             }
 
-            var extract = await ExtractAsync(job, work, staging, progress, cancellationToken).ConfigureAwait(false);
+            var extract = job.Level is PostProcessLevel.None or PostProcessLevel.Repair
+                ? new ExtractOutcome(null, new HashSet<string>(StringComparer.Ordinal))
+                : await ExtractAsync(job, work, staging, options, progress, cancellationToken).ConfigureAwait(false);
             if (extract.Error is not null)
             {
                 RemoveStaging(staging, target, targetExisted);
                 return Failed(job, extract.Error);
             }
 
+            if (options.UnwantedAction != UnwantedAction.Off && UnwantedFiles(work, staging, options) is { Count: > 0 } unwanted)
+            {
+                var names = string.Join(", ", unwanted.Take(5));
+                if (options.UnwantedAction is UnwantedAction.Pause or UnwantedAction.Fail)
+                {
+                    RemoveStaging(staging, target, targetExisted);
+                    return Failed(job, $"Unwanted files in the download: {names}.");
+                }
+
+                logger.LogWarning("{Title}: contains unwanted files: {Files}", job.Title, names);
+                warnings.Add($"Unwanted files: {names}.");
+            }
+
             progress.Report(new PostProcessProgress(PostProcessStage.Cleaning, 0, "Moving files"));
-            var files = MoveToTarget(work, staging, target, extract.Volumes, verify.Par2Files);
+            var files = MoveToTarget(job, work, staging, target, extract.Volumes, verify.Par2Files, options);
             RemoveStaging(staging, target, targetExisted: true);
 
             if (files.Count == 0)
             {
                 RemoveStaging(staging, target, targetExisted);
                 return Failed(job, "No files left to import after post-processing (only samples, .nfo or .par2 files).");
+            }
+
+            if (options.Deobfuscate)
+            {
+                files = DeobfuscateNames(job, target, files);
             }
 
             if (!job.KeepFiles)
@@ -83,7 +124,7 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
             progress.Report(new PostProcessProgress(PostProcessStage.Cleaning, 1, null));
 
             logger.LogInformation("Post-processing of {Title} done: {Count} file(s) in {Target}{Repaired}", job.Title, files.Count, target, verify.Repaired ? " (repaired)" : string.Empty);
-            return new PostProcessResult(true, null, target, files, verify.Repaired);
+            return new PostProcessResult(true, null, target, files, verify.Repaired, warnings.Count > 0 ? string.Join(" ", warnings) : null);
         }
         catch (OperationCanceledException)
         {
@@ -112,7 +153,8 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
 
     private sealed record VerifyOutcome(string? Error, bool Repaired, IReadOnlySet<string> Par2Files);
 
-    private async Task<VerifyOutcome> VerifyAndRepairAsync(PostProcessJob job, string work, IProgress<PostProcessProgress> progress, CancellationToken cancellationToken)
+    private async Task<VerifyOutcome> VerifyAndRepairAsync(
+        PostProcessJob job, string work, PostProcessSwitches options, IProgress<PostProcessProgress> progress, CancellationToken cancellationToken)
     {
         progress.Report(new PostProcessProgress(PostProcessStage.Verifying, 0, "Verifying files"));
 
@@ -198,6 +240,7 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
                 work,
                 main,
                 setFiles,
+                options.Par2Arguments,
                 new InlineProgress<double>(p => progress.Report(new PostProcessProgress(PostProcessStage.Repairing, (index + p) / damaged.Count, message))),
                 cancellationToken).ConfigureAwait(false);
 
@@ -235,7 +278,8 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
 
     private sealed record ExtractOutcome(string? Error, IReadOnlySet<string> Volumes);
 
-    private async Task<ExtractOutcome> ExtractAsync(PostProcessJob job, string work, string staging, IProgress<PostProcessProgress> progress, CancellationToken cancellationToken)
+    private async Task<ExtractOutcome> ExtractAsync(
+        PostProcessJob job, string work, string staging, PostProcessSwitches options, IProgress<PostProcessProgress> progress, CancellationToken cancellationToken)
     {
         var files = Directory.EnumerateFiles(work, "*", SearchOption.AllDirectories)
             .Where(f => !IsStaging(f) && !f.EndsWith(".par2", StringComparison.OrdinalIgnoreCase) && !IsPar2Backup(f) && !Par2Reader.IsPar2File(f))
@@ -275,6 +319,7 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
                 set.FirstVolume!,
                 output,
                 password,
+                options.SevenZipArguments,
                 new InlineProgress<double>(p => progress.Report(new PostProcessProgress(PostProcessStage.Extracting, (index + (0.9 * p)) / sets.Count, message))),
                 cancellationToken).ConfigureAwait(false);
 
@@ -285,25 +330,30 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
             }
         }
 
-        // One level of nested archives (e.g. a rar inside the rar): extract next to themselves, then drop them.
-        var nested = ArchiveSets.Detect(Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories));
-        foreach (var set in nested)
+        // Nested archives (e.g. a rar inside the rar): extract next to themselves, then drop them. Level by level.
+        for (var level = 0; options.RecursiveUnpack && level < MaxNestedLevels && Directory.Exists(staging); level++)
         {
-            if (set.FirstVolume is null)
+            var nested = ArchiveSets.Detect(Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories)).Where(s => s.FirstVolume is not null).ToList();
+            if (nested.Count == 0)
             {
-                continue;
+                break;
             }
 
-            progress.Report(new PostProcessProgress(PostProcessStage.Extracting, 0.95, $"Extracting {set.Name}"));
-            var result = await extractor.ExtractAsync(sevenZip.Path, set.FirstVolume, Path.GetDirectoryName(set.FirstVolume)!, password, new Progress<double>(), cancellationToken).ConfigureAwait(false);
-            if (!result.Success)
+            foreach (var set in nested)
             {
-                return new ExtractOutcome(result.Error, volumes);
-            }
+                progress.Report(new PostProcessProgress(PostProcessStage.Extracting, 0.95, $"Extracting {set.Name}"));
+                var result = await extractor.ExtractAsync(
+                        sevenZip.Path, set.FirstVolume!, Path.GetDirectoryName(set.FirstVolume)!, password, options.SevenZipArguments, new Progress<double>(), cancellationToken)
+                    .ConfigureAwait(false);
+                if (!result.Success)
+                {
+                    return new ExtractOutcome(result.Error, volumes);
+                }
 
-            foreach (var volume in set.Volumes)
-            {
-                File.Delete(volume);
+                foreach (var volume in set.Volumes)
+                {
+                    File.Delete(volume);
+                }
             }
         }
 
@@ -311,10 +361,15 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
         return new ExtractOutcome(null, volumes);
     }
 
-    /// <summary>Moves extracted files and loose files (no archives, par2, par2 backups, samples or junk) to the target.</summary>
-    private List<string> MoveToTarget(string work, string staging, string target, IReadOnlySet<string> volumes, IReadOnlySet<string> par2Files)
+    /// <summary>
+    /// Moves extracted files and loose files to the target. Full post-processing leaves out archives, par2 files, par2
+    /// backups, samples and the cleanup list; the lower levels move everything but executables and par2 backups.
+    /// </summary>
+    private List<string> MoveToTarget(
+        PostProcessJob job, string work, string staging, string target, IReadOnlySet<string> volumes, IReadOnlySet<string> par2Files, PostProcessSwitches options)
     {
         var moves = new List<(string From, string Relative)>();
+        var full = job.Level == PostProcessLevel.Full;
 
         if (Directory.Exists(staging))
         {
@@ -322,15 +377,17 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
         }
 
         var loose = Directory.EnumerateFiles(work, "*", SearchOption.AllDirectories)
-            .Where(f => !IsStaging(f) && !volumes.Contains(f) && !par2Files.Contains(f) && !IsPar2Backup(f))
+            .Where(f => !IsStaging(f) && !IsPar2Backup(f) && (!full || (!volumes.Contains(f) && !par2Files.Contains(f) && !Par2Reader.IsPar2File(f))))
             .ToList();
-        moves.AddRange(loose.Where(f => !Par2Reader.IsPar2File(f)).Select(f => (f, Path.GetRelativePath(work, f))));
+        moves.AddRange(loose.Select(f => (f, Path.GetRelativePath(work, f))));
 
         var moved = new List<string>();
         foreach (var (from, relative) in moves)
         {
             var size = new FileInfo(from).Length;
-            if (IsJunk(relative) || IsSample(relative, size))
+            if (IsExecutable(relative)
+                || (full && (options.CleanupExtensions.Contains(Path.GetExtension(relative)) || IsPar2Extension(relative)))
+                || (options.IgnoreSamples && job.Level != PostProcessLevel.None && IsSample(relative, size)))
             {
                 logger.LogDebug("Skipping {File}", relative);
                 continue;
@@ -346,7 +403,71 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
         return moved;
     }
 
-    public static bool IsJunk(string relativePath) => JunkExtensions.Contains(Path.GetExtension(relativePath));
+    /// <summary>Left out with the default settings: executables, par2 files and the default cleanup list (release info, checksums, index files).</summary>
+    public static bool IsJunk(string relativePath) =>
+        IsExecutable(relativePath) || IsPar2Extension(relativePath)
+        || Search.DownloadSettings.DefaultCleanupList.Contains(Path.GetExtension(relativePath).ToLowerInvariant());
+
+    public static bool IsExecutable(string relativePath) => ExecutableExtensions.Contains(Path.GetExtension(relativePath));
+
+    /// <summary>"a3f9c2…" style names: no separators, at least 16 characters, letters and digits mixed.</summary>
+    public static bool IsObfuscated(string fileName)
+    {
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        return stem.Length >= 16 && ObfuscatedRegex().IsMatch(stem) && stem.Any(char.IsDigit) && stem.Any(char.IsLetter);
+    }
+
+    private static bool IsPar2Extension(string relativePath) => Path.GetExtension(relativePath).Equals(".par2", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Names of files (downloaded or unpacked) with an unwanted extension.</summary>
+    private static List<string> UnwantedFiles(string work, string staging, PostProcessSwitches options)
+    {
+        if (options.UnwantedExtensions.Count == 0)
+        {
+            return [];
+        }
+
+        IEnumerable<string> files = Directory.EnumerateFiles(work, "*", SearchOption.AllDirectories).Where(f => !IsStaging(f));
+        if (Directory.Exists(staging))
+        {
+            files = files.Concat(Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories));
+        }
+
+        return [.. files.Where(f => options.UnwantedExtensions.Contains(Path.GetExtension(f))).Select(f => Path.GetFileName(f)).Distinct(StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// SABnzbd's "Deobfuscate final filenames": when the biggest file has a random name, it and every file with the same
+    /// stem (subtitles, nfo) get the download's name. Only files directly in the target are renamed.
+    /// </summary>
+    private List<string> DeobfuscateNames(PostProcessJob job, string target, List<string> files)
+    {
+        var top = files.Where(f => string.Equals(Path.GetDirectoryName(f), target, StringComparison.Ordinal)).ToList();
+        var biggest = top.OrderByDescending(f => new FileInfo(f).Length).FirstOrDefault();
+        if (biggest is null || !IsObfuscated(Path.GetFileName(biggest)))
+        {
+            return files;
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(biggest);
+        var title = Search.NzbFileNames.SafeName(job.Title);
+        var result = new List<string>(files);
+        foreach (var file in top.Where(f => Path.GetFileName(f).StartsWith(stem + ".", StringComparison.Ordinal)))
+        {
+            var renamed = Path.Combine(target, title + Path.GetFileName(file)[stem.Length..]);
+            if (File.Exists(renamed))
+            {
+                continue;
+            }
+
+            File.Move(file, renamed);
+            result[result.IndexOf(file)] = renamed;
+            logger.LogInformation("{Title}: renamed obfuscated file {From} to {To}", job.Title, Path.GetFileName(file), Path.GetFileName(renamed));
+        }
+
+        result.Sort(StringComparer.Ordinal);
+        return result;
+    }
 
     /// <summary>"sample" as a word in the file name or a folder name, and smaller than <see cref="SampleMaxBytes"/>.</summary>
     public static bool IsSample(string relativePath, long size) => size < SampleMaxBytes && SampleRegex().IsMatch(relativePath);
@@ -413,6 +534,9 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
 
     [GeneratedRegex(@"^(.+)\.\d{1,2}$")]
     private static partial Regex Par2BackupRegex();
+
+    [GeneratedRegex(@"^[A-Za-z0-9]+$")]
+    private static partial Regex ObfuscatedRegex();
 
     /// <summary>Reports synchronously (System.Progress posts to the thread pool, which reorders updates).</summary>
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>

@@ -47,6 +47,10 @@ builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.Hosting.Lifetime", LogL
 builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
 builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
 
+// One line per outgoing HTTP request (TMDB, indexers) is noise; keep warnings and errors only.
+builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
+builder.Logging.AddFilter<FileLoggerProvider>("System.Net.Http.HttpClient", LogLevel.Warning);
+
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
 builder.Services.AddSingleton(config);

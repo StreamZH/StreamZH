@@ -155,6 +155,12 @@ public static class LibraryEndpoints
                 counts.Sum(c => c.FileCount),
                 allMovies.Sum(m => m.File?.Size ?? 0) + counts.Sum(c => c.SizeOnDisk));
         });
+        library.MapPost("/refresh-all", (JobQueue jobs, MovieRepository movieRepo, SeriesRepository seriesRepo) =>
+        {
+            var queued = EnqueueRefreshAll(jobs, movieRepo, seriesRepo);
+            return Results.Accepted(value: new { queued });
+        }).RequireAuthorization(AuthSchemes.AdminPolicy);
+
         library.MapPost("/rescan", (JobQueue jobs) =>
             Queued(jobs, new Job("rescan", "Rescan library folders", (sp, ct) => sp.GetRequiredService<LibraryService>().RescanAllAsync(ct))))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
@@ -162,6 +168,23 @@ public static class LibraryEndpoints
         api.MapGet("/system/jobs", (JobQueue jobs) => jobs.Status).WithTags("System");
 
         return app;
+    }
+
+    /// <summary>Queues a metadata refresh for every movie and series, e.g. after the language changed.</summary>
+    public static int EnqueueRefreshAll(JobQueue jobs, MovieRepository movies, SeriesRepository series)
+    {
+        var count = 0;
+        foreach (var m in movies.All())
+        {
+            count += jobs.Enqueue(RefreshMovie(m.Id, m.Title)) ? 1 : 0;
+        }
+
+        foreach (var s in series.All())
+        {
+            count += jobs.Enqueue(RefreshSeries(s.Id, s.Title)) ? 1 : 0;
+        }
+
+        return count;
     }
 
     private static Job RefreshMovie(int id, string title) =>

@@ -12,7 +12,7 @@ public static class DiskScanner
 {
     public static readonly IReadOnlySet<string> VideoExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        ".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".mpg", ".mpeg", ".webm", ".divx", ".xvid", ".flv", ".vob",
+        ".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".mpg", ".mpeg", ".webm", ".divx", ".xvid", ".flv", ".vob", ".iso",
     };
 
     private static readonly IReadOnlySet<string> SkippedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -23,11 +23,61 @@ public static class DiskScanner
 
     private const long SampleMaxBytes = 300L * 1024 * 1024;
 
-    /// <summary>The main movie file: the largest video file that is not a sample.</summary>
+    /// <summary>Folder names of unpacked discs: Blu-ray (BDMV) and DVD (VIDEO_TS).</summary>
+    private static readonly string[] DiscFolders = ["BDMV", "VIDEO_TS"];
+
+    /// <summary>
+    /// The main movie file: an unpacked Blu-ray/DVD folder counts as one file, otherwise the largest
+    /// video file that is not a sample.
+    /// </summary>
     public static MediaFile? ScanMovie(string folder)
     {
+        if (FindDisc(folder) is { } disc)
+        {
+            return disc;
+        }
+
         var best = VideoFiles(folder).MaxBy(f => f.Length);
         return best is null ? null : ToMediaFile(folder, best);
+    }
+
+    /// <summary>Number of media files and their size for the import list (a disc folder counts as one).</summary>
+    public static (int Files, long Size) SummarizeMovieFolder(string folder)
+    {
+        if (FindDisc(folder) is { } disc)
+        {
+            return (1, disc.Size);
+        }
+
+        var files = VideoFiles(folder).ToList();
+        return (files.Count, files.Sum(f => f.Length));
+    }
+
+    private static MediaFile? FindDisc(string folder)
+    {
+        var root = new DirectoryInfo(folder);
+        if (!root.Exists)
+        {
+            return null;
+        }
+
+        var options = new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 2, IgnoreInaccessible = true, MatchCasing = MatchCasing.CaseInsensitive };
+        var disc = DiscFolders.SelectMany(name => root.EnumerateDirectories(name, options)).FirstOrDefault();
+        if (disc is null)
+        {
+            return null;
+        }
+
+        var files = disc.EnumerateFiles("*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }).ToList();
+        if (files.Count == 0)
+        {
+            return null;
+        }
+
+        return new MediaFile(
+            Path.GetRelativePath(folder, disc.FullName),
+            files.Sum(f => f.Length),
+            files.Max(f => f.LastWriteTimeUtc));
     }
 
     /// <summary>Episode files by (season, episode). Multi-episode files map to every episode they contain.</summary>

@@ -4,6 +4,7 @@
 
 using System.Security.Cryptography;
 using StreamZH.Core;
+using StreamZH.Core.Jobs;
 using StreamZH.Core.Users;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
@@ -69,7 +70,7 @@ public static class SettingsEndpoints
 
         group.MapGet("/metadata", (ConfigRepository config) => MetadataSettings.From(config));
 
-        group.MapPut("/metadata", (UpdateMetadataSettings request, ConfigRepository config) =>
+        group.MapPut("/metadata", (UpdateMetadataSettings request, ConfigRepository config, JobQueue jobs, MovieRepository movies, SeriesRepository series) =>
         {
             var language = request.Language ?? TmdbSettings.DefaultLanguage;
             if (!TmdbSettings.Languages.Contains(language))
@@ -82,7 +83,15 @@ public static class SettingsEndpoints
                 config.Set(ConfigKeys.TmdbToken, token.Trim());
             }
 
+            var before = TmdbSettings.ForTmdb(config.Get(ConfigKeys.TmdbLanguage) ?? TmdbSettings.DefaultLanguage);
             config.Set(ConfigKeys.TmdbLanguage, language);
+
+            // New language: fetch titles and descriptions again for the whole library.
+            if (before != TmdbSettings.ForTmdb(language))
+            {
+                LibraryEndpoints.EnqueueRefreshAll(jobs, movies, series);
+            }
+
             return Results.Ok(MetadataSettings.From(config));
         });
 

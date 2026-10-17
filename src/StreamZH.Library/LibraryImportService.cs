@@ -31,8 +31,10 @@ public sealed class LibraryImportService(RootFolderRepository rootFolders, Movie
             {
                 var path = Path.Combine(root.Path, name);
                 var parsed = FolderNameParser.Parse(name);
-                var files = DiskScanner.VideoFiles(path).ToList();
-                return new ImportCandidate(name, path, parsed.Title, parsed.Year, parsed.TmdbId, files.Count, files.Sum(f => f.Length));
+                var (count, size) = root.MediaType == MediaType.Movie
+                    ? DiskScanner.SummarizeMovieFolder(path)
+                    : (DiskScanner.VideoFiles(path).Count(), DiskScanner.VideoFiles(path).Sum(f => f.Length));
+                return new ImportCandidate(name, path, parsed.Title, parsed.Year, parsed.TmdbId, count, size);
             })
             .OrderBy(c => c.FolderName, StringComparer.OrdinalIgnoreCase)];
     }

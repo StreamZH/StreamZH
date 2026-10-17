@@ -18,6 +18,7 @@ export function MetadataSection() {
   const effectiveLanguage = language ?? settings.data?.language ?? 'en-US'
 
   const test = useMutation({ mutationFn: () => libraryApi.testMetadata(token.trim() || null) })
+  const refreshAll = useMutation({ mutationFn: libraryApi.refreshAll })
   const save = useMutation({
     mutationFn: () => libraryApi.saveMetadataSettings(token.trim() || null, effectiveLanguage),
     onSuccess: async (data) => {
@@ -90,7 +91,20 @@ export function MetadataSection() {
         {save.isSuccess && !test.isSuccess && <span className={styles.ok}>Saved</span>}
         {save.error && <span className={styles.error}>{save.error.message}</span>}
       </div>
-      <p className={styles.attribution}>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+      <div className={styles.actions}>
+        <button className={styles.secondary} type="button" onClick={() => refreshAll.mutate()} disabled={refreshAll.isPending || !settings.data.tmdbConfigured}>
+          Refresh all metadata
+        </button>
+        <span className={styles.muted}>
+          {refreshAll.isSuccess
+            ? `${refreshAll.data.queued} titles queued, progress shows in the sidebar.`
+            : 'Loads titles, posters and episodes again for the whole library. Happens automatically when the language changes.'}
+        </span>
+      </div>
+      <p className={styles.attribution}>
+        This product uses the TMDB API but is not endorsed or certified by TMDB. Swiss and Austrian variants use the German titles, since TMDB has few
+        regional translations.
+      </p>
     </form>
   )
 }

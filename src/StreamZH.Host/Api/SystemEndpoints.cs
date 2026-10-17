@@ -20,7 +20,7 @@ public static class SystemEndpoints
             AppName: AppInfo.Name,
             Version: AppInfo.Version,
             Runtime: RuntimeInformation.FrameworkDescription,
-            OperatingSystem: RuntimeInformation.OSDescription,
+            OperatingSystem: OperatingSystemName(),
             IsDocker: Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true",
             StartedAt: startup.StartedAt,
             DatabaseSchemaVersion: database.SchemaVersion()));
@@ -33,6 +33,33 @@ public static class SystemEndpoints
         app.MapGet("/health", () => Results.Ok(new { status = "ok" })).WithTags("System").AllowAnonymous();
 
         return app;
+    }
+
+    /// <summary>"Windows 11 25H2" instead of "Microsoft Windows 10.0.26200".</summary>
+    public static string OperatingSystemName()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var build = Environment.OSVersion.Version.Build;
+            var name = build >= 22000 ? "Windows 11" : "Windows 10";
+            try
+            {
+                var display = Microsoft.Win32.Registry.GetValue(
+                    @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "DisplayVersion", null) as string;
+                return string.IsNullOrWhiteSpace(display) ? $"{name} (build {build})" : $"{name} {display}";
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or IOException or UnauthorizedAccessException)
+            {
+                return $"{name} (build {build})";
+            }
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return $"macOS {Environment.OSVersion.Version.Major}.{Environment.OSVersion.Version.Minor}";
+        }
+
+        return RuntimeInformation.OSDescription;
     }
 }
 

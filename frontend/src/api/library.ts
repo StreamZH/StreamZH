@@ -178,6 +178,7 @@ export const libraryApi = {
 
   stats: () => request<LibraryStats>('GET', '/library/stats'),
   rescan: () => request<JobStatus>('POST', '/library/rescan'),
+  refreshAll: () => request<{ queued: number }>('POST', '/library/refresh-all'),
   jobs: () => request<JobStatus>('GET', '/system/jobs'),
 
   metadataSettings: () => request<MetadataSettings>('GET', '/settings/metadata'),

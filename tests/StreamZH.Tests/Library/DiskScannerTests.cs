@@ -27,6 +27,31 @@ public sealed class DiskScannerTests : IDisposable
     }
 
     [Fact]
+    public void Unpacked_bluray_counts_as_one_file()
+    {
+        var folder = Path.Combine(_root, "The Pope's Exorcist (2023)");
+        Touch(folder, "Disc/BDMV/STREAM/00001.m2ts", 20000);
+        Touch(folder, "Disc/BDMV/STREAM/00002.m2ts", 300);
+        Touch(folder, "Disc/BDMV/index.bdmv", 1);
+
+        var file = DiskScanner.ScanMovie(folder);
+
+        Assert.NotNull(file);
+        Assert.Equal(Path.Combine("Disc", "BDMV"), file.RelativePath);
+        Assert.Equal(20301L * 1024 * 1024, file.Size);
+        Assert.Equal((1, 20301L * 1024 * 1024), DiskScanner.SummarizeMovieFolder(folder));
+    }
+
+    [Fact]
+    public void Iso_image_is_a_movie_file()
+    {
+        var folder = Path.Combine(_root, "Arrival (2016)");
+        Touch(folder, "Arrival.2016.Complete.BluRay.iso", 40000);
+
+        Assert.Equal("Arrival.2016.Complete.BluRay.iso", DiskScanner.ScanMovie(folder)!.RelativePath);
+    }
+
+    [Fact]
     public void Missing_folder_has_no_file() => Assert.Null(DiskScanner.ScanMovie(Path.Combine(_root, "nope")));
 
     [Fact]

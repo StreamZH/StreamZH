@@ -15,5 +15,17 @@ public sealed class TmdbSettings(ConfigRepository config) : ITmdbSettings
 
     public string? Token => config.Get(ConfigKeys.TmdbToken);
 
-    public string Language => config.Get(ConfigKeys.TmdbLanguage) ?? DefaultLanguage;
+    /// <summary>
+    /// Language sent to TMDB. Regional variants with few translations (de-CH, de-AT, fr-CH, it-CH) are sent as the
+    /// main variant, because TMDB falls back to the original title instead of e.g. the German one.
+    /// </summary>
+    public string Language => ForTmdb(config.Get(ConfigKeys.TmdbLanguage) ?? DefaultLanguage);
+
+    public static string ForTmdb(string language) => language switch
+    {
+        "de-CH" or "de-AT" => "de-DE",
+        "fr-CH" => "fr-FR",
+        "it-CH" => "it-IT",
+        _ => language,
+    };
 }

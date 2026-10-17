@@ -12,7 +12,6 @@ export const stages = [
 ] as const
 
 /** Notifications (media servers, Discord …) are not part of this strip yet. */
-export const later = [{ key: 'notify', label: 'Notify' }] as const
 
 export type StageKey = (typeof stages)[number]['key']
 export type StageState = 'done' | 'current' | 'waiting' | 'paused' | 'failed' | 'todo'

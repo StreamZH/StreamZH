@@ -1,6 +1,6 @@
 import StatusIcon from '../status/icons'
 import styles from './Activity.module.css'
-import { later, stages, stageStates, stateText, type PipelineItem } from './pipeline'
+import { stages, stageStates, stateText, type PipelineItem } from './pipeline'
 
 export default function PipelineStrip({ item }: { item: PipelineItem }) {
   const states = stageStates(item)
@@ -32,15 +32,6 @@ export default function PipelineStrip({ item }: { item: PipelineItem }) {
             </li>,
           ]
         })}
-        <li aria-hidden="true" className={styles.lineLater} />
-        {later.map((stage) => (
-          <li key={stage.key} className={`${styles.stage} ${styles.stageLater}`} aria-label={`${stage.label}: coming soon`}>
-            <span className={styles.stageDot} aria-hidden="true" />
-            <span className={styles.stageLabel}>
-              {stage.label} <small>0.6</small>
-            </span>
-          </li>
-        ))}
       </ol>
       <p className={styles.pipelineCaption} aria-hidden="true">
         Step {stages.indexOf(current) + 1} of {stages.length} · <b>{current.label}</b>

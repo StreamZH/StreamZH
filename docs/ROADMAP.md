@@ -15,7 +15,7 @@ SABnzbd and the indexer setup on the CloudZH home server.
 | 0.3 ✅ | Parser & Profiles | Port release-name, quality and language parser incl. test fixtures; quality profiles; decision engine | Parser test suite green, releases ranked correctly |
 | 0.4 ✅ | Indexers & Search | Newznab client, capabilities, manual search (interactive), automatic search for missing items; 0.4.1: indexer catalog, query/grab limits, VIP expiry, indexer search/stats/history, import from Prowlarr (replaces Prowlarr) | Manual search shows ranked releases |
 | 0.5 ✅ | Download Engine | NZB parser, NNTP pool with backup servers, yEnc, assembly, par2 verify/repair, unpack | A real NZB downloads, repairs and unpacks |
-| 0.6 | Import & Activity | Import + rename, history, blocklist + retry, Plex refresh, Activity page with live pipeline; release rules, release profiles and RSS sync (Settings → Indexers) | Grab → playable file in Plex without manual steps |
+| 0.6 ✅ | Import & Settings | Import + rename, blocklist + retry, Plex/Jellyfin/Emby/Kodi and notifications, NFO and artwork; settings areas like Radarr/Sonarr/SABnzbd (Media Management, Indexers with release profiles and RSS sync, Downloads with categories/switches/schedule, Connect, Metadata, General with host/security/proxy/backups, UI) and System pages | Grab → playable file in Plex without manual steps |
 | 0.7 | Automation | Calendar, upgrades until cutoff, cleanup, health checks, notifications (Discord) | Runs unattended for two weeks |
 | 0.8 | Migration | Import settings and libraries from existing Sonarr/Radarr/Prowlarr/SABnzbd via their APIs | Home server switched over to StreamZH |
 

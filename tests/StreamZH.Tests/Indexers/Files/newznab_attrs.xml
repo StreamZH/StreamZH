@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/">
+  <channel>
+    <title>StreamZH test indexer</title>
+    <newznab:response offset="0" total="6" />
+    <item>
+      <title>Dune.Part.Two.2024.2160p.UHD.BluRay.x265-GROUP</title>
+      <guid isPermaLink="true">https://indexer.example/details/aaa111</guid>
+      <link>https://indexer.example/getnzb/aaa111.nzb&amp;i=1&amp;r=SECRETKEY</link>
+      <comments>https://indexer.example/details/aaa111#comments</comments>
+      <pubDate>Sat, 07 Mar 2015 18:32:13 +0000</pubDate>
+      <description>Size: 41.9&nbsp;GB</description>
+      <enclosure url="https://indexer.example/getnzb/aaa111.nzb&amp;i=1&amp;r=SECRETKEY" length="123" type="application/x-nzb" />
+      <newznab:attr name="category" value="2000" />
+      <newznab:attr name="category" value="2045" />
+      <newznab:attr name="size" value="45000000000" />
+      <newznab:attr name="grabs" value="42" />
+      <newznab:attr name="tmdb" value="693134" />
+      <newznab:attr name="imdb" value="15239678" />
+      <newznab:attr name="usenetdate" value="Fri, 06 Mar 2015 10:00:00 +0100" />
+    </item>
+    <item>
+      <title>Star.Wars.1977.1080p.BluRay.x264-OLD</title>
+      <guid>bbb222</guid>
+      <link>https://indexer.example/getnzb/bbb222.nzb</link>
+      <pubDate>Mon, 27 Feb 2012 11:09:39 EST</pubDate>
+      <enclosure url="https://indexer.example/getnzb/bbb222.nzb" length="2000000000" type="application/x-nzb" />
+      <newznab:attr name="tmdbid" value="11" />
+      <newznab:attr name="imdbid" value="tt0076759" />
+      <newznab:attr name="category" value="2040" />
+    </item>
+    <item>
+      <title>Breaking.Bad.S01E01.720p.HDTV.x264-CTU</title>
+      <guid>ccc333</guid>
+      <pubDate>not a date</pubDate>
+      <enclosure url="https://indexer.example/getnzb/ccc333.nzb" length="700000000" type="application/x-nzb" />
+      <newznab:attr name="tvdbid" value="81189" />
+      <newznab:attr name="imdb" value="0903747" />
+      <newznab:attr name="tmdbid" value="0" />
+      <newznab:attr name="grabs" value="many" />
+    </item>
+    <item>
+      <title>   </title>
+      <guid>no-title</guid>
+      <link>https://indexer.example/getnzb/notitle.nzb</link>
+    </item>
+    <item>
+      <title>No.Download.Link.2020.720p-GRP</title>
+      <guid>no-link</guid>
+    </item>
+    <item>
+      <title>Link.Only.Item.2021.1080p.WEB-DL-GRP</title>
+      <link>https://indexer.example/getnzb/linkonly.nzb</link>
+      <pubDate>Tue, 05 Jan 2021 08:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

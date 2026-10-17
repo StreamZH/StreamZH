@@ -15,4 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/StreamZH.Host/StreamZH.Host.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Indexers/Files/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

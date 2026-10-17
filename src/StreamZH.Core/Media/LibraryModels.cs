@@ -31,6 +31,7 @@ public sealed class Movie
     public string? PosterPath { get; set; }
     public string? BackdropPath { get; set; }
     public bool Monitored { get; set; } = true;
+    public int QualityProfileId { get; set; }
     public int RootFolderId { get; set; }
     public string FolderPath { get; set; } = string.Empty;
     public DateTime Added { get; set; }
@@ -55,6 +56,7 @@ public sealed class Series
     public string? PosterPath { get; set; }
     public string? BackdropPath { get; set; }
     public bool Monitored { get; set; } = true;
+    public int QualityProfileId { get; set; }
     public int RootFolderId { get; set; }
     public string FolderPath { get; set; } = string.Empty;
     public DateTime Added { get; set; }

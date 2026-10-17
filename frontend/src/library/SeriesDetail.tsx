@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { libraryApi, queryKeys, type Episode, type Season } from '../api/library'
+import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDate, isAired } from '../lib/format'
 import page from '../pages/Page.module.css'
@@ -13,7 +14,7 @@ import { useDetailActions } from './useDetailActions'
 export default function SeriesDetail() {
   const id = Number(useParams().id)
   const detail = useQuery({ queryKey: queryKeys.seriesDetail(id), queryFn: () => libraryApi.seriesDetail(id) })
-  const { monitor, refresh, remove } = useDetailActions('Series', id)
+  const { monitor, refresh, remove, assignProfile } = useDetailActions('Series', id)
 
   if (detail.isError) return <p className={ui.error}>{detail.error.message}</p>
   if (!detail.data) return <div className={page.page} aria-busy="true" />
@@ -49,7 +50,17 @@ export default function SeriesDetail() {
             <button className={ui.button} type="button" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
               {refresh.isSuccess ? 'Refresh queued' : 'Refresh & rescan'}
             </button>
+            <label className={styles.profile}>
+              <span>Profile</span>
+              <ProfileSelect
+                className=""
+                value={s.qualityProfileId}
+                onChange={(profileId) => assignProfile.mutate(profileId)}
+                disabled={assignProfile.isPending}
+              />
+            </label>
             <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
         }
       />

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { libraryApi, queryKeys } from '../api/library'
+import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDate, formatRuntime } from '../lib/format'
 import page from '../pages/Page.module.css'
@@ -12,7 +13,7 @@ import { useDetailActions } from './useDetailActions'
 export default function MovieDetail() {
   const id = Number(useParams().id)
   const movie = useQuery({ queryKey: queryKeys.movie(id), queryFn: () => libraryApi.movie(id) })
-  const { monitor, refresh, remove } = useDetailActions('Movie', id)
+  const { monitor, refresh, remove, assignProfile } = useDetailActions('Movie', id)
 
   if (movie.isError) return <p className={ui.error}>{movie.error.message}</p>
   if (!movie.data) return <div className={page.page} aria-busy="true" />
@@ -45,7 +46,17 @@ export default function MovieDetail() {
             <button className={ui.button} type="button" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
               {refresh.isSuccess ? 'Refresh queued' : 'Refresh & rescan'}
             </button>
+            <label className={styles.profile}>
+              <span>Profile</span>
+              <ProfileSelect
+                className=""
+                value={m.qualityProfileId}
+                onChange={(profileId) => assignProfile.mutate(profileId)}
+                disabled={assignProfile.isPending}
+              />
+            </label>
             <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
         }
       />

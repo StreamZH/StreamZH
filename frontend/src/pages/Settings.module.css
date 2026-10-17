@@ -248,3 +248,16 @@
 .rootForm input {
   flex: 1 1 280px;
 }
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 24px;
+}
+
+.subnav {
+  display: flex;
+  gap: 8px;
+}

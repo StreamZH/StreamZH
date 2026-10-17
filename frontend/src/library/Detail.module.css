@@ -200,3 +200,27 @@
   background: rgb(28 27 25 / 0.85);
   backdrop-filter: blur(6px);
 }
+
+.profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.profile select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: rgb(28 27 25 / 0.85);
+  backdrop-filter: blur(6px);
+}
+
+.profile select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}

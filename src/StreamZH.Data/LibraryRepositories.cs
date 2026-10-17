@@ -48,7 +48,7 @@ public sealed class MovieRepository(Database database)
 {
     private const string Columns = """
         Id, TmdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Runtime, Status, Genres, PosterPath, BackdropPath,
-        Monitored, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified
+        Monitored, QualityProfileId, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified
         """;
 
     public IReadOnlyList<Movie> All()
@@ -87,9 +87,9 @@ public sealed class MovieRepository(Database database)
         movie.Id = connection.ExecuteScalar<int>(
             """
             INSERT INTO Movies (TmdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Runtime, Status, Genres, PosterPath, BackdropPath,
-                Monitored, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified)
+                Monitored, QualityProfileId, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified)
             VALUES (@TmdbId, @ImdbId, @Title, @OriginalTitle, @SortTitle, @Year, @Overview, @Runtime, @Status, @Genres, @PosterPath, @BackdropPath,
-                @Monitored, @RootFolderId, @FolderPath, @Added, @LastRefreshed, @FileRelativePath, @FileSize, @FileModified);
+                @Monitored, @QualityProfileId, @RootFolderId, @FolderPath, @Added, @LastRefreshed, @FileRelativePath, @FileSize, @FileModified);
             SELECT last_insert_rowid();
             """,
             MovieRow.From(movie));
@@ -103,7 +103,7 @@ public sealed class MovieRepository(Database database)
             """
             UPDATE Movies SET ImdbId = @ImdbId, Title = @Title, OriginalTitle = @OriginalTitle, SortTitle = @SortTitle, Year = @Year,
                 Overview = @Overview, Runtime = @Runtime, Status = @Status, Genres = @Genres, PosterPath = @PosterPath, BackdropPath = @BackdropPath,
-                Monitored = @Monitored, FolderPath = @FolderPath, LastRefreshed = @LastRefreshed,
+                Monitored = @Monitored, QualityProfileId = @QualityProfileId, FolderPath = @FolderPath, LastRefreshed = @LastRefreshed,
                 FileRelativePath = @FileRelativePath, FileSize = @FileSize, FileModified = @FileModified
             WHERE Id = @Id
             """,
@@ -132,6 +132,7 @@ public sealed class MovieRepository(Database database)
         public string? PosterPath { get; init; }
         public string? BackdropPath { get; init; }
         public bool Monitored { get; init; }
+        public long QualityProfileId { get; init; }
         public long RootFolderId { get; init; }
         public string FolderPath { get; init; } = string.Empty;
         public DateTime Added { get; init; }
@@ -156,6 +157,7 @@ public sealed class MovieRepository(Database database)
             PosterPath = m.PosterPath,
             BackdropPath = m.BackdropPath,
             Monitored = m.Monitored,
+            QualityProfileId = m.QualityProfileId,
             RootFolderId = m.RootFolderId,
             FolderPath = m.FolderPath,
             Added = m.Added,
@@ -181,6 +183,7 @@ public sealed class MovieRepository(Database database)
             PosterPath = PosterPath,
             BackdropPath = BackdropPath,
             Monitored = Monitored,
+            QualityProfileId = (int)QualityProfileId,
             RootFolderId = (int)RootFolderId,
             FolderPath = FolderPath,
             Added = Utc(Added),
@@ -196,7 +199,7 @@ public sealed class SeriesRepository(Database database)
 {
     private const string Columns = """
         Id, TmdbId, TvdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Status, Network, Genres, PosterPath, BackdropPath,
-        Monitored, RootFolderId, FolderPath, Added, LastRefreshed
+        Monitored, QualityProfileId, RootFolderId, FolderPath, Added, LastRefreshed
         """;
 
     private const string EpisodeColumns = """
@@ -233,9 +236,9 @@ public sealed class SeriesRepository(Database database)
         series.Id = connection.ExecuteScalar<int>(
             """
             INSERT INTO Series (TmdbId, TvdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Status, Network, Genres, PosterPath, BackdropPath,
-                Monitored, RootFolderId, FolderPath, Added, LastRefreshed)
+                Monitored, QualityProfileId, RootFolderId, FolderPath, Added, LastRefreshed)
             VALUES (@TmdbId, @TvdbId, @ImdbId, @Title, @OriginalTitle, @SortTitle, @Year, @Overview, @Status, @Network, @Genres, @PosterPath, @BackdropPath,
-                @Monitored, @RootFolderId, @FolderPath, @Added, @LastRefreshed);
+                @Monitored, @QualityProfileId, @RootFolderId, @FolderPath, @Added, @LastRefreshed);
             SELECT last_insert_rowid();
             """,
             SeriesRow.From(series));
@@ -249,7 +252,7 @@ public sealed class SeriesRepository(Database database)
             """
             UPDATE Series SET TvdbId = @TvdbId, ImdbId = @ImdbId, Title = @Title, OriginalTitle = @OriginalTitle, SortTitle = @SortTitle, Year = @Year,
                 Overview = @Overview, Status = @Status, Network = @Network, Genres = @Genres, PosterPath = @PosterPath, BackdropPath = @BackdropPath,
-                Monitored = @Monitored, FolderPath = @FolderPath, LastRefreshed = @LastRefreshed
+                Monitored = @Monitored, QualityProfileId = @QualityProfileId, FolderPath = @FolderPath, LastRefreshed = @LastRefreshed
             WHERE Id = @Id
             """,
             SeriesRow.From(series));
@@ -392,6 +395,7 @@ public sealed class SeriesRepository(Database database)
         public string? PosterPath { get; init; }
         public string? BackdropPath { get; init; }
         public bool Monitored { get; init; }
+        public long QualityProfileId { get; init; }
         public long RootFolderId { get; init; }
         public string FolderPath { get; init; } = string.Empty;
         public DateTime Added { get; init; }
@@ -414,6 +418,7 @@ public sealed class SeriesRepository(Database database)
             PosterPath = s.PosterPath,
             BackdropPath = s.BackdropPath,
             Monitored = s.Monitored,
+            QualityProfileId = s.QualityProfileId,
             RootFolderId = s.RootFolderId,
             FolderPath = s.FolderPath,
             Added = s.Added,
@@ -437,6 +442,7 @@ public sealed class SeriesRepository(Database database)
             PosterPath = PosterPath,
             BackdropPath = BackdropPath,
             Monitored = Monitored,
+            QualityProfileId = (int)QualityProfileId,
             RootFolderId = (int)RootFolderId,
             FolderPath = FolderPath,
             Added = DateTime.SpecifyKind(Added, DateTimeKind.Utc),

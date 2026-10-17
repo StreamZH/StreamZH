@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { api, ApiError, logLevels, type GeneralSettings } from '../api/client'
 import { authQueryKey, useAuth } from '../auth/auth'
+import ui from '../components/ui.module.css'
 import { useScrollToHash } from '../lib/useScrollToHash'
 import { MetadataSection, RootFoldersSection } from './MediaSettings'
 import page from './Page.module.css'
@@ -15,9 +17,16 @@ export default function Settings() {
 
   return (
     <div className={page.page}>
-      <header>
-        <h1 className={page.title}>Settings</h1>
-        <p className={page.lead}>Media folders, metadata, API access and logs.</p>
+      <header className={styles.header}>
+        <div>
+          <h1 className={page.title}>Settings</h1>
+          <p className={page.lead}>Media folders, metadata, API access and logs.</p>
+        </div>
+        <nav className={styles.subnav} aria-label="More settings">
+          <Link className={ui.button} to="/settings/profiles">
+            Profiles
+          </Link>
+        </nav>
       </header>
 
       <div id="media" className={page.page}>

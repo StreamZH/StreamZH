@@ -13,10 +13,19 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext http, Exception exception, CancellationToken cancellationToken)
     {
+        if (exception is ValidationFailedException validation)
+        {
+            logger.LogDebug("API validation error: {Fields}", string.Join(", ", validation.Errors.Keys));
+            await Results.ValidationProblem(validation.Errors).ExecuteAsync(http);
+            return true;
+        }
+
         var (status, code) = exception switch
         {
             LibraryException { Error: LibraryError.NotFound } => (StatusCodes.Status404NotFound, "not-found"),
             LibraryException { Error: LibraryError.AlreadyExists } => (StatusCodes.Status409Conflict, "already-exists"),
+            LibraryException { Error: LibraryError.InUse } => (StatusCodes.Status409Conflict, "in-use"),
+            LibraryException { Error: LibraryError.Conflict } => (StatusCodes.Status409Conflict, "conflict"),
             LibraryException => (StatusCodes.Status400BadRequest, "invalid"),
             TmdbException { StatusCode: null } when exception.Message.StartsWith("TMDB is not set up", StringComparison.Ordinal)
                 => (StatusCodes.Status400BadRequest, "tmdb-not-configured"),

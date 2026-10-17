@@ -29,7 +29,7 @@ public sealed record ManualImportRequest(MediaType MediaType, int? MovieId, int?
 public sealed record ManualImportFile(string Path, IReadOnlyList<int> EpisodeIds);
 
 /// <summary>A video file in a download folder as the manual import dialog shows it.</summary>
-public sealed record ImportCandidate(
+public sealed record ImportFileCandidate(
     string RelativePath,
     long Size,
     string Quality,
@@ -169,7 +169,7 @@ public sealed class DownloadImportService(
     }
 
     /// <summary>The video files of a download for the manual import dialog, matched to episodes of <paramref name="seriesId"/> when given.</summary>
-    public IReadOnlyList<ImportCandidate> Candidates(int downloadId, int? seriesId)
+    public IReadOnlyList<ImportFileCandidate> Candidates(int downloadId, int? seriesId)
     {
         var item = queue?.Find(downloadId) ?? throw new LibraryException($"Download {downloadId} not found.", LibraryError.NotFound);
         if (item.OutputPath is not { } folder || !Directory.Exists(folder))
@@ -198,7 +198,7 @@ public sealed class DownloadImportService(
                 }
             }
 
-            return new ImportCandidate(
+            return new ImportFileCandidate(
                 Path.GetRelativePath(folder, file.FullName),
                 file.Length,
                 info.Quality.ToString(),

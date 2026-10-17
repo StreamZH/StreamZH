@@ -81,7 +81,7 @@ export default function Layout() {
     <div className={styles.shell}>
       <nav className={styles.sidebar} aria-label="Main">
         <div className={styles.brand}>
-          <Logo size={28} />
+          <Logo size={35} />
         </div>
 
         {sections.map((section, index) => (

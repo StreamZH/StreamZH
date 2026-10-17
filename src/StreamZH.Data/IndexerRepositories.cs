@@ -35,7 +35,8 @@ public sealed class IndexerRepository(Database database)
 {
     private const string Columns = """
         Id, Name, Implementation, BaseUrl, ApiPath, ApiKey, Categories, TvCategories, Priority,
-        EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added
+        EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added,
+        Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit
         """;
 
     /// <summary>All indexers ordered by priority, then name.</summary>
@@ -64,9 +65,11 @@ public sealed class IndexerRepository(Database database)
         return connection.ExecuteScalar<int>(
             """
             INSERT INTO Indexers (Name, Implementation, BaseUrl, ApiPath, ApiKey, Categories, TvCategories, Priority,
-                EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added)
+                EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added,
+                Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit)
             VALUES (@Name, @Implementation, @BaseUrl, @ApiPath, @ApiKey, @Categories, @TvCategories, @Priority,
-                @EnableRss, @EnableAutomaticSearch, @EnableInteractiveSearch, @Added);
+                @EnableRss, @EnableAutomaticSearch, @EnableInteractiveSearch, @Added,
+                @Enable, @DefinitionKey, @AdditionalParameters, @VipExpiration, @QueryLimit, @GrabLimit, @LimitsUnit);
             SELECT last_insert_rowid();
             """,
             IndexerRow.From(indexer, added));
@@ -79,10 +82,37 @@ public sealed class IndexerRepository(Database database)
             """
             UPDATE Indexers SET Name = @Name, Implementation = @Implementation, BaseUrl = @BaseUrl, ApiPath = @ApiPath, ApiKey = @ApiKey,
                 Categories = @Categories, TvCategories = @TvCategories, Priority = @Priority, EnableRss = @EnableRss,
-                EnableAutomaticSearch = @EnableAutomaticSearch, EnableInteractiveSearch = @EnableInteractiveSearch
+                EnableAutomaticSearch = @EnableAutomaticSearch, EnableInteractiveSearch = @EnableInteractiveSearch,
+                Enable = @Enable, DefinitionKey = @DefinitionKey, AdditionalParameters = @AdditionalParameters, VipExpiration = @VipExpiration,
+                QueryLimit = @QueryLimit, GrabLimit = @GrabLimit, LimitsUnit = @LimitsUnit
             WHERE Id = @Id
             """,
             IndexerRow.From(indexer, default));
+    }
+
+    /// <summary>Stores the capabilities (JSON) read from the indexer and when they were read; nulls clear them.</summary>
+    public void SaveCapabilities(int id, string? capabilitiesJson, DateTime? checkedAt)
+    {
+        using var connection = database.Open();
+        connection.Execute(
+            "UPDATE Indexers SET Capabilities = @capabilitiesJson, CapabilitiesCheckedAt = @checkedAt WHERE Id = @id",
+            new { id, capabilitiesJson, checkedAt });
+    }
+
+    /// <summary>The stored capabilities (JSON) and when they were read; both null when never read.</summary>
+    public (string? Json, DateTime? CheckedAt) FindCapabilities(int id)
+    {
+        using var connection = database.Open();
+        var row = connection.QuerySingleOrDefault<CapabilitiesRow>("SELECT Capabilities, CapabilitiesCheckedAt FROM Indexers WHERE Id = @id", new { id });
+        return row is null
+            ? (null, null)
+            : (row.Capabilities, row.CapabilitiesCheckedAt is { } at ? DateTime.SpecifyKind(at, DateTimeKind.Utc) : null);
+    }
+
+    private sealed class CapabilitiesRow
+    {
+        public string? Capabilities { get; init; }
+        public DateTime? CapabilitiesCheckedAt { get; init; }
     }
 
     /// <summary>Deletes the indexer; its status row goes with it (cascade).</summary>
@@ -107,6 +137,13 @@ public sealed class IndexerRepository(Database database)
         public bool EnableAutomaticSearch { get; init; }
         public bool EnableInteractiveSearch { get; init; }
         public DateTime Added { get; init; }
+        public bool Enable { get; init; } = true;
+        public string? DefinitionKey { get; init; }
+        public string AdditionalParameters { get; init; } = string.Empty;
+        public string? VipExpiration { get; init; }
+        public long? QueryLimit { get; init; }
+        public long? GrabLimit { get; init; }
+        public string LimitsUnit { get; init; } = "day";
 
         public static IndexerRow From(IndexerDefinition i, DateTime added) => new()
         {
@@ -123,6 +160,13 @@ public sealed class IndexerRepository(Database database)
             EnableAutomaticSearch = i.EnableAutomaticSearch,
             EnableInteractiveSearch = i.EnableInteractiveSearch,
             Added = added,
+            Enable = i.Enable,
+            DefinitionKey = i.DefinitionKey,
+            AdditionalParameters = i.AdditionalParameters ?? string.Empty,
+            VipExpiration = i.VipExpiration,
+            QueryLimit = i.QueryLimit,
+            GrabLimit = i.GrabLimit,
+            LimitsUnit = i.LimitsUnit == IndexerLimitsUnit.Hour ? "hour" : "day",
         };
 
         public IndexerDefinition ToDefinition() => new(
@@ -137,7 +181,16 @@ public sealed class IndexerRepository(Database database)
             (int)Priority,
             EnableRss,
             EnableAutomaticSearch,
-            EnableInteractiveSearch);
+            EnableInteractiveSearch)
+        {
+            Enable = Enable,
+            DefinitionKey = DefinitionKey,
+            AdditionalParameters = AdditionalParameters ?? string.Empty,
+            VipExpiration = VipExpiration,
+            QueryLimit = QueryLimit is { } q ? (int)q : null,
+            GrabLimit = GrabLimit is { } g ? (int)g : null,
+            LimitsUnit = string.Equals(LimitsUnit, "hour", StringComparison.OrdinalIgnoreCase) ? IndexerLimitsUnit.Hour : IndexerLimitsUnit.Day,
+        };
     }
 }
 

@@ -141,6 +141,39 @@ public static partial class NewznabRequestBuilder
     /// <summary>The newest releases (RSS): t=search without a query.</summary>
     public static NewznabQuery Recent(IReadOnlyList<int> categories) => new("search", categories, string.Empty);
 
+    /// <summary>
+    /// The indexer's additional parameters ("a=b&amp;c=d", leading '&amp;' optional) as "&amp;a=b&amp;c=d", escaped.
+    /// Parts without a name or '=' are dropped, and so are t, apikey, offset and limit: StreamZH sets those itself.
+    /// </summary>
+    public static string AdditionalParameters(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var result = new StringBuilder();
+        foreach (var part in value.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separator = part.IndexOf('=', StringComparison.Ordinal);
+            if (separator <= 0)
+            {
+                continue;
+            }
+
+            var name = Unescape(part[..separator]).Trim();
+            if (name.Length == 0 || ReservedParameters.Contains(name))
+            {
+                continue;
+            }
+
+            var parameterValue = Unescape(part[(separator + 1)..]);
+            result.Append('&').Append(Uri.EscapeDataString(name)).Append('=').Append(Uri.EscapeDataString(parameterValue));
+        }
+
+        return result.ToString();
+    }
+
     /// <summary>Radarr's and Sonarr's GetCleanSceneTitle: for search engines other than "raw".</summary>
     public static string CleanTitle(string title)
     {
@@ -173,6 +206,20 @@ public static partial class NewznabRequestBuilder
         return int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var number) && number > 0
             ? number.ToString("D7", CultureInfo.InvariantCulture)
             : null;
+    }
+
+    private static readonly HashSet<string> ReservedParameters = new(["t", "apikey", "offset", "limit"], StringComparer.OrdinalIgnoreCase);
+
+    private static string Unescape(string value)
+    {
+        try
+        {
+            return Uri.UnescapeDataString(value.Replace('+', ' '));
+        }
+        catch (UriFormatException)
+        {
+            return value;
+        }
     }
 
     private static List<NewznabQuery> TvIdQueries(EpisodeSearchCriteria criteria, IReadOnlyList<int> categories, NewznabCaps caps, string suffix)

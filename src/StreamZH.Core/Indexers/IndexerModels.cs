@@ -2,6 +2,9 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Globalization;
+using System.Text.Json.Serialization;
+
 namespace StreamZH.Core.Indexers;
 
 /// <summary>Which job asks for releases; each indexer can be switched on or off per use.</summary>
@@ -39,12 +42,50 @@ public sealed record IndexerDefinition(
 {
     public const string Newznab = "Newznab";
 
-    public bool IsEnabledFor(IndexerUse use) => use switch
+    /// <summary>Master switch (Prowlarr's "Enable"): a disabled indexer is never used.</summary>
+    public bool Enable { get; init; } = true;
+
+    /// <summary>Key of the catalog entry the indexer was created from; null for older indexers (treated as "generic-newznab").</summary>
+    public string? DefinitionKey { get; init; }
+
+    /// <summary>Extra parameters appended to every API request, e.g. "&amp;attrs=poster" (leading '&amp;' optional).</summary>
+    public string AdditionalParameters { get; init; } = string.Empty;
+
+    /// <summary>End of the VIP membership as "yyyy-MM-dd", or null.</summary>
+    public string? VipExpiration { get; init; }
+
+    /// <summary>Maximum API queries (search and RSS) per <see cref="LimitsUnit"/>; null or 0 = unlimited.</summary>
+    public int? QueryLimit { get; init; }
+
+    /// <summary>Maximum NZB downloads per <see cref="LimitsUnit"/>; null or 0 = unlimited.</summary>
+    public int? GrabLimit { get; init; }
+
+    public IndexerLimitsUnit LimitsUnit { get; init; } = IndexerLimitsUnit.Day;
+
+    /// <summary>The VIP expiration as a date; null when not set or not readable.</summary>
+    public DateOnly? VipExpirationDate =>
+        DateOnly.TryParseExact(VipExpiration, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
+
+    /// <summary>The rolling window of the query and grab limits.</summary>
+    public TimeSpan LimitsWindow => LimitsUnit == IndexerLimitsUnit.Hour ? TimeSpan.FromHours(1) : TimeSpan.FromHours(24);
+
+    public bool IsEnabledFor(IndexerUse use) => Enable && use switch
     {
         IndexerUse.Rss => EnableRss,
         IndexerUse.AutomaticSearch => EnableAutomaticSearch,
         _ => EnableInteractiveSearch,
     };
+}
+
+/// <summary>Window for query and grab limits: rolling 24 hours or rolling hour (like Prowlarr).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<IndexerLimitsUnit>))]
+public enum IndexerLimitsUnit
+{
+    [JsonStringEnumMemberName("day")]
+    Day,
+
+    [JsonStringEnumMemberName("hour")]
+    Hour,
 }
 
 /// <summary>One category from the indexer's capabilities, with its sub-categories.</summary>
@@ -131,4 +172,10 @@ public sealed class IndexerException : Exception
 
     /// <summary>Wrong API key or account problem: retrying will not help until the settings change.</summary>
     public bool IsAuthError => Code is >= 100 and < 200;
+
+    /// <summary>
+    /// StreamZH's own query or grab limit for the indexer is reached and no request was sent.
+    /// Not a failure of the indexer, so it does not count towards the back-off.
+    /// </summary>
+    public bool IsLimitReached { get; init; }
 }

@@ -16,15 +16,20 @@ public static class IndexerServiceCollectionExtensions
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
     /// <summary>
-    /// Registers the Newznab client as <see cref="IIndexerClient"/> (typed HttpClient, 60 s timeout, "StreamZH/{version}" User-Agent)
-    /// and the shared caps cache. <paramref name="configure"/> runs last and can override the defaults.
+    /// Registers the Newznab client (typed HttpClient, 60 s timeout, "StreamZH/{version}" User-Agent) as <see cref="NewznabClient"/>,
+    /// as keyed <see cref="IIndexerClient"/> under <see cref="IndexerClientKeys.Inner"/> (wrapped by the tracking client of
+    /// AddIndexerManagement) and, only when nothing else is registered, as plain <see cref="IIndexerClient"/>.
+    /// Also registers the shared caps cache. <paramref name="configure"/> runs last and can override the defaults.
     /// </summary>
     public static IServiceCollection AddNewznabIndexers(this IServiceCollection services, Action<HttpClient>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton(sp => new NewznabCapabilitiesCache(sp.GetService<TimeProvider>()));
-        services.AddHttpClient<IIndexerClient, NewznabClient>(client =>
+        services.AddKeyedTransient<IIndexerClient>(IndexerClientKeys.Inner, (sp, _) => sp.GetRequiredService<NewznabClient>());
+        services.TryAddTransient<IIndexerClient>(sp => sp.GetRequiredService<NewznabClient>());
+        // Named "IIndexerClient" as in 0.4.0, so configuration by name keeps working.
+        services.AddHttpClient<NewznabClient>(nameof(IIndexerClient), client =>
             {
                 client.Timeout = Timeout;
                 client.DefaultRequestHeaders.UserAgent.Clear();

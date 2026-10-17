@@ -3,7 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Portions based on Prowlarr (https://github.com/Prowlarr/Prowlarr), Copyright (c) Prowlarr contributors, GPL-3.0.
 
+using System.Collections.Concurrent;
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using StreamZH.Core.Events;
 using StreamZH.Core.Indexers;
 using StreamZH.Data;
 
@@ -26,6 +31,32 @@ public sealed record IndexerTestResult(IndexerCapabilities? Capabilities, string
 {
     public bool Success => Capabilities is not null;
 }
+
+/// <summary>One row of "Test all".</summary>
+public sealed record IndexerTestAllResult(int Id, string Name, bool Ok, string? Message);
+
+/// <summary>Which limit stops the indexer right now.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<IndexerLimitKind>))]
+public enum IndexerLimitKind
+{
+    [JsonStringEnumMemberName("query")]
+    Query,
+
+    [JsonStringEnumMemberName("grab")]
+    Grab,
+}
+
+/// <summary>Use of the query and grab limits in the current window, and days until the VIP membership ends (negative: expired).</summary>
+public sealed record IndexerLimitStatus(int QueriesUsed, int GrabsUsed, IndexerLimitKind? LimitReached, int? VipExpiresInDays)
+{
+    public static readonly IndexerLimitStatus None = new(0, 0, null, null);
+}
+
+/// <summary>Everything the details page shows; nothing here calls the indexer.</summary>
+public sealed record IndexerDetails(IndexerDefinition Indexer, IndexerCatalogEntry? Definition, IndexerCapabilities? Capabilities, DateTimeOffset? CapabilitiesCheckedAt);
+
+/// <summary>Indexers were added, changed, deleted, imported or tested, or their health changed (hub message "indexersChanged").</summary>
+public sealed record IndexersChanged : IAppEvent;
 
 /// <summary>
 /// Wait times after repeated failures, like Prowlarr's EscalationBackOff (without its 1-minute step).
@@ -56,7 +87,9 @@ public sealed class IndexerService(
     IndexerRepository indexers,
     IndexerStatusRepository statuses,
     TimeProvider time,
-    ILogger<IndexerService> logger) : IIndexerProvider
+    ILogger<IndexerService> logger,
+    IndexerHistoryRepository? history = null,
+    IEventBus? events = null) : IIndexerProvider
 {
     public const int MaxNameLength = 100;
     public const int MinPriority = 1;
@@ -67,6 +100,9 @@ public sealed class IndexerService(
     /// <summary>What the API shows instead of a stored API key. Sent back unchanged, it means "keep the stored key".</summary>
     public const string MaskedApiKey = "********";
 
+    /// <summary>A successful test is used for the capabilities of the indexer saved with the same connection within this time.</summary>
+    public static readonly TimeSpan RecentTestLifetime = TimeSpan.FromMinutes(30);
+
     private const int MaxErrorLength = 500;
 
     /// <summary>Radarr's default Newznab movie categories.</summary>
@@ -75,7 +111,12 @@ public sealed class IndexerService(
     /// <summary>Sonarr's default Newznab TV categories.</summary>
     public static readonly IReadOnlyList<int> DefaultTvCategories = [5030, 5040];
 
+    private static readonly JsonSerializerOptions CapabilitiesJson = new(JsonSerializerDefaults.Web);
+
     private readonly Lock _statusLock = new();
+
+    // Successful tests by connection (URL, path, key), so saving right after "Test" stores the capabilities.
+    private readonly ConcurrentDictionary<string, (IndexerCapabilities Caps, DateTimeOffset At)> _recentTests = new(StringComparer.Ordinal);
 
     /// <summary>A new Newznab indexer to start from.</summary>
     public static IndexerDefinition Schema() => new(
@@ -97,9 +138,17 @@ public sealed class IndexerService(
 
     public IndexerDefinition? Find(int id) => indexers.Find(id);
 
-    public IndexerDefinition Create(IndexerDefinition indexer)
+    /// <summary>
+    /// Adds an indexer. With <paramref name="cloneFromId"/> ("Clone" in the UI) a masked API key means the stored key of that indexer.
+    /// </summary>
+    public IndexerDefinition Create(IndexerDefinition indexer, int? cloneFromId = null)
     {
         var normalized = Normalize(indexer) with { Id = 0 };
+        if (normalized.ApiKey == MaskedApiKey && cloneFromId is > 0 && indexers.Find(cloneFromId.Value) is { } source)
+        {
+            normalized = normalized with { ApiKey = source.ApiKey };
+        }
+
         var errors = Validate(normalized, null);
         if (normalized.ApiKey == MaskedApiKey)
         {
@@ -108,7 +157,9 @@ public sealed class IndexerService(
 
         ThrowIfAny(errors);
         var id = indexers.Add(normalized, time.GetUtcNow().UtcDateTime);
+        StoreRecentTest(id, normalized);
         logger.LogInformation("Indexer '{Name}' added", normalized.Name);
+        NotifyChanged();
         return indexers.Find(id)!;
     }
 
@@ -123,7 +174,14 @@ public sealed class IndexerService(
 
         ThrowIfAny(Validate(normalized, id));
         indexers.Update(normalized);
+        if (!StoreRecentTest(id, normalized) && ConnectionKey(existing) != ConnectionKey(normalized))
+        {
+            // Capabilities of another address or account would be misleading.
+            indexers.SaveCapabilities(id, null, null);
+        }
+
         logger.LogInformation("Indexer '{Name}' saved", normalized.Name);
+        NotifyChanged();
         return indexers.Find(id)!;
     }
 
@@ -132,22 +190,29 @@ public sealed class IndexerService(
         var existing = indexers.Find(id) ?? throw new LibraryException("Indexer not found.", LibraryError.NotFound);
         indexers.Delete(id);
         logger.LogInformation("Indexer '{Name}' deleted", existing.Name);
+        NotifyChanged();
     }
 
     /// <summary>
-    /// Reads the capabilities without saving anything. A masked API key uses the stored key of the indexer with the same id.
+    /// Reads the capabilities without saving the indexer. A masked API key uses the stored key of the indexer with the same id.
+    /// When the tested connection is the one of a saved indexer, its capabilities are stored.
     /// Throws <see cref="ValidationFailedException"/> when the address is not usable; connection problems come back as <see cref="IndexerTestResult.Error"/>.
     /// </summary>
-    public async Task<IndexerTestResult> TestAsync(IndexerDefinition indexer, IIndexerClient client, CancellationToken cancellationToken)
+    public async Task<IndexerTestResult> TestAsync(IndexerDefinition indexer, IIndexerClient client, CancellationToken cancellationToken, int? cloneFromId = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         var normalized = Normalize(indexer);
         var errors = ValidateConnection(normalized);
+        IndexerDefinition? stored = normalized.Id > 0 ? indexers.Find(normalized.Id) : null;
         if (normalized.ApiKey == MaskedApiKey)
         {
-            if (normalized.Id > 0 && indexers.Find(normalized.Id) is { } stored)
+            if (stored is not null)
             {
                 normalized = normalized with { ApiKey = stored.ApiKey };
+            }
+            else if (cloneFromId is > 0 && indexers.Find(cloneFromId.Value) is { } cloned)
+            {
+                normalized = normalized with { ApiKey = cloned.ApiKey };
             }
             else
             {
@@ -157,11 +222,24 @@ public sealed class IndexerService(
 
         ThrowIfAny(errors);
 
+        // Only the saved indexer's history gets the call; an indexer being edited is tested with its stored id.
+        if (stored is null)
+        {
+            normalized = normalized with { Id = 0 };
+        }
+
         var host = new Uri(normalized.BaseUrl).Authority;
+        using var source = IndexerCallContext.Begin(IndexerCallSource.Test);
         try
         {
             var caps = await client.GetCapabilitiesAsync(normalized, cancellationToken);
             logger.LogInformation("Indexer test for {Host} succeeded ({Count} categories)", host, caps.Categories.Count);
+            RememberTest(normalized, caps);
+            if (stored is not null && ConnectionKey(stored) == ConnectionKey(normalized))
+            {
+                SaveCapabilities(stored.Id, caps);
+            }
+
             return new IndexerTestResult(caps, null);
         }
         catch (IndexerException ex)
@@ -184,6 +262,69 @@ public sealed class IndexerService(
         }
     }
 
+    /// <summary>Tests every enabled indexer in parallel with its stored settings and records the outcome in its health.</summary>
+    public async Task<IReadOnlyList<IndexerTestAllResult>> TestAllAsync(IIndexerClient client, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        var enabled = indexers.All().Where(i => i.Enable).ToList();
+        var results = await Task.WhenAll(enabled.Select(async indexer =>
+        {
+            string? message;
+            try
+            {
+                message = (await TestAsync(indexer, client, cancellationToken)).Error;
+            }
+            catch (ValidationFailedException ex)
+            {
+                message = string.Join(" ", ex.Errors.Values.SelectMany(v => v));
+            }
+
+            if (message is null)
+            {
+                RecordSuccess(indexer.Id, notify: false);
+            }
+            else
+            {
+                RecordFailure(indexer.Id, new IndexerException(message), notify: false);
+            }
+
+            return new IndexerTestAllResult(indexer.Id, indexer.Name, message is null, message);
+        }));
+
+        logger.LogInformation("Tested {Count} indexers, {Failed} failed", results.Length, results.Count(r => !r.Ok));
+        NotifyChanged();
+        return results;
+    }
+
+    /// <summary>The indexer with its catalog entry and the capabilities stored by the last successful test.</summary>
+    public IndexerDetails? Details(int id)
+    {
+        if (indexers.Find(id) is not { } indexer)
+        {
+            return null;
+        }
+
+        var (json, checkedAt) = indexers.FindCapabilities(id);
+        IndexerCapabilities? caps = null;
+        if (!string.IsNullOrEmpty(json))
+        {
+            try
+            {
+                caps = JsonSerializer.Deserialize<IndexerCapabilities>(json, CapabilitiesJson);
+            }
+            catch (JsonException ex)
+            {
+                logger.LogWarning("Stored capabilities of indexer {Id} are unreadable: {Message}", id, ex.Message);
+            }
+        }
+
+        return new IndexerDetails(
+            indexer,
+            IndexerCatalog.For(indexer),
+            caps,
+            caps is not null && checkedAt is { } at ? new DateTimeOffset(at, TimeSpan.Zero) : null);
+    }
+
     // ---- Health ----
 
     /// <summary>Health of every indexer that has a status; indexers without one are healthy.</summary>
@@ -196,6 +337,27 @@ public sealed class IndexerService(
     public IndexerHealth Health(int indexerId) =>
         statuses.Find(indexerId) is { } status ? ToHealth(status, time.GetUtcNow()) : IndexerHealth.Ok(indexerId);
 
+    /// <summary>Calls in the current limit windows of every indexer that made calls in the last 24 hours.</summary>
+    public IReadOnlyDictionary<int, IndexerUsageCounts> Usage() =>
+        history?.Usage(time.GetUtcNow().UtcDateTime) ?? new Dictionary<int, IndexerUsageCounts>();
+
+    /// <summary>Limit use and VIP days of one indexer, from its usage counts.</summary>
+    public IndexerLimitStatus LimitStatus(IndexerDefinition indexer, IndexerUsageCounts? usage)
+    {
+        ArgumentNullException.ThrowIfNull(indexer);
+        var counts = usage ?? IndexerUsageCounts.None;
+        var queries = counts.Queries(indexer.LimitsUnit);
+        var grabs = counts.Grabs(indexer.LimitsUnit);
+        IndexerLimitKind? reached = indexer.QueryLimit is > 0 and var q && queries >= q ? IndexerLimitKind.Query
+            : indexer.GrabLimit is > 0 and var g && grabs >= g ? IndexerLimitKind.Grab
+            : null;
+
+        int? vipDays = indexer.VipExpirationDate is { } vip
+            ? vip.DayNumber - DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).DayNumber
+            : null;
+        return new IndexerLimitStatus(queries, grabs, reached, vipDays);
+    }
+
     public IReadOnlyList<IndexerDefinition> Active(IndexerUse use)
     {
         var now = time.GetUtcNow().UtcDateTime;
@@ -207,7 +369,16 @@ public sealed class IndexerService(
     }
 
     /// <summary>Back to healthy: the escalation starts from zero after the next failure.</summary>
-    public void RecordSuccess(int indexerId)
+    public void RecordSuccess(int indexerId) => RecordSuccess(indexerId, notify: true);
+
+    /// <summary>
+    /// Escalates the back-off one level and skips the indexer until the wait is over.
+    /// A longer <see cref="IndexerException.RetryAfter"/> from the indexer wins. StreamZH's own limits
+    /// (<see cref="IndexerException.IsLimitReached"/>) are not failures and are ignored.
+    /// </summary>
+    public void RecordFailure(int indexerId, Exception error) => RecordFailure(indexerId, error, notify: true);
+
+    private void RecordSuccess(int indexerId, bool notify)
     {
         if (indexerId <= 0)
         {
@@ -225,16 +396,16 @@ public sealed class IndexerService(
         }
 
         logger.LogInformation("Indexer {Id} is working again", indexerId);
+        if (notify)
+        {
+            NotifyChanged();
+        }
     }
 
-    /// <summary>
-    /// Escalates the back-off one level and skips the indexer until the wait is over.
-    /// A longer <see cref="IndexerException.RetryAfter"/> from the indexer wins.
-    /// </summary>
-    public void RecordFailure(int indexerId, Exception error)
+    private void RecordFailure(int indexerId, Exception error, bool notify)
     {
         ArgumentNullException.ThrowIfNull(error);
-        if (indexerId <= 0 || indexers.Find(indexerId) is not { } indexer)
+        if (error is IndexerException { IsLimitReached: true } || indexerId <= 0 || indexers.Find(indexerId) is not { } indexer)
         {
             return;
         }
@@ -259,7 +430,63 @@ public sealed class IndexerService(
         }
 
         logger.LogWarning("Indexer '{Name}' failed ({Message}); skipped until {DisabledTill:u}", indexer.Name, status.LastError, status.DisabledTill);
+        if (notify)
+        {
+            NotifyChanged();
+        }
     }
+
+    /// <summary>Tells the browsers that the indexer list changed. Never throws.</summary>
+    public void NotifyChanged()
+    {
+        if (events is not null)
+        {
+            _ = PublishChangedAsync(events);
+        }
+    }
+
+    private async Task PublishChangedAsync(IEventBus bus)
+    {
+        try
+        {
+            await bus.PublishAsync(new IndexersChanged());
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug("Could not publish the indexer change: {Message}", ex.Message);
+        }
+    }
+
+    // ---- Capabilities ----
+
+    private void SaveCapabilities(int id, IndexerCapabilities caps) =>
+        indexers.SaveCapabilities(id, JsonSerializer.Serialize(caps, CapabilitiesJson), time.GetUtcNow().UtcDateTime);
+
+    private void RememberTest(IndexerDefinition indexer, IndexerCapabilities caps)
+    {
+        var now = time.GetUtcNow();
+        foreach (var old in _recentTests.Where(e => now - e.Value.At > RecentTestLifetime).Select(e => e.Key).ToList())
+        {
+            _recentTests.TryRemove(old, out _);
+        }
+
+        _recentTests[ConnectionKey(indexer)] = (caps, now);
+    }
+
+    /// <summary>Stores the capabilities of a recent successful test of the same connection; false when there was none.</summary>
+    private bool StoreRecentTest(int id, IndexerDefinition indexer)
+    {
+        if (!_recentTests.TryGetValue(ConnectionKey(indexer), out var test) || time.GetUtcNow() - test.At > RecentTestLifetime)
+        {
+            return false;
+        }
+
+        SaveCapabilities(id, test.Caps);
+        return true;
+    }
+
+    private static string ConnectionKey(IndexerDefinition indexer) =>
+        $"{indexer.BaseUrl.TrimEnd('/')}\n{indexer.ApiPath}\n{indexer.ApiKey}\n{indexer.AdditionalParameters}";
 
     // ---- Validation ----
 
@@ -294,10 +521,38 @@ public sealed class IndexerService(
             errors["categories"] = ["Category ids must be positive numbers."];
         }
 
+        if (indexer.DefinitionKey is { } key)
+        {
+            var entry = IndexerCatalog.Find(key);
+            if (entry is null)
+            {
+                errors["definitionKey"] = ["Unknown indexer definition."];
+            }
+            else if (!entry.Supported)
+            {
+                errors["definitionKey"] = [entry.UnsupportedReason ?? "This indexer is not supported yet."];
+            }
+        }
+
+        if (indexer.VipExpiration is not null && indexer.VipExpirationDate is null)
+        {
+            errors["vipExpiration"] = ["Enter a date like 2027-01-31."];
+        }
+
+        if (indexer.QueryLimit < 0)
+        {
+            errors["queryLimit"] = ["Use 0 or more (0 or empty = unlimited)."];
+        }
+
+        if (indexer.GrabLimit < 0)
+        {
+            errors["grabLimit"] = ["Use 0 or more (0 or empty = unlimited)."];
+        }
+
         return errors;
     }
 
-    /// <summary>The fields needed to reach the indexer: implementation, URL and API path.</summary>
+    /// <summary>The fields needed to reach the indexer: implementation, URL, API path and additional parameters.</summary>
     private static Dictionary<string, string[]> ValidateConnection(IndexerDefinition indexer)
     {
         var errors = new Dictionary<string, string[]>();
@@ -320,6 +575,11 @@ public sealed class IndexerService(
         if (indexer.ApiPath.Any(char.IsWhiteSpace) || indexer.ApiPath.Contains('?', StringComparison.Ordinal) || indexer.ApiPath.Contains('#', StringComparison.Ordinal))
         {
             errors["apiPath"] = ["Enter a path like /api, without spaces or query."];
+        }
+
+        if (indexer.AdditionalParameters.Any(char.IsWhiteSpace) || indexer.AdditionalParameters.Contains('#', StringComparison.Ordinal))
+        {
+            errors["additionalParameters"] = ["Enter parameters like &attrs=poster, without spaces or #."];
         }
 
         return errors;
@@ -355,7 +615,29 @@ public sealed class IndexerService(
             ApiKey = indexer.ApiKey?.Trim() ?? string.Empty,
             Categories = [.. (indexer.Categories ?? []).Distinct().Order()],
             TvCategories = [.. (indexer.TvCategories ?? []).Distinct().Order()],
+            DefinitionKey = string.IsNullOrWhiteSpace(indexer.DefinitionKey) ? null : indexer.DefinitionKey.Trim().ToLowerInvariant(),
+            AdditionalParameters = indexer.AdditionalParameters?.Trim() ?? string.Empty,
+            VipExpiration = NormalizeDate(indexer.VipExpiration),
         };
+    }
+
+    /// <summary>"2027-01-31", "2027-01-31T00:00:00Z" and similar become "2027-01-31"; empty becomes null; anything else stays (and fails validation).</summary>
+    private static string? NormalizeDate(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return null;
+        }
+
+        if (DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dateTime)
+            ? dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : text;
     }
 
     private static IndexerHealth ToHealth(IndexerStatus status, DateTimeOffset now)

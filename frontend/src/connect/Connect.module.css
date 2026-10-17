@@ -1,0 +1,249 @@
+/* Connection cards, like Radarr's Connect page: one card per media server or notification service. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grid > li {
+  display: flex;
+  min-width: 0;
+}
+
+.card,
+.addCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 112px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.card:hover:not(:disabled),
+.addCard:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.card:focus-visible,
+.addCard:focus-visible,
+.typeCard:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.card:disabled {
+  cursor: default;
+}
+
+.card.disabled {
+  opacity: 0.6;
+}
+
+.card.failing {
+  border-color: color-mix(in srgb, #ef6b6b 55%, var(--line));
+}
+
+.addCard {
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 10px;
+  color: var(--text-muted);
+  border-style: dashed;
+  font-size: 13px;
+}
+
+.addCard:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.plus {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.cardType {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+  font-size: 12px;
+}
+
+.trigger {
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.cardError {
+  font-size: 12.5px;
+  color: #ef6b6b;
+  overflow-wrap: anywhere;
+}
+
+.cardTime {
+  color: var(--text-faint);
+}
+
+/* Type picker */
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.typeGrid > li {
+  display: flex;
+}
+
+.typeCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.typeCard:hover {
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.typeName {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.typeText {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Form */
+.triggerChecks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px 16px;
+  padding-top: 6px;
+}
+
+.triggerCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.triggerCheck input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.triggerCheck span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.triggerCheck small {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-faint);
+}
+
+.withUnit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unit {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chipOn {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+
+.textArea {
+  max-width: 460px;
+  resize: vertical;
+}

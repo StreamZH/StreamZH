@@ -76,6 +76,7 @@ public sealed class OngoingService(
         AddIndexerNotices(notices);
         AddFolderNotices(notices);
         AddFailedNotices(notices, active);
+        ConnectNotices.Add(notices, services.GetService<ConnectionRepository>(), time);
 
         return new OngoingResource(running, notices);
     }

@@ -1,10 +1,14 @@
-import { ComingSoon, SettingsPage } from './SettingsKit'
+import { ConnectionsSection } from '../connect/ConnectionsSection'
+import { SettingsPage } from './SettingsKit'
 
-/** Placeholder, filled in 0.6. */
+/** Settings → Connect: media servers (Plex, Jellyfin, Emby, Kodi) and notifications, like Radarr's Connect page. */
 export default function ConnectPage() {
   return (
-    <SettingsPage title="Connect" lead="Tell Plex, Jellyfin or Emby about new files, and get notified.">
-      <ComingSoon>Being built.</ComingSoon>
+    <SettingsPage
+      title="Connect"
+      lead="Tell Plex, Jellyfin, Emby or Kodi about new files, and get notified on Discord, Telegram, by email and more. Messages are sent in the background and retried when a service is down."
+    >
+      <ConnectionsSection />
     </SettingsPage>
   )
 }

@@ -25,9 +25,10 @@ export function isAired(airDate: string | null): boolean {
   return airDate <= new Date().toISOString().slice(0, 10)
 }
 
-const imageBase = 'https://image.tmdb.org/t/p/'
-
-/** TMDB image URL. Sizes: w92, w185, w342, w500, w780, w1280, original. */
+/**
+ * TMDB image through StreamZH: from its image cache when that is on (Settings → Metadata), otherwise a redirect to
+ * the TMDB image CDN. Sizes: w92, w185, w342, w500, w780, w1280, original.
+ */
 export function tmdbImage(path: string | null | undefined, size = 'w342'): string | null {
-  return path ? `${imageBase}${size}${path}` : null
+  return path ? `/api/v1/mediacover/${size}${path}` : null
 }

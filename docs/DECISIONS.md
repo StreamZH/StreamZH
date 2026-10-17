@@ -4,6 +4,7 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Logo refined: wordmark 70 % of the monogram, gap 0.32, monogram corners softened (radius 1.5), app icon monogram 60 % | Owner's choice after comparing variants; reads better next to the monogram and less angular |
 | 2026-10-17 | Indexer catalog like Prowlarr: StreamZH ships indexer definitions (Usenet Newznab presets now, torrent definitions with the torrent engine in 1.0); replaces the earlier "no built-in indexer list" rule | Owner decision: adding an indexer should be as easy as in Prowlarr, Prowlarr no longer needed |
 | 2026-10-17 | Prowlarr features built in: per-indexer query/grab limits, VIP expiry, additional parameters, indexer history, stats, search across all indexers, import from Prowlarr | StreamZH replaces Prowlarr completely |
 | 2026-10-17 | Until the built-in download engine (0.5), "Grab" saves the NZB into a folder that SABnzbd can watch | Real downloads can be tested with 0.4 already; the folder becomes the engine's input later |

@@ -1,10 +1,10 @@
-/* Proportions as the CloudZH logo (docs/brand/README.md): gap 0.418 x monogram,
-   wordmark height 0.616 x monogram, wordmark 5 % above the centre. */
+/* Proportions (docs/brand/README.md): cap height 70 % of the monogram, so the wordmark box
+   (viewBox height 106) is 0.742 x monogram; gap 0.32 x monogram; wordmark 2.8 % above the centre. */
 .logo {
   --mark-size: 28px;
   display: flex;
   align-items: center;
-  gap: calc(var(--mark-size) * 0.418);
+  gap: calc(var(--mark-size) * 0.32);
   color: var(--text);
 }
 
@@ -16,11 +16,11 @@
 }
 
 .word {
-  height: calc(var(--mark-size) * 0.616);
+  height: calc(var(--mark-size) * 0.742);
   width: auto;
   display: block;
   overflow: visible;
-  transform: translateY(-5%);
+  transform: translateY(-2.8%);
 }
 
 .ink {

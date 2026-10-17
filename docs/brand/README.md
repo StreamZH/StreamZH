@@ -1,7 +1,9 @@
 # StreamZH Logo
 
 StreamZH is part of the CloudZH family and uses the **same logo as CloudZH**, with «Stream» in place of «Cloud».
-Monogram, colours, font, proportions and clear space are identical to the CloudZH brand kit.
+Monogram geometry, colours, font and clear space follow the CloudZH brand kit. Refined for StreamZH (17.10.2026):
+monogram corners softened (radius 1.5 of 100), larger wordmark (70 % instead of 58 %), tighter gap (0.32 instead of 0.42),
+larger monogram on the app icon (60 % instead of 54 %).
 
 ## Parts
 
@@ -29,6 +31,8 @@ All SVGs contain only paths, no fonts and no scripts. In the app the logo is the
 - H `M0 0H17V100H0Z M83 0H100V100H83Z M17 41.5H38.07L29.12 58.5H17Z M70.88 41.5H83V58.5H61.93Z`
 - Z `M23 0H77V17L42.25 83H77V100H23V83L57.75 17H23Z`
 - Stems, bars and diagonal 17 wide; the crossbar of the H ends parallel to the diagonal of the Z with a clear gap
+- Corners softened with radius 1.5 (convex and concave), `ROUND` in `tools/brand/generate.py`; the paths above are the
+  sharp construction, the files contain the softened outline
 - App icon: monogram 60 % of the tile on a graphite gradient (#2A2927 to #1F1E1D), corner radius 112 of 512.
   Slightly larger than the CloudZH app icon (54 %); `ICON_FRAC` in `tools/brand/generate.py`
 - Favicon: the same monogram (100 of 128) on a graphite tile #1F1E1D with corner radius 26 of 128
@@ -36,8 +40,9 @@ All SVGs contain only paths, no fonts and no scripts. In the app the logo is the
 ## Wordmark
 
 - Font Outfit (SIL Open Font License): «Stream» Medium, «ZH» Bold, tracking −2 %
-- Side by side: wordmark height 0.616 × monogram, gap 0.418 × monogram, wordmark 5 % above the centre.
-  In CSS: `gap: calc(M * .418)`, wordmark `height: calc(M * .616); transform: translateY(-5%)` (M = monogram size)
+- Side by side: cap height of the wordmark 70 % of the monogram, gap 0.32 × monogram (`LOGO_TEXT`, `LOGO_GAP`).
+  In CSS: `gap: calc(M * .32)`, wordmark (viewBox height 106) `height: calc(M * .742); transform: translateY(-2.8%)`
+  (M = monogram size)
 
 ## Clear space and minimum sizes
 

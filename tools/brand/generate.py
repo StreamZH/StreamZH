@@ -32,6 +32,12 @@ NAVY, NAVY_2, PAPER = "#1F1E1D", "#2A2927", "#F4F2EC"
 NS = 'xmlns="http://www.w3.org/2000/svg"'
 # App icon: monogram 60 % of the tile (CloudZH: 54 %); a bit larger on the dark tile, chosen 17.10.2026
 ICON_FRAC = 0.60
+# Corners of the monogram softened with this radius (of 100), so it does not look too angular (17.10.2026)
+ROUND = 1.5
+# Logo side by side: cap height of the wordmark 70 % of the monogram, gap 0.32 x monogram (17.10.2026;
+# CloudZH: 58 % and 0.42)
+LOGO_TEXT = 0.70
+LOGO_GAP = 0.32
 
 
 # ---------------------------------------------------------------- Monogram
@@ -42,6 +48,13 @@ def letter_z(w, s, x=0.0):
                         Polygon([(x + w - wh, s), (x + w, s), (x + wh, 100 - s), (x, 100 - s)])])
 
 
+def soften(geom, r=ROUND):
+    """Rounds convex and concave corners with radius r; the gaps between H and Z stay unchanged."""
+    if r <= 0:
+        return geom
+    return geom.buffer(r, quad_segs=8).buffer(-2 * r, quad_segs=8).buffer(r, quad_segs=8)
+
+
 def monogram():
     """The CloudZH family monogram: stems and crossbar 17 wide, the crossbar ends parallel to the diagonal of the Z
     with a clear gap. StreamZH uses exactly the same geometry as CloudZH."""
@@ -49,7 +62,7 @@ def monogram():
                      Polygon([(17, 41.5), (38.07, 41.5), (29.12, 58.5), (17, 58.5)]),
                      Polygon([(70.88, 41.5), (83, 41.5), (83, 58.5), (61.93, 58.5)])])
     z = Polygon([(23, 0), (77, 0), (77, 17), (42.25, 83), (77, 83), (77, 100), (23, 100), (23, 83), (57.75, 17), (23, 17)])
-    return h, z
+    return soften(h), soften(z)
 
 
 def path(geom):
@@ -107,10 +120,11 @@ def build(accent, dark):
         return f'<svg {NS} viewBox="0 -3 {WW:.1f} 106"><path d="{WORD}" fill="{ink}"/><path d="{ZH}" fill="{red}"/></svg>'
 
     def logo(ink, red):
-        # As CloudZH: monogram 1.7 x cap height, gap 0.71 x cap height to the wordmark (its left side bearing
-        # included), monogram centred 5.8 below the middle of the cap height
-        mh, gap = 172, 72
-        my = 49.55 + 5.8 - mh / 2
+        # Monogram 1 / LOGO_TEXT x cap height, gap LOGO_GAP x monogram to the wordmark (its left side bearing
+        # included); the monogram sits slightly below the middle of the cap height (CloudZH: 5.8 at 172)
+        mh = 100 / LOGO_TEXT
+        gap = LOGO_GAP * mh
+        my = 49.55 + 5.8 * (mh - 100) / 72 - mh / 2
         w = mh + gap + WW
         return (f'<svg {NS} viewBox="0 {my - 2:.1f} {w:.1f} {mh + 4:.1f}">'
                 f'<g transform="translate(0 {my:.1f}) scale({mh / 100})"><path d="{path(H)}" fill="{ink}"/><path d="{path(Z)}" fill="{red}"/></g>'

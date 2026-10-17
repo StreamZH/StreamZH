@@ -22,6 +22,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+$env:DOTNET_NOLOGO = '1'
+$env:NPM_CONFIG_UPDATE_NOTIFIER = 'false'
 $repo = Split-Path -Parent $PSScriptRoot
 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
 

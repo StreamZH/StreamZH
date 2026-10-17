@@ -12,6 +12,7 @@ using StreamZH.Host.Hubs;
 using StreamZH.Host.Jobs;
 using StreamZH.Host.Logging;
 using StreamZH.Host.Settings;
+using StreamZH.Indexers;
 using StreamZH.Library;
 using StreamZH.Metadata.Tmdb;
 
@@ -86,6 +87,7 @@ builder.Services.AddScoped<LibraryService>();
 builder.Services.AddScoped<RootFolderService>();
 builder.Services.AddScoped<LibraryImportService>();
 builder.Services.AddIndexerManagement();
+builder.Services.AddNewznabIndexers();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));

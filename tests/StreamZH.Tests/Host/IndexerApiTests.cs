@@ -145,11 +145,15 @@ public sealed class IndexerApiTests : IDisposable
     }
 
     [Fact]
-    public async Task Test_without_an_indexer_client_is_unavailable()
+    public async Task Test_with_the_real_newznab_client_reports_an_unreachable_indexer()
     {
         var client = await _factory.CreateOwnerClientAsync();
-        var response = await client.PostAsJsonAsync("/api/v1/indexer/test", NewIndexer("A", "key"));
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var indexer = NewIndexer("A", "secret-key", "http://127.0.0.1:1");
+        var response = await client.PostAsJsonAsync("/api/v1/indexer/test", indexer);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("indexer-test-failed", body);
+        Assert.DoesNotContain("secret-key", body);
     }
 
     [Fact]
@@ -173,11 +177,11 @@ public sealed class IndexerApiTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await _factory.CreateClient().GetAsync("/api/v1/indexer")).StatusCode);
     }
 
-    private static object NewIndexer(string name, string apiKey) => new
+    private static object NewIndexer(string name, string apiKey, string baseUrl = "https://indexer.example/") => new
     {
         name,
         implementation = "Newznab",
-        baseUrl = "https://indexer.example/",
+        baseUrl,
         apiPath = "/api",
         apiKey,
         categories = new[] { 2000, 2040 },

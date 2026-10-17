@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using StreamZH.Core.Decisions;
+using StreamZH.Core.Indexers;
 using StreamZH.Core.Jobs;
 using StreamZH.Core.Media;
 using StreamZH.Data;
@@ -52,7 +53,7 @@ public static class IndexerOptionsEndpoints
         profiles.MapGet("/{id:int}", (int id, ReleaseProfileRepository repo) =>
             repo.Find(id) is { } p ? Results.Ok(ReleaseProfileResource.From(p)) : Results.NotFound());
 
-        profiles.MapPost("/", (ReleaseProfileResource request, ReleaseProfileRepository repo, IndexerRepository indexers, QualityProfileRepository qualityProfiles) =>
+        profiles.MapPost("/", (ReleaseProfileResource request, ReleaseProfileRepository repo, IIndexerProvider indexers, QualityProfileRepository qualityProfiles) =>
         {
             var errors = Validate(request, indexers, qualityProfiles, out var profile);
             if (errors.Count > 0)
@@ -64,7 +65,7 @@ public static class IndexerOptionsEndpoints
             return Results.Created($"/api/v1/releaseprofile/{id}", ReleaseProfileResource.From(repo.Find(id)!));
         });
 
-        profiles.MapPut("/{id:int}", (int id, ReleaseProfileResource request, ReleaseProfileRepository repo, IndexerRepository indexers, QualityProfileRepository qualityProfiles) =>
+        profiles.MapPut("/{id:int}", (int id, ReleaseProfileResource request, ReleaseProfileRepository repo, IIndexerProvider indexers, QualityProfileRepository qualityProfiles) =>
         {
             if (repo.Find(id) is null)
             {
@@ -163,7 +164,7 @@ public static class IndexerOptionsEndpoints
     }
 
     private static Dictionary<string, string[]> Validate(
-        ReleaseProfileResource request, IndexerRepository indexers, QualityProfileRepository qualityProfiles, out ReleaseProfile? profile)
+        ReleaseProfileResource request, IIndexerProvider indexers, QualityProfileRepository qualityProfiles, out ReleaseProfile? profile)
     {
         var errors = new Dictionary<string, string[]>();
         profile = null;
@@ -192,8 +193,7 @@ public static class IndexerOptionsEndpoints
         }
 
         var indexerIds = (request.IndexerIds ?? []).Distinct().ToList();
-        var known = indexers.All().Select(i => i.Id).ToHashSet();
-        if (indexerIds.Any(id => !known.Contains(id)))
+        if (indexerIds.Any(id => indexers.Find(id) is null))
         {
             errors["indexerIds"] = ["One of the indexers does not exist (any more)."];
         }

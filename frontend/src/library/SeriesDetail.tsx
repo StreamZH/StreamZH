@@ -6,7 +6,9 @@ import Icon from '../components/Icon'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDate, isAired } from '../lib/format'
+import RenameDialog from '../mediaManagement/RenameDialog'
 import page from '../pages/Page.module.css'
+import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
@@ -20,6 +22,8 @@ export default function SeriesDetail() {
   const id = Number(useParams().id)
   const detail = useQuery({ queryKey: queryKeys.seriesDetail(id), queryFn: () => libraryApi.seriesDetail(id) })
   const { monitor, refresh, remove, assignProfile } = useDetailActions('Series', id)
+  const admin = useIsAdmin()
+  const [renaming, setRenaming] = useState(false)
 
   if (detail.isError) return <p className={ui.error}>{detail.error.message}</p>
   if (!detail.data) return <div className={page.page} aria-busy="true" />
@@ -64,6 +68,11 @@ export default function SeriesDetail() {
                 disabled={assignProfile.isPending}
               />
             </label>
+            {admin && s.fileCount > 0 && (
+              <button className={ui.button} type="button" onClick={() => setRenaming(true)}>
+                Rename files
+              </button>
+            )}
             <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
@@ -71,6 +80,7 @@ export default function SeriesDetail() {
       />
 
       <p className={`${ui.mono} ${ui.muted}`}>{s.folderPath}</p>
+      {renaming && <RenameDialog type="Series" id={s.id} title={s.title} onClose={() => setRenaming(false)} />}
 
       {seasons.map((season) => (
         <SeasonPanel

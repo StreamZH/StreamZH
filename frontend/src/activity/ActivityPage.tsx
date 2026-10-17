@@ -3,6 +3,7 @@ import { useRef, type KeyboardEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import { downloadKeys, downloadsApi } from '../api/downloads'
 import page from '../pages/Page.module.css'
+import BlocklistTab from './BlocklistTab'
 import HistoryTab from './HistoryTab'
 import QueueTab from './QueueTab'
 import styles from './Activity.module.css'
@@ -10,17 +11,19 @@ import styles from './Activity.module.css'
 const tabs = [
   { key: 'queue', label: 'Queue' },
   { key: 'history', label: 'History' },
+  { key: 'blocklist', label: 'Blocklist' },
 ] as const
 
 type TabKey = (typeof tabs)[number]['key']
 
-/** Downloads in progress (Queue) and what finished, failed or was grabbed (History). */
+/** Downloads in progress and waiting for import (Queue), what finished, failed or was imported (History), and the Blocklist. */
 export default function ActivityPage() {
   const [url, setUrl] = useSearchParams()
-  const tab: TabKey = url.get('tab') === 'history' ? 'history' : 'queue'
+  const requested = url.get('tab')
+  const tab: TabKey = tabs.find((t) => t.key === requested)?.key ?? 'queue'
   const queue = useQuery({ queryKey: downloadKeys.queue, queryFn: downloadsApi.queue, enabled: false })
   const count = queue.data?.items.length ?? 0
-  const refs = useRef<Record<TabKey, HTMLButtonElement | null>>({ queue: null, history: null })
+  const refs = useRef<Record<TabKey, HTMLButtonElement | null>>({ queue: null, history: null, blocklist: null })
 
   const select = (key: TabKey) => setUrl(key === 'queue' ? {} : { tab: key })
 
@@ -40,7 +43,7 @@ export default function ActivityPage() {
       <header>
         <p className={styles.eyebrow}>System</p>
         <h1 className={page.title}>Activity</h1>
-        <p className={page.lead}>Downloads in progress, from grab to unpack, and everything that finished or failed.</p>
+        <p className={page.lead}>Downloads in progress, from grab to import, and everything that finished, failed or was blocklisted.</p>
       </header>
 
       <div className={styles.tabs} role="tablist" aria-label="Activity" onKeyDown={onKeyDown}>
@@ -66,7 +69,7 @@ export default function ActivityPage() {
       </div>
 
       <section id={`activity-panel-${tab}`} role="tabpanel" aria-labelledby={`activity-tab-${tab}`} className={styles.panel}>
-        {tab === 'queue' ? <QueueTab /> : <HistoryTab />}
+        {tab === 'queue' ? <QueueTab /> : tab === 'history' ? <HistoryTab /> : <BlocklistTab />}
       </section>
     </div>
   )

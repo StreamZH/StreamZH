@@ -9,7 +9,7 @@ import { formatBytes } from '../lib/format'
 import page from '../pages/Page.module.css'
 import styles from '../pages/Settings.module.css'
 
-export function RootFoldersSection() {
+export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
   const queryClient = useQueryClient()
   const folders = useQuery({ queryKey: queryKeys.rootFolders, queryFn: libraryApi.rootFolders })
   const [path, setPath] = useState('')
@@ -37,7 +37,7 @@ export function RootFoldersSection() {
   return (
     <section className={page.panel}>
       <h2 className={page.panelTitle}>Root folders</h2>
-      <p className={styles.text}>The folders where your movies and series live. StreamZH reads them and, later, moves new downloads there.</p>
+      <p className={styles.text}>The folders where your movies and series live. StreamZH reads them and imports finished downloads into them.</p>
 
       {(folders.data ?? []).length > 0 && (
         <ul className={styles.rootList}>
@@ -71,11 +71,17 @@ export function RootFoldersSection() {
       )}
       {(folders.data ?? []).some((f) => f.accessible && !f.writable) && (
         <p className={styles.text}>
-          <strong>Read only</strong> folders can be scanned and imported, but StreamZH cannot move new downloads into them yet.
+          <strong>Read only</strong> folders can be scanned, but StreamZH cannot import finished downloads into them.
           {(folders.data ?? []).find((f) => f.writeProblem)?.writeProblem && (
             <>
               {' '}
               Reason: {(folders.data ?? []).find((f) => f.writeProblem)?.writeProblem}
+            </>
+          )}
+          {windows && (
+            <>
+              {' '}
+              If Windows <strong>Controlled folder access</strong> is on (Windows Security → Ransomware protection), allow StreamZH.exe there.
             </>
           )}
         </p>

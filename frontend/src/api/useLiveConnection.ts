@@ -58,6 +58,7 @@ export function useLiveConnection(): boolean {
 
     connection.on('downloadChanged', () => {
       void queryClient.invalidateQueries({ queryKey: downloadKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['imports'] })
       refetchOngoingSoon()
     })
 

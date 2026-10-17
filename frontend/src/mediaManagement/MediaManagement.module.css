@@ -1,0 +1,378 @@
+/* Settings → Media Management, the rename dialog and the manual import dialog. */
+
+.format {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.formatInput {
+  display: flex;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.formatInput input {
+  flex: 1;
+  min-width: 0;
+}
+
+.formatInput button {
+  flex: none;
+}
+
+.tokensOpen {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.example {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  max-width: 720px;
+}
+
+.example code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  border-radius: 6px;
+  padding: 3px 8px;
+  overflow-wrap: anywhere;
+}
+
+.tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+}
+
+.tokenGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tokenGroupName {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.tokenList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.token {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 9px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.token:hover,
+.token:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  background: var(--surface-hover);
+}
+
+.token code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.token small {
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.tokenHelp {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.tokenHelp code {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* One save bar for the whole page, sticky at the bottom while there are changes. */
+.saveDock {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.25);
+}
+
+.saveDockIdle {
+  position: static;
+  box-shadow: none;
+  background: transparent;
+  border-style: dashed;
+}
+
+.short {
+  width: 120px;
+}
+
+.subRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+  border-radius: var(--radius-small);
+}
+
+.notice strong {
+  color: var(--text);
+}
+
+/* Rename and manual import dialogs */
+.dialogText {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.renameList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(56vh, 520px);
+  overflow: auto;
+}
+
+.renameItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.renameItem input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.renamePaths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.renameOld {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-faint) 60%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.renameNew {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.renameNew::before {
+  content: '→ ';
+  color: var(--accent);
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dialogActions > :first-child {
+  margin-right: auto;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--accent);
+}
+
+.pickList {
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.pickItem {
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  cursor: pointer;
+}
+
+.pickItem:last-child {
+  border-bottom: none;
+}
+
+.pickItem:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.pickItem[aria-selected='true'] {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.fileTable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(50vh, 460px);
+  overflow: auto;
+}
+
+.fileRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 150px;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.fileRow input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.fileName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.fileName small {
+  font-family: var(--font-body, inherit);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.fileProblem {
+  color: var(--warn) !important;
+}
+
+.episodeInput {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .fileRow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .fileRow .episodeInput {
+    grid-column: 2;
+  }
+
+  .formatInput {
+    flex-direction: column;
+  }
+
+  .formatInput button {
+    align-self: flex-start;
+  }
+}

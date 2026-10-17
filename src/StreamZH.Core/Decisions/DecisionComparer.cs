@@ -10,7 +10,7 @@ namespace StreamZH.Core.Decisions;
 /// Compare(x, y) &gt; 0 means x is better. Rules, first difference wins:
 /// <list type="number">
 /// <item>Profile quality rank, higher first.</item>
-/// <item>Revision (REAL, then version), higher first.</item>
+/// <item>Revision (REAL, then version), higher first; skipped with <see cref="ProperHandling.DoNotPrefer"/>.</item>
 /// <item>Dual language first, when the profile prefers it.</item>
 /// <item>Preferred score of the release profiles, higher first (after quality and language, like Sonarr v3).</item>
 /// <item>Indexer priority, lower number first.</item>
@@ -72,7 +72,7 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
         int[] results =
         [
             CompareQuality(x, y),
-            x.Release.Quality.Revision.CompareTo(y.Release.Quality.Revision),
+            _context.Target.Propers == ProperHandling.DoNotPrefer ? 0 : x.Release.Quality.Revision.CompareTo(y.Release.Quality.Revision),
             CompareDualLanguage(x, y),
             PreferredScore(x).CompareTo(PreferredScore(y)),
             y.IndexerPriority.CompareTo(x.IndexerPriority),

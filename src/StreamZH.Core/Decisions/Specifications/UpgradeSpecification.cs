@@ -29,7 +29,8 @@ public sealed class UpgradeSpecification : IDecisionSpecification
             LanguageRules.Normalize(target.ExistingLanguages, target.OriginalLanguage),
             candidate.Release.Quality,
             LanguageRules.EffectiveLanguages(candidate.Release, target.OriginalLanguage),
-            target.OriginalLanguage);
+            target.OriginalLanguage,
+            target.Propers);
 
         if (verdict is (UpgradeVerdict.NotBetter or UpgradeVerdict.CutoffMet) && IsPreferredScoreUpgrade(candidate, context))
         {

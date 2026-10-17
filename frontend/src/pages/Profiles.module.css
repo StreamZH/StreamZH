@@ -78,7 +78,9 @@
 
 .rowActions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: 190px;
   margin-left: auto;
 }
 

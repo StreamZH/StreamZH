@@ -21,4 +21,7 @@ public static class RejectionCodes
     public const string DiskCutoffMet = "DiskCutoffMet";
     public const string DiskUpgradesNotAllowed = "DiskUpgradesNotAllowed";
     public const string DecisionError = "DecisionError";
+
+    /// <summary>The release is for another movie or series (title, year or movie/series mix-up).</summary>
+    public const string WrongMedia = "WrongMedia";
 }

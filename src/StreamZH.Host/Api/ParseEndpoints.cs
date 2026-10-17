@@ -47,7 +47,8 @@ public static class ParseEndpoints
                     existingName is null ? [] : LanguageParser.ParseLanguages(Path.GetFileName(movie.FolderPath)),
                     Monitored: true,
                     BlocklistedTitles: new HashSet<string>());
-                decision = Decide(parsed, size, target, movieProfile.Name, $"{movie.Title} ({movie.Year})", definitions);
+                var match = ReleaseMatcher.Match(parsed, isSeries: false, [movie.Title, movie.OriginalTitle], movie.Year, movie.ImdbId, movie.TmdbId);
+                decision = Decide(parsed, size, target, movieProfile.Name, $"{movie.Title} ({movie.Year})", match, definitions);
             }
             else if (seriesId is { } sid && series.Find(sid) is { } show && profiles.Find(show.QualityProfileId) is { } showProfile)
             {
@@ -60,7 +61,8 @@ public static class ParseEndpoints
                     null, [],
                     Monitored: true,
                     BlocklistedTitles: new HashSet<string>());
-                decision = Decide(parsed, size, target, showProfile.Name, $"{show.Title} ({show.Year})", definitions);
+                var match = ReleaseMatcher.Match(parsed, isSeries: true, [show.Title, show.OriginalTitle], show.Year);
+                decision = Decide(parsed, size, target, showProfile.Name, $"{show.Title} ({show.Year})", match, definitions);
             }
 
             return Results.Ok(new ParseResult(ParsedReleaseResource.From(parsed), decision));
@@ -69,12 +71,30 @@ public static class ParseEndpoints
         return app;
     }
 
-    private static DecisionResult Decide(ParsedRelease parsed, long size, DecisionTarget target, string profile, string targetName, QualityDefinitionRepository definitions)
+    private static DecisionResult Decide(
+        ParsedRelease parsed, long size, DecisionTarget target, string profile, string targetName, ReleaseMatch match, QualityDefinitionRepository definitions)
     {
         var candidate = new ReleaseCandidate(parsed, size, "Manual test", 25, DateTimeOffset.UtcNow, string.Empty, parsed.ReleaseTitle);
         var defs = definitions.All().ToDictionary(d => d.QualityId);
         var result = DecisionEngine.Evaluate([candidate], target, defs, DateTimeOffset.UtcNow).Single();
-        return new DecisionResult(targetName, profile, result.Accepted, [.. result.Rejections.Select(r => new RejectionResource(r.Code, r.Message))]);
+
+        // A search only ever offers releases that belong to the item; here the user can type anything, so say so first.
+        List<RejectionResource> rejections = [];
+        var named = parsed.Year > 0 ? $"{parsed.Title} ({parsed.Year})" : parsed.Title;
+        var mismatch = match switch
+        {
+            ReleaseMatch.WrongType => parsed.IsEpisode ? $"This is a series release, {targetName} is a movie" : $"This is a movie release, {targetName} is a series",
+            ReleaseMatch.WrongTitle => $"The release is for {named}, not {targetName}",
+            ReleaseMatch.WrongYear => $"Same title, but the release year {parsed.Year} does not fit {targetName}",
+            _ => null,
+        };
+        if (mismatch is not null)
+        {
+            rejections.Add(new RejectionResource(RejectionCodes.WrongMedia, mismatch));
+        }
+
+        rejections.AddRange(result.Rejections.Select(r => new RejectionResource(r.Code, r.Message)));
+        return new DecisionResult(targetName, profile, rejections.Count == 0, rejections);
     }
 }
 

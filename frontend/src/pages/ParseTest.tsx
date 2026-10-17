@@ -123,7 +123,7 @@ function ParsedTable({ parsed: p }: { parsed: ParsedRelease }) {
           ? `Season ${p.seasonNumber} (pack)`
           : p.absoluteEpisodeNumbers.length > 0
             ? `Absolute ${p.absoluteEpisodeNumbers.join(', ')}`
-            : `S${String(p.seasonNumber ?? 0).padStart(2, '0')} E${p.episodeNumbers.join(', E')}`
+            : `S${pad(p.seasonNumber ?? 0)}` + p.episodeNumbers.map((e) => `E${pad(e)}`).join('')
       : null
 
   const rows: [string, string | null][] = [
@@ -157,4 +157,8 @@ function ParsedTable({ parsed: p }: { parsed: ParsedRelease }) {
       </dl>
     </section>
   )
+}
+
+function pad(n: number) {
+  return String(n).padStart(2, '0')
 }

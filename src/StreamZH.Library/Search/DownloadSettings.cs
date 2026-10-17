@@ -17,7 +17,7 @@ public enum DownloadClientKind
 
 /// <summary>
 /// Download settings: which client gets grabbed releases, the NZB folder (blackhole), the incomplete and complete
-/// folders of the built-in engine and its speed limit.
+/// folders of the built-in engine, its speed limit and its expert settings (free space, cleanup, abort, tries).
 /// </summary>
 public sealed class DownloadSettings(ConfigRepository config, AppPaths paths)
 {
@@ -27,7 +27,23 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths)
     /// <summary>10 GB/s; anything above is a typo.</summary>
     public const long MaxSpeedLimitKBps = 10_000_000;
 
+    /// <summary>Below this much free space in the incomplete folder the queue pauses (unless set otherwise).</summary>
+    public const double DefaultMinFreeSpaceGb = 1;
+
+    public const double MaxMinFreeSpaceGb = 10_000;
+
+    /// <summary>Tries per server and article on timeouts and dropped connections (like SABnzbd's "max_art_tries").</summary>
+    public const int DefaultArticleTries = 3;
+
+    public const int MaxArticleTries = 10;
+
+    private const long BytesPerGb = 1024L * 1024 * 1024;
+
     private long? _speedLimit;
+    private EngineValues? _engine;
+
+    /// <summary>The download engine's expert settings, cached (read on every tick and article).</summary>
+    private sealed record EngineValues(double MinFreeSpaceGb, bool KeepFiles, bool AbortHopeless, int ArticleTries);
 
     public string DefaultNzbFolder => Path.Combine(paths.DataDirectory, "downloads", "nzb");
 
@@ -66,6 +82,46 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths)
         }
     }
 
+    /// <summary>The queue pauses below this much free space in the incomplete folder (GB of 1024³ bytes, like the disk notice).</summary>
+    public double MinFreeSpaceGb => Engine.MinFreeSpaceGb;
+
+    public long MinFreeSpaceBytes => (long)(MinFreeSpaceGb * BytesPerGb);
+
+    /// <summary>After a successful unpack the download folder (par2, archives, nfo) stays in the incomplete folder instead of being deleted.</summary>
+    public bool KeepFiles => Engine.KeepFiles;
+
+    /// <summary>A download fails as soon as more articles are missing than par2 could repair (default), instead of downloading the rest.</summary>
+    public bool AbortHopeless => Engine.AbortHopeless;
+
+    /// <summary>Tries per server and article on timeouts and dropped connections.</summary>
+    public int ArticleTries => Engine.ArticleTries;
+
+    private EngineValues Engine
+    {
+        get
+        {
+            if (_engine is { } cached)
+            {
+                return cached;
+            }
+
+            var minFree = double.TryParse(config.Get(ConfigKeys.DownloadMinFreeSpaceGb), NumberStyles.Float, CultureInfo.InvariantCulture, out var gb)
+                && double.IsFinite(gb) && gb >= 0
+                ? gb
+                : DefaultMinFreeSpaceGb;
+            var tries = int.TryParse(config.Get(ConfigKeys.DownloadArticleTries), NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n is >= 1 and <= MaxArticleTries
+                ? n
+                : DefaultArticleTries;
+            var values = new EngineValues(
+                minFree,
+                string.Equals(config.Get(ConfigKeys.DownloadKeepFiles), "true", StringComparison.OrdinalIgnoreCase),
+                !string.Equals(config.Get(ConfigKeys.DownloadAbortHopeless), "false", StringComparison.OrdinalIgnoreCase),
+                tries);
+            _engine = values;
+            return values;
+        }
+    }
+
     public static string ClientValue(DownloadClientKind kind) => kind == DownloadClientKind.Blackhole ? BlackholeValue : BuiltInValue;
 
     /// <summary>Saves the NZB folder (empty = default). Creates it when missing and checks that StreamZH can write there.</summary>
@@ -87,8 +143,19 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths)
     /// Saves the given settings; null keeps the current value, an empty folder means the default. All fields are
     /// checked first and nothing is saved when one is invalid.
     /// </summary>
-    /// <exception cref="ValidationFailedException">One or more fields are invalid (keys: client, nzbFolder, incompleteFolder, completeFolder, speedLimitKBps).</exception>
-    public void Update(string? client, string? nzbFolder, string? incompleteFolder, string? completeFolder, long? speedLimitKBps)
+    /// <exception cref="ValidationFailedException">
+    /// One or more fields are invalid (keys: client, nzbFolder, incompleteFolder, completeFolder, speedLimitKBps, minFreeSpaceGb, articleTries).
+    /// </exception>
+    public void Update(
+        string? client,
+        string? nzbFolder,
+        string? incompleteFolder,
+        string? completeFolder,
+        long? speedLimitKBps,
+        double? minFreeSpaceGb = null,
+        bool? keepFiles = null,
+        bool? abortHopeless = null,
+        int? articleTries = null)
     {
         var errors = new Dictionary<string, string[]>();
         DownloadClientKind? kind = null;
@@ -125,6 +192,16 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths)
             errors["speedLimitKBps"] = [$"Use 0 (unlimited) to {MaxSpeedLimitKBps.ToString("N0", CultureInfo.InvariantCulture)} KB/s."];
         }
 
+        if (minFreeSpaceGb is { } gb && (!double.IsFinite(gb) || gb < 0 || gb > MaxMinFreeSpaceGb))
+        {
+            errors["minFreeSpaceGb"] = [$"Use 0 (never pause) to {MaxMinFreeSpaceGb.ToString("N0", CultureInfo.InvariantCulture)} GB."];
+        }
+
+        if (articleTries is < 1 or > MaxArticleTries)
+        {
+            errors["articleTries"] = [$"Use 1 to {MaxArticleTries} tries."];
+        }
+
         if (errors.Count > 0)
         {
             throw new ValidationFailedException(errors);
@@ -155,6 +232,28 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths)
             config.Set(ConfigKeys.DownloadSpeedLimit, limit.ToString(CultureInfo.InvariantCulture));
             _speedLimit = limit;
         }
+
+        if (minFreeSpaceGb is { } minFree)
+        {
+            config.Set(ConfigKeys.DownloadMinFreeSpaceGb, Math.Round(minFree, 2).ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (keepFiles is { } keep)
+        {
+            config.Set(ConfigKeys.DownloadKeepFiles, keep ? "true" : "false");
+        }
+
+        if (abortHopeless is { } abort)
+        {
+            config.Set(ConfigKeys.DownloadAbortHopeless, abort ? "true" : "false");
+        }
+
+        if (articleTries is { } tries)
+        {
+            config.Set(ConfigKeys.DownloadArticleTries, tries.ToString(CultureInfo.InvariantCulture));
+        }
+
+        _engine = null;
     }
 
     /// <summary>Null when the folder exists (or could be created) and is writable, otherwise the reason.</summary>

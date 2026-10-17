@@ -190,6 +190,114 @@ public sealed class UsenetServerServiceTests : IAsyncLifetime
         Assert.All(status.Servers, s => Assert.True(s.Healthy));
     }
 
+    [Fact]
+    public void Expert_settings_are_stored_and_default_to_the_old_behaviour()
+    {
+        var plain = _service.Create(Valid("Plain"));
+        Assert.Equal(60, plain.TimeoutSeconds);
+        Assert.Equal(CertificateCheck.Strict, plain.CertificateCheck);
+        Assert.Equal(1, plain.ArticlesPerRequest);
+        Assert.Equal(ServerFailureAction.Skip, plain.OnFailure);
+        Assert.Null(plain.ExpiresOn);
+        Assert.Null(plain.QuotaBytes);
+        Assert.Null(plain.QuotaSince);
+        Assert.Equal(string.Empty, plain.Notes);
+
+        var expert = _service.Create(Valid("Expert") with
+        {
+            TimeoutSeconds = 120,
+            CertificateCheck = CertificateCheck.Minimal,
+            ArticlesPerRequest = 2,
+            OnFailure = ServerFailureAction.PauseDownloads,
+            ExpiresOn = "2026-10-22T00:00:00Z",
+            QuotaBytes = 500 * UsenetServer.BytesPerGb,
+            Notes = "  Block account, bought 2026  ",
+        });
+
+        var stored = _service.Find(expert.Id)!;
+        Assert.Equal(120, stored.TimeoutSeconds);
+        Assert.Equal(CertificateCheck.Minimal, stored.CertificateCheck);
+        Assert.Equal(2, stored.ArticlesPerRequest);
+        Assert.Equal(ServerFailureAction.PauseDownloads, stored.OnFailure);
+        Assert.Equal("2026-10-22", stored.ExpiresOn);
+        Assert.Equal(new DateOnly(2026, 10, 22), stored.ExpiryDate);
+        Assert.Equal(500 * UsenetServer.BytesPerGb, stored.QuotaBytes);
+        Assert.Equal(0, stored.QuotaUsedBytes);
+        Assert.Equal(_time.GetUtcNow().UtcDateTime, stored.QuotaSince);
+        Assert.Equal("Block account, bought 2026", stored.Notes);
+        Assert.Equal(20 + (20 * 2), _source.MaxConnections);
+    }
+
+    [Fact]
+    public void Expert_settings_are_validated_with_their_own_keys()
+    {
+        var error = Assert.Throws<ValidationFailedException>(() => _service.Create(Valid("A") with
+        {
+            TimeoutSeconds = 5,
+            CertificateCheck = (CertificateCheck)7,
+            ArticlesPerRequest = 21,
+            OnFailure = (ServerFailureAction)9,
+            ExpiresOn = "31.01.2027",
+            QuotaBytes = 0,
+            Notes = new string('x', 2001),
+        }));
+
+        Assert.Equal(
+            ["articlesPerRequest", "certificateCheck", "expiresOn", "notes", "onFailure", "quotaGb", "timeoutSeconds"],
+            error.Errors.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task Quota_counter_starts_when_set_survives_changes_and_resets()
+    {
+        _server.AddYenc("a@x", YencArticles.Random(50_000));
+        var created = _service.Create(Local("Block"));
+        await _source.FetchAsync("a@x", [], DateTimeOffset.MinValue, CancellationToken.None);
+        Assert.Equal(0, _service.Find(created.Id)!.QuotaUsedBytes);
+
+        // Set: counting starts now, earlier downloads do not count.
+        _time.Advance(TimeSpan.FromHours(1));
+        var withQuota = _service.Update(created.Id, created with { QuotaBytes = 100 * UsenetServer.BytesPerGb });
+        Assert.Equal(0, withQuota.QuotaUsedBytes);
+        Assert.Equal(_time.GetUtcNow().UtcDateTime, withQuota.QuotaSince);
+
+        await _source.FetchAsync("a@x", [], DateTimeOffset.MinValue, CancellationToken.None);
+        var used = _service.Find(created.Id)!.QuotaUsedBytes;
+        Assert.True(used > 50_000);
+
+        // A different amount keeps the counter.
+        _time.Advance(TimeSpan.FromHours(1));
+        var raised = _service.Update(created.Id, withQuota with { QuotaBytes = 200 * UsenetServer.BytesPerGb });
+        Assert.Equal(used, raised.QuotaUsedBytes);
+        Assert.Equal(withQuota.QuotaSince, raised.QuotaSince);
+
+        // Reset: zero, counting from now.
+        var reset = _service.ResetQuota(created.Id);
+        Assert.Equal(0, reset.QuotaUsedBytes);
+        Assert.Equal(_time.GetUtcNow().UtcDateTime, reset.QuotaSince);
+
+        // Removed: no counter.
+        var removed = _service.Update(created.Id, raised with { QuotaBytes = null });
+        Assert.Null(removed.QuotaSince);
+        Assert.Null(_source.QuotaUsed(created.Id));
+        Assert.Equal(LibraryError.Invalid, Assert.Throws<LibraryException>(() => _service.ResetQuota(created.Id)).Error);
+        Assert.Equal(LibraryError.NotFound, Assert.Throws<LibraryException>(() => _service.ResetQuota(999)).Error);
+    }
+
+    [Fact]
+    public void Stored_quota_usage_only_counts_for_servers_with_a_quota()
+    {
+        var repository = new UsenetServerRepository(new Database(_file));
+        var withQuota = _service.Create(Valid("Quota") with { QuotaBytes = UsenetServer.BytesPerGb });
+        var without = _service.Create(Valid("Free"));
+
+        repository.AddQuotaUsage(new Dictionary<int, long> { [withQuota.Id] = 1000, [without.Id] = 1000 });
+        repository.AddQuotaUsage(new Dictionary<int, long> { [withQuota.Id] = 500 });
+
+        Assert.Equal(1500, repository.Find(withQuota.Id)!.QuotaUsedBytes);
+        Assert.Equal(0, repository.Find(without.Id)!.QuotaUsedBytes);
+    }
+
     private static UsenetServer Valid(string name) => new(0, name, "news.example.com", 563, true, "user", "password", 20, 0, true, 0);
 
     private UsenetServer Local(string name) => new(0, name, "127.0.0.1", _server.Port, false, "user", "top secret", 2, 0, true, 0);

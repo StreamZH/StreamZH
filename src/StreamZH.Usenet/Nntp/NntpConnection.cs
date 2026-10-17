@@ -22,8 +22,9 @@ public readonly record struct NntpResponse(int Code, string Text)
 /// <summary>
 /// One NNTP connection (RFC 3977, AUTHINFO from RFC 4643): TCP, optionally TLS, greeting, login, BODY by message-id, DATE, QUIT.
 /// Reads through one pooled buffer; multi-line answers are dot-unstuffed and end at the "." line.
-/// Not thread-safe: one command at a time. After a timeout, a lost connection or a cancelled command the connection is
-/// no longer <see cref="IsUsable"/> and must be disposed.
+/// Not thread-safe: one command at a time, except for pipelined BODY commands (<see cref="SendBodyAsync"/> and
+/// <see cref="ReceiveBodyAsync"/>: one sender and one reader at once, answers read in sending order). After a timeout, a lost
+/// connection or a cancelled command the connection is no longer <see cref="IsUsable"/> and must be disposed.
 /// </summary>
 public sealed class NntpConnection : IAsyncDisposable
 {
@@ -40,7 +41,7 @@ public sealed class NntpConnection : IAsyncDisposable
     private byte[] _buffer = ArrayPool<byte>.Shared.Rent(ReadBufferSize);
     private int _start;
     private int _end;
-    private bool _broken;
+    private volatile bool _broken;
     private int _disposed;
 
     private NntpConnection(Stream stream, NntpConnectionSettings settings, string? tlsProtocol)
@@ -134,6 +135,33 @@ public sealed class NntpConnection : IAsyncDisposable
     /// <exception cref="NntpException">Any other failure.</exception>
     public async Task<DecodedArticle> BodyAsync(string messageId, CancellationToken cancellationToken)
     {
+        await SendBodyAsync(messageId, cancellationToken);
+        return await ReceiveBodyAsync(messageId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Pipelining, first half: sends BODY without waiting for the answer. Answers come in the order the commands were sent;
+    /// read each with <see cref="ReceiveBodyAsync"/>. One sender and one reader may run at the same time, not more.
+    /// </summary>
+    /// <exception cref="NntpException">The command could not be sent (the connection is unusable afterwards).</exception>
+    public async Task SendBodyAsync(string messageId, CancellationToken cancellationToken)
+    {
+        var id = NormalizeMessageId(messageId);
+        ThrowIfUnusable();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        try
+        {
+            await WriteLineAsync($"BODY <{id}>", timeout);
+        }
+        catch (Exception ex)
+        {
+            throw Fail(ex, cancellationToken);
+        }
+    }
+
+    /// <summary>Pipelining, second half: reads the answer to the oldest BODY not read yet. Same results as <see cref="BodyAsync"/>.</summary>
+    public async Task<DecodedArticle> ReceiveBodyAsync(string messageId, CancellationToken cancellationToken)
+    {
         var id = NormalizeMessageId(messageId);
         ThrowIfUnusable();
         using var body = new PooledBuffer(ArticleBufferSize);
@@ -141,7 +169,6 @@ public sealed class NntpConnection : IAsyncDisposable
         {
             try
             {
-                await WriteLineAsync($"BODY <{id}>", timeout);
                 var response = await ReadResponseAsync(timeout);
                 switch (response.Code)
                 {
@@ -200,6 +227,12 @@ public sealed class NntpConnection : IAsyncDisposable
             throw Fail(ex, cancellationToken);
         }
     }
+
+    /// <summary>
+    /// Marks the connection unusable without closing it, e.g. when a pipelined answer will never be read: the answers
+    /// after it would be out of step. Commands already reading finish; new ones fail with <see cref="NntpErrorKind.Closed"/>.
+    /// </summary>
+    public void MarkBroken() => _broken = true;
 
     /// <summary>Says goodbye (QUIT, waits up to 2 seconds for 205). Never throws; the connection is unusable afterwards.</summary>
     public async Task QuitAsync()

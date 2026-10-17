@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
@@ -30,6 +31,13 @@ public sealed class UsenetServerService(
     public const int MinConnections = 1;
     public const int MaxConnections = 100;
     public const int MaxPriority = 99;
+    public const int MinTimeoutSeconds = 10;
+    public const int MaxTimeoutSeconds = 300;
+    public const int MaxArticlesPerRequest = 20;
+    public const int MaxNotesLength = 2000;
+
+    /// <summary>Largest quota in GB (1 PB); anything above is a typo.</summary>
+    public const long MaxQuotaGb = 1_000_000;
 
     /// <summary>What the API shows instead of a stored password. Sent back unchanged, it means "keep the stored password".</summary>
     public const string MaskedPassword = "********";
@@ -37,10 +45,10 @@ public sealed class UsenetServerService(
     /// <summary>A new server to start from: SSL on port 563, 20 connections, primary.</summary>
     public static UsenetServer Schema() => new(0, string.Empty, string.Empty, DefaultPort, true, string.Empty, string.Empty, DefaultConnections, 0, true, 0);
 
-    /// <summary>All servers ordered by priority, then name.</summary>
-    public IReadOnlyList<UsenetServer> All() => servers.All();
+    /// <summary>All servers ordered by priority, then name. Quota counters are live (ahead of the stored value).</summary>
+    public IReadOnlyList<UsenetServer> All() => [.. servers.All().Select(WithLiveQuota)];
 
-    public UsenetServer? Find(int id) => servers.Find(id);
+    public UsenetServer? Find(int id) => servers.Find(id) is { } server ? WithLiveQuota(server) : null;
 
     public UsenetServer Create(UsenetServer server)
     {
@@ -56,7 +64,7 @@ public sealed class UsenetServerService(
         var id = servers.Add(normalized, time.GetUtcNow().UtcDateTime);
         logger.LogInformation("Usenet server '{Name}' ({Host}) added", normalized.Name, normalized.Host);
         Changed();
-        return servers.Find(id)!;
+        return Find(id)!;
     }
 
     public UsenetServer Update(int id, UsenetServer server)
@@ -71,9 +79,34 @@ public sealed class UsenetServerService(
 
         ThrowIfAny(Validate(normalized, id));
         servers.Update(normalized);
+
+        // The counter starts when a quota is set and is dropped when it is removed; changing the amount keeps it.
+        if ((existing.QuotaBytes is null) != (normalized.QuotaBytes is null))
+        {
+            DateTime? since = normalized.QuotaBytes is null ? null : time.GetUtcNow().UtcDateTime;
+            source.ResetQuota(id, () => servers.ResetQuota(id, since));
+        }
+
         logger.LogInformation("Usenet server '{Name}' ({Host}) saved", normalized.Name, normalized.Host);
         Changed();
-        return servers.Find(id)!;
+        return Find(id)!;
+    }
+
+    /// <summary>Sets the quota counter to zero, counting from now. A server whose quota was used up is used again.</summary>
+    /// <exception cref="LibraryException">Not found, or the server has no quota.</exception>
+    public UsenetServer ResetQuota(int id)
+    {
+        var existing = servers.Find(id) ?? throw new LibraryException("Usenet server not found.", LibraryError.NotFound);
+        if (existing.QuotaBytes is null)
+        {
+            throw new LibraryException("This server has no quota.", LibraryError.Invalid);
+        }
+
+        var now = time.GetUtcNow().UtcDateTime;
+        source.ResetQuota(id, () => servers.ResetQuota(id, now));
+        logger.LogInformation("Quota counter of Usenet server '{Name}' reset", existing.Name);
+        Changed();
+        return Find(id)!;
     }
 
     public void Delete(int id)
@@ -95,7 +128,8 @@ public sealed class UsenetServerService(
         var list = servers.All()
             .Select(s => byId.GetValueOrDefault(s.Id) is { } status
                 ? status with { Name = s.Name }
-                : new UsenetServerStatus(s.Id, s.Name, 0, s.Connections, true, null, source.BytesToday(s.Id)))
+                : new UsenetServerStatus(
+                    s.Id, s.Name, 0, s.Connections, true, null, source.BytesToday(s.Id), null, s.QuotaBytes is null ? null : source.QuotaUsed(s.Id) ?? s.QuotaUsedBytes))
             .ToList();
         return live with { Servers = list };
     }
@@ -208,6 +242,31 @@ public sealed class UsenetServerService(
             errors["retentionDays"] = ["Use 0 (unknown) or more days."];
         }
 
+        if (server.ArticlesPerRequest is < 1 or > MaxArticlesPerRequest)
+        {
+            errors["articlesPerRequest"] = [$"Use 1 to {MaxArticlesPerRequest}. 1 sends one request at a time; 2 is what SABnzbd uses."];
+        }
+
+        if (!Enum.IsDefined(server.OnFailure))
+        {
+            errors["onFailure"] = ["Choose what happens when the server fails."];
+        }
+
+        if (server.ExpiresOn is not null && server.ExpiryDate is null)
+        {
+            errors["expiresOn"] = ["Enter a date like 2027-01-31."];
+        }
+
+        if (server.QuotaBytes is <= 0 or > MaxQuotaGb * UsenetServer.BytesPerGb)
+        {
+            errors["quotaGb"] = [$"Use more than 0 and at most {MaxQuotaGb.ToString("N0", CultureInfo.InvariantCulture)} GB, or leave it empty for no quota."];
+        }
+
+        if (server.Notes.Length > MaxNotesLength)
+        {
+            errors["notes"] = [$"Use at most {MaxNotesLength} characters."];
+        }
+
         return errors;
     }
 
@@ -245,6 +304,16 @@ public sealed class UsenetServerService(
             errors["password"] = ["Remove line breaks and other control characters."];
         }
 
+        if (server.TimeoutSeconds is < MinTimeoutSeconds or > MaxTimeoutSeconds)
+        {
+            errors["timeoutSeconds"] = [$"Use {MinTimeoutSeconds} to {MaxTimeoutSeconds} seconds."];
+        }
+
+        if (!Enum.IsDefined(server.CertificateCheck))
+        {
+            errors["certificateCheck"] = ["Choose Strict, Minimal or Off."];
+        }
+
         return errors;
     }
 
@@ -263,5 +332,28 @@ public sealed class UsenetServerService(
         Host = server.Host?.Trim() ?? string.Empty,
         Username = server.Username?.Trim() ?? string.Empty,
         Password = server.Password ?? string.Empty,
+        ExpiresOn = NormalizeDate(server.ExpiresOn),
+        Notes = server.Notes?.Trim() ?? string.Empty,
     };
+
+    /// <summary>"2027-01-31" and "2027-01-31T00:00:00Z" become "2027-01-31"; empty becomes null; anything else stays (and fails validation).</summary>
+    private static string? NormalizeDate(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return null;
+        }
+
+        if (text.Length > 10 && DateOnly.TryParseExact(text[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        return text;
+    }
+
+    /// <summary>The stored server with the live quota counter of the connection pool.</summary>
+    private UsenetServer WithLiveQuota(UsenetServer server) =>
+        server.QuotaBytes is not null && source.QuotaUsed(server.Id) is { } used ? server with { QuotaUsedBytes = used } : server;
 }

@@ -11,7 +11,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using StreamZH.Core.Downloads;
 using StreamZH.Library.Downloads;
+using StreamZH.Library.Search;
 using StreamZH.Tests.Library.Downloads;
+using StreamZH.Usenet.Pool;
 
 namespace StreamZH.Tests.Host;
 
@@ -153,6 +155,37 @@ public sealed class DownloadApiTests : IDisposable
         var result = await saved.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(("blackhole", complete, 2048L), (Text(result, "client"), Text(result, "completeFolder"), result.GetProperty("speedLimitKBps").GetInt64()));
         Assert.Equal(2048, (await client.GetFromJsonAsync<JsonElement>("/api/v1/download")).GetProperty("speedLimitKBps").GetInt64());
+    }
+
+    [Fact]
+    public async Task Download_expert_settings_keep_todays_behaviour_by_default_and_reach_the_engine()
+    {
+        var client = await OwnerClientAsync();
+
+        var settings = await client.GetFromJsonAsync<JsonElement>("/api/v1/settings/downloads");
+        Assert.Equal(1, settings.GetProperty("minFreeSpaceGb").GetDouble());
+        Assert.False(settings.GetProperty("keepFiles").GetBoolean());
+        Assert.True(settings.GetProperty("abortHopeless").GetBoolean());
+        Assert.Equal(3, settings.GetProperty("articleTries").GetInt32());
+        Assert.Equal(3, _factory.Services.GetRequiredService<UsenetPoolOptions>().Attempts);
+
+        var invalid = await client.PutAsJsonAsync("/api/v1/settings/downloads", new { minFreeSpaceGb = -1, articleTries = 11, keepFiles = true });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        var errors = (await invalid.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.Equal(["articleTries", "minFreeSpaceGb"], errors.EnumerateObject().Select(p => p.Name).Order());
+        Assert.False(_factory.Services.GetRequiredService<DownloadSettings>().KeepFiles); // nothing saved
+
+        var saved = await client.PutAsJsonAsync("/api/v1/settings/downloads", new { minFreeSpaceGb = 2.5, keepFiles = true, abortHopeless = false, articleTries = 5 });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var result = await saved.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(2.5, result.GetProperty("minFreeSpaceGb").GetDouble());
+        Assert.True(result.GetProperty("keepFiles").GetBoolean());
+        Assert.False(result.GetProperty("abortHopeless").GetBoolean());
+        Assert.Equal(5, result.GetProperty("articleTries").GetInt32());
+
+        var downloads = _factory.Services.GetRequiredService<DownloadSettings>();
+        Assert.Equal((long)(2.5 * 1024 * 1024 * 1024), downloads.MinFreeSpaceBytes);
+        Assert.Equal(5, _factory.Services.GetRequiredService<UsenetPoolOptions>().Attempts);
     }
 
     private static string? Text(JsonElement element, string property) => element.GetProperty(property).GetString();

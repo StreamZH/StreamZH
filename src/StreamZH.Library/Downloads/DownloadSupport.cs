@@ -12,9 +12,6 @@ public sealed class DownloadEngineOptions
     /// <summary>Progress events, speed samples, checkpoints and the disk-space check run on this interval.</summary>
     public TimeSpan Tick { get; set; } = TimeSpan.FromSeconds(1);
 
-    /// <summary>Below this much free space in the incomplete folder the whole queue pauses.</summary>
-    public long MinFreeBytes { get; set; } = 1024L * 1024 * 1024;
-
     /// <summary>Wait after "no server reachable" before the next attempt (doubles up to <see cref="MaxServerRetryDelay"/>).</summary>
     public TimeSpan ServerRetryDelay { get; set; } = TimeSpan.FromSeconds(10);
 

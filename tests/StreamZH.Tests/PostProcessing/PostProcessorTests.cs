@@ -45,6 +45,25 @@ public sealed class PostProcessorTests : IDisposable
     }
 
     [Fact]
+    public async Task Keep_files_leaves_the_rest_of_the_download_folder()
+    {
+        var movie = TestData.Random(300_000, 1);
+        _folder.Write("work/Some.Movie.mkv", movie);
+        _folder.Write("work/Some.Movie.nfo", TestData.Random(500, 2));
+        _folder.Write("work/Some.Movie.sfv", TestData.Random(50, 3));
+
+        var job = PostProcessorFactory.Job(_folder) with { KeepFiles = true };
+        var result = await PostProcessorFactory.Create(noTools: true).RunAsync(job, _progress, CancellationToken.None);
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(movie, File.ReadAllBytes(Path.Combine(Target, "Some.Movie.mkv")));
+        Assert.False(File.Exists(Path.Combine(Work, "Some.Movie.mkv")), "the media file is moved, not copied");
+        Assert.True(File.Exists(Path.Combine(Work, "Some.Movie.nfo")));
+        Assert.True(File.Exists(Path.Combine(Work, "Some.Movie.sfv")));
+        Assert.DoesNotContain(_progress.Items, p => p.Message == "Deleting download folder");
+    }
+
+    [Fact]
     public async Task Big_files_named_sample_are_kept()
     {
         var path = _folder.Write("work/The.Sample.2024.mkv", []);

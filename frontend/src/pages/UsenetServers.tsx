@@ -6,8 +6,11 @@ import {
   formatBytes,
   maskedPassword,
   newUsenetServer,
+  quotaUsage,
   usenetApi,
   usenetKeys,
+  type CertificateCheck,
+  type FailureAction,
   type UsenetServer,
   type UsenetServerStatus,
 } from '../api/usenet'
@@ -16,11 +19,31 @@ import ui from '../components/ui.module.css'
 import { Pill } from '../indexers/Chips'
 import Dialog from '../indexers/Dialog'
 import form from '../indexers/Form.module.css'
+import { Advanced, AdvancedHint, AdvancedToggle } from '../lib/Advanced'
+import { advancedLabel, setAdvanced } from '../lib/advancedMode'
+import { formatDate } from '../lib/format'
 import page from './Page.module.css'
 import styles from './UsenetServers.module.css'
 
 const sslPort = 563
 const plainPort = 119
+
+/** Fields only shown in advanced mode. A save or test error on one of them switches advanced mode on. */
+const advancedFields = [
+  'priority',
+  'retentionDays',
+  'timeoutSeconds',
+  'certificateCheck',
+  'articlesPerRequest',
+  'onFailure',
+  'expiresOn',
+  'quotaGb',
+  'notes',
+]
+
+const showHiddenErrors = (error: Error) => {
+  if (error instanceof ApiError && Object.keys(error.fieldErrors).some((name) => advancedFields.includes(name))) setAdvanced(true)
+}
 
 function useCanEdit() {
   const { user } = useAuth()
@@ -41,10 +64,15 @@ export default function UsenetServers() {
         <Link className={styles.back} to="/settings">
           ← Settings
         </Link>
-        <h1 className={page.title}>Usenet servers</h1>
-        <p className={page.lead}>
-          Where StreamZH downloads from. The primary server is asked first; backup servers, such as a block account, fill in what it is missing.
-        </p>
+        <div className={styles.pageHead}>
+          <div>
+            <h1 className={page.title}>Usenet servers</h1>
+            <p className={page.lead}>
+              Where StreamZH downloads from. The primary server is asked first; backup servers, such as a block account, fill in what it is missing.
+            </p>
+          </div>
+          <AdvancedToggle />
+        </div>
       </header>
       <ServerList canEdit={canEdit} />
     </div>
@@ -178,8 +206,10 @@ function ServerRow({
   onEdit: () => void
 }) {
   const failing = s.enabled && status != null && !status.healthy
-  const state = !s.enabled ? styles.disabled : failing ? styles.failing : styles.enabled
+  const quotaFull = s.enabled && status?.quotaExhausted === true
+  const state = !s.enabled ? styles.disabled : failing || quotaFull ? styles.failing : styles.enabled
   const inUse = status?.connectionsInUse ?? 0
+  const quotaUsed = status?.quotaUsedBytes ?? s.quotaUsedBytes
 
   return (
     <li className={`${styles.row} ${state}`} onClick={canEdit ? onEdit : undefined}>
@@ -208,15 +238,27 @@ function ServerRow({
               Backup
             </Pill>
           )}
+          {s.onFailure === 'pause' && (
+            <Pill tone="warn" title="Required: downloads pause while this server cannot be used">
+              Required
+            </Pill>
+          )}
+          {s.onFailure === 'ignore' && (
+            <Pill tone="off" title="Optional: skipped for longer on errors, which are not shown in the status window">
+              Optional
+            </Pill>
+          )}
           {!s.enabled && <Pill tone="off">Disabled</Pill>}
           {failing && <Pill tone="error">{status?.retryAt ? `Skipped until ${formatTime(status.retryAt)}` : 'Failing'}</Pill>}
-          {s.enabled && !failing && inUse > 0 && <Pill tone="ok">Downloading</Pill>}
+          {quotaFull && <Pill tone="error">Quota used up</Pill>}
+          {s.enabled && !failing && !quotaFull && inUse > 0 && <Pill tone="ok">Downloading</Pill>}
         </div>
         <div className={styles.hostLine}>
           <span className={styles.host}>
             {s.host}:{s.port}
           </span>
           <span className={s.useSsl ? styles.ssl : styles.noSsl}>{s.useSsl ? 'SSL' : 'No SSL'}</span>
+          {s.quotaGb != null && <span className={styles.quota}>{quotaUsage(quotaUsed, s.quotaGb)}</span>}
         </div>
       </div>
       <div className={styles.cell}>
@@ -267,15 +309,31 @@ function ServerRow({
   )
 }
 
-function Field({ id, label, help, error, children }: { id?: string; label: string; help?: ReactNode; error?: string; children: ReactNode }) {
+function Field({
+  id,
+  label,
+  advanced = false,
+  help,
+  error,
+  children,
+}: {
+  id?: string
+  label: string
+  /** An expert setting: the label stands out while advanced mode is on. */
+  advanced?: boolean
+  help?: ReactNode
+  error?: string
+  children: ReactNode
+}) {
+  const labelClass = `${form.label} ${advanced ? advancedLabel : ''}`
   return (
     <div className={`${form.row} ${error ? form.invalid : ''}`}>
       {id ? (
-        <label className={form.label} htmlFor={id}>
+        <label className={labelClass} htmlFor={id}>
           {label}
         </label>
       ) : (
-        <span className={form.label}>{label}</span>
+        <span className={labelClass}>{label}</span>
       )}
       <div className={form.control}>
         {children}
@@ -298,6 +356,20 @@ function Switch({ checked, onChange, on, off }: { checked: boolean; onChange: (c
 
 const numberValue = (value: number) => (Number.isNaN(value) ? '' : value)
 
+const certificateHelp: Record<CertificateCheck, string> = {
+  strict: 'The certificate must be valid, trusted and issued for this host. Use this unless the server has a self-signed certificate.',
+  minimal: 'A self-signed, untrusted or expired certificate is accepted, but it must be issued for this host. The connection is still encrypted.',
+  off: 'Any certificate is accepted. Unsafe: someone between you and the server could read your login and downloads. Only for a server you trust.',
+}
+
+const failureHelp: Record<FailureAction, string> = {
+  skip: 'When the server fails (connection, login, quota used up), StreamZH skips it for 5 minutes and the other servers carry on. Right for most servers.',
+  pause:
+    'Required: when the server fails, downloads pause until it works again instead of skipping it. For your main or only provider, so articles are not wrongly counted as missing and downloads do not fail while it is down.',
+  ignore:
+    'Optional: an unreliable extra server. When it fails it is skipped for 30 minutes, and its errors do not show up in the status window.',
+}
+
 /** Add or edit a server; single column with help per field, like the indexer form. */
 function ServerForm({ server, canEdit, onClose }: { server: UsenetServer; canEdit: boolean; onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -311,9 +383,26 @@ function ServerForm({ server, canEdit, onClose }: { server: UsenetServer; canEdi
     onClose()
   }
 
-  const save = useMutation({ mutationFn: () => (isNew ? usenetApi.create(draft) : usenetApi.update(draft)), onSuccess: done })
+  const save = useMutation({
+    mutationFn: () => (isNew ? usenetApi.create(draft) : usenetApi.update(draft)),
+    onSuccess: done,
+    onError: showHiddenErrors,
+  })
   const remove = useMutation({ mutationFn: () => usenetApi.remove(server.id), onSuccess: done })
-  const test = useMutation({ mutationFn: () => usenetApi.test(draft) })
+  const test = useMutation({ mutationFn: () => usenetApi.test(draft), onError: showHiddenErrors })
+
+  // Live quota counter (the list polls the status); the reset starts it again from zero.
+  const status = useQuery({ queryKey: usenetKeys.status, queryFn: usenetApi.status, enabled: !isNew })
+  const live = status.data?.servers.find((s) => s.id === server.id)
+  const [counter, setCounter] = useState({ used: server.quotaUsedBytes, since: server.quotaSince })
+  const quotaUsed = live?.quotaUsedBytes ?? counter.used
+  const resetQuota = useMutation({
+    mutationFn: () => usenetApi.resetQuota(server.id),
+    onSuccess: async (saved) => {
+      setCounter({ used: saved.quotaUsedBytes, since: saved.quotaSince })
+      await queryClient.invalidateQueries({ queryKey: usenetKeys.all })
+    },
+  })
 
   // Fields changed since the last save or test: their old error no longer applies and is hidden.
   const [edited, setEdited] = useState<Set<string>>(new Set())
@@ -364,6 +453,7 @@ function ServerForm({ server, canEdit, onClose }: { server: UsenetServer; canEdi
           {save.error && Object.keys(saveErrors).length === 0 && <span className={ui.error}>{save.error.message}</span>}
           {openErrors && <span className={ui.error}>Check the highlighted fields.</span>}
           {remove.error && <span className={ui.error}>{remove.error.message}</span>}
+          {resetQuota.error && <span className={ui.error}>{resetQuota.error.message}</span>}
         </div>
         {!isNew && (
           <button className={`${ui.button} ${form.delete}`} type="button" onClick={() => setConfirmDelete(true)}>
@@ -401,7 +491,13 @@ function ServerForm({ server, canEdit, onClose }: { server: UsenetServer; canEdi
   )
 
   return (
-    <Dialog title={title} subtitle={isNew ? 'News server of your Usenet provider' : `${server.host}:${server.port}`} onClose={onClose} footer={footer}>
+    <Dialog
+      title={title}
+      subtitle={isNew ? 'News server of your Usenet provider' : `${server.host}:${server.port}`}
+      onClose={onClose}
+      footer={footer}
+      headerAction={<AdvancedToggle />}
+    >
       <form id={formId} className={form.form} onSubmit={submit} noValidate>
         <fieldset className={form.fieldset} disabled={!canEdit}>
           <Field id={id('name')} label="Name" help="Shown in the status and the log, e.g. the provider's name." error={fieldError('name')}>
@@ -504,44 +600,194 @@ function ServerForm({ server, canEdit, onClose }: { server: UsenetServer; canEdi
             />
           </Field>
 
-          <Field
-            id={id('priority')}
-            label="Priority"
-            error={fieldError('priority')}
-            help="0 is the primary server, asked first. Backup servers (1 to 99) are only asked for articles the servers before them do not have."
-          >
-            <input
+          <Advanced>
+            <Field
               id={id('priority')}
-              className={`${ui.input} ${form.number}`}
-              type="number"
-              min={0}
-              max={99}
-              inputMode="numeric"
-              value={numberValue(draft.priority)}
-              onChange={(e) => update({ priority: e.target.valueAsNumber })}
-            />
-          </Field>
-
-          <Field
-            id={id('retentionDays')}
-            label="Retention"
-            error={fieldError('retentionDays')}
-            help="Days the server keeps articles. Older posts are not requested from it. 0 if you do not know."
-          >
-            <div className={styles.withUnit}>
+              label="Priority"
+              advanced
+              error={fieldError('priority')}
+              help="0 is the primary server, asked first. Backup servers (1 to 99) are only asked for articles the servers before them do not have."
+            >
               <input
-                id={id('retentionDays')}
-                className={`${ui.input} ${styles.unitInput}`}
+                id={id('priority')}
+                className={`${ui.input} ${form.number}`}
                 type="number"
                 min={0}
+                max={99}
                 inputMode="numeric"
-                value={numberValue(draft.retentionDays)}
-                onChange={(e) => update({ retentionDays: e.target.valueAsNumber })}
+                value={numberValue(draft.priority)}
+                onChange={(e) => update({ priority: e.target.valueAsNumber })}
               />
-              <span className={ui.muted}>days</span>
-            </div>
-          </Field>
+            </Field>
+
+            <Field
+              id={id('retentionDays')}
+              label="Retention"
+              advanced
+              error={fieldError('retentionDays')}
+              help="Days the server keeps articles. Older posts are not requested from it. 0 if you do not know."
+            >
+              <div className={styles.withUnit}>
+                <input
+                  id={id('retentionDays')}
+                  className={`${ui.input} ${styles.unitInput}`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={numberValue(draft.retentionDays)}
+                  onChange={(e) => update({ retentionDays: e.target.valueAsNumber })}
+                />
+                <span className={ui.muted}>days</span>
+              </div>
+            </Field>
+
+            <Field
+              id={id('timeoutSeconds')}
+              label="Timeout"
+              advanced
+              error={fieldError('timeoutSeconds')}
+              help="How long StreamZH waits for an answer before it gives up on a connection and tries again (10 to 300 seconds)."
+            >
+              <div className={styles.withUnit}>
+                <input
+                  id={id('timeoutSeconds')}
+                  className={`${ui.input} ${styles.unitInput}`}
+                  type="number"
+                  min={10}
+                  max={300}
+                  inputMode="numeric"
+                  value={numberValue(draft.timeoutSeconds)}
+                  onChange={(e) => update({ timeoutSeconds: e.target.valueAsNumber })}
+                />
+                <span className={ui.muted}>seconds</span>
+              </div>
+            </Field>
+
+            {draft.useSsl && (
+              <Field
+                id={id('certificateCheck')}
+                label="Certificate check"
+                advanced
+                error={fieldError('certificateCheck')}
+                help={certificateHelp[draft.certificateCheck]}
+              >
+                <select
+                  id={id('certificateCheck')}
+                  className={`${ui.select} ${form.number}`}
+                  value={draft.certificateCheck}
+                  onChange={(e) => update({ certificateCheck: e.target.value as CertificateCheck })}
+                >
+                  <option value="strict">Strict (recommended)</option>
+                  <option value="minimal">Minimal</option>
+                  <option value="off">Off (unsafe)</option>
+                </select>
+              </Field>
+            )}
+
+            <Field
+              id={id('articlesPerRequest')}
+              label="Articles per request"
+              advanced
+              error={fieldError('articlesPerRequest')}
+              help="How many articles StreamZH asks for on one connection before the first one arrives (pipelining, 1 to 20). 2 can help when the server is far away; 1 is the safe choice."
+            >
+              <input
+                id={id('articlesPerRequest')}
+                className={`${ui.input} ${form.number}`}
+                type="number"
+                min={1}
+                max={20}
+                inputMode="numeric"
+                value={numberValue(draft.articlesPerRequest)}
+                onChange={(e) => update({ articlesPerRequest: e.target.valueAsNumber })}
+              />
+            </Field>
+
+            <Field id={id('onFailure')} label="On failure" advanced error={fieldError('onFailure')} help={failureHelp[draft.onFailure]}>
+              <select
+                id={id('onFailure')}
+                className={ui.select}
+                value={draft.onFailure}
+                onChange={(e) => update({ onFailure: e.target.value as FailureAction })}
+              >
+                <option value="skip">Skip the server for a few minutes</option>
+                <option value="pause">Pause downloads (required server)</option>
+                <option value="ignore">Ignore it for longer (optional server)</option>
+              </select>
+            </Field>
+
+            <Field
+              id={id('expiresOn')}
+              label="Account expires"
+              advanced
+              error={fieldError('expiresOn')}
+              help="When your provider account ends. The status window reminds you 5 days before and up to 5 days after."
+            >
+              <div className={form.inline}>
+                <input
+                  id={id('expiresOn')}
+                  className={`${ui.input} ${form.date}`}
+                  type="date"
+                  value={draft.expiresOn ?? ''}
+                  onChange={(e) => update({ expiresOn: e.target.value || null })}
+                />
+                {draft.expiresOn && (
+                  <button type="button" className={form.inlineLink} onClick={() => update({ expiresOn: null })}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </Field>
+
+            <Field
+              id={id('quotaGb')}
+              label="Quota"
+              advanced
+              error={fieldError('quotaGb')}
+              help="For block accounts and plans with a download limit. Counting starts when you set it; once it is used up the server is skipped. Empty for no quota."
+            >
+              <div className={styles.withUnit}>
+                <input
+                  id={id('quotaGb')}
+                  className={`${ui.input} ${styles.unitInput}`}
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="No quota"
+                  value={draft.quotaGb ?? ''}
+                  onChange={(e) => update({ quotaGb: e.target.value === '' || Number.isNaN(e.target.valueAsNumber) ? null : e.target.valueAsNumber })}
+                />
+                <span className={ui.muted}>GB</span>
+              </div>
+              {!isNew && server.quotaGb != null && (
+                <div className={`${styles.usage} ${quotaUsed >= server.quotaGb * 1e9 ? styles.usageFull : ''}`}>
+                  <span>
+                    {quotaUsage(quotaUsed, server.quotaGb)}
+                    {counter.since && <> since {formatDate(counter.since)}</>}
+                  </span>
+                  {canEdit && (
+                    <button type="button" className={ui.button} onClick={() => resetQuota.mutate()} disabled={resetQuota.isPending}>
+                      {resetQuota.isPending ? 'Resetting…' : 'Reset counter'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </Field>
+
+            <Field id={id('notes')} label="Notes" advanced error={fieldError('notes')} help="Only for you, e.g. when you bought the account or what it costs.">
+              <textarea
+                id={id('notes')}
+                className={`${ui.input} ${styles.notes}`}
+                maxLength={2000}
+                rows={3}
+                value={draft.notes}
+                onChange={(e) => update({ notes: e.target.value })}
+              />
+            </Field>
+          </Advanced>
         </fieldset>
+        <AdvancedHint count={draft.useSsl ? advancedFields.length : advancedFields.length - 1} />
       </form>
     </Dialog>
   )

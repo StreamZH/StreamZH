@@ -4,6 +4,11 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Advanced mode like Sonarr/SABnzbd: simple view by default, one "Advanced" switch (remembered per browser) shows the expert settings, their labels in the warn colour; a save error on a hidden field switches it on | Most users never need timeouts or pipelining; experts find everything in one place without a separate settings page |
+| 2026-10-17 | Usenet server "On failure" is one select: Skip (default, 5 min), Pause downloads (required: every fetch fails while the server is in back-off, its quota is used up or it failed for an article, so the engine pauses and nothing is marked missing), Ignore longer (optional: 30 min back-off, no status-window notice) | Same idea as SABnzbd's required/optional, but one choice instead of two exclusive checkboxes |
+| 2026-10-17 | Articles per request (pipelining) defaults to 1, not SABnzbd's 2 | New pipelining code in the NNTP client; experts can raise it per server |
+| 2026-10-17 | Server quota counts NNTP bytes in GB of 10^9 (as providers sell them) from when it is set or reset; used up = server skipped and a notice | A block account must not be overdrawn; the free-space setting stays in GB of 1024³ like the disk notice |
+| 2026-10-17 | Download engine expert settings: minimum free space (1 GB), abort hopeless downloads (on), keep par2/archive files (off), tries per article (3) | The engine's former constants; defaults keep the old behaviour |
 | 2026-10-17 | Built-in Usenet download engine is the default download client; "Blackhole folder" stays as an option for an external downloader | StreamZH replaces SABnzbd; the folder mode keeps SABnzbd usable during the switch |
 | 2026-10-17 | par2 verify and deobfuscation in own C# code; repair with par2cmdline and unpacking with 7-Zip as external processes (par2 downloaded by Update-Local.ps1 on Windows) | Verify is needed for every download and must not depend on tools; repair and RAR unpacking are best left to the proven tools, not linked |
 | 2026-10-17 | Recovery par2 volumes are only fetched when articles are missing (about 1.2× the missing data, all of them if repair still lacks blocks) | Saves bandwidth like SABnzbd |

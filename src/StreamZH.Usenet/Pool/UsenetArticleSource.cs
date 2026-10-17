@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Collections.Concurrent;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Downloads;
 using StreamZH.Usenet.Nntp;
@@ -16,6 +17,8 @@ namespace StreamZH.Usenet.Pool;
 /// <param name="LastError">The most recent connection problem; cleared when the server works again after a back-off.</param>
 /// <param name="BytesToday">Bytes received from this server since local midnight.</param>
 /// <param name="RetryAt">While unhealthy: when the server is tried again.</param>
+/// <param name="QuotaUsedBytes">Bytes counted against the quota; null when the server has no quota.</param>
+/// <param name="QuotaExhausted">The quota is used up: the server is skipped until the counter is reset or the quota raised.</param>
 public sealed record UsenetServerStatus(
     int Id,
     string Name,
@@ -24,7 +27,9 @@ public sealed record UsenetServerStatus(
     bool Healthy,
     string? LastError,
     long BytesToday,
-    DateTimeOffset? RetryAt = null);
+    DateTimeOffset? RetryAt = null,
+    long? QuotaUsedBytes = null,
+    bool QuotaExhausted = false);
 
 /// <param name="SpeedBps">All servers together, averaged over the last few seconds.</param>
 public sealed record UsenetPoolStatus(IReadOnlyList<UsenetServerStatus> Servers, long SpeedBps);
@@ -35,11 +40,14 @@ public sealed record UsenetPoolStatus(IReadOnlyList<UsenetServerStatus> Servers,
 /// <item>Servers are asked by <see cref="UsenetServer.Priority"/> (then id). 430, a broken yEnc body or an article older than the
 /// server's retention moves on to the next server; <see cref="ArticleNotFoundException"/> only when every server was asked
 /// (or skipped by retention) and none had it.</item>
-/// <item>Transient errors (timeout, dropped connection, busy) are retried up to <see cref="UsenetPoolOptions.MaxAttempts"/> times
+/// <item>Transient errors (timeout, dropped connection, busy) are retried up to <see cref="UsenetPoolOptions.Attempts"/> times
 /// per server, each on another connection.</item>
 /// <item>A refused login, a TLS failure, or a server where not a single connection can be opened is skipped for
-/// <see cref="UsenetPoolOptions.FailureBackOff"/>. When no server could be used at all: <see cref="UsenetServerException"/>,
+/// <see cref="UsenetPoolOptions.FailureBackOff"/> (an optional server for <see cref="UsenetPoolOptions.OptionalFailureBackOff"/>).
+/// A server whose quota is used up is skipped, too. When no server could be used at all: <see cref="UsenetServerException"/>,
 /// with <see cref="UsenetServerException.IsAuthError"/> when every server refused the login.</item>
+/// <item>A required server (<see cref="ServerFailureAction.PauseDownloads"/>) is never skipped: while it cannot be used every
+/// fetch fails with <see cref="UsenetServerException"/>, so the download engine pauses instead of marking articles as missing.</item>
 /// </list>
 /// Thread-safe. <see cref="Configure"/> swaps the server list at any time; fetches already running finish on the old pools.
 /// </summary>
@@ -50,7 +58,9 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
     private readonly UsenetPoolOptions _options;
     private readonly SpeedMeter _speed;
     private readonly ConcurrentDictionary<int, DayCounter> _bytesToday = new();
+    private readonly ConcurrentDictionary<int, QuotaCounter> _quota = new();
     private readonly Lock _configLock = new();
+    private readonly Lock _quotaSaveLock = new();
     private readonly ITimer _sweeper;
     private ServerPool[] _pools = [];
     private bool _disposed;
@@ -62,22 +72,37 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
         _options = options ?? new UsenetPoolOptions();
         _speed = new SpeedMeter(time, _options.SpeedWindow);
         var interval = TimeSpan.FromTicks(Math.Clamp(_options.IdleTimeout.Ticks / 4, TimeSpan.FromSeconds(1).Ticks, TimeSpan.FromSeconds(15).Ticks));
-        _sweeper = time.CreateTimer(_ => CloseIdleConnections(), null, interval, interval);
+        _sweeper = time.CreateTimer(_ => Sweep(), null, interval, interval);
     }
 
-    public int MaxConnections => Volatile.Read(ref _pools).Sum(p => p.Server.Connections);
+    /// <summary>
+    /// A server became unusable or usable again, or its quota was used up or reset: what the status window shows changed.
+    /// Raised on the fetching thread; handlers must be quick and must not throw.
+    /// </summary>
+    public event Action? StateChanged;
+
+    /// <summary>
+    /// Stores quota bytes counted since the last call (server id → bytes). Called every few seconds and on dispose;
+    /// without it the counters only live in memory.
+    /// </summary>
+    public Action<IReadOnlyDictionary<int, long>>? SaveQuotaUsage { get; set; }
+
+    /// <summary>Most fetches at once over all enabled servers: connections × articles per request.</summary>
+    public int MaxConnections => Volatile.Read(ref _pools).Sum(p => p.Capacity);
 
     /// <summary>Uses these servers from now on (disabled ones are ignored). Unchanged servers keep their connections and health.</summary>
     public void Configure(IEnumerable<UsenetServer> servers)
     {
         ArgumentNullException.ThrowIfNull(servers);
+        var list = servers.ToList();
         ServerPool[] next;
         lock (_configLock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            ConfigureQuota(list);
             var current = _pools.ToDictionary(p => p.Server.Id);
             var pools = new List<ServerPool>();
-            foreach (var server in servers.Where(s => s.Enabled && s.Connections > 0).OrderBy(s => s.Priority).ThenBy(s => s.Id))
+            foreach (var server in list.Where(s => s.Enabled && s.Connections > 0).OrderBy(s => s.Priority).ThenBy(s => s.Id))
             {
                 if (current.Remove(server.Id, out var existing) && existing.ConnectionKey == ServerPool.KeyOf(server))
                 {
@@ -87,7 +112,7 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
                 }
 
                 existing?.Retire();
-                pools.Add(new ServerPool(server, _options, _time));
+                pools.Add(new ServerPool(server, _options, _time, RaiseStateChanged));
             }
 
             foreach (var removed in current.Values)
@@ -112,6 +137,15 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
             throw new UsenetServerException("No Usenet server is enabled. Add one under Settings → Usenet servers.");
         }
 
+        // A required server that cannot be used stops everything, whatever its priority: downloads pause until it works.
+        foreach (var pool in pools)
+        {
+            if (pool.Server.OnFailure == ServerFailureAction.PauseDownloads && Unusable(pool, _time.GetUtcNow()) is { } reason)
+            {
+                throw Required(pool.Server, reason.Message, reason.IsAuth);
+            }
+        }
+
         var askedAndMissing = false;
         var failures = new List<(string Server, string Message, bool IsAuth)>();
         foreach (var pool in pools)
@@ -125,9 +159,9 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
                 continue;
             }
 
-            if (!pool.IsAvailable(now))
+            if (Unusable(pool, now) is { } skipped)
             {
-                failures.Add((server.Name, pool.LastError ?? "Skipped after errors.", pool.AuthFailed));
+                failures.Add((server.Name, skipped.Message, skipped.IsAuth));
                 continue;
             }
 
@@ -140,6 +174,11 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
             if (outcome.Missing)
             {
                 askedAndMissing = true;
+            }
+            else if (server.OnFailure == ServerFailureAction.PauseDownloads)
+            {
+                // Do not let the next server's "430" mark the article as missing while the required one could not answer.
+                throw Required(server, outcome.Error ?? "Failed.", outcome.IsAuthError);
             }
             else
             {
@@ -169,12 +208,14 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
             return new UsenetServerStatus(
                 server.Id,
                 server.Name,
-                p.InUse,
+                p.BusyConnections,
                 server.Connections,
                 p.IsAvailable(now),
                 p.LastError,
                 _bytesToday.TryGetValue(server.Id, out var counter) ? counter.Get(today) : 0,
-                p.RetryAt(now));
+                p.RetryAt(now),
+                QuotaUsed(server.Id),
+                QuotaExhausted(server));
         }).ToList();
         return new UsenetPoolStatus(servers, _speed.BytesPerSecond());
     }
@@ -182,6 +223,85 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
     /// <summary>Bytes received from the server since local midnight (also for servers that are disabled by now).</summary>
     public long BytesToday(int serverId) =>
         _bytesToday.TryGetValue(serverId, out var counter) ? counter.Get(DateOnly.FromDateTime(_time.GetLocalNow().DateTime)) : 0;
+
+    /// <summary>Bytes counted against the server's quota (live, ahead of the stored value); null without a quota.</summary>
+    public long? QuotaUsed(int serverId) => _quota.TryGetValue(serverId, out var counter) ? counter.Used : null;
+
+    /// <summary>True when the server has a quota and it is used up.</summary>
+    public bool QuotaExhausted(UsenetServer server)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        return server.QuotaBytes is { } quota && QuotaUsed(server.Id) is { } used && used >= quota;
+    }
+
+    /// <summary>
+    /// Sets the quota counter of a server to zero. <paramref name="store"/> (reset the stored counter) runs under the same
+    /// lock as <see cref="SaveQuotaUsage"/>, so bytes counted before the reset cannot be stored after it.
+    /// </summary>
+    public void ResetQuota(int serverId, Action? store = null)
+    {
+        bool wasExhausted;
+        lock (_quotaSaveLock)
+        {
+            store?.Invoke();
+            wasExhausted = Volatile.Read(ref _pools).FirstOrDefault(p => p.Server.Id == serverId)?.Server is { } server && QuotaExhausted(server);
+
+            // No counter: the server has no quota (yet); Configure creates one from the stored value.
+            if (_quota.TryGetValue(serverId, out var counter))
+            {
+                counter.Reset();
+            }
+        }
+
+        if (wasExhausted)
+        {
+            RaiseStateChanged();
+        }
+    }
+
+    /// <summary>Hands the quota bytes counted since the last call to <see cref="SaveQuotaUsage"/>. Runs on a timer; public for tests.</summary>
+    public void FlushQuotaUsage()
+    {
+        if (SaveQuotaUsage is not { } save)
+        {
+            return;
+        }
+
+        lock (_quotaSaveLock)
+        {
+            var pending = new Dictionary<int, long>();
+            foreach (var (id, counter) in _quota)
+            {
+                if (counter.TakeUnsaved() is > 0 and var bytes)
+                {
+                    pending[id] = bytes;
+                }
+            }
+
+            if (pending.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                save(pending);
+            }
+            catch (Exception ex)
+            {
+                // Kept in memory; the next flush tries again.
+                foreach (var (id, bytes) in pending)
+                {
+                    if (_quota.TryGetValue(id, out var counter))
+                    {
+                        counter.Unsave(bytes);
+                    }
+                }
+
+                _logger.LogWarning("Could not store the Usenet quota counters: {Message}", ex.Message);
+            }
+        }
+    }
 
     /// <summary>Closes connections idle for longer than the idle timeout. Runs on a timer; public for tests.</summary>
     public void CloseIdleConnections()
@@ -208,18 +328,50 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
         }
 
         await _sweeper.DisposeAsync();
+        FlushQuotaUsage();
         foreach (var pool in pools)
         {
             pool.Retire();
         }
     }
 
+    private void Sweep()
+    {
+        CloseIdleConnections();
+        FlushQuotaUsage();
+    }
+
+    /// <summary>Why the server is skipped right now (back-off or quota used up), or null when it can be asked.</summary>
+    private (string Message, bool IsAuth)? Unusable(ServerPool pool, DateTimeOffset now)
+    {
+        var server = pool.Server;
+        if (!pool.IsAvailable(now))
+        {
+            return (pool.LastError ?? "Skipped after errors.", pool.AuthFailed);
+        }
+
+        if (QuotaExhausted(server))
+        {
+            return ($"The quota of {FormatGb(server.QuotaBytes!.Value)} is used up.", false);
+        }
+
+        return null;
+    }
+
+    private static UsenetServerException Required(UsenetServer server, string reason, bool isAuth)
+    {
+        var text = reason.TrimEnd();
+        var sentence = text.Length > 0 && char.IsPunctuation(text[^1]) ? text : text + ".";
+        return new UsenetServerException($"{server.Name} is required and cannot be used: {sentence} Downloads wait until it works again.", isAuth);
+    }
+
     private async Task<FetchOutcome> FetchFromAsync(ServerPool pool, string messageId, CancellationToken cancellationToken)
     {
         string? lastError = null;
-        for (var attempt = 1; attempt <= _options.MaxAttempts; attempt++)
+        var attempts = _options.Attempts;
+        for (var attempt = 1; attempt <= attempts; attempt++)
         {
-            NntpConnection connection;
+            PooledConnection connection;
             try
             {
                 connection = await pool.AcquireAsync(cancellationToken);
@@ -229,8 +381,7 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
                 // Login, TLS and "access denied" will not get better by retrying; neither will a server where not a single connection opens.
                 if (ex.Kind is NntpErrorKind.Auth or NntpErrorKind.Tls or NntpErrorKind.Rejected || pool.Open == 0)
                 {
-                    pool.MarkUnavailable(ex.Message, ex.Kind == NntpErrorKind.Auth);
-                    _logger.LogWarning("Usenet server '{Server}' skipped for {Minutes:0} minutes: {Message}", pool.Server.Name, _options.FailureBackOff.TotalMinutes, ex.Message);
+                    MarkUnavailable(pool, ex.Message, ex.Kind == NntpErrorKind.Auth);
                     return FetchOutcome.Failed(ex.Message, ex.Kind == NntpErrorKind.Auth);
                 }
 
@@ -241,10 +392,10 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
             }
 
             var reuse = false;
-            var before = connection.BytesReceived;
+            var serverId = pool.Server.Id;
             try
             {
-                var article = await connection.BodyAsync(messageId, cancellationToken);
+                var article = await connection.BodyAsync(messageId, bytes => Count(serverId, bytes), cancellationToken);
                 reuse = true;
                 return FetchOutcome.Found(article);
             }
@@ -262,24 +413,37 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
             }
             catch (NntpException ex) when (ex.Kind == NntpErrorKind.Auth)
             {
-                pool.MarkUnavailable(ex.Message, isAuthError: true);
-                _logger.LogWarning("Usenet server '{Server}' skipped for {Minutes:0} minutes: {Message}", pool.Server.Name, _options.FailureBackOff.TotalMinutes, ex.Message);
+                MarkUnavailable(pool, ex.Message, isAuthError: true);
                 return FetchOutcome.Failed(ex.Message, isAuthError: true);
             }
             catch (NntpException ex)
             {
                 pool.RecordError(ex.Message);
                 lastError = ex.Message;
-                _logger.LogDebug("Article <{MessageId}> from '{Server}' failed (try {Attempt} of {Max}): {Message}", messageId, pool.Server.Name, attempt, _options.MaxAttempts, ex.Message);
+                _logger.LogDebug("Article <{MessageId}> from '{Server}' failed (try {Attempt} of {Max}): {Message}", messageId, pool.Server.Name, attempt, attempts, ex.Message);
             }
             finally
             {
-                Count(pool.Server.Id, connection.BytesReceived - before);
                 pool.Release(connection, reuse);
             }
         }
 
         return FetchOutcome.Failed(lastError ?? "Failed.", isAuthError: false);
+    }
+
+    private void MarkUnavailable(ServerPool pool, string message, bool isAuthError)
+    {
+        pool.MarkUnavailable(message, isAuthError);
+        var server = pool.Server;
+        var minutes = _options.BackOffFor(server).TotalMinutes;
+        if (server.OnFailure == ServerFailureAction.IgnoreLonger)
+        {
+            _logger.LogInformation("Optional Usenet server '{Server}' skipped for {Minutes:0} minutes: {Message}", server.Name, minutes, message);
+        }
+        else
+        {
+            _logger.LogWarning("Usenet server '{Server}' skipped for {Minutes:0} minutes: {Message}", server.Name, minutes, message);
+        }
     }
 
     private void Count(int serverId, long bytes)
@@ -291,7 +455,44 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
 
         _speed.Add(bytes);
         _bytesToday.GetOrAdd(serverId, _ => new DayCounter()).Add(DateOnly.FromDateTime(_time.GetLocalNow().DateTime), bytes);
+        if (_quota.TryGetValue(serverId, out var quota)
+            && Volatile.Read(ref _pools).FirstOrDefault(p => p.Server.Id == serverId)?.Server is { QuotaBytes: { } limit } server
+            && quota.Add(bytes, limit))
+        {
+            _logger.LogWarning("Usenet server '{Server}' used up its quota of {Quota}; it is skipped until the counter is reset", server.Name, FormatGb(limit));
+            RaiseStateChanged();
+        }
     }
+
+    /// <summary>Counters for servers with a quota: kept when they exist (memory is ahead of the database), dropped without a quota.</summary>
+    private void ConfigureQuota(IReadOnlyList<UsenetServer> servers)
+    {
+        var withQuota = servers.Where(s => s.QuotaBytes is not null).ToDictionary(s => s.Id);
+        foreach (var id in _quota.Keys.Where(id => !withQuota.ContainsKey(id)).ToList())
+        {
+            _quota.TryRemove(id, out _);
+        }
+
+        foreach (var server in withQuota.Values)
+        {
+            _quota.GetOrAdd(server.Id, _ => new QuotaCounter(server.QuotaUsedBytes));
+        }
+    }
+
+    private void RaiseStateChanged()
+    {
+        try
+        {
+            StateChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("A Usenet state handler failed: {Message}", ex.Message);
+        }
+    }
+
+    private static string FormatGb(long bytes) =>
+        $"{(bytes / (double)UsenetServer.BytesPerGb).ToString("0.##", CultureInfo.InvariantCulture)} GB";
 
     private readonly record struct FetchOutcome(DecodedArticle? Article, bool Missing, string? Error, bool IsAuthError)
     {
@@ -300,6 +501,64 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
         public static FetchOutcome Found(DecodedArticle article) => new(article, false, null, false);
 
         public static FetchOutcome Failed(string error, bool isAuthError) => new(null, false, error, isAuthError);
+    }
+
+    /// <summary>Bytes counted against a quota, and how many of them are not stored yet.</summary>
+    private sealed class QuotaCounter(long used)
+    {
+        private readonly Lock _lock = new();
+        private long _used = used;
+        private long _unsaved;
+
+        public long Used
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _used;
+                }
+            }
+        }
+
+        /// <returns>True when this addition used up the quota.</returns>
+        public bool Add(long bytes, long limit)
+        {
+            lock (_lock)
+            {
+                var before = _used;
+                _used += bytes;
+                _unsaved += bytes;
+                return before < limit && _used >= limit;
+            }
+        }
+
+        public long TakeUnsaved()
+        {
+            lock (_lock)
+            {
+                var bytes = _unsaved;
+                _unsaved = 0;
+                return bytes;
+            }
+        }
+
+        public void Unsave(long bytes)
+        {
+            lock (_lock)
+            {
+                _unsaved += bytes;
+            }
+        }
+
+        public void Reset()
+        {
+            lock (_lock)
+            {
+                _used = 0;
+                _unsaved = 0;
+            }
+        }
     }
 
     /// <summary>Bytes of the current local day; starts from zero on a new day.</summary>

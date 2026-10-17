@@ -4,8 +4,9 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Indexer catalog like Prowlarr: StreamZH ships indexer definitions (Usenet Newznab presets now, torrent definitions with the torrent engine in 1.0); replaces the earlier "no built-in indexer list" rule | Owner decision: adding an indexer should be as easy as in Prowlarr, Prowlarr no longer needed |
+| 2026-10-17 | Prowlarr features built in: per-indexer query/grab limits, VIP expiry, additional parameters, indexer history, stats, search across all indexers, import from Prowlarr | StreamZH replaces Prowlarr completely |
 | 2026-10-17 | Until the built-in download engine (0.5), "Grab" saves the NZB into a folder that SABnzbd can watch | Real downloads can be tested with 0.4 already; the folder becomes the engine's input later |
-| 2026-10-17 | Indexers only via Newznab, no built-in indexer list; Prowlarr users add Prowlarr's per-indexer Newznab URLs | Project rule (no indexer list); Prowlarr keeps working as a source during the test phase |
 | 2026-10-17 | Failing indexers pause with escalating back-off (5 min up to 24 h), a success resets it | Same idea as Prowlarr; protects API limits |
 | 2026-10-17 | Releases without a language tag count as the original language of the movie or series (from TMDB) | Same as Radarr; English scene releases carry no tag |
 | 2026-10-17 | Ranking: quality first, then PROPER/REPACK, then dual language | Same order as Radarr without custom formats; a German.DL WEB-1080p does not beat a German Bluray-1080p |

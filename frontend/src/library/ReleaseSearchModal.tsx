@@ -3,13 +3,14 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { historyKeys } from '../api/history'
+import { formatScore } from '../api/indexerOptions'
 import { episodeLabel, formatAge, releaseKeys, releasesApi, type Release, type SearchTarget } from '../api/releases'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
 import styles from './ReleaseSearch.module.css'
 
-type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'grabs'
+type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'grabs' | 'score'
 
 const sortLabels: Record<SortKey, string> = {
   rank: 'Best match',
@@ -18,10 +19,11 @@ const sortLabels: Record<SortKey, string> = {
   age: 'Age',
   size: 'Size',
   grabs: 'Grabs',
+  score: 'Score',
 }
 
-/** Direction a column sorts in on the first click: newest, largest and most grabbed first. */
-const firstDescending: Record<SortKey, boolean> = { rank: false, title: false, indexer: false, age: false, size: true, grabs: true }
+/** Direction a column sorts in on the first click: newest, largest, most grabbed and best scored first. */
+const firstDescending: Record<SortKey, boolean> = { rank: false, title: false, indexer: false, age: false, size: true, grabs: true, score: true }
 
 function compare(a: Release, b: Release, key: SortKey): number {
   switch (key) {
@@ -37,6 +39,8 @@ function compare(a: Release, b: Release, key: SortKey): number {
       return a.size - b.size
     case 'grabs':
       return (a.grabs ?? -1) - (b.grabs ?? -1)
+    case 'score':
+      return a.preferredScore - b.preferredScore || a.rank - b.rank
   }
 }
 
@@ -66,6 +70,8 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
   const accepted = data?.releases.filter((r) => r.accepted).length ?? 0
   const rejected = (data?.releases.length ?? 0) - accepted
   const indexerCount = indexers.data?.interactiveSearch
+  // The score column only shows when release profiles gave any release a score.
+  const hasScores = data?.releases.some((r) => r.preferredScore !== 0) ?? false
 
   // Portal: the dialog must not inherit styles of the place it is opened from (hero actions, episode table).
   return createPortal(
@@ -118,6 +124,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   <option value="size:desc">Largest</option>
                   <option value="size:asc">Smallest</option>
                   <option value="grabs:desc">Most grabbed</option>
+                  {hasScores && <option value="score:desc">Preferred score</option>}
                   <option value="indexer:asc">Indexer</option>
                   <option value="title:asc">Title</option>
                 </select>
@@ -147,7 +154,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                 </p>
               </div>
             ) : (
-              <div className={styles.table} role="table" aria-label="Releases">
+              <div className={`${styles.table} ${hasScores ? styles.withScore : ''}`} role="table" aria-label="Releases">
                 <div className={styles.head} role="row">
                   <span role="columnheader" aria-label="Status" />
                   {(['title', 'indexer', 'age', 'size'] as SortKey[]).map((key) => (
@@ -155,6 +162,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   ))}
                   <span role="columnheader">Quality</span>
                   <span role="columnheader">Languages</span>
+                  {hasScores && <SortHeader sortKey="score" sort={sort} onSort={sortBy} />}
                   <SortHeader sortKey="grabs" sort={sort} onSort={sortBy} />
                   <span role="columnheader" className={styles.headAction}>
                     {sort.key !== 'rank' && (
@@ -165,7 +173,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   </span>
                 </div>
                 {releases.map((release) => (
-                  <ReleaseRow key={`${release.indexerId}:${release.guid}`} release={release} />
+                  <ReleaseRow key={`${release.indexerId}:${release.guid}`} release={release} showScore={hasScores} />
                 ))}
               </div>
             )}
@@ -189,7 +197,7 @@ function SortHeader({ sortKey, sort, onSort }: { sortKey: SortKey; sort: { key: 
   )
 }
 
-function ReleaseRow({ release }: { release: Release }) {
+function ReleaseRow({ release, showScore }: { release: Release; showScore: boolean }) {
   const queryClient = useQueryClient()
   const [reasonsOpen, setReasonsOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -242,6 +250,16 @@ function ReleaseRow({ release }: { release: Release }) {
         <span role="cell" className={styles.cell}>
           {release.languages.length > 0 ? release.languages.join(', ') : <span className={ui.muted}>–</span>}
         </span>
+        {showScore && (
+          <span
+            role="cell"
+            className={`${styles.cell} ${styles.num} ${release.preferredScore > 0 ? styles.scorePlus : release.preferredScore < 0 ? styles.scoreMinus : ''}`}
+            title="Preferred score from the release profiles (Settings → Indexers)"
+          >
+            <span className={styles.mobileLabel}>Score </span>
+            {release.preferredScore !== 0 ? formatScore(release.preferredScore) : '–'}
+          </span>
+        )}
         <span role="cell" className={`${styles.cell} ${styles.num}`} title="Grabs on the indexer">
           <span className={styles.mobileLabel}>Grabs </span>
           {release.grabs ?? '–'}

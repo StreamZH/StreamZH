@@ -29,6 +29,8 @@ export interface Release {
   episodeNumbers: number[]
   fullSeason: boolean
   episodeIds: number[]
+  /** Sum of the matching preferred terms of the release profiles (Settings → Indexers). */
+  preferredScore: number
 }
 
 export interface ReleaseSearch {

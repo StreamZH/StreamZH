@@ -33,7 +33,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 12px;
   align-items: end;
 }
@@ -73,4 +73,45 @@
   .row {
     grid-template-columns: 1fr;
   }
+}
+
+.score {
+  margin-left: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.profiles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profiles > li {
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+}
+
+.profiles > li.profileRejects {
+  border-left-color: #ef6b6b;
+}
+
+.terms {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.bad {
+  color: #ef6b6b;
+}
+
+.plus {
+  color: var(--ok);
 }

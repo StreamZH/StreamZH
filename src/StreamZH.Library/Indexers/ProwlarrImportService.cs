@@ -179,6 +179,19 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
                 throw Invalid("url", $"No Prowlarr API found at {host}. Check the address (and the URL base, if Prowlarr uses one).");
             }
 
+            // A reverse proxy with a web login (SSO, Authelia, a dashboard login) answers API calls with a redirect to its login page.
+            var finalUri = response.RequestMessage?.RequestUri;
+            var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            var redirected = finalUri is not null && !string.Equals(finalUri.AbsolutePath.TrimEnd('/'), new Uri($"{baseUrl}/api/v1/indexer").AbsolutePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
+                || (finalUri is not null && !string.Equals(finalUri.Authority, host, StringComparison.OrdinalIgnoreCase));
+            if (redirected || mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
+            {
+                var where = finalUri is not null && !string.Equals(finalUri.Authority, host, StringComparison.OrdinalIgnoreCase) ? $" ({finalUri.Authority})" : string.Empty;
+                throw Invalid("url",
+                    $"{host} answered with a web page{where}, probably the login of a reverse proxy, not with Prowlarr's API. " +
+                    "Use Prowlarr's local address instead (e.g. http://192.168.1.10:9696), or let requests to /api with an API key pass the login.");
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 throw Invalid("url", string.Create(CultureInfo.InvariantCulture, $"Prowlarr at {host} answered with HTTP {(int)response.StatusCode}."));

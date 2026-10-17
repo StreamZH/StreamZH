@@ -232,6 +232,30 @@ public sealed class ProwlarrImportTests : IDisposable
         Assert.Contains("HTTP 500", error.Errors["url"][0], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_login_page_in_front_of_prowlarr_is_explained()
+    {
+        var login = new ProwlarrImportService(new HttpClient(new LoginPageHandler()), _indexers, NullLogger<ProwlarrImportService>.Instance);
+
+        var error = await Assert.ThrowsAsync<ValidationFailedException>(() => login.PreviewAsync("https://prowlarr.example.ch", StubProwlarr.ApiKey, CancellationToken.None));
+
+        var message = error.Errors["url"][0];
+        Assert.Contains("login", message, StringComparison.Ordinal);
+        Assert.Contains("(app.example.ch)", message, StringComparison.Ordinal);
+        Assert.Contains("local address", message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Behaves like HttpClient after following a reverse proxy's redirect to its login page.</summary>
+    private sealed class LoginPageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://app.example.ch/?next=https%3A%2F%2Fprowlarr.example.ch%2Fapi%2Fv1%2Findexer"),
+                Content = new StringContent("<!doctype html><title>Sign in</title>", System.Text.Encoding.UTF8, "text/html"),
+            });
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

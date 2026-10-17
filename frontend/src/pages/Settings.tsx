@@ -7,6 +7,7 @@ import ui from '../components/ui.module.css'
 import { useScrollToHash } from '../lib/useScrollToHash'
 import { DownloadsSection, MetadataSection, RootFoldersSection } from './MediaSettings'
 import page from './Page.module.css'
+import { UsenetServersCard } from './UsenetServers'
 import styles from './Settings.module.css'
 import { ToolsSection } from './ToolsSettings'
 
@@ -30,8 +31,13 @@ export default function Settings() {
           <Link className={ui.button} to="/settings/release-test">
             Release test
           </Link>
+          <Link className={ui.button} to="/settings/usenet">
+            Usenet servers
+          </Link>
         </nav>
       </header>
+
+      <UsenetServersCard />
 
       <div id="media" className={page.page}>
         <RootFoldersSection />

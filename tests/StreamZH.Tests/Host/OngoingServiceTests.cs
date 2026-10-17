@@ -39,6 +39,7 @@ public sealed class OngoingServiceTests : IDisposable
         _indexers = new IndexerService(new IndexerRepository(_database), new IndexerStatusRepository(_database), _time, NullLogger<IndexerService>.Instance);
         _config = new ConfigRepository(_database);
         _rootFolders = new RootFolderRepository(_database);
+        AddUsenetServer("Default");
         _events.Subscribe<OngoingChanged>((e, _) =>
         {
             _published.Add(e);
@@ -133,18 +134,13 @@ public sealed class OngoingServiceTests : IDisposable
         using (var connection = _database.Open())
         {
             using var command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE UsenetServers (Id INTEGER PRIMARY KEY, Name TEXT, Enabled INTEGER)";
+            command.CommandText = "DELETE FROM UsenetServers";
             command.ExecuteNonQuery();
         }
 
         Assert.Equal(["no-usenet-server"], Service().Get().Notices.Select(n => n.Key));
 
-        using (var connection = _database.Open())
-        {
-            using var command = connection.CreateCommand();
-            command.CommandText = "INSERT INTO UsenetServers (Name, Enabled) VALUES ('Eweka', 1)";
-            command.ExecuteNonQuery();
-        }
+        AddUsenetServer("Eweka");
 
         Assert.Empty(Service().Get().Notices);
     }
@@ -342,6 +338,21 @@ public sealed class OngoingServiceTests : IDisposable
         Status = status,
         Added = _time.Now.AddMinutes(id),
     };
+
+    private void AddUsenetServer(string name)
+    {
+        using var connection = _database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO UsenetServers (Name, Host, Port, UseSsl, Username, Password, Connections, Priority, Enabled, RetentionDays, Added)
+            VALUES ($name, 'news.example', 563, 1, '', '', 10, 0, 1, 0, '2026-10-17')
+            """;
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "$name";
+        parameter.Value = name;
+        command.Parameters.Add(parameter);
+        command.ExecuteNonQuery();
+    }
 
     public void Dispose()
     {

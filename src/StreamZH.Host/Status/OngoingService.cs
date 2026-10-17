@@ -324,16 +324,30 @@ public sealed class OngoingService(
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _lastJob = (jobs.Status.Running, jobs.Status.Queued > 0);
-        _subscriptions.Add(events.Subscribe<JobsChanged>(OnJobsChanged));
-        _subscriptions.Add(events.Subscribe<IndexersChanged>((_, ct) => events.PublishAsync(new OngoingChanged(), ct)));
-        _subscriptions.Add(events.Subscribe<DownloadChanged>(OnDownloadChanged));
+        lock (_subscriptions)
+        {
+            _subscriptions.Add(events.Subscribe<JobsChanged>(OnJobsChanged));
+            _subscriptions.Add(events.Subscribe<IndexersChanged>((_, ct) => events.PublishAsync(new OngoingChanged(), ct)));
+            _subscriptions.Add(events.Subscribe<DownloadChanged>(OnDownloadChanged));
+        }
+
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _subscriptions.ForEach(s => s.Dispose());
-        _subscriptions.Clear();
+        IDisposable[] subscriptions;
+        lock (_subscriptions)
+        {
+            subscriptions = [.. _subscriptions];
+            _subscriptions.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
+        }
+
         return Task.CompletedTask;
     }
 

@@ -25,8 +25,9 @@ public sealed class StatusApiTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("running").ValueKind);
-        var notice = Assert.Single(json.RootElement.GetProperty("notices").EnumerateArray());
-        Assert.Equal("no-indexer", notice.GetProperty("key").GetString());
+        var notices = json.RootElement.GetProperty("notices").EnumerateArray().ToList();
+        Assert.Equal(["no-usenet-server", "no-indexer"], notices.Select(n => n.GetProperty("key").GetString()));
+        var notice = notices[1];
         Assert.Equal("warn", notice.GetProperty("level").GetString());
         Assert.False(notice.GetProperty("dismissible").GetBoolean());
 

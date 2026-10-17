@@ -18,6 +18,7 @@ import Placeholder from './pages/Placeholder'
 import Profiles from './pages/Profiles'
 import ParseTest from './pages/ParseTest'
 import Settings from './pages/Settings'
+import UsenetServers from './pages/UsenetServers'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -45,6 +46,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="settings" element={<Settings />} />
             <Route path="settings/profiles" element={<Profiles />} />
             <Route path="settings/release-test" element={<ParseTest />} />
+            <Route path="settings/usenet" element={<UsenetServers />} />
             <Route path="*" element={<Placeholder title="Not found" />} />
           </Route>
           </Routes>

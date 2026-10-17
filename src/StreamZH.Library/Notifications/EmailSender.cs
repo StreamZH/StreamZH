@@ -94,14 +94,14 @@ public sealed class EmailSender(IEmailTransport transport) : IConnectionSender, 
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(errors);
-        if (settings.Text("from") is { } from && !MailboxAddress.TryParse(from, out _))
+        if (settings.Text("from") is { } from && !IsAddress(from))
         {
             errors.TryAdd("from", ["Enter an email address, e.g. streamzh@example.com."]);
         }
 
         foreach (var field in new[] { "to", "cc", "bcc" })
         {
-            if (settings.List(field).FirstOrDefault(a => !MailboxAddress.TryParse(a, out _)) is { } invalid)
+            if (settings.List(field).FirstOrDefault(a => !IsAddress(a)) is { } invalid)
             {
                 errors.TryAdd(field, [$"{invalid} is not an email address."]);
             }
@@ -152,8 +152,12 @@ public sealed class EmailSender(IEmailTransport transport) : IConnectionSender, 
         return message;
     }
 
+    /// <summary>"name@domain" or "Name &lt;name@domain&gt;"; a bare word is not enough.</summary>
+    public static bool IsAddress(string text) =>
+        MailboxAddress.TryParse(text, out var address) && address.Address.IndexOf('@', StringComparison.Ordinal) is > 0 and var at && at < address.Address.Length - 1;
+
     private static MailboxAddress Address(string text) =>
-        MailboxAddress.TryParse(text, out var address) ? address : throw new ConnectException($"{text} is not an email address");
+        IsAddress(text) ? MailboxAddress.Parse(text) : throw new ConnectException($"{text} is not an email address");
 }
 
 /// <summary>Extra checks of a type's settings beyond the field rules, run before saving and testing.</summary>

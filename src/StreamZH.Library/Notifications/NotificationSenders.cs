@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Globalization;
-using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -256,15 +255,22 @@ public sealed class TelegramSender(IHttpClientFactory httpFactory) : IConnection
     {
         ArgumentNullException.ThrowIfNull(e);
         var text = new StringBuilder();
-        text.Append("<b>").Append(WebUtility.HtmlEncode(e.Subject)).Append("</b>\n");
-        text.Append(WebUtility.HtmlEncode(ConnectText.Body(e)));
+        text.Append("<b>").Append(Escape(e.Subject)).Append("</b>\n");
+        text.Append(Escape(ConnectText.Body(e)));
         if (withLinks && ConnectText.Links(e) is { Count: > 0 } links)
         {
-            text.Append('\n').Append(string.Join(" | ", links.Select(l => $"<a href=\"{WebUtility.HtmlEncode(l.Url)}\">{l.Name}</a>")));
+            text.Append('\n').Append(string.Join(" | ", links.Select(l => $"<a href=\"{Escape(l.Url)}\">{l.Name}</a>")));
         }
 
         return ConnectText.Truncate(text.ToString(), 4096);
     }
+
+    /// <summary>Telegram's HTML mode only needs &amp;, &lt;, &gt; and quotes escaped (umlauts and "·" stay readable).</summary>
+    public static string Escape(string text) =>
+        text.Replace("&", "&amp;", StringComparison.Ordinal)
+            .Replace("<", "&lt;", StringComparison.Ordinal)
+            .Replace(">", "&gt;", StringComparison.Ordinal)
+            .Replace("\"", "&quot;", StringComparison.Ordinal);
 
     private async Task PostAsync(ConnectionContext context, ConnectEvent e, CancellationToken cancellationToken)
     {
@@ -285,7 +291,7 @@ public sealed class TelegramSender(IHttpClientFactory httpFactory) : IConnection
         }
 
         var http = httpFactory.CreateClient(ConnectHttp.ClientName);
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(ApiBase, $"bot{token}/sendMessage"))
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"{ApiBase}bot{token}/sendMessage"))
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
         };

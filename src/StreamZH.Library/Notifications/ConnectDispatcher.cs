@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Downloads;
@@ -22,8 +23,8 @@ public sealed record ConnectOptions(IReadOnlyList<TimeSpan> RetryDelays)
 
 /// <summary>
 /// Sends grabs, imports, upgrades, renames, failed downloads and health changes to the enabled connections whose
-/// triggers ask for them. Every delivery runs in the background (the import never waits), one at a time per connection
-/// so messages arrive in order, with retries on network and server errors. The last error is stored and shows in the
+/// triggers ask for them. Events are handled in the order they happen, in the background (the import never waits);
+/// deliveries run one after the other per connection, so messages arrive in order, with retries on network and server errors. The last error is stored and shows in the
 /// connection list and the status window until a delivery works again.
 /// </summary>
 public sealed class ConnectDispatcher(
@@ -36,12 +37,16 @@ public sealed class ConnectDispatcher(
     ILogger<ConnectDispatcher> logger) : IHostedService
 {
     private readonly List<IDisposable> _subscriptions = [];
-    private readonly ConcurrentDictionary<int, SemaphoreSlim> _gates = new();
+    private readonly Channel<Func<ConnectEvent>> _queue = Channel.CreateUnbounded<Func<ConnectEvent>>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Dictionary<int, Task> _tails = [];
     private readonly ConcurrentDictionary<Task, byte> _running = new();
     private readonly CancellationTokenSource _stopping = new();
+    private int _waiting;
+    private Task? _reader;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _reader = Task.Run(ReadAsync, CancellationToken.None);
         lock (_subscriptions)
         {
             _subscriptions.Add(events.Subscribe<ReleaseGrabbed>((e, _) => Queue(() => factory.Grab(e))));
@@ -66,10 +71,11 @@ public sealed class ConnectDispatcher(
             _subscriptions.Clear();
         }
 
+        _queue.Writer.TryComplete();
         await _stopping.CancelAsync();
         try
         {
-            await Task.WhenAll(_running.Keys).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            await Task.WhenAll([.. _running.Keys, _reader ?? Task.CompletedTask]).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         }
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
         {
@@ -87,19 +93,55 @@ public sealed class ConnectDispatcher(
         _ = Queue(() => ConnectEventFactory.HealthChanged(health, restored));
     }
 
-    /// <summary>Sends an event built by <paramref name="build"/> (in the background, since it reads the database).</summary>
+    /// <summary>Sends an event built by <paramref name="build"/> (later, in order: building reads the database).</summary>
     public ValueTask Queue(Func<ConnectEvent> build)
     {
-        Track(Task.Run(() => Dispatch(build()), _stopping.Token));
+        Interlocked.Increment(ref _waiting);
+        if (!_queue.Writer.TryWrite(build))
+        {
+            Interlocked.Decrement(ref _waiting);
+        }
+
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Waits until every queued delivery is done (tests, shutdown).</summary>
+    /// <summary>Waits until every queued event is delivered or has failed (tests, shutdown).</summary>
     public async Task WhenIdleAsync(CancellationToken cancellationToken = default)
     {
-        while (!_running.IsEmpty)
+        while (Volatile.Read(ref _waiting) > 0 || !_running.IsEmpty)
         {
+            if (_running.IsEmpty)
+            {
+                await Task.Delay(5, cancellationToken);
+                continue;
+            }
+
             await Task.WhenAll(_running.Keys).WaitAsync(cancellationToken).ContinueWith(_ => { }, TaskScheduler.Default);
+        }
+    }
+
+    private async Task ReadAsync()
+    {
+        try
+        {
+            await foreach (var build in _queue.Reader.ReadAllAsync(_stopping.Token))
+            {
+                try
+                {
+                    Dispatch(build());
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Could not prepare a connection event");
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _waiting);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
@@ -121,7 +163,14 @@ public sealed class ConnectDispatcher(
                 continue;
             }
 
-            Track(DeliverAsync(connection, connectEvent));
+            // After the previous delivery to the same connection, so messages keep their order.
+            lock (_tails)
+            {
+                var tail = _tails.GetValueOrDefault(connection.Id) ?? Task.CompletedTask;
+                var next = tail.ContinueWith(_ => DeliverAsync(connection, connectEvent), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
+                _tails[connection.Id] = next;
+                Track(next);
+            }
         }
     }
 
@@ -133,16 +182,6 @@ public sealed class ConnectDispatcher(
         }
 
         var token = _stopping.Token;
-        var gate = _gates.GetOrAdd(connection.Id, _ => new SemaphoreSlim(1, 1));
-        try
-        {
-            await gate.WaitAsync(token);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-
         try
         {
             var context = connections.Context(connection);
@@ -180,10 +219,6 @@ public sealed class ConnectDispatcher(
         }
         catch (OperationCanceledException)
         {
-        }
-        finally
-        {
-            gate.Release();
         }
     }
 

@@ -17,7 +17,7 @@ public sealed class SettingsApiTests : IDisposable
     {
         var client = await _factory.CreateOwnerClientAsync();
 
-        var settings = await client.GetFromJsonAsync<GeneralSettings>("/api/v1/settings/general");
+        var settings = await client.GetFromJsonAsync<GeneralSettingsResource>("/api/v1/settings/general");
         Assert.Equal("StreamZH", settings!.InstanceName);
         Assert.Equal("Information", settings.LogLevel);
         Assert.Equal(32, settings.ApiKey.Length);
@@ -26,9 +26,9 @@ public sealed class SettingsApiTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
 
         var saved = await client.PutAsJsonAsync("/api/v1/settings/general", new { instanceName = "John's Server", logLevel = "Debug" });
-        Assert.Equal(HttpStatusCode.NoContent, saved.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
 
-        settings = await client.GetFromJsonAsync<GeneralSettings>("/api/v1/settings/general");
+        settings = await client.GetFromJsonAsync<GeneralSettingsResource>("/api/v1/settings/general");
         Assert.Equal("John's Server", settings!.InstanceName);
         Assert.Equal("Debug", settings.LogLevel);
 

@@ -8,6 +8,8 @@ using StreamZH.Core.Jobs;
 using StreamZH.Data;
 using StreamZH.Host.Api;
 using StreamZH.Host.Auth;
+using StreamZH.Host.Backups;
+using StreamZH.Host.General;
 using StreamZH.Host.Hubs;
 using StreamZH.Host.Jobs;
 using StreamZH.Host.Logging;
@@ -18,6 +20,10 @@ using StreamZH.Library;
 using StreamZH.Library.Downloads;
 using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
+
+// Restart (Settings → General, System → Status) runs everything from here again in this process; see AppLifecycle.
+RestartState? restart = null;
+start:
 
 // Installed builds: content root = install folder, so wwwroot is found from any working directory.
 // Development (dotnet run): the default content root plus static web assets from the project.
@@ -31,35 +37,19 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 // --data <dir> on the command line, STREAMZH_DATA, /config in Docker, else the OS default.
 var paths = AppPaths.Resolve(builder.Configuration["data"]);
 paths.EnsureCreated();
+var restored = new StartupRestore(PendingRestore.Apply(paths));
 
 var database = new Database(paths.DatabaseFile);
 database.Migrate();
 
 var config = new ConfigRepository(database);
-config.GetOrCreate(ConfigKeys.ApiKey, SettingsEndpoints.NewApiKey);
-
-var logLevel = new LogLevelSwitch(Enum.TryParse<LogLevel>(config.Get(ConfigKeys.LogLevel), out var level) ? level : LogLevel.Information);
-var fileLogger = new FileLoggerProvider(paths.LogDirectory, logLevel);
-builder.Logging.AddProvider(fileLogger);
-
-// The file log follows the level from the settings page; framework noise stays at Warning.
-builder.Logging.AddFilter<FileLoggerProvider>(null, LogLevel.Trace);
-builder.Logging.AddFilter<FileLoggerProvider>("Microsoft", LogLevel.Warning);
-builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.Hosting.Lifetime", LogLevel.Information);
-
-// Keys are stored unencrypted in the data folder by design (same as Sonarr/Radarr); no warning on every start.
-builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
-builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
-
-// One line per outgoing HTTP request (TMDB, indexers) is noise; keep warnings and errors only.
-builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
-builder.Logging.AddFilter<FileLoggerProvider>("System.Net.Http.HttpClient", LogLevel.Warning);
+config.GetOrCreate(ConfigKeys.ApiKey, GeneralSettingsEndpoints.NewApiKey);
+var fileLogger = builder.AddStreamZhLogging(paths, config);
+var runningHost = builder.UseStreamZhHost(config, restart);
 
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
 builder.Services.AddSingleton(config);
-builder.Services.AddSingleton(logLevel);
-builder.Services.AddSingleton(fileLogger);
 builder.Services.AddSingleton<UserRepository>();
 builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
@@ -102,22 +92,29 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
 builder.Services.AddStreamZhAuth(paths);
+builder.Services.AddGeneralSettings(restored);
 builder.Services.AddSignalR();
 builder.Services.AddOpenApi("v1");
 
 var app = builder.Build();
 
+app.UseStreamZhUrlBase();
 app.UseExceptionHandler();
-app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseBasicAuthenticationChallenge();
 app.UseAuthorization();
 
 app.MapOpenApi("/api/{documentName}/openapi.json");
 app.MapAuthEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
+app.MapGeneralSettingsEndpoints();
+app.MapUiSettingsEndpoints();
+app.MapSystemInfoEndpoints();
+app.MapBackupEndpoints();
+app.MapLogEndpoints();
 app.MapToolSettingsEndpoints();
 app.MapSystemTaskEndpoints();
 app.MapLibraryEndpoints();
@@ -135,11 +132,19 @@ app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.
 app.MapFallback("/api/{**path}", () => Results.NotFound());
-app.MapFallbackToFile("index.html");
+app.MapStreamZhIndex();
 
 app.Logger.LogInformation("{App} {Version} started, data in {DataDirectory}", AppInfo.Name, AppInfo.Version, paths.DataDirectory);
+if (restored.Outcome is { } restoreOutcome)
+{
+    app.Logger.Log(restoreOutcome.Success ? LogLevel.Warning : LogLevel.Error, "{Message}", restoreOutcome.Message);
+}
 
-app.Run();
+restart = await app.RunUntilStoppedAsync(runningHost, fileLogger);
+if (restart is not null)
+{
+    goto start;
+}
 
 public sealed record StartupInfo(DateTimeOffset StartedAt);
 

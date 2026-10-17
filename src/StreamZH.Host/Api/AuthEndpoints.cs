@@ -22,7 +22,12 @@ public static partial class AuthEndpoints
         {
             var setupRequired = users.Count() == 0;
             var current = CurrentUser(http, users);
-            return new AuthState(setupRequired, current is not null, current, config.Get(ConfigKeys.InstanceName) ?? "StreamZH");
+            return new AuthState(
+                setupRequired,
+                current is not null,
+                current,
+                config.Get(ConfigKeys.InstanceName) ?? "StreamZH",
+                current is not null && http.User.Identity?.AuthenticationType == AuthSchemes.Cookie);
         });
 
         group.MapPost("/setup", async (SetupRequest request, HttpContext http, UserRepository users, PasswordService passwords) =>
@@ -74,9 +79,10 @@ public static partial class AuthEndpoints
             return null;
         }
 
-        if (http.User.Identity.AuthenticationType == AuthSchemes.ApiKey)
+        // API key, local network without sign-in, External authentication: the owner without an account.
+        if (http.User.Identity.AuthenticationType is AuthSchemes.ApiKey or AuthSchemes.Local or AuthSchemes.External)
         {
-            return new UserInfo(0, "api", nameof(Core.Users.UserRole.Owner));
+            return new UserInfo(0, http.User.Identity.Name ?? "api", nameof(Core.Users.UserRole.Owner));
         }
 
         // The account may have been removed since the cookie was issued.
@@ -128,4 +134,5 @@ public sealed record UserInfo(int Id, string Username, string Role)
     public static UserInfo From(User user) => new(user.Id, user.Username, user.Role.ToString());
 }
 
-public sealed record AuthState(bool SetupRequired, bool Authenticated, UserInfo? User, string InstanceName);
+/// <param name="CanSignOut">False for sessions without a sign-in cookie (Basic, External, local network, API key).</param>
+public sealed record AuthState(bool SetupRequired, bool Authenticated, UserInfo? User, string InstanceName, bool CanSignOut = false);

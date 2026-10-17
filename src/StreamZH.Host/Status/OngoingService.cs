@@ -75,6 +75,7 @@ public sealed class OngoingService(
         AddIndexerNotices(notices);
         AddFolderNotices(notices);
         AddFailedNotices(notices, active);
+        GeneralNotices.Add(notices, services);
 
         return new OngoingResource(running, notices);
     }

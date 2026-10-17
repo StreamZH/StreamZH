@@ -13,6 +13,8 @@ import {
   type IndexerDefinition,
 } from '../api/indexers'
 import ui from '../components/ui.module.css'
+import { AdvancedHint, AdvancedToggle } from '../lib/Advanced'
+import { advancedLabel, useAdvanced } from '../lib/advancedMode'
 import { PrivacyChip, ProtocolChip } from './Chips'
 import Dialog from './Dialog'
 import { formatUntil, hostOf } from './model'
@@ -33,22 +35,28 @@ function Field({
   label,
   help,
   error,
+  advanced = false,
   children,
 }: {
   id?: string
   label: string
   help?: ReactNode
   error?: string
+  /** Expert setting: only shown in advanced mode (or while it has an error, so nobody is stuck). */
+  advanced?: boolean
   children: ReactNode
 }) {
+  const advancedMode = useAdvanced()
+  if (advanced && !advancedMode && !error) return null
+  const labelClass = `${styles.label} ${advanced ? advancedLabel : ''}`
   return (
     <div className={`${styles.row} ${error ? styles.invalid : ''}`}>
       {id ? (
-        <label className={styles.label} htmlFor={id}>
+        <label className={labelClass} htmlFor={id}>
           {label}
         </label>
       ) : (
-        <span className={styles.label}>{label}</span>
+        <span className={labelClass}>{label}</span>
       )}
       <div className={styles.control}>
         {children}
@@ -222,7 +230,7 @@ export default function IndexerForm({
   )
 
   return (
-    <Dialog title={title} subtitle={subtitle} onClose={onClose} footer={footer}>
+    <Dialog title={title} subtitle={subtitle} onClose={onClose} footer={footer} headerAction={<AdvancedToggle />}>
       <form id={formId} className={styles.form} onSubmit={submit} noValidate>
         {status && !status.healthy && status.disabledTill && (
           <p className={styles.statusNote}>
@@ -251,7 +259,7 @@ export default function IndexerForm({
             </label>
           </Field>
 
-          <Field
+          <Field advanced={fixed != null}
             id={id('baseUrl')}
             label="URL"
             error={fieldError('baseUrl')}
@@ -288,7 +296,7 @@ export default function IndexerForm({
             />
           </Field>
 
-          <Field
+          <Field advanced
             id={id('apiPath')}
             label="API path"
             error={fieldError('apiPath')}
@@ -336,7 +344,7 @@ export default function IndexerForm({
             />
           </Field>
 
-          <Field
+          <Field advanced
             id={id('additionalParameters')}
             label="Additional parameters"
             error={fieldError('additionalParameters')}
@@ -356,7 +364,7 @@ export default function IndexerForm({
             />
           </Field>
 
-          <Field
+          <Field advanced
             id={id('vipExpiration')}
             label="VIP expiration"
             error={fieldError('vipExpiration')}
@@ -378,7 +386,7 @@ export default function IndexerForm({
             </div>
           </Field>
 
-          <Field
+          <Field advanced
             id={id('queryLimit')}
             label="Query limit"
             error={fieldError('queryLimit')}
@@ -396,7 +404,7 @@ export default function IndexerForm({
             />
           </Field>
 
-          <Field
+          <Field advanced
             id={id('grabLimit')}
             label="Grab limit"
             error={fieldError('grabLimit')}
@@ -414,7 +422,7 @@ export default function IndexerForm({
             />
           </Field>
 
-          <Field id={id('limitsUnit')} label="Limits unit" error={fieldError('limitsUnit')} help="Limits count over the last 24 hours or the last hour.">
+          <Field advanced id={id('limitsUnit')} label="Limits unit" error={fieldError('limitsUnit')} help="Limits count over the last 24 hours or the last hour.">
             <select
               id={id('limitsUnit')}
               className={`${ui.select} ${styles.number}`}
@@ -426,7 +434,7 @@ export default function IndexerForm({
             </select>
           </Field>
 
-          <Field
+          <Field advanced
             id={id('priority')}
             label="Indexer priority"
             error={fieldError('priority')}
@@ -465,7 +473,7 @@ export default function IndexerForm({
             </div>
           </Field>
 
-          <Field
+          <Field advanced
             label="Categories"
             error={fieldError('categories')}
             help={caps ? undefined : 'Standard Newznab categories. Test to load the indexer’s own list.'}
@@ -486,6 +494,7 @@ export default function IndexerForm({
             </div>
           </Field>
         </fieldset>
+        <AdvancedHint count={fixed ? 9 : 8} />
       </form>
     </Dialog>
   )

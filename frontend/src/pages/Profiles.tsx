@@ -6,6 +6,7 @@ import { profileKeys, profilesApi, type Language, type QualityDefinition, type Q
 import { useAuth } from '../auth/auth'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
+import { Advanced, AdvancedToggle } from '../lib/Advanced'
 import page from './Page.module.css'
 import styles from './Profiles.module.css'
 
@@ -15,15 +16,21 @@ export default function Profiles() {
 
   return (
     <div className={page.page}>
-      <header>
-        <Link className={styles.back} to="/settings">
-          ← Settings
-        </Link>
-        <h1 className={page.title}>Profiles</h1>
-        <p className={page.lead}>Which qualities and languages StreamZH grabs, and until when it keeps upgrading.</p>
+      <header className={styles.header}>
+        <div>
+          <Link className={styles.back} to="/settings">
+            ← Settings
+          </Link>
+          <h1 className={page.title}>Profiles</h1>
+          <p className={page.lead}>Which qualities and languages StreamZH grabs, and until when it keeps upgrading.</p>
+        </div>
+        <AdvancedToggle />
       </header>
       <ProfileList canEdit={canEdit} />
-      <SizeLimits canEdit={canEdit} />
+      {/* Size limits per quality are an expert setting, like Radarr's Quality page. */}
+      <Advanced>
+        <SizeLimits canEdit={canEdit} />
+      </Advanced>
     </div>
   )
 }

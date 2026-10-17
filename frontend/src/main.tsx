@@ -31,6 +31,9 @@ import LogsPage from './system/LogsPage'
 import BackupPage from './system/BackupPage'
 import StatusPage from './system/StatusPage'
 import TasksPage from './system/TasksPage'
+import UiSettingsSync from './lib/UiSettingsSync'
+import { RestartOverlay } from './system/Restart'
+import { urlBase } from './lib/urlBase'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -40,8 +43,10 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <RestartOverlay />
       <AuthGate>
-        <BrowserRouter>
+        <UiSettingsSync />
+        <BrowserRouter basename={urlBase || undefined}>
           <Routes>
           <Route element={<Layout />}>
             <Route index element={<Home />} />

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { historyApi, historyKeys, type HistoryFilter } from '../api/history'
 import ui from '../components/ui.module.css'
-import { formatBytes, formatDate } from '../lib/format'
+import { formatBytes, formatDate, formatDateTime } from '../lib/format'
 import page from '../pages/Page.module.css'
 import styles from './ReleaseSearch.module.css'
 
@@ -19,7 +19,7 @@ export default function HistoryPanel({ movieId, seriesId }: { movieId?: number; 
         <ul className={styles.history}>
           {history.data.records.map((h) => (
             <li key={h.id}>
-              <span className={styles.historyDate} title={new Date(h.date).toLocaleString()}>
+              <span className={styles.historyDate} title={formatDateTime(h.date)}>
                 {formatDate(h.date)}
               </span>
               <span className={styles.historyTitle}>{h.sourceTitle}</span>

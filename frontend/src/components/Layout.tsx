@@ -57,7 +57,7 @@ const sections: { title?: string; items: NavItem[] }[] = [
 export default function Layout() {
   const live = useLiveConnection()
   const { pathname } = useLocation()
-  const { user } = useAuth()
+  const { user, canSignOut } = useAuth()
   const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats })
   const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs })
   const busy = jobs.data && (jobs.data.running || jobs.data.queued > 0)
@@ -133,9 +133,11 @@ export default function Layout() {
           <div className={styles.user}>
             <span className={styles.avatar}>{user?.username.slice(0, 1).toUpperCase()}</span>
             <span className={styles.userName}>{user?.username}</span>
-            <button className={styles.logout} type="button" onClick={() => logout.mutate()} title="Sign out">
-              Sign out
-            </button>
+            {canSignOut && (
+              <button className={styles.logout} type="button" onClick={() => logout.mutate()} title="Sign out">
+                Sign out
+              </button>
+            )}
           </div>
           {/* Administrators see running jobs in the status window at the bottom right. */}
           {busy && !admin && (

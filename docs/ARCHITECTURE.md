@@ -133,8 +133,10 @@ User ── Owner, Admin, Friend (same roles as CloudZH)
 ## API
 
 - REST under `/api/v1/...`, JSON, OpenAPI document at `/api/v1/openapi.json`.
-- Auth: cookie session for the web UI, API key header `X-Api-Key` for scripts and
-  CloudZH.
+- Auth: cookie session for the web UI (Forms), or HTTP Basic, or External (a reverse
+  proxy signs in); API key header `X-Api-Key` for scripts and CloudZH. Optionally no
+  sign-in from local addresses (Settings → General → Security). `--auth-method forms`
+  on the command line overrides the stored method (way back in after a lockout).
 - SignalR hub `/hub` pushes queue progress and events.
 - Compatibility layer (later, optional): minimal Sonarr/Radarr-compatible endpoints so
   tools like Requestrr, Overseerr/Seerr or Plex helpers keep working.
@@ -143,10 +145,12 @@ User ── Owner, Admin, Friend (same roles as CloudZH)
 
 | Item | Default |
 |---|---|
-| Port | 9797 |
+| Port | 9797 (Settings → General → Host: bind address, port, URL base, HTTPS; `--urls` or `ASPNETCORE_URLS` win) |
 | Config/data dir | `/config` in Docker, `C:\ProgramData\StreamZH` on Windows, `~/Library/Application Support/StreamZH` on macOS, `~/.config/streamzh` on Linux (`/var/lib/streamzh` as systemd service via `STREAMZH_DATA`) |
 | Database | `<data>/streamzh.db` |
-| Logs | `<data>/logs/` |
+| Logs | `<data>/logs/` (1 MB per file, 5 old files; configurable) |
+| Backups | `<data>/Backups/scheduled` and `manual` (zip: database via `VACUUM INTO`, keys, backup.json) |
+| Staged restore | `<data>/restore/pending.zip`, applied at the next start before the database opens; the old database stays in `<data>/restore/before-restore-*` |
 | Incomplete downloads | `<data>/downloads/incomplete` (configurable) |
 
 ## Security
@@ -156,3 +160,9 @@ User ── Owner, Admin, Friend (same roles as CloudZH)
 - Secrets (indexer keys, Usenet passwords) never returned by the API in clear text,
   masked in the UI and in logs.
 - No telemetry.
+- Outgoing HTTP (all `IHttpClientFactory` clients) goes through the proxy of Settings →
+  General and its certificate-validation choice; NNTP is never proxied.
+- Restart (Settings → General, System → Status) runs the whole startup again in the
+  same process (`goto start` in Program.cs), so it works in a console, as a service and
+  in Docker without a supervisor; a new port that cannot be bound falls back to the
+  previous one.

@@ -78,6 +78,7 @@ public sealed class OngoingService(
         AddFailedNotices(notices, active);
         ConnectNotices.Add(notices, services.GetService<ConnectionRepository>(), time);
         ImportNotices.Add(notices, services.GetService<DownloadImportRepository>(), time);
+        GeneralNotices.Add(notices, services);
 
         return new OngoingResource(running, notices);
     }

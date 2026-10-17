@@ -8,24 +8,8 @@ export function hostOf(url: string) {
   }
 }
 
-/** Time today, or "Oct 17, 14:05" on another day. */
-export function formatUntil(value: string) {
-  const date = new Date(value)
-  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-  if (date.toDateString() === new Date().toDateString()) return time
-  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`
-}
-
-/** "3 minutes ago", "2 days ago". */
-export function formatAgo(value: string) {
-  const seconds = Math.round((new Date(value).getTime() - Date.now()) / 1000)
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-  const abs = Math.abs(seconds)
-  if (abs < 60) return rtf.format(seconds, 'second')
-  if (abs < 3600) return rtf.format(Math.round(seconds / 60), 'minute')
-  if (abs < 86400) return rtf.format(Math.round(seconds / 3600), 'hour')
-  return rtf.format(Math.round(seconds / 86400), 'day')
-}
+/** Time today, or "Oct 17, 14:05" on another day; "3 minutes ago". Both follow Settings → UI (see lib/format). */
+export { formatAgo, formatUntil } from '../lib/format'
 
 export function usesList(i: Indexer): string[] {
   return [i.enableRss && 'RSS', i.enableAutomaticSearch && 'Automatic', i.enableInteractiveSearch && 'Interactive'].filter(

@@ -1,6 +1,7 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { withBase } from '../lib/urlBase'
 import { downloadKeys, type DownloadProgressItem, type LiveProgress } from './downloads'
 import { historyKeys } from './history'
 import { indexerKeys } from './indexers'
@@ -19,7 +20,7 @@ export function useLiveConnection(): boolean {
 
   useEffect(() => {
     const connection = new HubConnectionBuilder()
-      .withUrl('/hub')
+      .withUrl(withBase('/hub'))
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build()

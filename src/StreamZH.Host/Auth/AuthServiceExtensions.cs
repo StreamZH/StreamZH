@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using StreamZH.Core;
 using StreamZH.Core.Users;
+using StreamZH.Data;
+using StreamZH.Host.General;
 
 namespace StreamZH.Host.Auth;
 
@@ -22,15 +24,12 @@ public static class AuthServiceExtensions
             .SetApplicationName("StreamZH")
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(paths.DataDirectory, "keys")));
 
+        // Smart picks the API key, the cookie (Forms) or Basic per request; see SmartAuthenticationHandler.
+        services.AddSingleton<BasicCredentialCache>();
         services.AddAuthentication(AuthSchemes.Smart)
-            .AddPolicyScheme(AuthSchemes.Smart, "Cookie or API key", options =>
-            {
-                options.ForwardDefaultSelector = context =>
-                    context.Request.Headers.ContainsKey(AuthSchemes.ApiKeyHeader) || context.Request.Query.ContainsKey(AuthSchemes.ApiKeyQuery)
-                        ? AuthSchemes.ApiKey
-                        : AuthSchemes.Cookie;
-            })
+            .AddScheme<AuthenticationSchemeOptions, SmartAuthenticationHandler>(AuthSchemes.Smart, null)
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(AuthSchemes.ApiKey, null)
+            .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>(AuthSchemes.Basic, null)
             .AddCookie(AuthSchemes.Cookie, options =>
             {
                 options.Cookie.Name = "StreamZH.Auth";
@@ -65,5 +64,26 @@ public static class AuthServiceExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// With Basic authentication every request without valid credentials gets the browser's login dialog, the web app
+    /// itself too (like Radarr). Before the first account exists, the setup page stays reachable.
+    /// </summary>
+    public static IApplicationBuilder UseBasicAuthenticationChallenge(this IApplicationBuilder app)
+    {
+        return app.Use(async (context, next) =>
+        {
+            if (context.User.Identity?.IsAuthenticated != true
+                && !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
+                && context.RequestServices.GetRequiredService<SecuritySettings>().Method == AuthenticationMethod.Basic
+                && context.RequestServices.GetRequiredService<UserRepository>().Count() > 0)
+            {
+                await context.ChallengeAsync(AuthSchemes.Basic);
+                return;
+            }
+
+            await next(context);
+        });
     }
 }

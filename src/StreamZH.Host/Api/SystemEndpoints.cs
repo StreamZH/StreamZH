@@ -5,8 +5,6 @@
 using System.Runtime.InteropServices;
 using StreamZH.Core;
 using StreamZH.Data;
-using StreamZH.Host.Auth;
-using StreamZH.Host.Logging;
 
 namespace StreamZH.Host.Api;
 
@@ -24,10 +22,6 @@ public static class SystemEndpoints
             IsDocker: Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true",
             StartedAt: startup.StartedAt,
             DatabaseSchemaVersion: database.SchemaVersion()));
-
-        group.MapGet("/logs", (FileLoggerProvider files, int? lines) =>
-            new LogTail(files.Tail(Math.Clamp(lines ?? 200, 1, 2000))))
-            .RequireAuthorization(AuthSchemes.AdminPolicy);
 
         // Anonymous, for Docker health checks and uptime monitors.
         app.MapGet("/health", () => Results.Ok(new { status = "ok" })).WithTags("System").AllowAnonymous();
@@ -71,5 +65,3 @@ public sealed record SystemStatus(
     bool IsDocker,
     DateTimeOffset StartedAt,
     long DatabaseSchemaVersion);
-
-public sealed record LogTail(IReadOnlyList<string> Lines);

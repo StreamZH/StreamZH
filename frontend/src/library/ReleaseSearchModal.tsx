@@ -7,7 +7,7 @@ import { formatScore } from '../api/indexerOptions'
 import { episodeLabel, formatAge, releaseKeys, releasesApi, type Release, type SearchTarget } from '../api/releases'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
-import { formatBytes } from '../lib/format'
+import { formatBytes, formatDateTime } from '../lib/format'
 import styles from './ReleaseSearch.module.css'
 
 type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'grabs' | 'score'
@@ -237,7 +237,7 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
         <span role="cell" className={styles.cell}>
           {release.indexer}
         </span>
-        <span role="cell" className={styles.cell} title={new Date(release.publishDate).toLocaleString()}>
+        <span role="cell" className={styles.cell} title={formatDateTime(release.publishDate)}>
           {formatAge(release)}
         </span>
         <span role="cell" className={`${styles.cell} ${styles.num}`}>
@@ -308,7 +308,7 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
         <p className={styles.rowNote}>
           {grab.data.folder.replaceAll('\\', '/').endsWith('nzb-queue') ? (
             <>
-              Added to the download queue. Follow it under <a href="/activity">Activity</a>.
+              Added to the download queue. Follow it under <Link to="/activity">Activity</Link>.
             </>
           ) : (
             <>

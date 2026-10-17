@@ -10,7 +10,7 @@ import {
   type IndexerDetails as Details,
 } from '../api/indexers'
 import ui from '../components/ui.module.css'
-import { formatDate } from '../lib/format'
+import { formatDate, formatDateTime } from '../lib/format'
 import { Pill, PrivacyChip, ProtocolChip } from './Chips'
 import { languageName } from './labels'
 import Dialog from './Dialog'
@@ -251,7 +251,7 @@ function DetailsTab({ details }: { details: Details }) {
             <Item label="Page size" mono>
               {capabilities.defaultPageSize} / max {capabilities.maxPageSize}
             </Item>
-            <Item label="Last checked">{capabilitiesCheckedAt ? <span title={new Date(capabilitiesCheckedAt).toLocaleString()}>{formatAgo(capabilitiesCheckedAt)}</span> : '–'}</Item>
+            <Item label="Last checked">{capabilitiesCheckedAt ? <span title={formatDateTime(capabilitiesCheckedAt)}>{formatAgo(capabilitiesCheckedAt)}</span> : '–'}</Item>
           </dl>
         ) : (
           <NotChecked />

@@ -27,4 +27,21 @@ public static class ConfigKeys
     public const string DownloadKeepFiles = "DownloadKeepFiles";
     public const string DownloadAbortHopeless = "DownloadAbortHopeless";
     public const string DownloadArticleTries = "DownloadArticleTries";
+
+    // Metadata (0.6): NFO options, image cache and the Kodi (XBMC) / Emby metadata writer; empty = default.
+    public const string MetadataCertificationCountry = "MetadataCertificationCountry";
+    public const string MetadataNfoOriginalTitle = "MetadataNfoOriginalTitle";
+    public const string MetadataImageCache = "MetadataImageCache";
+    public const string KodiMetadataEnabled = "KodiMetadataEnabled";
+    public const string KodiMovieMetadata = "KodiMovieMetadata";
+    public const string KodiMovieMetadataUrl = "KodiMovieMetadataUrl";
+    public const string KodiMovieImages = "KodiMovieImages";
+    public const string KodiUseMovieNfo = "KodiUseMovieNfo";
+    public const string KodiMovieCollection = "KodiMovieCollection";
+    public const string KodiSeriesMetadata = "KodiSeriesMetadata";
+    public const string KodiSeriesMetadataUrl = "KodiSeriesMetadataUrl";
+    public const string KodiEpisodeMetadata = "KodiEpisodeMetadata";
+    public const string KodiSeriesImages = "KodiSeriesImages";
+    public const string KodiSeasonImages = "KodiSeasonImages";
+    public const string KodiEpisodeImages = "KodiEpisodeImages";
 }

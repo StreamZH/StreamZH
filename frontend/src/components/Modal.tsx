@@ -14,12 +14,10 @@ export default function Modal({ title, onClose, children }: { title: string; onC
     <dialog
       ref={ref}
       className={styles.dialog}
+      // Only the close button, Cancel and Esc close it: a click next to the window must not throw away what was typed.
       onCancel={(e) => {
         e.preventDefault()
         onClose()
-      }}
-      onClick={(e) => {
-        if (e.target === ref.current) onClose()
       }}
     >
       <div className={styles.body}>

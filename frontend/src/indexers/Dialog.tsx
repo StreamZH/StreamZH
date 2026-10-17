@@ -37,12 +37,10 @@ export default function Dialog({
       ref={ref}
       className={`${styles.dialog} ${size === 'wide' ? styles.wide : ''} ${tall ? styles.tall : ''}`}
       aria-labelledby={titleId}
+      // Only the close button, Cancel and Esc close it: a click next to the window must not throw away what was typed.
       onCancel={(e) => {
         e.preventDefault()
         onClose()
-      }}
-      onClick={(e) => {
-        if (e.target === ref.current) onClose()
       }}
     >
       <div className={styles.frame}>

@@ -13,4 +13,6 @@ public static class ConfigKeys
     public const string TmdbLanguage = "TmdbLanguage";
     public const string DefaultQualityProfileId = "DefaultQualityProfileId";
     public const string NzbFolder = "NzbFolder";
+    public const string Par2Path = "Par2Path";
+    public const string SevenZipPath = "SevenZipPath";
 }

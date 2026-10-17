@@ -108,6 +108,7 @@ app.MapSettingsEndpoints();
 app.MapLibraryEndpoints();
 app.MapProfileEndpoints();
 app.MapFileSystemEndpoints();
+app.MapParseEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

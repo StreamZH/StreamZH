@@ -11,6 +11,7 @@ import SeriesDetail from './library/SeriesDetail'
 import Home from './pages/Home'
 import Placeholder from './pages/Placeholder'
 import Profiles from './pages/Profiles'
+import ParseTest from './pages/ParseTest'
 import Settings from './pages/Settings'
 import './index.css'
 
@@ -35,6 +36,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="indexers" element={<Placeholder title="Indexers" phase="0.4" />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/profiles" element={<Profiles />} />
+            <Route path="settings/release-test" element={<ParseTest />} />
             <Route path="*" element={<Placeholder title="Not found" />} />
           </Route>
           </Routes>

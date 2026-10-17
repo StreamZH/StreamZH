@@ -26,6 +26,9 @@ export default function Settings() {
           <Link className={ui.button} to="/settings/profiles">
             Profiles
           </Link>
+          <Link className={ui.button} to="/settings/release-test">
+            Release test
+          </Link>
         </nav>
       </header>
 

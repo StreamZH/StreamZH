@@ -64,7 +64,16 @@ builder.Services.AddSingleton<RootFolderRepository>();
 builder.Services.AddSingleton<MovieRepository>();
 builder.Services.AddSingleton<SeriesRepository>();
 builder.Services.AddSingleton<ITmdbSettings, TmdbSettings>();
-builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+
+    // Only for development and tests: point StreamZH at a TMDB stand-in.
+    if (builder.Configuration["tmdb-url"] is { Length: > 0 } tmdbUrl)
+    {
+        client.BaseAddress = new Uri(tmdbUrl.EndsWith('/') ? tmdbUrl : tmdbUrl + "/");
+    }
+});
 builder.Services.AddScoped<LibraryService>();
 builder.Services.AddScoped<RootFolderService>();
 builder.Services.AddScoped<LibraryImportService>();

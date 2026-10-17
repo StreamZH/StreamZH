@@ -1,6 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet } from 'react-router'
 import { api } from '../api/client'
+import { libraryApi, queryKeys } from '../api/library'
 import { authQueryKey, useAuth } from '../auth/auth'
 import { useLiveConnection } from '../api/useLiveConnection'
 import Icon, { type IconName } from './Icon'
@@ -11,6 +12,7 @@ interface NavItem {
   label: string
   icon: IconName
   color?: string
+  count?: 'movies' | 'series'
 }
 
 const sections: { title?: string; items: NavItem[] }[] = [
@@ -18,8 +20,8 @@ const sections: { title?: string; items: NavItem[] }[] = [
   {
     title: 'Library',
     items: [
-      { to: '/library/movies', label: 'Movies', icon: 'movies', color: 'var(--movies)' },
-      { to: '/library/series', label: 'Series', icon: 'series', color: 'var(--series)' },
+      { to: '/library/movies', label: 'Movies', icon: 'movies', color: 'var(--movies)', count: 'movies' },
+      { to: '/library/series', label: 'Series', icon: 'series', color: 'var(--series)', count: 'series' },
     ],
   },
   {
@@ -35,6 +37,9 @@ const sections: { title?: string; items: NavItem[] }[] = [
 export default function Layout() {
   const live = useLiveConnection()
   const { user } = useAuth()
+  const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats })
+  const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs })
+  const busy = jobs.data && (jobs.data.running || jobs.data.queued > 0)
   const queryClient = useQueryClient()
   const logout = useMutation({
     mutationFn: api.logout,
@@ -63,7 +68,8 @@ export default function Layout() {
                 style={item.color ? { ['--item-color' as string]: item.color } : undefined}
               >
                 <Icon name={item.icon} />
-                {item.label}
+                <span className={styles.label}>{item.label}</span>
+                {item.count && stats.data && <span className={styles.count}>{stats.data[item.count]}</span>}
               </NavLink>
             ))}
           </div>
@@ -77,6 +83,15 @@ export default function Layout() {
               Sign out
             </button>
           </div>
+          {busy && (
+            <div className={styles.job} title={jobs.data?.running ?? undefined}>
+              <span className={styles.spinner} />
+              <span className={styles.jobText}>
+                {jobs.data?.running ?? 'Working'}
+                {jobs.data && jobs.data.queued > 0 && ` · ${jobs.data.queued} queued`}
+              </span>
+            </div>
+          )}
           <div className={styles.live}>
             <span className={live ? styles.dotOk : styles.dotOff} />
             {live ? 'Live' : 'Offline'}

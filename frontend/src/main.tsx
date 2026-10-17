@@ -4,6 +4,10 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import AuthGate from './auth/AuthGate'
 import Layout from './components/Layout'
+import ImportPage from './library/ImportPage'
+import LibraryPage from './library/LibraryPage'
+import MovieDetail from './library/MovieDetail'
+import SeriesDetail from './library/SeriesDetail'
 import Home from './pages/Home'
 import Placeholder from './pages/Placeholder'
 import Settings from './pages/Settings'
@@ -21,8 +25,11 @@ createRoot(document.getElementById('root')!).render(
           <Routes>
           <Route element={<Layout />}>
             <Route index element={<Home />} />
-            <Route path="library/movies" element={<Placeholder title="Movies" phase="0.2" />} />
-            <Route path="library/series" element={<Placeholder title="Series" phase="0.2" />} />
+            <Route path="library/movies" element={<LibraryPage key="movies" type="Movie" />} />
+            <Route path="library/movies/:id" element={<MovieDetail />} />
+            <Route path="library/series" element={<LibraryPage key="series" type="Series" />} />
+            <Route path="library/series/:id" element={<SeriesDetail />} />
+            <Route path="library/import" element={<ImportPage />} />
             <Route path="activity" element={<Placeholder title="Activity" phase="0.6" />} />
             <Route path="indexers" element={<Placeholder title="Indexers" phase="0.4" />} />
             <Route path="settings" element={<Settings />} />

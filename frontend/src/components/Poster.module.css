@@ -1,0 +1,21 @@
+.poster,
+.fallback {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-small);
+  background: var(--surface-hover);
+  object-fit: cover;
+}
+
+.fallback {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+}

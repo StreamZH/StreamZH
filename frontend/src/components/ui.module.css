@@ -1,0 +1,144 @@
+.button,
+.primary,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: var(--radius-small);
+  padding: 9px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.button {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.primary {
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.primary:hover:not(:disabled) {
+  background: #d02631;
+}
+
+.danger {
+  color: #fff;
+  background: #8f1820;
+  border: 1px solid #8f1820;
+}
+
+.button:disabled,
+.primary:disabled,
+.danger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.input,
+.select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  padding: 9px 12px;
+  min-width: 0;
+}
+
+.input:focus,
+.select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.field small {
+  color: var(--text-faint);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--accent);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.missing {
+  color: #ef6b6b;
+}
+
+.idle {
+  color: var(--text-faint);
+}
+
+.waiting {
+  color: var(--warn);
+}
+
+.error {
+  color: #ef6b6b;
+  font-size: 13px;
+  margin: 0;
+}
+
+.muted {
+  color: var(--text-faint);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}

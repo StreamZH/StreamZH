@@ -1,0 +1,174 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
+import { ApiError } from '../api/client'
+import { libraryApi, queryKeys, type MediaType } from '../api/library'
+import ui from '../components/ui.module.css'
+import { formatBytes } from '../lib/format'
+import page from './Page.module.css'
+import styles from './Settings.module.css'
+
+export function MetadataSection() {
+  const queryClient = useQueryClient()
+  const settings = useQuery({ queryKey: queryKeys.metadata, queryFn: libraryApi.metadataSettings })
+  const [token, setToken] = useState('')
+  const [language, setLanguage] = useState<string | null>(null)
+
+  const effectiveLanguage = language ?? settings.data?.language ?? 'en-US'
+
+  const test = useMutation({ mutationFn: () => libraryApi.testMetadata(token.trim() || null) })
+  const save = useMutation({
+    mutationFn: () => libraryApi.saveMetadataSettings(token.trim() || null, effectiveLanguage),
+    onSuccess: async (data) => {
+      queryClient.setQueryData(queryKeys.metadata, data)
+      setToken('')
+      test.reset()
+    },
+  })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    save.mutate()
+  }
+
+  if (!settings.data) return null
+
+  return (
+    <form className={page.panel} onSubmit={submit}>
+      <h2 className={page.panelTitle}>Metadata (TMDB)</h2>
+      <p className={styles.text}>
+        StreamZH finds titles, posters and episode lists on The Movie Database. Create a free account on{' '}
+        <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
+          themoviedb.org
+        </a>{' '}
+        and paste the <em>API Read Access Token</em> (or the shorter API key) here.
+      </p>
+      <div className={styles.grid}>
+        <label className={styles.field}>
+          <span>
+            API token{' '}
+            {settings.data.tmdbConfigured ? (
+              <span className={`${ui.badge} ${ui.ok}`}>Saved {settings.data.tmdbTokenHint}</span>
+            ) : (
+              <span className={`${ui.badge} ${ui.missing}`}>Not set</span>
+            )}
+          </span>
+          <input
+            type="password"
+            autoComplete="off"
+            placeholder={settings.data.tmdbConfigured ? 'Leave empty to keep the saved token' : 'eyJhbGciOi…'}
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+          />
+        </label>
+        <label className={styles.field}>
+          <span>Language for titles and descriptions</span>
+          <select value={effectiveLanguage} onChange={(e) => setLanguage(e.target.value)}>
+            {settings.data.languages.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className={styles.actions}>
+        <button className={styles.primary} type="submit" disabled={save.isPending || (!token.trim() && effectiveLanguage === settings.data.language)}>
+          {save.isPending ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          className={styles.secondary}
+          type="button"
+          onClick={() => test.mutate()}
+          disabled={test.isPending || (!token.trim() && !settings.data.tmdbConfigured)}
+        >
+          {test.isPending ? 'Testing…' : 'Test connection'}
+        </button>
+        {test.isSuccess && <span className={styles.ok}>TMDB connection works</span>}
+        {test.error && <span className={styles.error}>{test.error.message}</span>}
+        {save.isSuccess && !test.isSuccess && <span className={styles.ok}>Saved</span>}
+        {save.error && <span className={styles.error}>{save.error.message}</span>}
+      </div>
+      <p className={styles.attribution}>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </form>
+  )
+}
+
+export function RootFoldersSection() {
+  const queryClient = useQueryClient()
+  const folders = useQuery({ queryKey: queryKeys.rootFolders, queryFn: libraryApi.rootFolders })
+  const [path, setPath] = useState('')
+  const [mediaType, setMediaType] = useState<MediaType>('Movie')
+
+  const add = useMutation({
+    mutationFn: () => libraryApi.addRootFolder(path.trim(), mediaType),
+    onSuccess: async () => {
+      setPath('')
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rootFolders })
+    },
+  })
+
+  const remove = useMutation({
+    mutationFn: libraryApi.removeRootFolder,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.rootFolders }),
+  })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    add.mutate()
+  }
+
+  return (
+    <section className={page.panel}>
+      <h2 className={page.panelTitle}>Root folders</h2>
+      <p className={styles.text}>The folders where your movies and series live. StreamZH reads them and, later, moves new downloads there.</p>
+
+      {(folders.data ?? []).length > 0 && (
+        <ul className={styles.rootList}>
+          {folders.data!.map((f) => (
+            <li key={f.id}>
+              <span className={`${ui.badge} ${f.accessible ? ui.ok : ui.missing}`}>{f.mediaType === 'Movie' ? 'Movies' : 'Series'}</span>
+              <code className={styles.rootPath}>{f.path}</code>
+              <span className={styles.rootMeta}>
+                {!f.accessible
+                  ? 'Not reachable'
+                  : f.freeSpace != null
+                    ? `${formatBytes(f.freeSpace)} free`
+                    : ''}
+              </span>
+              {f.unmappedFolders > 0 && (
+                <Link className={styles.rootImport} to={`/library/import?type=${f.mediaType}`}>
+                  Import {f.unmappedFolders}
+                </Link>
+              )}
+              <button className={styles.secondary} type="button" onClick={() => remove.mutate(f.id)} disabled={remove.isPending}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {remove.error && <p className={styles.error}>{remove.error.message}</p>}
+
+      <form className={styles.rootForm} onSubmit={submit}>
+        <input
+          className={ui.input}
+          placeholder="Full path, e.g. D:\Movies or /media/tv"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+          aria-label="Folder path"
+        />
+        <select className={ui.select} value={mediaType} onChange={(e) => setMediaType(e.target.value as MediaType)} aria-label="Media type">
+          <option value="Movie">Movies</option>
+          <option value="Series">Series</option>
+        </select>
+        <button className={styles.primary} type="submit" disabled={!path.trim() || add.isPending}>
+          Add folder
+        </button>
+      </form>
+      {add.error && (
+        <p className={styles.error}>{add.error instanceof ApiError ? add.error.message : 'Could not add the folder.'}</p>
+      )}
+    </section>
+  )
+}

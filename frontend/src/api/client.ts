@@ -46,7 +46,7 @@ export class ApiError extends Error {
 /** Fired when a request comes back 401, so the app can show the login page. */
 export const unauthorizedEvent = 'streamzh:unauthorized'
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     method,
     credentials: 'same-origin',

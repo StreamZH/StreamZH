@@ -114,7 +114,7 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
         var separator = relativeUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
         var url = $"{relativeUrl}{separator}language={Uri.EscapeDataString(settings.Language)}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(BaseAddress, url));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(http.BaseAddress ?? BaseAddress, url));
         if (ApiKeyRegex().IsMatch(token))
         {
             request.RequestUri = new Uri(request.RequestUri + $"&api_key={token}");

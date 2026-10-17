@@ -1,0 +1,202 @@
+.back {
+  font-size: 13px;
+  color: var(--text-faint);
+  align-self: flex-start;
+}
+
+.back:hover {
+  color: var(--text);
+}
+
+.hero {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 20%;
+  opacity: 0.22;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 45%);
+}
+
+.heroInner {
+  position: relative;
+  display: flex;
+  gap: 28px;
+  padding: 28px;
+}
+
+.poster {
+  flex: 0 0 200px;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--font-title);
+  font-size: 44px;
+  line-height: 1.05;
+}
+
+.facts {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.overview {
+  margin: 4px 0 0;
+  max-width: 70ch;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.facts2 {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 20px;
+  margin: 0;
+}
+
+.facts2 dt {
+  color: var(--text-faint);
+}
+
+.facts2 dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.links {
+  display: flex;
+  gap: 14px;
+}
+
+.links a {
+  color: var(--accent);
+}
+
+.seasonHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.seasonToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.chevron {
+  width: 14px;
+  color: var(--text-faint);
+}
+
+.seasonTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.episodes {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.episodes td {
+  padding: 9px 8px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.epNumber {
+  width: 36px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+}
+
+.epTitle {
+  display: block;
+}
+
+.epFile {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.epDate {
+  width: 120px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.epStatus {
+  width: 110px;
+  text-align: right;
+}
+
+.unmonitored {
+  opacity: 0.55;
+}
+
+@media (max-width: 760px) {
+  .heroInner {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .poster {
+    flex: none;
+    width: 140px;
+  }
+
+  .title {
+    font-size: 34px;
+  }
+
+  .epDate {
+    display: none;
+  }
+}
+
+.actions button {
+  background: rgb(28 27 25 / 0.85);
+  backdrop-filter: blur(6px);
+}

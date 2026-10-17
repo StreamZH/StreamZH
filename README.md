@@ -34,11 +34,15 @@ cd ..
 
 # Backend on http://localhost:9797, data in ./.devdata
 dotnet run --project src/StreamZH.Host -- --data .devdata
-# Open http://localhost:9797 and create the owner account
+# Open http://localhost:9797, create the owner account, then add a root folder
+# and your free TMDB API key under Settings
 
 # Tests
 dotnet test
 ```
+
+Without a TMDB key you can point StreamZH at a TMDB stand-in for development:
+`--tmdb-url http://localhost:9800/3/`.
 
 For UI work run `npm run dev` in `frontend/` (http://localhost:5173). It proxies
 `/api` and `/hub` to the backend on port 9797.

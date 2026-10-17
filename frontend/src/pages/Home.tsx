@@ -1,11 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router'
 import { api } from '../api/client'
+import { libraryApi, queryKeys } from '../api/library'
+import { formatBytes } from '../lib/format'
 import styles from './Page.module.css'
 
 const pipeline = ['Search', 'Grab', 'Download', 'Verify & Unpack', 'Import & Rename', 'Notify']
 
 export default function Home() {
   const status = useQuery({ queryKey: ['system-status'], queryFn: api.systemStatus })
+  const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats })
+  const s = stats.data
 
   return (
     <div className={styles.page}>
@@ -15,23 +20,25 @@ export default function Home() {
       </header>
 
       <section className={styles.cards}>
+        <Link className={`${styles.card} ${styles.cardLink}`} to="/library/movies" style={{ ['--tone' as string]: 'var(--movies)' }}>
+          <div className={styles.label}>Movies</div>
+          <div className={styles.value}>{s?.movies ?? '…'}</div>
+          <div className={styles.sub}>{s ? `${s.moviesWithFile} on disk` : ''}</div>
+        </Link>
+        <Link className={`${styles.card} ${styles.cardLink}`} to="/library/series" style={{ ['--tone' as string]: 'var(--series)' }}>
+          <div className={styles.label}>Series</div>
+          <div className={styles.value}>{s?.series ?? '…'}</div>
+          <div className={styles.sub}>{s ? `${s.episodesWithFile} of ${s.episodes} episodes on disk` : ''}</div>
+        </Link>
         <div className={styles.card}>
-          <div className={styles.label}>Version</div>
-          <div className={styles.value}>{status.data?.version ?? '...'}</div>
+          <div className={styles.label}>Size on disk</div>
+          <div className={styles.value}>{s ? formatBytes(s.sizeOnDisk) : '…'}</div>
+          <div className={styles.sub}>Movies and episodes</div>
         </div>
         <div className={styles.card}>
-          <div className={styles.label}>Database schema</div>
-          <div className={styles.value}>{status.data?.databaseSchemaVersion ?? '...'}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.label}>Runtime</div>
-          <div className={styles.valueSmall}>{status.data?.runtime ?? '...'}</div>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.label}>Host</div>
-          <div className={styles.valueSmall}>
-            {status.data ? (status.data.isDocker ? 'Docker' : status.data.operatingSystem) : '...'}
-          </div>
+          <div className={styles.label}>StreamZH</div>
+          <div className={styles.value}>{status.data?.version ?? '…'}</div>
+          <div className={styles.sub}>{status.data ? (status.data.isDocker ? 'Docker' : status.data.operatingSystem) : ''}</div>
         </div>
       </section>
 
@@ -44,7 +51,7 @@ export default function Home() {
             <li key={stage}>{stage}</li>
           ))}
         </ol>
-        <p className={styles.muted}>The queue is empty. Add movies or series to get started.</p>
+        <p className={styles.muted}>Searching and downloading arrive with versions 0.4 and 0.5. The queue is empty.</p>
       </section>
     </div>
   )

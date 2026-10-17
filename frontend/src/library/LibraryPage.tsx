@@ -1,0 +1,188 @@
+import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
+import { libraryApi, queryKeys, type MediaType, type Movie, type Series } from '../api/library'
+import { useAuth } from '../auth/auth'
+import Poster from '../components/Poster'
+import ui from '../components/ui.module.css'
+import { formatBytes } from '../lib/format'
+import page from '../pages/Page.module.css'
+import AddDialog from './AddDialog'
+import styles from './Library.module.css'
+import { SetupHint } from './SetupHint'
+
+type Sort = 'title' | 'year' | 'added'
+type Filter = 'all' | 'missing' | 'ondisk' | 'unmonitored'
+
+interface Item {
+  id: number
+  title: string
+  year: number
+  sortTitle: string
+  added: string
+  posterPath: string | null
+  monitored: boolean
+  status: 'ondisk' | 'missing' | 'unmonitored' | 'partial' | 'loading'
+  detail: string
+}
+
+export default function LibraryPage({ type }: { type: MediaType }) {
+  const isMovie = type === 'Movie'
+  const { user } = useAuth()
+  const [adding, setAdding] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<Sort>('title')
+  const [filter, setFilter] = useState<Filter>('all')
+
+  const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies, enabled: isMovie })
+  const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series, enabled: !isMovie })
+  const rootFolders = useQuery({ queryKey: queryKeys.rootFolders, queryFn: libraryApi.rootFolders })
+  const metadata = useQuery({ queryKey: queryKeys.metadata, queryFn: libraryApi.metadataSettings, enabled: user?.role !== 'Friend' })
+
+  const source = isMovie ? movies : series
+  const items = useMemo(
+    () => (isMovie ? (movies.data ?? []).map(movieItem) : (series.data ?? []).map(seriesItem)),
+    [isMovie, movies.data, series.data],
+  )
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return items
+      .filter((i) => !term || i.title.toLowerCase().includes(term))
+      .filter((i) => {
+        if (filter === 'missing') return i.status === 'missing' || i.status === 'partial'
+        if (filter === 'ondisk') return i.status === 'ondisk' || i.status === 'partial'
+        if (filter === 'unmonitored') return !i.monitored
+        return true
+      })
+      .sort((a, b) => {
+        if (sort === 'year') return b.year - a.year || a.sortTitle.localeCompare(b.sortTitle)
+        if (sort === 'added') return b.added.localeCompare(a.added)
+        return a.sortTitle.localeCompare(b.sortTitle)
+      })
+  }, [items, search, sort, filter])
+
+  const folders = (rootFolders.data ?? []).filter((r) => r.mediaType === type)
+  const unmapped = folders.reduce((sum, r) => sum + r.unmappedFolders, 0)
+  const noun = isMovie ? 'movie' : 'series'
+  const tmdbMissing = metadata.data && !metadata.data.tmdbConfigured
+  const noRoot = rootFolders.data && folders.length === 0
+  const canAdd = !tmdbMissing && !noRoot
+
+  return (
+    <div className={page.page}>
+      <header className={styles.head}>
+        <div>
+          <h1 className={page.title}>{isMovie ? 'Movies' : 'Series'}</h1>
+          <p className={page.lead}>
+            {source.data ? `${items.length} in library` : 'Loading…'}
+            {!isMovie && series.data && ` · ${series.data.reduce((s, x) => s + x.fileCount, 0)} episodes on disk`}
+            {' · '}
+            {formatBytes(
+              isMovie
+                ? (movies.data ?? []).reduce((s, m) => s + (m.file?.size ?? 0), 0)
+                : (series.data ?? []).reduce((s, x) => s + x.sizeOnDisk, 0),
+            )}
+          </p>
+        </div>
+        <div className={styles.actions}>
+          {user?.role !== 'Friend' && unmapped > 0 && (
+            <Link className={ui.button} to={`/library/import?type=${type}`}>
+              Import {unmapped} existing
+            </Link>
+          )}
+          <button className={ui.primary} type="button" onClick={() => setAdding(true)} disabled={!canAdd}>
+            + Add {noun}
+          </button>
+        </div>
+      </header>
+
+      <SetupHint tmdbMissing={!!tmdbMissing} noRoot={!!noRoot} type={type} />
+
+      {items.length > 0 && (
+        <div className={styles.toolbar}>
+          <input
+            className={ui.input}
+            type="search"
+            placeholder={`Filter ${isMovie ? 'movies' : 'series'}`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select className={ui.select} value={filter} onChange={(e) => setFilter(e.target.value as Filter)} aria-label="Show">
+            <option value="all">All</option>
+            <option value="ondisk">On disk</option>
+            <option value="missing">Missing</option>
+            <option value="unmonitored">Unmonitored</option>
+          </select>
+          <select className={ui.select} value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort">
+            <option value="title">Title</option>
+            <option value="year">Year</option>
+            <option value="added">Recently added</option>
+          </select>
+        </div>
+      )}
+
+      {source.isError && <p className={ui.error}>{source.error.message}</p>}
+
+      {source.data && items.length === 0 && canAdd && (
+        <div className={`${page.panel} ${styles.empty}`}>
+          <p>
+            Your {isMovie ? 'movie' : 'series'} library is empty. Add a {noun}
+            {unmapped > 0 ? ` or import the ${unmapped} folders already in your root folder` : ''}.
+          </p>
+        </div>
+      )}
+
+      {visible.length > 0 && (
+        <ul className={styles.grid}>
+          {visible.map((item) => (
+            <li key={item.id}>
+              <Link className={styles.card} to={`/library/${isMovie ? 'movies' : 'series'}/${item.id}`}>
+                <Poster path={item.posterPath} title={item.title} />
+                <span className={`${styles.bar} ${styles[item.status]}`} />
+                <span className={styles.cardTitle}>{item.title}</span>
+                <span className={styles.cardMeta}>
+                  {item.year > 0 ? item.year : '–'} · {item.detail}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {items.length > 0 && visible.length === 0 && <p className={ui.muted}>Nothing matches this filter.</p>}
+
+      {adding && <AddDialog type={type} onClose={() => setAdding(false)} />}
+    </div>
+  )
+}
+
+function movieItem(m: Movie): Item {
+  return {
+    id: m.id,
+    title: m.title,
+    year: m.year,
+    sortTitle: m.title.toLowerCase().replace(/^(the|a|an|der|die|das) /, ''),
+    added: m.added,
+    posterPath: m.posterPath,
+    monitored: m.monitored,
+    status: m.hasFile ? 'ondisk' : m.monitored ? 'missing' : 'unmonitored',
+    detail: m.hasFile ? 'On disk' : m.monitored ? 'Missing' : 'Unmonitored',
+  }
+}
+
+function seriesItem(s: Series): Item {
+  const loading = s.lastRefreshed === null
+  const complete = s.airedCount > 0 && s.fileCount >= s.airedCount
+  return {
+    id: s.id,
+    title: s.title,
+    year: s.year,
+    sortTitle: s.title.toLowerCase().replace(/^(the|a|an|der|die|das) /, ''),
+    added: s.added,
+    posterPath: s.posterPath,
+    monitored: s.monitored,
+    status: loading ? 'loading' : complete ? 'ondisk' : s.fileCount > 0 ? 'partial' : s.monitored ? 'missing' : 'unmonitored',
+    detail: loading ? 'Loading episodes…' : `${s.fileCount} / ${s.airedCount} episodes`,
+  }
+}

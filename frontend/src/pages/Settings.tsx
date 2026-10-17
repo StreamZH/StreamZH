@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, logLevels, type GeneralSettings } from '../api/client'
 import { authQueryKey, useAuth } from '../auth/auth'
+import { useScrollToHash } from '../lib/useScrollToHash'
+import { MetadataSection, RootFoldersSection } from './MediaSettings'
 import page from './Page.module.css'
 import styles from './Settings.module.css'
 
@@ -9,13 +11,19 @@ const settingsKey = ['settings-general']
 
 export default function Settings() {
   const settings = useQuery({ queryKey: settingsKey, queryFn: api.generalSettings })
+  useScrollToHash()
 
   return (
     <div className={page.page}>
       <header>
         <h1 className={page.title}>Settings</h1>
-        <p className={page.lead}>General options, API access and logs.</p>
+        <p className={page.lead}>Media folders, metadata, API access and logs.</p>
       </header>
+
+      <div id="media" className={page.page}>
+        <RootFoldersSection />
+        <MetadataSection />
+      </div>
 
       {settings.isError && <p className={page.error}>{settings.error.message}</p>}
       {settings.data && (

@@ -1,0 +1,96 @@
+.back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar select {
+  min-width: min(100%, 420px);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.summary span:first-child {
+  flex: 1;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.table tr:first-child td {
+  border-top: none;
+}
+
+.table input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.table select {
+  width: 100%;
+  max-width: 420px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.folder {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.right {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.skipped td {
+  opacity: 0.55;
+}
+
+.table th:first-child,
+.table td:first-child {
+  width: 40px;
+}
+
+.table th:last-child,
+.table td:last-child {
+  width: 140px;
+}

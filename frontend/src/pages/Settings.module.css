@@ -179,3 +179,72 @@
 .levelTrace {
   color: var(--text-faint);
 }
+
+.field input,
+.field select {
+  min-width: 0;
+}
+
+.field span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text a {
+  color: var(--accent);
+}
+
+.attribution {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.rootList {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rootList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.rootList li:first-child {
+  border-top: none;
+}
+
+.rootPath {
+  flex: 1 1 240px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.rootMeta {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.rootImport {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.rootForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rootForm input {
+  flex: 1 1 280px;
+}

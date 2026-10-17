@@ -1,0 +1,163 @@
+// StreamZH - one app for your whole media pipeline.
+// Copyright (c) 2026 The StreamZH Authors.
+// SPDX-License-Identifier: GPL-3.0-only
+
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Dapper;
+using StreamZH.Core.Media;
+
+namespace StreamZH.Data;
+
+/// <summary>What happened to a release. Values are stored in the database; never renumber.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<HistoryEventType>))]
+public enum HistoryEventType
+{
+    /// <summary>The NZB was fetched from the indexer and handed to the download step.</summary>
+    Grabbed = 1,
+}
+
+/// <summary>One history entry. <see cref="Data"/> holds event-specific details (download URL, NZB path, …).</summary>
+public sealed record HistoryItem
+{
+    public int Id { get; init; }
+    public DateTime Date { get; init; }
+    public HistoryEventType EventType { get; init; }
+    public MediaType MediaType { get; init; }
+    public int? MovieId { get; init; }
+    public int? SeriesId { get; init; }
+    public IReadOnlyList<int> EpisodeIds { get; init; } = [];
+    public required string SourceTitle { get; init; }
+    public int QualityId { get; init; }
+    public IReadOnlyList<int> LanguageIds { get; init; } = [];
+    public string? ReleaseGroup { get; init; }
+    public string? Indexer { get; init; }
+    public int? IndexerId { get; init; }
+    public long Size { get; init; }
+    public IReadOnlyDictionary<string, string?> Data { get; init; } = new Dictionary<string, string?>();
+}
+
+public sealed class HistoryRepository(Database database)
+{
+    private const string Columns = """
+        Id, Date, EventType, MediaType, MovieId, SeriesId, EpisodeIds, SourceTitle, QualityId, Languages, ReleaseGroup, Indexer, IndexerId, Size, Data
+        """;
+
+    public int Add(HistoryItem item)
+    {
+        using var connection = database.Open();
+        return connection.ExecuteScalar<int>(
+            """
+            INSERT INTO History (Date, EventType, MediaType, MovieId, SeriesId, EpisodeIds, SourceTitle, QualityId, Languages, ReleaseGroup, Indexer, IndexerId, Size, Data)
+            VALUES (@Date, @EventType, @MediaType, @MovieId, @SeriesId, @EpisodeIds, @SourceTitle, @QualityId, @Languages, @ReleaseGroup, @Indexer, @IndexerId, @Size, @Data);
+            SELECT last_insert_rowid();
+            """,
+            new
+            {
+                item.Date,
+                EventType = (int)item.EventType,
+                MediaType = (int)item.MediaType,
+                item.MovieId,
+                item.SeriesId,
+                EpisodeIds = item.EpisodeIds.Count == 0 ? null : JoinIds(item.EpisodeIds),
+                item.SourceTitle,
+                item.QualityId,
+                Languages = JoinIds(item.LanguageIds),
+                item.ReleaseGroup,
+                item.Indexer,
+                item.IndexerId,
+                item.Size,
+                Data = JsonSerializer.Serialize(item.Data),
+            });
+    }
+
+    /// <summary>Newest first. <paramref name="page"/> starts at 1.</summary>
+    public (IReadOnlyList<HistoryItem> Records, int Total) Page(int page, int pageSize, int? movieId = null, int? seriesId = null)
+    {
+        const string Filter = "(@movieId IS NULL OR MovieId = @movieId) AND (@seriesId IS NULL OR SeriesId = @seriesId)";
+        using var connection = database.Open();
+        var parameters = new { movieId, seriesId, take = pageSize, skip = (page - 1) * pageSize };
+        var total = connection.ExecuteScalar<int>($"SELECT COUNT(*) FROM History WHERE {Filter}", parameters);
+        var rows = connection.Query<HistoryRow>(
+            $"SELECT {Columns} FROM History WHERE {Filter} ORDER BY Date DESC, Id DESC LIMIT @take OFFSET @skip", parameters);
+        return ([.. rows.Select(r => r.ToItem())], total);
+    }
+
+    /// <summary>True when the movie has an event of this type at or after <paramref name="since"/>.</summary>
+    public bool MovieHasEventSince(int movieId, HistoryEventType eventType, DateTime since)
+    {
+        using var connection = database.Open();
+        return connection.ExecuteScalar<int>(
+            "SELECT COUNT(*) FROM History WHERE MovieId = @movieId AND EventType = @eventType AND Date >= @since",
+            new { movieId, eventType = (int)eventType, since }) > 0;
+    }
+
+    /// <summary>Episode ids of the series with an event of this type at or after <paramref name="since"/>.</summary>
+    public IReadOnlySet<int> EpisodesWithEventSince(int seriesId, HistoryEventType eventType, DateTime since)
+    {
+        using var connection = database.Open();
+        return connection.Query<string?>(
+                "SELECT EpisodeIds FROM History WHERE SeriesId = @seriesId AND EventType = @eventType AND Date >= @since",
+                new { seriesId, eventType = (int)eventType, since })
+            .SelectMany(SplitIds)
+            .ToHashSet();
+    }
+
+    private static string JoinIds(IEnumerable<int> ids) => string.Join(',', ids.Select(i => i.ToString(CultureInfo.InvariantCulture)));
+
+    private static IReadOnlyList<int> SplitIds(string? value) =>
+        string.IsNullOrEmpty(value)
+            ? []
+            : [.. value.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(v => int.Parse(v, CultureInfo.InvariantCulture))];
+
+    private sealed class HistoryRow
+    {
+        public long Id { get; init; }
+        public DateTime Date { get; init; }
+        public long EventType { get; init; }
+        public long MediaType { get; init; }
+        public long? MovieId { get; init; }
+        public long? SeriesId { get; init; }
+        public string? EpisodeIds { get; init; }
+        public string SourceTitle { get; init; } = string.Empty;
+        public long QualityId { get; init; }
+        public string Languages { get; init; } = string.Empty;
+        public string? ReleaseGroup { get; init; }
+        public string? Indexer { get; init; }
+        public long? IndexerId { get; init; }
+        public long Size { get; init; }
+        public string Data { get; init; } = "{}";
+
+        public HistoryItem ToItem() => new()
+        {
+            Id = (int)Id,
+            Date = DateTime.SpecifyKind(Date, DateTimeKind.Utc),
+            EventType = (HistoryEventType)EventType,
+            MediaType = (MediaType)MediaType,
+            MovieId = MovieId is { } m ? (int)m : null,
+            SeriesId = SeriesId is { } s ? (int)s : null,
+            EpisodeIds = SplitIds(EpisodeIds),
+            SourceTitle = SourceTitle,
+            QualityId = (int)QualityId,
+            LanguageIds = SplitIds(Languages),
+            ReleaseGroup = ReleaseGroup,
+            Indexer = Indexer,
+            IndexerId = IndexerId is { } i ? (int)i : null,
+            Size = Size,
+            Data = JsonSerializer.Deserialize<Dictionary<string, string?>>(Data) ?? [],
+        };
+    }
+}
+
+/// <summary>Finds the series and season of an episode by its id (for "search this episode").</summary>
+public sealed class EpisodeLookup(Database database)
+{
+    public (int SeriesId, int SeasonNumber)? Locate(int episodeId)
+    {
+        using var connection = database.Open();
+        var rows = connection.Query<(long SeriesId, long SeasonNumber)>(
+            "SELECT SeriesId, SeasonNumber FROM Episodes WHERE Id = @episodeId", new { episodeId }).ToList();
+        return rows.Count == 0 ? null : ((int)rows[0].SeriesId, (int)rows[0].SeasonNumber);
+    }
+}

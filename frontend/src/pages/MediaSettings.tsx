@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
+import { releaseKeys, releasesApi } from '../api/releases'
 import FolderPicker from '../components/FolderPicker'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
@@ -216,5 +217,72 @@ export function RootFoldersSection() {
         <p className={styles.error}>{add.error instanceof ApiError ? add.error.message : 'Could not add the folder.'}</p>
       )}
     </section>
+  )
+}
+
+export function DownloadsSection() {
+  const queryClient = useQueryClient()
+  const settings = useQuery({ queryKey: releaseKeys.downloads, queryFn: releasesApi.downloadSettings })
+  const [path, setPath] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
+  const value = path ?? settings.data?.nzbFolder ?? ''
+
+  const save = useMutation({
+    mutationFn: (folder: string) => releasesApi.saveDownloadSettings(folder),
+    onSuccess: (data) => {
+      queryClient.setQueryData(releaseKeys.downloads, data)
+      setPath(null)
+    },
+  })
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    save.mutate(value.trim())
+  }
+
+  if (!settings.data) return null
+
+  const error = save.error instanceof ApiError ? (save.error.fieldErrors.nzbFolder?.[0] ?? save.error.message) : save.error?.message
+  const dirty = path !== null && path.trim() !== settings.data.nzbFolder
+
+  return (
+    <form className={page.panel} onSubmit={submit}>
+      <h2 className={page.panelTitle}>Downloads</h2>
+      <p className={styles.text}>
+        Grabbed releases are saved as NZB files in this folder. Until StreamZH&apos;s own download engine arrives, let SABnzbd watch this folder
+        (Config → Folders → Watched Folder) and it downloads them automatically.
+      </p>
+      <div className={styles.rootForm}>
+        <input className={`${ui.input} ${ui.mono}`} value={value} onChange={(e) => setPath(e.target.value)} aria-label="NZB folder" spellCheck={false} />
+        <button className={styles.secondary} type="button" onClick={() => setPicking(true)}>
+          Browse…
+        </button>
+        <button className={styles.primary} type="submit" disabled={!dirty || save.isPending}>
+          {save.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      <div className={styles.actions}>
+        {settings.data.isDefault ? (
+          <span className={styles.muted}>Default folder inside the StreamZH data folder.</span>
+        ) : (
+          <button className={styles.secondary} type="button" onClick={() => save.mutate('')} disabled={save.isPending}>
+            Use default folder
+          </button>
+        )}
+        {save.isSuccess && !dirty && <span className={styles.ok}>Saved</span>}
+        {error && <span className={styles.error}>{error}</span>}
+        {!error && settings.data.problem && <span className={styles.error}>{settings.data.problem}</span>}
+      </div>
+      {picking && (
+        <FolderPicker
+          initialPath={value}
+          onClose={() => setPicking(false)}
+          onSelect={(selected) => {
+            setPath(selected)
+            setPicking(false)
+          }}
+        />
+      )}
+    </form>
   )
 }

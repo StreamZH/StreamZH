@@ -14,6 +14,7 @@ using StreamZH.Host.Logging;
 using StreamZH.Host.Settings;
 using StreamZH.Indexers;
 using StreamZH.Library;
+using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
 
 // Installed builds: content root = install folder, so wwwroot is found from any working directory.
@@ -88,6 +89,7 @@ builder.Services.AddScoped<RootFolderService>();
 builder.Services.AddScoped<LibraryImportService>();
 builder.Services.AddIndexerManagement();
 builder.Services.AddNewznabIndexers();
+builder.Services.AddReleaseSearch();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
@@ -113,6 +115,8 @@ app.MapProfileEndpoints();
 app.MapIndexerEndpoints();
 app.MapFileSystemEndpoints();
 app.MapParseEndpoints();
+app.MapReleaseEndpoints();
+app.MapHistoryEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

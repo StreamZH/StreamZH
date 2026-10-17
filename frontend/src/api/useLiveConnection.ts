@@ -1,7 +1,9 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { historyKeys } from './history'
 import { queryKeys, type JobStatus } from './library'
+import { releaseKeys, type SearchFinished } from './releases'
 
 /**
  * Keeps one SignalR connection to /hub open, refreshes cached library data when the
@@ -33,6 +35,11 @@ export function useLiveConnection(): boolean {
     connection.on('jobs', (status: JobStatus) => {
       queryClient.setQueryData(queryKeys.jobs, status)
     })
+
+    connection.on('releaseGrabbed', () => void queryClient.invalidateQueries({ queryKey: historyKeys.all }))
+    connection.on('searchFinished', (event: SearchFinished) =>
+      queryClient.setQueryData(releaseKeys.searchFinished(event.mediaType, event.id), { ...event, at: Date.now() }),
+    )
 
     connection.onreconnecting(() => setConnected(false))
     connection.onreconnected(() => {

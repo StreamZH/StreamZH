@@ -15,6 +15,7 @@ public static class ConfigKeys
     public const string NzbFolder = "NzbFolder";
     public const string Par2Path = "Par2Path";
     public const string SevenZipPath = "SevenZipPath";
+    public const string ToolsAutoInstall = "ToolsAutoInstall";
     public const string DownloadClient = "DownloadClient";
     public const string IncompleteFolder = "IncompleteFolder";
     public const string CompleteFolder = "CompleteFolder";

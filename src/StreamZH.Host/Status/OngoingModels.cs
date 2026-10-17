@@ -8,7 +8,7 @@ namespace StreamZH.Host.Status;
 public sealed record OngoingResource(IReadOnlyList<OngoingRunning> Running, IReadOnlyList<OngoingNotice> Notices);
 
 /// <summary>One running row.</summary>
-/// <param name="Kind">"job", "download" or "postprocess".</param>
+/// <param name="Kind">"job", "download", "postprocess" or "install" (par2 or 7-Zip being installed).</param>
 /// <param name="Progress">0..1, or null when the work has no measurable progress.</param>
 public sealed record OngoingRunning(
     string Key,
@@ -30,6 +30,7 @@ public static class OngoingKinds
     public const string Job = "job";
     public const string Download = "download";
     public const string PostProcess = "postprocess";
+    public const string Install = "install";
 }
 
 public static class NoticeLevels

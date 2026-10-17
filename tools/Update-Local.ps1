@@ -8,25 +8,21 @@
 
     Needs once: Git, .NET 10 SDK and Node.js (LTS). The script tells you how to install what is missing.
 
-    par2 (for repairing damaged downloads) is downloaded once into <InstallDir>\tools from the official
-    par2cmdline release on GitHub (pinned version, SHA256 checked). Skipped when it is already there or with -NoTools.
-    7-Zip is not downloaded: install it from https://www.7-zip.org (StreamZH finds C:\Program Files\7-Zip\7z.exe).
+    par2 and 7-Zip are not handled here: StreamZH installs them itself (par2cmdline-turbo and 7-Zip, pinned
+    official releases, SHA256 checked) into C:\ProgramData\StreamZH\tools, a few seconds after it starts,
+    or with "Install" in Settings -> Tools. An existing C:\Program Files\7-Zip is used as it is.
 
 .EXAMPLE
     C:\Repos\StreamZH\tools\Update-Local.ps1
 
 .EXAMPLE
     C:\Repos\StreamZH\tools\Update-Local.ps1 -NoPull -NoStart
-
-.EXAMPLE
-    C:\Repos\StreamZH\tools\Update-Local.ps1 -NoTools
 #>
 [CmdletBinding()]
 param(
     [string]$InstallDir = 'C:\Tools\StreamZH',
     [switch]$NoPull,
-    [switch]$NoStart,
-    [switch]$NoTools
+    [switch]$NoStart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,44 +33,6 @@ $repo = Split-Path -Parent $PSScriptRoot
 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
 function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
-
-# par2cmdline (GPL-2.0-or-later) is an external program; StreamZH only calls it. Pinned release, checked by SHA256.
-$par2Version = '1.4.0'
-$par2Url = "https://github.com/Parchive/par2cmdline/releases/download/v$par2Version/par2cmdline-$par2Version-win-x64.zip"
-$par2Sha256 = '200130143dba1e12f9d1be567d5a446e785d2093e5d735225d8ad0539125b71c'
-
-function Install-Par2([string]$toolsDir) {
-    $exe = Join-Path $toolsDir 'par2.exe'
-    if (Test-Path $exe) { return }
-
-    Step "Download par2cmdline $par2Version (repairs damaged downloads)"
-    Write-Host "Quelle: $par2Url"
-    Write-Host "Ziel:   $exe  (überspringen mit -NoTools)"
-    $zip = Join-Path $env:TEMP "par2cmdline-$par2Version-win-x64.zip"
-    $extract = Join-Path $env:TEMP "par2cmdline-$par2Version"
-    try {
-        Invoke-WebRequest -Uri $par2Url -OutFile $zip -UseBasicParsing
-        $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash
-        if ($hash -ne $par2Sha256) {
-            throw "SHA256 stimmt nicht: erwartet $par2Sha256, erhalten $hash"
-        }
-        if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
-        Expand-Archive -Path $zip -DestinationPath $extract
-        $found = Get-ChildItem -Path $extract -Filter 'par2.exe' -Recurse | Select-Object -First 1
-        if (-not $found) { throw 'par2.exe fehlt im Archiv' }
-        New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
-        Copy-Item $found.FullName $exe
-        Write-Host "par2 installiert: $exe" -ForegroundColor Green
-    }
-    catch {
-        # Not fatal: StreamZH runs without par2, only repairs are not possible (Settings -> Downloads -> Tools).
-        Write-Host "par2 konnte nicht installiert werden: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "Manuell: par2.exe von https://github.com/Parchive/par2cmdline/releases nach $toolsDir kopieren." -ForegroundColor Yellow
-    }
-    finally {
-        Remove-Item $zip, $extract -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
 
 function Require([string]$command, [string]$install) {
     if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
@@ -133,14 +91,10 @@ try {
 
     Step "Install to $InstallDir"
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-    # /XD keeps <InstallDir>\tools (par2.exe) although /MIR removes everything that is not in the build.
-    $toolsDir = Join-Path $InstallDir 'tools'
-    robocopy $out $InstallDir /MIR /XD $toolsDir /NFL /NDL /NJH /NJS /NP | Out-Null
+    # /MIR also removes the old <InstallDir>\tools\par2.exe of earlier versions of this script; StreamZH then
+    # installs par2cmdline-turbo into C:\ProgramData\StreamZH\tools by itself.
+    robocopy $out $InstallDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
-
-    if (-not $NoTools) {
-        Install-Par2 $toolsDir
-    }
 
     if (-not $NoStart) {
         Step 'Start StreamZH'

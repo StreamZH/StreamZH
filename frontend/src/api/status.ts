@@ -1,6 +1,7 @@
 import { request } from './client'
 
-export type OngoingKind = 'job' | 'download' | 'postprocess'
+/** 'install': par2 or 7-Zip being installed by StreamZH. */
+export type OngoingKind = 'job' | 'download' | 'postprocess' | 'install'
 export type NoticeLevel = 'info' | 'warn' | 'error'
 
 /** Something running right now (GET /status/ongoing). Download rows have the key "download-{id}". */

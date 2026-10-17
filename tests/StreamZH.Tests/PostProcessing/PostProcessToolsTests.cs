@@ -51,6 +51,37 @@ public sealed class PostProcessToolsTests
     }
 
     [Fact]
+    public void Copy_installed_by_streamzh_comes_after_the_configured_path_and_before_the_bundled_folder()
+    {
+        var installedPar2 = Path.Combine("/data/tools", "par2", "par2");
+        var installed7z = Path.Combine("/data/tools", "7-Zip", "7zz");
+        var bundled = Path.Combine("/opt/streamzh", "tools", "par2");
+        string[] existing = ["/custom/par2", installedPar2, installed7z, bundled, "/usr/bin/par2", "/usr/bin/7z"];
+        ToolEnvironment Environment(string? installedDirectory) => new("/opt/streamzh", "/usr/bin", false, [])
+        {
+            FileExists = existing.Contains,
+            InstalledDirectory = installedDirectory,
+        };
+
+        var configured = new PostProcessTools(new FixedToolSettings(par2: "/custom/par2"), new ToolProcessRunner(), Environment("/data/tools"));
+        Assert.Equal(ToolSource.Configured, configured.Find(PostProcessTool.Par2).Source);
+
+        var automatic = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment("/data/tools"));
+        var par2 = automatic.Find(PostProcessTool.Par2);
+        Assert.Equal(installedPar2, par2.Path);
+        Assert.Equal(ToolSource.Installed, par2.Source);
+
+        // 7zz (the Linux/macOS 7-Zip) is what StreamZH installs; it wins over 7z on PATH.
+        var sevenZip = automatic.Find(PostProcessTool.SevenZip);
+        Assert.Equal(installed7z, sevenZip.Path);
+        Assert.Equal(ToolSource.Installed, sevenZip.Source);
+
+        var withoutInstallFolder = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment(null));
+        Assert.Equal(ToolSource.Bundled, withoutInstallFolder.Find(PostProcessTool.Par2).Source);
+        Assert.Equal(ToolSource.Path, withoutInstallFolder.Find(PostProcessTool.SevenZip).Source);
+    }
+
+    [Fact]
     public void Path_is_searched_in_order_and_a_missing_configured_path_falls_back_with_a_problem()
     {
         var tools = Tools(new FixedToolSettings(sevenZip: "/gone/7z"), false, "/usr/local/bin:/usr/bin", "/usr/bin/7z", Path.Combine("/usr/local/bin", "7zz"));

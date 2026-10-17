@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StreamZH.Core.Downloads;
 using StreamZH.Host.Api;
 using StreamZH.Library.PostProcessing;
+using StreamZH.Tests.PostProcessing;
 
 namespace StreamZH.Tests.Host;
 
@@ -52,6 +53,87 @@ public sealed class ToolSettingsApiTests : IDisposable
         var automatic = await reset.Content.ReadFromJsonAsync<ToolSettingsResource>();
         Assert.Equal(string.Empty, automatic!.SevenZipPath);
         Assert.NotEqual("Configured", automatic.SevenZipSource);
+    }
+
+    [Fact]
+    public async Task Install_endpoint_installs_into_the_data_folder()
+    {
+        var (par2, data) = TestToolPackages.Par2();
+        var sevenZip = par2 with
+        {
+            Tool = PostProcessTool.SevenZip,
+            Name = "7-Zip",
+            Version = "26.03",
+            Download = TestToolPackages.Download("7z.zip", [1, 2, 3]),
+            Files = [OperatingSystem.IsWindows() ? "7z.exe" : "7zz"],
+        };
+        _factory.ToolDownloads.Add(par2.Download, data);
+        _factory.ToolCatalog = new ToolCatalog((tool, _) => tool == PostProcessTool.Par2 ? par2 : sevenZip);
+        var client = await _factory.CreateOwnerClientAsync();
+        var toolsFolder = Path.Combine(_factory.DataDirectory, "tools");
+
+        var before = (await client.GetFromJsonAsync<ToolSettingsResource>("/api/v1/settings/tools"))!;
+        Assert.True(before.Par2Installable);
+        Assert.True(before.SevenZipInstallable);
+        Assert.False(before.Par2Installing);
+        Assert.Null(before.Par2InstallProgress);
+        Assert.Null(before.Par2InstallError);
+        Assert.Null(before.Par2InstalledVersion);
+        Assert.Equal("1.5.0", before.Par2InstallVersion);
+        Assert.Equal("26.03", before.SevenZipInstallVersion);
+        Assert.True(before.AutoInstall);
+        Assert.Equal(toolsFolder, before.InstallFolder);
+
+        var response = await client.PostAsync("/api/v1/settings/tools/par2/install", null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var installed = (await response.Content.ReadFromJsonAsync<ToolSettingsResource>())!;
+        Assert.True(installed.Par2Found);
+        Assert.Equal("Installed", installed.Par2Source);
+        Assert.Equal(Path.Combine(toolsFolder, "par2", par2.Executable), installed.Par2ResolvedPath);
+        Assert.Equal("1.5.0", installed.Par2InstalledVersion);
+        Assert.False(installed.Par2Installing);
+
+        // The 7-Zip download is not there.
+        var failed = await client.PostAsync("/api/v1/settings/tools/sevenZip/install", null);
+        Assert.Equal(HttpStatusCode.Conflict, failed.StatusCode);
+        var problem = await failed.Content.ReadAsStringAsync();
+        Assert.Contains("7-Zip could not be installed", problem);
+        Assert.Contains("HTTP 404", problem);
+        var after = (await client.GetFromJsonAsync<ToolSettingsResource>("/api/v1/settings/tools"))!;
+        Assert.Contains("HTTP 404", after.SevenZipInstallError);
+        Assert.Null(after.SevenZipInstalledVersion);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/v1/settings/tools/ffmpeg/install", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Auto_install_can_be_switched_off()
+    {
+        var client = await _factory.CreateOwnerClientAsync();
+
+        var saved = await client.PutAsJsonAsync("/api/v1/settings/tools", new { autoInstall = false });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.False((await saved.Content.ReadFromJsonAsync<ToolSettingsResource>())!.AutoInstall);
+        Assert.False((await client.GetFromJsonAsync<ToolSettingsResource>("/api/v1/settings/tools"))!.AutoInstall);
+
+        var on = await client.PutAsJsonAsync("/api/v1/settings/tools", new { autoInstall = true });
+        Assert.True((await on.Content.ReadFromJsonAsync<ToolSettingsResource>())!.AutoInstall);
+    }
+
+    [Fact]
+    public async Task Tools_that_cannot_be_installed_here_are_refused()
+    {
+        _factory.ToolCatalog = new ToolCatalog((_, _) => null);
+        var client = await _factory.CreateOwnerClientAsync();
+
+        var settings = (await client.GetFromJsonAsync<ToolSettingsResource>("/api/v1/settings/tools"))!;
+        Assert.False(settings.Par2Installable);
+        Assert.Null(settings.Par2InstallVersion);
+
+        var response = await client.PostAsync("/api/v1/settings/tools/par2/install", null);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("cannot install par2", await response.Content.ReadAsStringAsync());
+        Assert.Empty(_factory.ToolDownloads.Requests);
     }
 
     [Fact]

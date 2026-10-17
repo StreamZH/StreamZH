@@ -19,6 +19,9 @@ public sealed class AppPaths
     public string LogDirectory => Path.Combine(DataDirectory, "logs");
     public string IncompleteDirectory => Path.Combine(DataDirectory, "downloads", "incomplete");
 
+    /// <summary>par2 and 7-Zip installed by StreamZH (&lt;data&gt;/tools/par2, &lt;data&gt;/tools/7-Zip); survives app updates.</summary>
+    public string ToolsDirectory => Path.Combine(DataDirectory, "tools");
+
     public void EnsureCreated()
     {
         Directory.CreateDirectory(DataDirectory);

@@ -42,7 +42,9 @@ the existing apps.
 | Packaging | Self-contained native packages (Windows, Linux, macOS) + Docker image | Runs natively like Sonarr/Radarr, or in a container; see Platforms in ROADMAP.md |
 
 External tools called as processes (not linked): `par2` (par2cmdline-turbo) for
-verify/repair and `unrar` / `7z` for extraction. Same approach as SABnzbd.
+repair and 7-Zip for extraction. Same approach as SABnzbd. When they are missing, StreamZH
+installs pinned official releases (SHA-256 checked) into `<data>/tools` itself
+(`ToolInstaller`, Settings → Tools).
 
 ## Module map
 

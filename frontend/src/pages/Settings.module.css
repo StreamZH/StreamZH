@@ -263,3 +263,76 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Settings → Tools: one row per tool (par2, 7-Zip). */
+.toolList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.toolRow:first-child {
+  border-top: none;
+  padding-top: 4px;
+}
+
+.toolMain {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.toolHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.toolMain small {
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.toolMain .error {
+  color: #ef6b6b;
+}
+
+.toolMain code,
+.toolAdvanced code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.toolAdvanced {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.toolAdvanced .actions {
+  margin-top: 0;
+}

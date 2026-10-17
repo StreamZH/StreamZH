@@ -1,0 +1,863 @@
+// StreamZH - one app for your whole media pipeline.
+// Copyright (c) 2026 The StreamZH Authors.
+// Portions ported from Radarr (https://github.com/Radarr/Radarr) and Sonarr (https://github.com/Sonarr/Sonarr), Copyright (c) their contributors, GPL-3.0.
+// SPDX-License-Identifier: GPL-3.0-only
+
+using StreamZH.Parsing.Releases;
+
+namespace StreamZH.Tests.Parsing;
+
+/// <summary>Movie release names: the owner's real folder names plus cases ported from Radarr's parser fixtures.</summary>
+public class ReleaseParserMovieTests
+{
+    [Theory]
+    [InlineData("Backrooms.2026.GERMAN.TELESYNC.1080p.x264-LiNEUP", "Backrooms", 2026, null)]
+    [InlineData("Bride.of.the.Year.2026.German.ML.EAC3.2160p.NF.WEB.H265-WAREZCX", "Bride of the Year", 2026, null)]
+    [InlineData("Der.Teufel.traegt.Prada.2.2026.German.5.1.Line.Dubbed.1080p.DCPRip.x264-CMN", "Der Teufel traegt Prada 2", 2026, null)]
+    [InlineData("Lee.Cronins.The.Mummy.2026.UHD.WEB-DL.2160p.HEVC.DV.HDR10Plus.EAC3.DL.Remux-TvR", "Lee Cronins The Mummy", 2026, null)]
+    [InlineData("Mortal.Kombat.II.2026.German.5.1.AC3.MD.1080p.DCPRip.x264-LiNEUP", "Mortal Kombat II", 2026, null)]
+    [InlineData("Rampage.Rache.ist.unbarmherzig.2009.Uncut.German.DL.1080p.BDRip.h265-WOTT", "Rampage Rache ist unbarmherzig", 2009, "Uncut")]
+    [InlineData("The.Pope's.Exorcist.2023.Multi.Complete.BluRay.-.MAMA", "The Pope's Exorcist", 2023, null)]
+    [InlineData("Toy.Story.5.2026.GERMAN.CAM.1080p.x264-LiNEUP", "Toy Story 5", 2026, null)]
+    [InlineData("Blade.Runner.2049.2017.1080p.BluRay.x264-GRP", "Blade Runner 2049", 2017, null)]
+    [InlineData("2001.A.Space.Odyssey.1968.Remastered.1080p.BluRay.x264-GRP", "2001 A Space Odyssey", 1968, "Remastered")]
+    public void Owner_movie_cases(string release, string title, int year, string? edition)
+    {
+        foreach (var parsed in new[] { ReleaseParser.ParseMovie(release), ReleaseParser.Parse(release) })
+        {
+            new ReleaseExpectation(release, parsed)
+                .Equal("Title", title, parsed?.Title)
+                .Equal("Year", year, parsed?.Year)
+                .Equal("Edition", edition, parsed?.Edition)
+                .Equal("CleanTitle", TitleNormalizer.Clean(title), parsed?.CleanTitle)
+                .Equal("IsEpisode", false, parsed?.IsEpisode)
+                .Equal("ReleaseTitle", release, parsed?.ReleaseTitle)
+                .Verify();
+        }
+    }
+
+    [Theory]
+    [InlineData("Backrooms.2026.GERMAN.TELESYNC.1080p.x264-LiNEUP", "x264", null)]
+    [InlineData("Bride.of.the.Year.2026.German.ML.EAC3.2160p.NF.WEB.H265-WAREZCX", "x265", "EAC3")]
+    [InlineData("Der.Teufel.traegt.Prada.2.2026.German.5.1.Line.Dubbed.1080p.DCPRip.x264-CMN", "x264", null)]
+    [InlineData("Lee.Cronins.The.Mummy.2026.UHD.WEB-DL.2160p.HEVC.DV.HDR10Plus.EAC3.DL.Remux-TvR", "x265", "EAC3")]
+    [InlineData("Mortal.Kombat.II.2026.German.5.1.AC3.MD.1080p.DCPRip.x264-LiNEUP", "x264", "AC3")]
+    [InlineData("Rampage.Rache.ist.unbarmherzig.2009.Uncut.German.DL.1080p.BDRip.h265-WOTT", "x265", null)]
+    [InlineData("Movie.2018.1080p.AMZN.WEB-DL.DD5.1.H.264-NTG", "x264", "AC3")]
+    [InlineData("Movie.2018.2160p.UHD.BluRay.REMUX.HDR.HEVC.TrueHD.7.1.Atmos-GRP", "x265", "TrueHD Atmos")]
+    [InlineData("Movie.2018.1080p.BluRay.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR", "x264", "DTS-HD MA")]
+    [InlineData("Movie.2018.1080p.BluRay.DTS-X.7.1.x264-GRP", "x264", "DTS-X")]
+    [InlineData("Movie.2018.1080p.BluRay.DTS.x264-GRP", "x264", "DTS")]
+    [InlineData("Movie.2018.1080p.WEB-DL.DDP5.1.Atmos.H.264-GRP", "x264", "EAC3 Atmos")]
+    [InlineData("Movie.2018.1080p.WEB-DL.DD+5.1.x265-GRP", "x265", "EAC3")]
+    [InlineData("Movie.2018.720p.BluRay.x264.AAC2.0-GRP", "x264", "AAC")]
+    [InlineData("Movie.2018.1080p.BluRay.FLAC.2.0.x264-GRP", "x264", "FLAC")]
+    [InlineData("Movie.2018.1080p.WEB.AV1.Opus-GRP", "AV1", "Opus")]
+    [InlineData("Movie.2003.DVDRip.XviD.MP3-GRP", "XviD", "MP3")]
+    [InlineData("Movie.2003.German.AC3D.DL.720p.BluRay.x264-GRP", "x264", "AC3")]
+    [InlineData("Movie.2003.1080p.BluRay.VC-1.LPCM.5.1-GRP", "VC-1", "PCM")]
+    [InlineData("Movie.2003.1080p.BluRay.10bit.x265.E-AC-3-GRP", "x265", "EAC3")]
+    public void Parses_codecs(string release, string? videoCodec, string? audioCodec)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("VideoCodec", videoCodec, parsed?.VideoCodec)
+            .Equal("AudioCodec", audioCodec, parsed?.AudioCodec)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("Opus.2025.1080p.WEB.H264-GRP", "Opus", "x264")]
+    [InlineData("AVC.Story.2020.1080p.BluRay.x265-GRP", "AVC Story", "x265")]
+    public void Codecs_are_not_read_from_the_title(string release, string title, string? videoCodec)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("Title", title, parsed?.Title)
+            .Equal("AudioCodec", null, parsed?.AudioCodec)
+            .Equal("VideoCodec", videoCodec, parsed?.VideoCodec)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("[Group] Movie Title (2019) [1080p] [ABCD1234]", "ABCD1234")]
+    [InlineData("[Arid] 5 Centimeters per Second (BDRip 1920x1080 Hi10 FLAC) [FD8B6FF2].mkv", "FD8B6FF2")]
+    [InlineData("Movie.Title.2019.1080p.BluRay.x264-GRP", null)]
+    public void Parses_release_hash(string release, string? hash)
+    {
+        Assert.Equal(hash, ReleaseParser.ParseMovie(release)?.ReleaseHash);
+    }
+
+    [Theory]
+    [InlineData("Breaking.Bad.S01E02.720p.HDTV.x264-GRP")]
+    [InlineData("Show.S01E01E02.1080p.WEB.h264-GRP")]
+    [InlineData("Show.S03E01-E03.1080p")]
+    [InlineData("Show.S02.German.DL.1080p.WEB.h264-GRP")]
+    [InlineData("Show.S01-S03.1080p.BluRay")]
+    [InlineData("The.Daily.Show.2026.10.16.1080p.WEB.h264-GRP")]
+    [InlineData("[SubGroup] Anime Title - 1025 [1080p]")]
+    [InlineData("Show.S00E05.Special.720p")]
+    [InlineData("Show.4x07.Title.720p")]
+    [InlineData("Series.Title.2010.S02E14.HDTV.XviD-LOL")]
+    public void Episode_releases_are_not_movies(string release)
+    {
+        Assert.Null(ReleaseParser.ParseMovie(release));
+        Assert.True(ReleaseParser.Parse(release)?.IsEpisode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("-----")]
+    public void Returns_null_for_empty_names(string release)
+    {
+        Assert.Null(ReleaseParser.ParseMovie(release));
+        Assert.Null(ReleaseParser.Parse(release));
+    }
+
+    [Fact]
+    public void Survives_pathological_input()
+    {
+        var release = string.Concat(Enumerable.Repeat("Movie.(", 3000)) + "2020";
+        var parsed = ReleaseParser.ParseMovie(release);
+        Assert.True(parsed is null || parsed.ReleaseTitle == release);
+    }
+
+    [Theory]
+    [InlineData("The.Movie.from.U.N.C.L.E.2015.1080p.BluRay.x264-SPARKS", "The Movie from U.N.C.L.E.")]
+    [InlineData("1776.1979.EXTENDED.720p.BluRay.X264-AMIABLE", "1776")]
+    [InlineData("MY MOVIE (2016) [R][Action, Horror][720p.WEB-DL.AVC.8Bit.6ch.AC3].mkv", "MY MOVIE")]
+    [InlineData("R.I.P.D.2013.720p.BluRay.x264-SPARKS", "R.I.P.D.")]
+    [InlineData("V.H.S.2.2013.LIMITED.720p.BluRay.x264-GECKOS", "V.H.S. 2")]
+    [InlineData("This Is A Movie (1999) [IMDB #] <Genre, Genre, Genre> {ACTORS} !DIRECTOR +MORE_SILLY_STUFF_NO_ONE_NEEDS ?", "This Is A Movie")]
+    [InlineData("We Are the Movie!.2013.720p.H264.mkv", "We Are the Movie!")]
+    [InlineData("(500).Days.Of.Movie.(2009).DTS.1080p.BluRay.x264.NLsubs", "(500) Days Of Movie")]
+    [InlineData("To.Live.and.Movie.in.L.A.1985.1080p.BluRay", "To Live and Movie in L.A.")]
+    [InlineData("A.I.Artificial.Movie.(2001)", "A.I. Artificial Movie")]
+    [InlineData("A.Movie.Name.(1998)", "A Movie Name")]
+    [InlineData("www.Torrenting.com - Movie.2008.720p.X264-DIMENSION", "Movie")]
+    [InlineData("www.5MovieRulz.tc - Movie (2000) Malayalam HQ HDRip - x264 - AAC - 700MB.mkv", "Movie")]
+    [InlineData("Movie: The Movie World 2013", "Movie: The Movie World")]
+    [InlineData("Movie.The.Final.Chapter.2016", "Movie The Final Chapter")]
+    [InlineData("Der.Movie.James.German.Bluray.FuckYou.Pso.Why.cant.you.follow.scene.rules.1998", "Der Movie James")]
+    [InlineData("Movie.German.DL.AC3.Dubbed..BluRay.x264-PsO", "Movie")]
+    [InlineData("Valana la Movie TRUEFRENCH BluRay 720p 2016 kjhlj", "Valana la Movie")]
+    [InlineData("Mission Movie: Rogue Movie (2015)�[XviD - Ita Ac3 - SoftSub Ita]azione, spionaggio, thriller *Prima Visione* Team mulnic Tom Cruise", "Mission Movie: Rogue Movie")]
+    [InlineData("Movie.Movie.2000.FRENCH..BluRay.-AiRLiNE", "Movie Movie")]
+    [InlineData("My Movie 1999 German Bluray", "My Movie")]
+    [InlineData("Leaving Movie by Movie (1897) [DVD].mp4", "Leaving Movie by Movie")]
+    [InlineData("Movie.2018.1080p.AMZN.WEB-DL.DD5.1.H.264-NTG", "Movie")]
+    [InlineData("Movie.Title.Imax.2018.1080p.AMZN.WEB-DL.DD5.1.H.264-NTG", "Movie Title")]
+    [InlineData("World.Movie.Z.EXTENDED.2013.German.DL.1080p.BluRay.AVC-XANOR", "World Movie Z")]
+    [InlineData("World.Movie.Z.2.EXTENDED.2013.German.DL.1080p.BluRay.AVC-XANOR", "World Movie Z 2")]
+    [InlineData("G.I.Movie.Movie.2013.THEATRiCAL.COMPLETE.BLURAY-GLiMMER", "G.I. Movie Movie")]
+    [InlineData("www.Torrenting.org - Movie.2008.720p.X264-DIMENSION", "Movie")]
+    [InlineData("The.French.Movie.2013.720p.BluRay.x264 - ROUGH[PublicHD]", "The French Movie")]
+    [InlineData("The.Good.German.2006.720p.BluRay.x264-RlsGrp", "The Good German")]
+    [InlineData("L'hypothèse.du.movie.volé.AKA.The.Hypothesis.of.the.Movie.Title.1978.1080p.CINET.WEB-DL.AAC2.0.x264-Cinefeel.mkv", "L'hypothèse du movie volé AKA The Hypothesis of the Movie Title")]
+    [InlineData("Skjegg.AKA.Rox.Beard.1965.CD1.CRiTERiON.DVDRip.XviD-KG.avi", "Skjegg AKA Rox Beard")]
+    [InlineData("Kjeller.chitai.AKA.Basement.of.Shame.1956.1080p.BluRay.x264.FLAC.1.0.mkv", "Kjeller chitai AKA Basement of Shame")]
+    [InlineData("Radarr.Under.Water.(aka.Beneath.the.Code.Freeze).1997.DVDRip.x264.CG-Grzechsin.mkv", "Radarr Under Water (aka Beneath the Code Freeze)")]
+    [InlineData("Radarr.prodavet. AKA.Radarr.Shift.2005.DVDRip.x264-HANDJOB.mkv", "Radarr prodavet  AKA Radarr Shift")]
+    [InlineData("AKA.2002.DVDRip.x264-HANDJOB.mkv", "AKA")]
+    [InlineData("KillRoyWasHere.2000.BluRay.1080p.DTS.x264.dxva-EuReKA.mkv", "KillRoyWasHere")]
+    [InlineData("Aka Rox (2008).avi", "Aka Rox")]
+    [InlineData("Return Earth to Normal 'em High aka World 2 (2022) 1080p.mp4", "Return Earth to Normal 'em High aka World 2")]
+    [InlineData("Енола Голмс / Enola Holmes (2020) UHD WEB-DL 2160p 4K HDR H.265 Ukr/Eng | Sub Ukr/Eng", "Енола Голмс / Enola Holmes")]
+    [InlineData("Mon cousin a.k.a. My Cousin 2020 1080p Blu-ray DD 5.1 x264.mkv", "Mon cousin AKA My Cousin")]
+    [InlineData("Sydney A.K.A. Hard Eight 1996 1080p AMZN WEB-DL DD+ 2.0 H.264.mkv", "Sydney AKA Hard Eight")]
+    public void Parses_movie_title(string release, string title)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("Title", title, parsed?.Title)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("The.Movie.from.U.N.C.L.E.2015.1080p.BluRay.x264-SPARKS", "The Movie from U.N.C.L.E.")]
+    [InlineData("1776.1979.EXTENDED.720p.BluRay.X264-AMIABLE", "1776")]
+    [InlineData("MY MOVIE (2016) [R][Action, Horror][720p.WEB-DL.AVC.8Bit.6ch.AC3].mkv", "MY MOVIE")]
+    [InlineData("R.I.P.D.2013.720p.BluRay.x264-SPARKS", "R.I.P.D.")]
+    [InlineData("V.H.S.2.2013.LIMITED.720p.BluRay.x264-GECKOS", "V.H.S. 2")]
+    [InlineData("This Is A Movie (1999) [IMDB #] <Genre, Genre, Genre> {ACTORS} !DIRECTOR +MORE_SILLY_STUFF_NO_ONE_NEEDS ?", "This Is A Movie")]
+    [InlineData("We Are the Movie!.2013.720p.H264.mkv", "We Are the Movie!")]
+    [InlineData("(500).Days.Of.Movie.(2009).DTS.1080p.BluRay.x264.NLsubs", "(500) Days Of Movie")]
+    [InlineData("To.Live.and.Movie.in.L.A.1985.1080p.BluRay", "To Live and Movie in L.A.")]
+    [InlineData("A.I.Artificial.Movie.(2001)", "A.I. Artificial Movie")]
+    [InlineData("A.Movie.Name.(1998)", "A Movie Name")]
+    [InlineData("www.Torrenting.com - Movie.2008.720p.X264-DIMENSION", "Movie")]
+    [InlineData("www.5MovieRulz.tc - Movie (2000) Malayalam HQ HDRip - x264 - AAC - 700MB.mkv", "Movie")]
+    [InlineData("Movie: The Movie World 2013", "Movie: The Movie World")]
+    [InlineData("Movie.The.Final.Chapter.2016", "Movie The Final Chapter")]
+    [InlineData("Der.Movie.James.German.Bluray.FuckYou.Pso.Why.cant.you.follow.scene.rules.1998", "Der Movie James")]
+    [InlineData("Movie.German.DL.AC3.Dubbed..BluRay.x264-PsO", "Movie")]
+    [InlineData("Valana la Movie TRUEFRENCH BluRay 720p 2016 kjhlj", "Valana la Movie")]
+    [InlineData("Mission Movie: Rogue Movie (2015)�[XviD - Ita Ac3 - SoftSub Ita]azione, spionaggio, thriller *Prima Visione* Team mulnic Tom Cruise", "Mission Movie: Rogue Movie")]
+    [InlineData("Movie.Movie.2000.FRENCH..BluRay.-AiRLiNE", "Movie Movie")]
+    [InlineData("My Movie 1999 German Bluray", "My Movie")]
+    [InlineData("Leaving Movie by Movie (1897) [DVD].mp4", "Leaving Movie by Movie")]
+    [InlineData("Movie.2018.1080p.AMZN.WEB-DL.DD5.1.H.264-NTG", "Movie")]
+    [InlineData("Movie.Title.Imax.2018.1080p.AMZN.WEB-DL.DD5.1.H.264-NTG", "Movie Title")]
+    [InlineData("World.Movie.Z.EXTENDED.2013.German.DL.1080p.BluRay.AVC-XANOR", "World Movie Z")]
+    [InlineData("World.Movie.Z.2.EXTENDED.2013.German.DL.1080p.BluRay.AVC-XANOR", "World Movie Z 2")]
+    [InlineData("G.I.Movie.Movie.2013.THEATRiCAL.COMPLETE.BLURAY-GLiMMER", "G.I. Movie Movie")]
+    [InlineData("www.Torrenting.org - Movie.2008.720p.X264-DIMENSION", "Movie")]
+    [InlineData("The.French.Movie.2013.720p.BluRay.x264 - ROUGH[PublicHD]", "The French Movie")]
+    [InlineData("The.Good.German.2006.720p.BluRay.x264-RlsGrp", "The Good German")]
+    [InlineData("L'hypothèse.du.movie.volé.AKA.The.Hypothesis.of.the.Movie.Title.1978.1080p.CINET.WEB-DL.AAC2.0.x264-Cinefeel.mkv", "L'hypothèse du movie volé AKA The Hypothesis of the Movie Title")]
+    [InlineData("Skjegg.AKA.Rox.Beard.1965.CD1.CRiTERiON.DVDRip.XviD-KG.avi", "Skjegg AKA Rox Beard")]
+    [InlineData("Kjeller.chitai.AKA.Basement.of.Shame.1956.1080p.BluRay.x264.FLAC.1.0.mkv", "Kjeller chitai AKA Basement of Shame")]
+    [InlineData("Radarr.Under.Water.(aka.Beneath.the.Code.Freeze).1997.DVDRip.x264.CG-Grzechsin.mkv", "Radarr Under Water (aka Beneath the Code Freeze)")]
+    [InlineData("Radarr.prodavet. AKA.Radarr.Shift.2005.DVDRip.x264-HANDJOB.mkv", "Radarr prodavet  AKA Radarr Shift")]
+    [InlineData("AKA.2002.DVDRip.x264-HANDJOB.mkv", "AKA")]
+    [InlineData("KillRoyWasHere.2000.BluRay.1080p.DTS.x264.dxva-EuReKA.mkv", "KillRoyWasHere")]
+    [InlineData("Aka Rox (2008).avi", "Aka Rox")]
+    [InlineData("Return Earth to Normal 'em High aka World 2 (2022) 1080p.mp4", "Return Earth to Normal 'em High aka World 2")]
+    [InlineData("Енола Голмс / Enola Holmes (2020) UHD WEB-DL 2160p 4K HDR H.265 Ukr/Eng | Sub Ukr/Eng", "Енола Голмс / Enola Holmes")]
+    [InlineData("Mon cousin a.k.a. My Cousin 2020 1080p Blu-ray DD 5.1 x264.mkv", "Mon cousin AKA My Cousin")]
+    [InlineData("Sydney A.K.A. Hard Eight 1996 1080p AMZN WEB-DL DD+ 2.0 H.264.mkv", "Sydney AKA Hard Eight")]
+    public void Parse_picks_the_movie_path_for_movie_names(string release, string title)
+    {
+        var parsed = ReleaseParser.Parse(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("Title", title, parsed?.Title)
+            .Equal("IsEpisode", false, parsed?.IsEpisode)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("Movie.Title.3.2017.720p.TSRip.x264.AAC-Ozlem")]
+    [InlineData("Movie: Title (2024) TeleSynch 720p | HEVC-FILVOVAN")]
+    [InlineData("Movie Name 2018 NEW PROPER 720p HD-CAM X264 HQ-CPG")]
+    [InlineData("Movie Name (2022) 1080p HQCAM ENG x264 AAC - QRips")]
+    [InlineData("Movie Name (2018) 720p Hindi HQ CAMrip x264 AAC 1.4GB")]
+    [InlineData("Movie Name (2022) New HDCAMRip 1080p [Love Rulz]")]
+    [InlineData("Movie.Name.2024.NEWCAM.1080p.HEVC.AC3.English-RypS")]
+    [InlineData("The.Third.Movie Name.2008.DVDRip.360p.H264 iPod -20-40")]
+    [InlineData("SomeMovie.2018.DVDRip.ts")]
+    [InlineData("Some.Movie.Magic.Rainbow.2007.DVD5.NTSC")]
+    [InlineData("Some.Movie.Magic.Rainbow.2007.DVD9.NTSC")]
+    [InlineData("Some.Movie.Magic.Rainbow.2007.DVDR.NTSC")]
+    [InlineData("Some.Movie.Magic.Rainbow.2007.DVD-R.NTSC")]
+    [InlineData("Some.Movie.2020.PAL.2xDVD9")]
+    [InlineData("Some.Movie.2000.2DVD5")]
+    [InlineData("Some.Movie.2005.PAL.MDVDR-SOMegRoUP")]
+    [InlineData("[HorribleSubs] Movie Title! 2018 [Web][MKV][h264][480p][AAC 2.0][Softsubs (HorribleSubs)]")]
+    [InlineData("Movie.Name.2011.LIMITED.BluRay.360p.H264-20-40")]
+    [InlineData("Movie.Name.2011.BluRay.480i.DD.2.0.AVC.REMUX-FraMeSToR")]
+    [InlineData("Movie.Name.2011.480i.DD.2.0.AVC.REMUX-FraMeSToR")]
+    [InlineData("Movie.Name.2020.1080i.HDTV.DD5.1.H.264-NOGRP")]
+    [InlineData("[HorribleSubs] Movie Title! 2018 [Web][MKV][h264][720p][AAC 2.0][Softsubs (HorribleSubs)]")]
+    [InlineData("[HorribleSubs] Movie Title! 2018 [Web][MKV][h264][AAC 2.0][Softsubs (HorribleSubs)]")]
+    [InlineData("Movie.Title.2013.960p.WEB-DL.AAC2.0.H.264-squalor")]
+    [InlineData("Movie.Title.2021.DP.WEB.720p.DDP.5.1.H.264.PLEX")]
+    [InlineData("The.Movie.Name.2017.1080p.WEB-DL.DD5.1.H.264.Remux.-NTb")]
+    [InlineData("Movie.Name.2019.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTG")]
+    [InlineData("Movie.Name.2020.1080p.AMZN.WEB...")]
+    [InlineData("Movie.Name.2020.1080p.AMZN.WEB.")]
+    [InlineData("Movie Title - 2020 1080p Viva MKV WEB")]
+    [InlineData("[HorribleSubs] Movie Title! 2018 [Web][MKV][h264][1080p][AAC 2.0][Softsubs (HorribleSubs)]")]
+    [InlineData("Movie.Titles.2020.1080p.NF.WEB.DD2.0.x264-SNEAkY")]
+    [InlineData("The.Movie.2022.NORDiC.1080p.DV.HDR.WEB.H 265-NiDHUG")]
+    [InlineData("Movie Title 2018 [WEB 1080p HEVC Opus] [Netaro]")]
+    [InlineData("Movie Title 2018 (WEB 1080p HEVC Opus) [Netaro]")]
+    [InlineData("Movie.Title.2024.German.Dubbed.DL.AAC.1080p.WEB.AVC-GROUP")]
+    [InlineData("Movie.Title.2019.1080p.AMZN.WEB-Rip.DDP.5.1.HEVC")]
+    [InlineData("[HorribleSubs] Movie Title! 2018 [Web][MKV][h264][2160p][AAC 2.0][Softsubs (HorribleSubs)]")]
+    [InlineData("Movie Name 2020 WEB-DL 4K H265 10bit HDR DDP5.1 Atmos-PTerWEB")]
+    [InlineData("The.Movie.2022.NORDiC.2160p.DV.HDR.WEB.H.265-NiDHUG")]
+    [InlineData("Movie.Name.2024.German.Dubbed.DL.AAC.2160p.DV.HDR.WEB.HEVC-GROUP")]
+    [InlineData("Movie.Name.2024.German.AC3D.DL.2160p.Hybrid.WEB.DV.HDR10Plus.HEVC-GROUP")]
+    [InlineData("Movie.Name.2024.German.Atmos.Dubbed.DL.2160p.Hybrid.WEB.DV.HDR10Plus.HEVC-GROUP")]
+    [InlineData("Movie.Name.2024.German.EAC3D.DL.2160p.Hybrid.WEB.DV.HDR10Plus.HEVC-GROUP")]
+    [InlineData("Movie.Name.2016.2018.720p.MBluRay.x264-CRUELTY.mkv")]
+    [InlineData("Movie.Name.2019.720p.MBLURAY.x264-MBLURAYFANS.mkv")]
+    [InlineData("Movie.Name2017.720p.MBluRay.x264-TREBLE.mkv")]
+    [InlineData("Movie.Hunter.2018.720p.Blu-ray.Remux.AVC.FLAC.2.0-SiCFoI")]
+    [InlineData("Movie.Name.2011.720p.DD.2.0.AVC.REMUX-FraMeSToR")]
+    [InlineData("Movie.Name.2016.2018.1080p.MBluRay.x264-CRUELTY.mkv")]
+    [InlineData("Movie.Name.2019.1080p.MBLURAY.x264-MBLURAYFANS.mkv")]
+    [InlineData("Movie.Name2017.1080p.MBluRay.x264-TREBLE.mkv")]
+    [InlineData("Movie Name 2005 1080p UHD BluRay DD+7.1 x264-LoRD.mkv")]
+    [InlineData("Movie.Name.2011.1080p.UHD.BluRay.DD5.1.HDR.x265-CtrlHD.mkv")]
+    [InlineData("Movie.Name.2016.German.DTS.DL.1080p.UHDBD.x265-TDO.mkv")]
+    [InlineData("Movie.Name.2021.1080p.BDLight.x265-AVCDVD")]
+    [InlineData("Movie.Title.2012.German.DL.1080p.UHD2BD.x264-QfG")]
+    [InlineData("Movie.Title.2005.1080p.HDDVDRip.x264")]
+    [InlineData("Movie.Title.2019.German.DL.1080p.HDR.UHDBDRip.AV1-GROUP")]
+    [InlineData("Movie.Title.2014.German.OPUS.DL.1080p.UHDBDRiP.HDR.AV1-GROUP")]
+    [InlineData("Movie.Title.1999.German.DL.1080p.HDR.UHDBDRip.AV1-GROUP")]
+    [InlineData("Movie.Title.1993.Uncut.German.DL.1080p.HDR.UHDBDRip.h265-GROUP")]
+    [InlineData("Movie.Title.2016.2018.2160p.MBluRay.x264-CRUELTY.mkv")]
+    [InlineData("Movie.Title.2019.2160p.MBLURAY.x264-MBLURAYFANS.mkv")]
+    [InlineData("Movie.Title.2017.2160p.MBluRay.x264-TREBLE.mkv")]
+    [InlineData("Movie.Name.2020.German.UHDBD.2160p.HDR10.HEVC.EAC3.DL-pmHD.mkv")]
+    [InlineData("Movie.Title.2014.2160p.UHD.BluRay.X265-IAMABLE.mkv")]
+    [InlineData("Movie.Title.2014.2160p.BDRip.AAC.7.1.HDR10.x265.10bit-Markll")]
+    [InlineData("Movie.Title.1956.German.DL.2160p.HDR.UHDBDRip.h266-GROUP")]
+    [InlineData("Movie.Title.2021.4K.HDR.2160P.UHDBDRip.HEVC-10bit.GROUP")]
+    [InlineData("Movie.Name.2004.576p.BDRip.x264-HANDJOB")]
+    [InlineData("Movie.1993.720p.BluRay.REMUX.AVC.FLAC.2.0-BLURANiUM")]
+    [InlineData("Movie.Title.2016.REMUX.1080p.BluRay.AVC.DTS-HD.MA.5.1-iFT")]
+    [InlineData("Movie.Name.2008.REMUX.1080p.Bluray.AVC.DTS-HR.MA.5.1-LEGi0N")]
+    [InlineData("Movie.Name.2008.BDREMUX.1080p.Bluray.AVC.DTS-HR.MA.5.1-LEGi0N")]
+    [InlineData("Movie.Title.M.2008.USA.BluRay.Remux.1080p.MPEG-2.DD.5.1-TDD")]
+    [InlineData("Movie.Title.2018.1080p.BluRay.REMUX.MPEG-2.DTS-HD.MA.5.1-EPSiLON")]
+    [InlineData("Movie.Title.II.2003.4K.BluRay.Remux.1080p.AVC.DTS-HD.MA.5.1-BMF")]
+    [InlineData("Movie Title 2022 (BDRemux 1080p HEVC FLAC) [Netaro]")]
+    [InlineData("[Vodes] Movie Title - Other Title (2020) [BDRemux 1080p HEVC Dual-Audio]")]
+    [InlineData("This.Wonderful.Movie.1991.German.ML.1080p.BluRay.AVC-GeRMaNSCeNEGRoUP")]
+    [InlineData("Movie.Name.2011.1080p.DD.2.0.AVC.REMUX-FraMeSToR")]
+    [InlineData("Movie Name 2018 1080p BluRay Hybrid-REMUX AVC TRUEHD 5.1 Dual Audio-ZR-")]
+    [InlineData("Movie.Name.2018.1080p.BluRay.Hybrid-REMUX.AVC.TRUEHD.5.1.Dual.Audio-ZR-")]
+    [InlineData("Movie.Title.2016.REMUX.2160p.BluRay.AVC.DTS-HD.MA.5.1-iFT")]
+    [InlineData("Movie.Name.2008.REMUX.2160p.Bluray.AVC.DTS-HR.MA.5.1-LEGi0N")]
+    [InlineData("Movie.Title.1980.2160p.UHD.BluRay.Remux.HDR.HEVC.DTS-HD.MA.5.1-PmP.mkv")]
+    [InlineData("Movie.Title.2016.T1.UHDRemux.2160p.HEVC.Dual.AC3.5.1-TrueHD.5.1.Sub")]
+    [InlineData("Movie.Name.2020.German.UHDBD.2160p.HDR10.HEVC.EAC3.DL.Remux-pmHD.mkv")]
+    [InlineData("Movie Name (2021) [Remux-2160p x265 HDR 10-BIT DTS-HD MA 7.1]-FraMeSToR.mkv")]
+    [InlineData("This.Wonderful.Movie.1991.German.ML.2160p.BluRay.HEVC-GeRMaNSCeNEGRoUP")]
+    [InlineData("Movie.Name.2011.2160p.DD.2.0.AVC.REMUX-FraMeSToR")]
+    [InlineData("Movie Name 2018 2160p BluRay Hybrid-REMUX AVC TRUEHD 5.1 Dual Audio-ZR-")]
+    [InlineData("Movie.Name.2018.2160p.BluRay.Hybrid-REMUX.AVC.TRUEHD.5.1.Dual.Audio-ZR-")]
+    [InlineData("Movie.Title.2013.BDISO")]
+    [InlineData("Movie.Title.2005.MULTi.COMPLETE.BLURAY-VLS")]
+    [InlineData("Movie Name (2012) Bluray ISO [USENET-TURK]")]
+    [InlineData("Movie Name.1993..BD25.ISO")]
+    [InlineData("Movie.Title.2012.Bluray.1080p.3D.AVC.DTS-HD.MA.5.1.iso")]
+    [InlineData("Movie.Title.1996.Bluray.ISO")]
+    [InlineData("Random.Title.2010.1080p.HD.DVD.AVC.DDP.5.1-GRouP")]
+    [InlineData("Movie Title 2005 1080p USA Blu-ray AVC DTS-HD MA 5.1-PTP")]
+    [InlineData("Movie Title 2014 1080p Blu-ray AVC DTS-HD MA 5.1-PTP")]
+    [InlineData("Movie Title 1976 2160p UHD Blu-ray DTS-HD MA 5.1 DV HDR HEVC-UNTOUCHED")]
+    [InlineData("Movie Title 2004 1080p FRA Blu-ray VC-1 TrueHD 5.1-HDBEE")]
+    [InlineData("BD25.Movie.Title.1994.1080p.DTS-HD")]
+    [InlineData("Movie.Title.1997.1080p.NL.BD-50")]
+    [InlineData("Movie Title 2009 3D BD 2009 UNTOUCHED")]
+    [InlineData("Movie.Title.1982.1080p.HD.DVD.VC-1.DD+.5.1")]
+    [InlineData("Movie.Title.2007.1080p.HD.DVD.DD+.AVC")]
+    [InlineData("Movie.Title.2008.1080i.XXX.Blu-ray.MPEG-2.LPCM2.0.ISO")]
+    [InlineData("Movie.Title.2008.BONUS.GERMAN.SUBBED.COMPLETE.BLURAY")]
+    [InlineData("The German 2021 Bluray AVC")]
+    [InlineData("German.Only.Movie.2021.French.1080p.BluRay.AVC-UNTAVC")]
+    [InlineData("Movie.Title.2008.US.Directors.Cut.UHD.BD66.Blu-ray")]
+    [InlineData("Movie.2009.Blu.ray.AVC.DTS.HD.MA.5.1")]
+    [InlineData("[BD]Movie.Title.2008.2023.1080p.COMPLETE.BLURAY-RlsGrp")]
+    [InlineData("Movie.Title.2015.Open.Matte.1080i.HDTV.DD5.1.MPEG2")]
+    [InlineData("Movie.Title.2009.1080i.HDTV.AAC2.0.MPEG2-PepelefuF")]
+    [InlineData("Movie - 2018 [HDTV-1080p]")]
+    [InlineData("Movie.Title.2018.Bluray720p")]
+    [InlineData("Movie.Title.2018.Bluray1080p")]
+    [InlineData("Movie.Title.2018.Bluray2160p")]
+    [InlineData("Movie.Title.2018.848x480.dvd")]
+    [InlineData("Movie.Title.2018.848x480.Bluray")]
+    [InlineData("Movie.Title.2018.1280x720.Bluray")]
+    [InlineData("Movie.Title.2018.1920x1080.Bluray")]
+    [InlineData("Movie.Title.2018.848x480")]
+    [InlineData("Movie.Title.2018.1280x720")]
+    [InlineData("Movie.Title.2018.1920x1080")]
+    [InlineData("Movie Title 2018 REPACK 720p HDTV x264 aAF")]
+    [InlineData("Movie.Title.2018.REPACK.720p.HDTV.x264-aAF")]
+    [InlineData("Movie.Title.2018.REPACK2.720p.HDTV.x264-aAF")]
+    [InlineData("Movie.Title.2018.PROPER.720p.HDTV.x264-aAF")]
+    [InlineData("Movie.Title.2018.RERIP.720p.BluRay.x264-DEMAND")]
+    [InlineData("Movie.Title.2018.RERIP2.720p.BluRay.x264-DEMAND")]
+    [InlineData("Movie.Title.1994.English.1080p.XviD-LOL")]
+    [InlineData("Movie Title 1994 Eng 1080p XviD-GROUP")]
+    [InlineData("Movie Title 1994 EN 1080p XviD-GROUP")]
+    [InlineData("The Danish Movie 2015")]
+    [InlineData("Movie.Title.2018.2160p.WEBRip.x265.10bit.HDR.DD5.1-GASMASK")]
+    [InlineData("Movie.Title.2010.720p.BluRay.x264.-[YTS.LT]")]
+    [InlineData("Movie.Title.2010.SUBFRENCH.1080p.WEB.x264-GROUP")]
+    [InlineData("Movie.Title.2010.En.1080p.WEB.x264-GROUP")]
+    [InlineData("Movie Title - 2022.en.sub")]
+    [InlineData("Movie Title - 2022.EN.sub")]
+    [InlineData("Movie Title - 2022.eng.sub")]
+    [InlineData("Movie Title - 2022.ENG.sub")]
+    [InlineData("Movie Title - 2022.English.sub")]
+    [InlineData("Movie Title - 2022.english.sub")]
+    [InlineData("Movie Title - 2022.en.cc.sub")]
+    [InlineData("Movie Title - 2022.en.sdh.sub")]
+    [InlineData("Movie Title - 2022.en.forced.sub")]
+    [InlineData("Movie Title - 2022.en.sdh.forced.sub")]
+    [InlineData("Movie.Title.1994.French.1080p.XviD-LOL")]
+    [InlineData("Movie Title : Other Title 2011 AVC.1080p.Blu-ray HD.VOSTFR.VFF")]
+    [InlineData("Movie Title - Other Title 2011 Bluray 4k HDR HEVC AC3 VFF")]
+    [InlineData("Movie Title  2019 AVC.1080p.Blu-ray Remux HD.VOSTFR.VFF")]
+    [InlineData("Movie Title  : Other Title 2010 x264.720p.Blu-ray Rip HD.VOSTFR.VFF. ONLY")]
+    [InlineData("Movie Title  2019 HEVC.2160p.Blu-ray 4K.VOSTFR.VFF. JATO")]
+    [InlineData("Movie.Title.1956.MULTi.VF.Bluray.1080p.REMUX.AC3.x264")]
+    [InlineData("Movie.Title.2016.ENG-ITA-FRA.AAC.1080p.WebDL.x264")]
+    [InlineData("Movie Title 2016 (BDrip 1080p ENG-ITA-FRA) Multisub x264")]
+    [InlineData("Movie.Title.2016.ENG-ITA-FRE.AAC.1080p.WebDL.x264")]
+    [InlineData("Movie Title 2016 (BDrip 1080p ENG-ITA-FRE) Multisub x264")]
+    [InlineData("Movie 1990 1080p Eng Fra [mkvonly]")]
+    [InlineData("Movie Directory 25 Anniversary 1990 Eng Fre Multi Subs 720p [H264 mp4]")]
+    [InlineData("Movie.Title.1994.Spanish.1080p.XviD-LOL")]
+    [InlineData("Movie Title (2020)[BDRemux AVC 1080p][E-AC3 DD Plus 5.1 Castellano-Inglés Subs]")]
+    [InlineData("Movie Title (2020) [UHDRemux2160p HDR][DTS-HD MA 5.1 AC3 5.1 Castellano - True-HD 7.1 Atmos Inglés Subs]")]
+    [InlineData("Movie Title (2016) [UHDRemux 2160p SDR] [Castellano DD 5.1 - Inglés DTS-HD MA 5.1 Subs]")]
+    [InlineData("Movie Title 2022 [HDTV 720p][Cap.101][AC3 5.1 Castellano][www.pctnew.ORG]")]
+    [InlineData("Movie Title 2022 [HDTV 720p][Cap.206][AC3 5.1 Español Castellano]")]
+    [InlineData("Movie Title 2022 [Remux-1080p 8-bit h264 DTS-HD MA 2.0][ES.EN]-HiFi")]
+    [InlineData("Movie Title 2022 [BDRemux 1080p AVC ES DTS-HD MA 5.1 Subs][HDO].mkv")]
+    [InlineData("Movie.Name.2022.BluRay.1080p.H264.DTS[EN+ES].[EN+ES+IT]")]
+    [InlineData("Movie.Title.1994.German.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.2016.GERMAN.DUBBED.WS.WEBRiP.XviD.REPACK-TVP")]
+    [InlineData("Movie Title 2016 - Kampfhaehne - mkv - by Videomann")]
+    [InlineData("Movie.Title.2016.Ger.Dub.AAC.1080p.WebDL.x264-TKP21")]
+    [InlineData("Movie.Title.2016.Ger.AAC.1080p.WebDL.x264-TKP21")]
+    [InlineData("Movie.Title.2016.1080p.10Bit.HEVC.WEBRip.HIN-ENG-GER.DD5.1.H.265")]
+    [InlineData("Movie.Title.2016.HU-IT-DE.AAC.1080p.WebDL.x264")]
+    [InlineData("Movie.Title.2016.SwissGerman.WEB-DL.h264-RlsGrp")]
+    [InlineData("Movie.Title.1994.Italian.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.2016.ENG-FRE-ITA.AAC.1080p.WebDL.x264")]
+    [InlineData("Movie Title 2016 (BDrip 1080p ENG-FRE-ITA) Multisub x264")]
+    [InlineData("Movie.Title.1994.Danish.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Dutch.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Japanese.1080p.XviD-LOL")]
+    [InlineData("Movie.Title (1988) 2160p HDR 5.1 Eng - Jap x265 10bit")]
+    [InlineData("Movie Title (1985) (1080p.AC3 ITA-ENG-JAP)")]
+    [InlineData("Movie.Title.1994.Icelandic.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Chinese.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Russian.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.2020.WEB-DLRip.AVC.AC3.EN.RU.ENSub.RUSub-LOL")]
+    [InlineData("Movie Title (2020) WEB-DL (720p) Rus-Eng")]
+    [InlineData("Movie.Title.1994.Romanian.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.1080p.XviD.RoDubbed-LOL")]
+    [InlineData("Movie.Title.1994.Hindi.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Thai.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Bulgarian.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.BGAUDIO.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.BG.AUDIO.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Dublado.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.2.2019.1080p.Bluray.Dublado.WWW.TPF.GRATIS")]
+    [InlineData("Movie.Title.2014.1080p.Bluray.Brazilian.WWW.TPF.GRATIS")]
+    [InlineData("Movie.Title.2014.1080p.AMZN.WEB-DL.DDP2.0.H.264.pt-BR.ENG-LCD")]
+    [InlineData("Movie.Title.1994.Polish.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PL.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PLDUB.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.DUBPL.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PL-DUB.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.DUB-PL.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PLLEK.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.LEKPL.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PL-LEK.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PL-SUB.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.PLSUB.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.SUB-PL.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Vietnamese.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.VIE.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Swedish.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Norwegian.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Finnish.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Turkish.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Portuguese.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Flemish.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Greek.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Korean.1080p.XviD-LOL")]
+    [InlineData("Movie Title [2006] BDRip 720p [Kor Rus] GROUP")]
+    [InlineData("Movie.Title.2019.KOR.1080p.HDRip.H264.AAC-GROUP")]
+    [InlineData("Movie.Title.1994.Hungarian.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.Hebrew.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.1994.1080p.BluRay.HebDubbed.Also.English.x264-P2P")]
+    [InlineData("Movie.Title.1994.AC3.LT.EN-CNN")]
+    [InlineData("Movie.Title.1994.CZ.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.2019.ARABIC.WEBRip.x264-VXT")]
+    [InlineData("Movie.Title [1989, BDRip] MVO + DVO + UKR (MVO) + Sub")]
+    [InlineData("Movie.Title (2006) BDRemux 1080p 2xUkr | Sub Ukr")]
+    [InlineData("Movie.Title [1984, BDRip 720p] MVO + MVO + Dub + AVO + 3xUkr")]
+    [InlineData("Movie.Title.2019.UKRAINIAN.WEBRip.x264-VXT")]
+    [InlineData("Movie.Title.2019.PERSIAN.WEBRip.x264-VXT")]
+    [InlineData("Movie.Title.2019.BENGALI.WEBRip.x264-VXT")]
+    [InlineData("Movie Title (2018) Telugu DVDScr X264 AAC 700 MB")]
+    [InlineData("Movie.Title.2022.Tel.WEBRip.x264-VXT")]
+    [InlineData("Movie Title (2019) Proper HDRip - 720p - x264 - HQ Line Auds - [Telugu + Tamil + Hindi + English] - 1.1GB")]
+    [InlineData("Movie.Title.1994.HDTV.x264.SK-iCZi")]
+    [InlineData("Movie.Title.2019.1080p.HDTV.x265.iNTERNAL.SK-iCZi")]
+    [InlineData("Movie.Title.2018.SLOVAK.DUAL.2160p.UHD.BluRay.x265-iCZi")]
+    [InlineData("Movie.Title.1990.SLOVAK.HDTV.x264-iCZi")]
+    [InlineData("Movie.Title.2022.LV.WEBRip.XviD-LOL")]
+    [InlineData("Movie.Title.2022.lv.WEBRip.XviD-LOL")]
+    [InlineData("Movie.Title.2022.LATVIAN.WEBRip.XviD-LOL")]
+    [InlineData("Movie.Title.2022.Latvian.WEBRip.XviD-LOL")]
+    [InlineData("Movie.Title.2022.1080p.WEB-DL.DDP5.1.Atmos.H.264.Lat.Eng")]
+    [InlineData("Movie.Title.2022.1080p.WEB-DL.LAV.RUS-NPPK")]
+    [InlineData("Movie.Title.2019.720p_Eng-Spa(Latino)_MovieClubMx")]
+    [InlineData("Movie.Title.1994.Catalan.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.2024.Catalán.1080p.XviD-LOL")]
+    [InlineData("Movie.Title.(2024).(Catala.Spanish.Subs).WEBRip.1080p.x264-EAC3")]
+    [InlineData("Movie.Title.(2024).(Spanish.Catala.English.Subs).BDRip.1080p.x264-EAC3")]
+    [InlineData("Movie Title [2024] [BDrip 1080p-x264-AC3 5.1 català-español-english+sub]")]
+    [InlineData("Movie Title (2024) Malayalam BRRip 1080p x264 DTS 5.1 E-subs-MBRHDRG")]
+    [InlineData("Movie.Title.2024.Malayalam.1080p.AMZN.WEB-DL.DD+5.1.H.264-Shadow.BonsaiHD")]
+    [InlineData("Movie.Title.2024.2160p.Malayalam.WEB-DL.H.265.SDR.DDP5.1-NbT")]
+    [InlineData("Movie Title (2024) Kannada 1080p HD AVC MP4 x264 .9.8GB TEAMTR")]
+    [InlineData("Movie.Title.2024.Kannada.1080p.AMZN.WEB-DL.DD+2.0.x264-Telly")]
+    [InlineData("Movie Title (2024) Albanian 1080p HD AVC MP4 x264 .9.8GB TEAMTR")]
+    [InlineData("Movie.Title.2024.Albanian.1080p.AMZN.WEB-DL.DD+2.0.x264-Telly")]
+    [InlineData("Movie Title (2024) Afrikaans 1080p HD AVC MP4 x264 .9.8GB TEAMTR")]
+    [InlineData("Movie.Title.2024.Afrikaans.1080p.AMZN.WEB-DL.DD+2.0.x264-Telly")]
+    [InlineData("Movie Title 2015 Marathi 1080p WebRip x264 AC3 5.1 ESubs [TMB]")]
+    [InlineData("Movie.Title.(2018).720p.CensorRip.Marathi.x264.AAC.-.LHDm@Telly")]
+    [InlineData("Movie Title 2024 1080p Tagalog WEB-DL HEVC x265 BONE")]
+    [InlineData("Movie.Title.2022.720p.Tagalog.WEB-DL.AAC.x264-Mkvking")]
+    [InlineData("Movie Title 2024 1080p Urdu WEB-DL HEVC x265 BONE")]
+    [InlineData("Movie.Title.2022.720p.Urdu.WEB-DL.AAC.x264-Mkvking")]
+    [InlineData("The.Movie.Name.2016.Romansh.WEB-DL.h264-RlsGrp")]
+    [InlineData("The.Movie.Name.2016.Rumantsch.WEB.DL.h264-RlsGrp")]
+    [InlineData("The Movie Name 2016 Romansch WEB DL h264-RlsGrp")]
+    [InlineData("Movie.Title.2025.Mongolian.WEB-DL.h264")]
+    [InlineData("Movie.Title.2025.Khalkha.WEB-DL.h264")]
+    [InlineData("Movie.Title.1994.Georgian.WEB-DL.h264")]
+    [InlineData("Movie.Title.2016.Geo.WEB-DL.h264")]
+    [InlineData("Movie.Title.2016.KA.WEB-DL.h264")]
+    [InlineData("Movie.Title.2016.RU-KA.WEB-DL.h264")]
+    [InlineData("The.Movie.Name.2016.German.DTS.DL.720p.BluRay.x264-RlsGrp")]
+    [InlineData("The.Movie.Name.2016.GERMAN.WEB-DL.h264-RlsGrp")]
+    [InlineData("The.Movie.Name.2016.GERMAN.WEB.DL.h264-RlsGrp")]
+    [InlineData("The Movie Name 2016 GERMAN WEB DL h264-RlsGrp")]
+    [InlineData("The.Movie.Name.2016.GERMAN.WEBDL.h264-RlsGrp")]
+    [InlineData("Movie.Title.2025.Original.1080P.WEB.H264-RlsGrp")]
+    [InlineData("Movie.Title.2025.Orig.1080P.WEB.H264-RlsGrp")]
+    [InlineData("Movie Title 2025 [HEVC, HDR10, Dolby Vision, WEB-DL 2160p] [Hybrid] 3 XX + Original")]
+    [InlineData("The.Movie.Name.2023.German.ML.EAC3.720p.NF.WEB.H264-RlsGrp")]
+    [InlineData("Name (2020) - [AAC 2.0].testtitle.default.eng.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].eng.default.testtitle.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].default.eng.testtitle.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].testtitle.forced.eng.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].eng.forced.testtitle.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].forced.eng.testtitle.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].testtitle.default.fra.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].fra.default.testtitle.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].default.fra.testtitle.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].testtitle.forced.fra.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].fra.forced.testtitle.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].forced.fra.testtitle.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].default.forced.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].default.ass")]
+    [InlineData("Name (2020) - [AAC 2.0].ass")]
+    [InlineData("Name (2020) - [AAC 2.0].testtitle.ass")]
+    [InlineData("Movie.Name.2018.720p.WEBRip.DDP5.1.x264-NTb-postbot")]
+    [InlineData("Movie.Name.2018.720p.WEBRip.DDP5.1.x264-NTb-xpost")]
+    [InlineData("Some.Movie.2013.1080p.BluRay.REMUX.AVC.DTS-X.MA.5.1")]
+    [InlineData("Some.Movie.2013.1080p.BluRay.REMUX.AVC.DTS-MA.5.1")]
+    [InlineData("Movie.Name.2013.1080p.BluRay.REMUX.AVC.DTS-ES.MA.5.1")]
+    [InlineData("Some.Dead.Movie.2006.1080p.BluRay.DTS.x264.D-Z0N3")]
+    [InlineData("The.Movie.Title.2013.720p.BluRay.x264-ROUGH [PublicHD]")]
+    [InlineData("Some.Really.Bad.Movie.Title.[2021].1080p.WEB-HDRip.Dual.Audio.[Hindi.[Clean]. .English].x264.AAC.DD.2.0.By.Full4Movies.mkv-xpost")]
+    [InlineData("The.Movie.Title.2013.1080p.10bit.AMZN.WEB-DL.DDP5.1.HEVC-Vyndros")]
+    [InlineData("Movie.Name.2022.1080p.BluRay.x264-[YTS.AG]")]
+    [InlineData("Movie.Name.2022.1080p.BluRay.x264-VARYG")]
+    [InlineData("Movie Name (2017) [2160p REMUX] [HEVC DV HYBRID HDR10+ Dolby TrueHD Atmos 7 1 24-bit Audio English] [Data Lass]")]
+    [InlineData("Movie Name (2017) [2160p REMUX] [HEVC DV HYBRID HDR10+ Dolby TrueHD Atmos 7 1 24-bit Audio English]-DataLass")]
+    [InlineData("Movie Name (2017) (Showtime) (1080p.BD.DD5.1.x265-TheSickle[TAoE])")]
+    [InlineData("Movie Name (2003) (2160p BluRay X265 HEVC 10bit HDR AAC 7.1 Tigole) [QxR]")]
+    [InlineData("Ode To Joy (2009) (2160p BluRay x265 10bit HDR Joy)")]
+    [InlineData("Movie Name (2001) 1080p NF WEB-DL DDP2.0 x264-E.N.D")]
+    [InlineData("Movie Name (2020) [1080p] [WEBRip] [5.1] [YTS.MX]")]
+    [InlineData("Movie Name.2018.1080p.Blu-ray.Remux.AVC.DTS-HD.MA.5.1.KRaLiMaRKo")]
+    [InlineData("Ode To Joy (2009) (2160p BluRay x265 10bit HDR FreetheFish)")]
+    [InlineData("Ode To Joy (2009) (2160p BluRay x265 10bit HDR afm72)")]
+    [InlineData("Ode To Joy (2009) (2160p BluRay x265 10bit HDR)")]
+    [InlineData("Movie Name (2012) (1080p BluRay x265 HEVC 10bit AC3 2.0 Anna)")]
+    [InlineData("Movie Name (2019) (1080p BluRay x265 HEVC 10bit AAC 7.1 Q22 Joy)")]
+    [InlineData("Movie Name (2019) (2160p BluRay x265 HEVC 10bit HDR AAC 7.1 Bandi)")]
+    [InlineData("Movie Name (2009) (1080p HDTV x265 HEVC 10bit AAC 2.0 Ghost)")]
+    [InlineData("Movie Name in the Movie (2017) (1080p BluRay x265 HEVC 10bit AAC 7.1 Tigole)")]
+    [InlineData("Mission - Movie Name - Movie Protocol (2011) (1080p BluRay x265 HEVC 10bit AAC 7.1 Tigole)")]
+    [InlineData("Movie Name (1990) (1080p BluRay x265 HEVC 10bit AAC 5.1 Silence)")]
+    [InlineData("Happy Movie Name (1999) (1080p BluRay x265 HEVC 10bit AAC 5.1 Korean Kappa)")]
+    [InlineData("Movie Name (2007) Open Matte (1080p AMZN WEB-DL x265 HEVC 10bit AAC 5.1 MONOLITH)")]
+    [InlineData("Movie-Name (2019) (1080p BluRay x265 HEVC 10bit DTS 7.1 Qman)")]
+    [InlineData("Movie Name - Hell to Ticket (2018) + Extras (1080p BluRay x265 HEVC 10bit AAC 5.1 RZeroX)")]
+    [InlineData("Movie Name (2013) (Diamond Luxe Edition) + Extras (1080p BluRay x265 HEVC 10bit EAC3 7.1 SAMPA)")]
+    [InlineData("Movie Name 1984 (2020) (1080p AMZN WEB-DL x265 HEVC 10bit EAC3 5.1 Silence)")]
+    [InlineData("The.Movie.of.the.Name.1991.REMASTERED.720p.10bit.BluRay.6CH.x265.HEVC-PSA")]
+    [InlineData("Movie Name 2016 (1080p BluRay x265 HEVC 10bit DDP 5.1 theincognito)")]
+    [InlineData("Movie Name - A History of Movie (2017) (1080p AMZN WEB-DL x265 HEVC 10bit EAC3 2.0 t3nzin)")]
+    [InlineData("Movie Name (2019) (1080p BluRay x265 HEVC 10bit AAC 7.1 Vyndros)")]
+    [InlineData("Movie Name (2015) [BDRemux 1080p AVC ES-CAT-EN DTS-HD MA 5.1 Subs][HDO]")]
+    [InlineData("Movie Name (2015) [BDRemux 1080p AVC EN-CAT-ES DTS-HD MA 5.1 Subs][HDO]")]
+    [InlineData("Movie Name (2017) [BDRemux 1080p AVC ES DTS 5.1 - EN DTS-HD MA 7.1 Subs][HDO]")]
+    [InlineData("Movie Name (2006) [BDRemux 1080p AVC ES DTS-HD MA 2.0 - EN DTS-HD MA 5.1 Sub][HDO]")]
+    [InlineData("Movie Name (2015) [BDRemux 1080p AVC ES-CAT-EN DTS-HD MA 5.1 Subs]")]
+    [InlineData("Movie Name (2015) [BDRemux 1080p AVC EN-CAT-ES DTS-HD MA 5.1 Subs]")]
+    [InlineData("Movie Name (2015) [BDRemux 1080p AVC EN-ES-CAT DTS-HD MA 5.1 Subs]")]
+    [InlineData("Another Crappy Anime Movie Name 1999 [DusIctv] [Blu-ray][MKV][h264][1080p][DTS-HD MA 5.1][Dual Audio][Softsubs (DusIctv)")]
+    [InlineData("Another Crappy Anime Movie Name 1999 [DHD] [Blu-ray][MKV][h264][1080p][AAC 5.1][Dual Audio][Softsubs (DHD)]")]
+    [InlineData("Another Crappy Anime Movie Name 1999 [SEV] [Blu-ray][MKV][h265 10-bit][1080p][FLAC 5.1][Dual Audio][Softsubs (SEV)]")]
+    [InlineData("Another Crappy Anime Movie Name 1999 [CtrlHD] [Blu-ray][MKV][h264][720p][AC3 2.0][Dual Audio][Softsubs (CtrlHD)]")]
+    [InlineData("Crappy Anime Movie Name 2017 [-ZR-] [Blu-ray][MKV][h264][1080p][TrueHD 5.1][Dual Audio][Softsubs (-ZR-)]")]
+    [InlineData("Crappy Anime Movie Name 2017 [XZVN] [Blu-ray][MKV][h264][1080p][TrueHD 5.1][Dual Audio][Softsubs (XZVN)]")]
+    [InlineData("Crappy Anime Movie Name 2017 [ADC] [Blu-ray][M2TS (A)][16:9][h264][1080p][TrueHD 5.1][Dual Audio][Softsubs (ADC)]")]
+    [InlineData("Crappy Anime Movie Name 2017 [Koten_Gars] [Blu-ray][MKV][h264][1080p][TrueHD 5.1][Dual Audio][Softsubs (Koten_Gars)]")]
+    [InlineData("Crappy Anime Movie Name 2017 [RH] [Blu-ray][MKV][h264 10-bit][1080p][FLAC 5.1][Dual Audio][Softsubs (RH)]")]
+    [InlineData("Yet Another Anime Movie 2012 [Kametsu] [Blu-ray][MKV][h264 10-bit][1080p][FLAC 5.1][Dual Audio][Softsubs (Kametsu)]")]
+    [InlineData("Another.Anime.Film.Name.2016.JPN.Blu-Ray.Remux.AVC.DTS-MA.BluDragon")]
+    [InlineData("A Movie in the Name (1964) (1080p BluRay x265 r00t)")]
+    [InlineData("Movie Title (2022) (2160p ATV WEB-DL Hybrid H265 DV HDR DDP Atmos 5.1 English - HONE)")]
+    [InlineData("Movie Title (2009) (2160p PMTP WEB-DL Hybrid H265 DV HDR10+ DDP Atmos 5.1 English - HONE)")]
+    [InlineData("Movie Title (2022) (1080p PCOK WEB-DL H265 DV HDR DDP Atmos 5.1 English - GiLG)")]
+    [InlineData("Movie Title (2022) Extended (2160p PCOK WEB-DL H265 DV HDR DDP Atmos 5.1 English - GiLG)")]
+    [InlineData("Why.Cant.You.Use.Normal.Characters.2021.2160p.UHD.HDR10+.BluRay.TrueHD.Atmos.7.1.x265-ZØNEHD")]
+    [InlineData("Movie.Should.Not.Use.Dots.2022.1080p.BluRay.x265.10bit.Tigole)")]
+    [InlineData("Movie.Should.Not.Use.Dots.2022.1080p.BluRay.x265.10bit.Tigole")]
+    [InlineData("Movie.Title.2005.2160p.UHD.BluRay.TrueHD 7.1.Atmos.x265 - HQMUX")]
+    [InlineData("Movie.Name.2022.1080p.BluRay.x264-VARYG (Blue Lock, Multi-Subs)")]
+    [InlineData("Movie Title (2023) (1080p BluRay x265 SDR AAC 2.0 English Vyndros)")]
+    [InlineData("Movie Title (2010) 1080p BrRip x264 - YIFY")]
+    [InlineData("Movie Title (2011) [BluRay] [1080p] [YTS.MX] [YIFY]")]
+    [InlineData("Movie Title (2014) [BluRay] [1080p] [YIFY] [YTS]")]
+    [InlineData("Movie Title (2018) [BluRay] [1080p] [YIFY] [YTS.LT]")]
+    [InlineData("Movie Title (2016) (1080p AMZN WEB-DL x265 HEVC 10bit EAC3 5 1 RZeroX) QxR")]
+    [InlineData("Movie Title (2016) (1080p AMZN WEB-DL x265 HEVC 10bit EAC3 5 1 Garshasp) QxR")]
+    [InlineData("Movie Title 2024 mUHD 10Bits DoVi HDR10 2160p BluRay DD 5 1 x265 - TMd")]
+    [InlineData("Movie Title 2024 mUHD 10Bits DoVi HDR10 2160p BluRay DD 5 1 x265 TMd")]
+    [InlineData("Movie Title (2024) 2160p WEB-DL ESP DD+ 5.1 ING DD+ 5.1 Atmos DV HDR H.265-Eml HDTeam")]
+    [InlineData("Movie Title(2023) 1080p SkySHO WEB-DL ESP DD+ 5.1 H.264-EML HDTeam")]
+    [InlineData("Movie Title (2022) BDFull 1080p DTS-HD MA 5.1 AVC LMain")]
+    [InlineData("Movie Title (2024) (1080p BluRay x265 SDR DDP 5.1 English - DarQ)")]
+    [InlineData("Movie Title (2024) (1080p BluRay x265 SDR DDP 5.1 English -BEN THE MEN")]
+    [InlineData("Movie Title 2024 2160p WEB-DL DoVi HDR10+ H265 DDP 5.1 Atmos-126811")]
+    [InlineData("Movie Title (2025) (1080p BluRay x265 SDR DDP Atmos 7.1 English - Celdra QxR)")]
+    [InlineData("Movie Title (2025) (1080p BluRay x265 Celdra)")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-RP")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-RP-RP")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Obfuscation")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-NZBgeek")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-1")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-sample.mkv")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Scrambled")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-postbot")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-xpost")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Rakuv")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Rakuv02")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Rakuvfinhel")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Obfuscated")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-WhiteRev")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-BUYMORE")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-AsRequested")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-AlternativeToRequested")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-GEROV")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Z0iDS3N")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-Chamele0n")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-4P")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-EVO-4Planet")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-DON-AlteZachen")]
+    [InlineData("Some.Movie.2019.1080p.BDRip.X264.AC3-HarrHD-RePACKPOST")]
+    public void Parses_radarr_release_names_as_movies(string release)
+    {
+        var parsed = ReleaseParser.Parse(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("IsEpisode", false, parsed?.IsEpisode)
+            .Equal("ParseMovie agrees", true, parsed is not null && ReleaseParser.ParseMovie(release)?.Title == parsed.Title)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("[MTBB] Kimi no Na wa. (2016) v2 [97681524].mkv", "Kimi no Na wa", 2016)]
+    [InlineData("[sam] Toward the Terra (1980) [BD 1080p TrueHD].mkv", "Toward the Terra", 1980)]
+    [InlineData("[Inka-Subs] Rokudenashi Blues 1993 (1993) [VHS]", "Rokudenashi Blues 1993", 1993)]
+    public void Parses_anime_movie_title(string release, string title, int year)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("Title", title, parsed?.Title)
+            .Equal("Year", year, parsed?.Year)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("[Arid] Cowboy Bebop - Knockin' on Heaven's Door v2 [00F4CDA0].mkv", "Cowboy Bebop - Knockin' on Heaven's Door")]
+    [InlineData("[Baws] Evangelion 1.11 - You Are (Not) Alone v2 (1080p BD HEVC FLAC) [BF42B1C8].mkv", "Evangelion 1 11 - You Are (Not) Alone")]
+    [InlineData("[Arid] 5 Centimeters per Second (BDRip 1920x1080 Hi10 FLAC) [FD8B6FF2].mkv", "5 Centimeters per Second")]
+    [InlineData("[Baws] Evangelion 2.22 - You Can (Not) Advance (1080p BD HEVC FLAC) [56E7A5B8].mkv", "Evangelion 2 22 - You Can (Not) Advance")]
+    [InlineData("[sam] Goblin Slayer - Goblin's Crown [BD 1080p FLAC] [CD298D48].mkv", "Goblin Slayer - Goblin's Crown")]
+    [InlineData("[Kulot] Violet Evergarden Gaiden Eien to Jidou Shuki Ningyou [Dual-Audio][BDRip 1920x804 HEVC FLACx2] [91FC62A8].mkv", "Violet Evergarden Gaiden Eien to Jidou Shuki Ningyou")]
+    public void Parses_anime_movie_title_without_year(string release, string title)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("Title", title, parsed?.Title)
+            .Equal("Year", 0, parsed?.Year)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("Movie.Aufbruch.nach.Pandora.Extended.2009.German.DTS.720p.BluRay.x264-SoW", "Movie Aufbruch nach Pandora", "Extended", 2009)]
+    [InlineData("Drop.Movie.1994.German.AC3D.DL.720p.BluRay.x264-KLASSiGERHD", "Drop Movie", null, 1994)]
+    [InlineData("Kick.Movie.2.2013.German.DTS.DL.720p.BluRay.x264-Pate", "Kick Movie 2", null, 2013)]
+    [InlineData("Movie.Hills.2019.German.DL.AC3.Dubbed.1080p.BluRay.x264-muhHD", "Movie Hills", null, 2019)]
+    [InlineData("96.Hours.Movie.3.EXTENDED.2014.German.DL.1080p.BluRay.x264-ENCOUNTERS", "96 Hours Movie 3", "EXTENDED", 2014)]
+    [InlineData("Movie.War.Q.EXTENDED.CUT.2013.German.DL.1080p.BluRay.x264-HQX", "Movie War Q", "EXTENDED CUT", 2013)]
+    [InlineData("Sin.Movie.2005.RECUT.EXTENDED.German.DL.1080p.BluRay.x264-DETAiLS", "Sin Movie", "RECUT EXTENDED", 2005)]
+    [InlineData("2.Movie.in.L.A.1996.GERMAN.DL.720p.WEB.H264-SOV", "2 Movie in L.A.", null, 1996)]
+    [InlineData("8.2019.GERMAN.720p.BluRay.x264-UNiVERSUM", "8", null, 2019)]
+    [InlineData("Life.Movie.2014.German.DL.PAL.DVDR-ETM", "Life Movie", null, 2014)]
+    [InlineData("Joe.Movie.2.EXTENDED.EDITION.2015.German.DL.PAL.DVDR-ETM", "Joe Movie 2", "EXTENDED EDITION", 2015)]
+    [InlineData("Movie.EXTENDED.2011.HDRip.AC3.German.XviD-POE", "Movie", "EXTENDED", 2011)]
+    [InlineData("Movie.Klasse.von.1999.1990.German.720p.HDTV.x264-NORETAiL", "Movie Klasse von 1999", null, 1990)]
+    [InlineData("Movie.Squad.2016.EXTENDED.German.DL.AC3.BDRip.x264-hqc", "Movie Squad", "EXTENDED", 2016)]
+    [InlineData("Movie.and.Movie.2010.Extended.Cut.German.DTS.DL.720p.BluRay.x264-HDS", "Movie and Movie", "Extended Cut", 2010)]
+    [InlineData("Der.Movie.James.German.Bluray.FuckYou.Pso.Why.cant.you.follow.scene.rules.1998", "Der Movie James", null, 1998)]
+    [InlineData("Der.Movie.Eine.Unerwartete.Reise.Extended.German.720p.BluRay.x264-EXQUiSiTE", "Der Movie Eine Unerwartete Reise", "Extended", 0)]
+    [InlineData("Movie.Weg.des.Kriegers.EXTENDED.German.720p.BluRay.x264-EXQUiSiTE", "Movie Weg des Kriegers", "EXTENDED", 0)]
+    [InlineData("Die.Unfassbaren.Movie.Name.EXTENDED.German.DTS.720p.BluRay.x264-RHD", "Die Unfassbaren Movie Name", "EXTENDED", 0)]
+    [InlineData("Die Unfassbaren Movie Name EXTENDED German DTS 720p BluRay x264-RHD", "Die Unfassbaren Movie Name", "EXTENDED", 0)]
+    [InlineData("Passengers.German.DL.AC3.Dubbed..BluRay.x264-PsO", "Passengers", null, 0)]
+    [InlineData("Das.A.Team.Der.Film.Extended.Cut.German.720p.BluRay.x264-ANCIENT", "Das A Team Der Film", "Extended Cut", 0)]
+    [InlineData("Cars.2.German.DL.720p.BluRay.x264-EmpireHD", "Cars 2", null, 0)]
+    [InlineData("Die.fantastische.Reise.des.Dr.Dolittle.2020.German.DL.LD.1080p.WEBRip.x264-PRD", "Die fantastische Reise des Dr. Dolittle", null, 2020)]
+    [InlineData("Der.Film.deines.Lebens.German.2011.PAL.DVDR-ETM", "Der Film deines Lebens", null, 2011)]
+    [InlineData("Kick.Ass.2.2013.German.DTS.DL.720p.BluRay.x264-Pate_", "Kick Ass 2", null, 2013)]
+    [InlineData("The.Good.German.2006.GERMAN.720p.HDTV.x264-RLsGrp", "The Good German", null, 2006)]
+    public void Parses_german_movie(string release, string title, string? edition, int year)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed)
+            .Equal("Title", title, parsed?.Title)
+            .Equal("Edition", edition, parsed?.Edition)
+            .Equal("Year", year, parsed?.Year)
+            .Verify();
+    }
+
+    [Theory]
+    [InlineData("1776.1979.EXTENDED.720p.BluRay.X264-AMIABLE", 1979)]
+    [InlineData("Movie Name FRENCH BluRay 720p 2016 kjhlj", 2016)]
+    [InlineData("Der.Movie.German.Bluray.FuckYou.Pso.Why.cant.you.follow.scene.rules.1998", 1998)]
+    [InlineData("Movie Name (1897) [DVD].mp4", 1897)]
+    [InlineData("World Movie Z Movie [2023]", 2023)]
+    public void Parses_movie_year(string release, int year)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed).Equal("Year", year, parsed?.Year).Verify();
+    }
+
+    [Theory]
+    [InlineData("Movie Name (2016) {tmdbid-43074}", 43074)]
+    [InlineData("Movie Name (2016) [tmdb-43074]", 43074)]
+    [InlineData("Movie Name (2016) {tmdb-43074}", 43074)]
+    [InlineData("Movie Name (2016) {tmdb-2020}", 2020)]
+    public void Parses_tmdb_id(string release, int tmdbId)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed).Equal("TmdbId", tmdbId, parsed?.TmdbId).Verify();
+    }
+
+    [Theory]
+    [InlineData("That Italian Movie 2008 [tt1234567] 720p BluRay X264", "tt1234567")]
+    [InlineData("That Italian Movie 2008 [tt12345678] 720p BluRay X264", "tt12345678")]
+    public void Parses_imdb_id(string release, string imdbId)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed).Equal("ImdbId", imdbId, parsed?.ImdbId).Verify();
+    }
+
+    [Theory]
+    [InlineData("Movie Title 2012 Directors Cut", "Directors Cut")]
+    [InlineData("Movie Title 1999 (Despecialized).mkv", "Despecialized")]
+    [InlineData("Movie Title.2012.(Special.Edition.Remastered).[Bluray-1080p].mkv", "Special Edition Remastered")]
+    [InlineData("Movie Title 2012 Extended", "Extended")]
+    [InlineData("Movie Title 2012 Extended Directors Cut Fan Edit", "Extended Directors Cut Fan Edit")]
+    [InlineData("Movie Title 2012 Director's Cut", "Director's Cut")]
+    [InlineData("Movie Title.2012.(Extended.Theatrical.Version.IMAX).BluRay.1080p.2012.asdf", "Extended Theatrical Version IMAX")]
+    [InlineData("2021 A Movie (1968) Director's Cut .mkv", "Director's Cut")]
+    [InlineData("2021 A Movie 1968 (Extended Directors Cut FanEdit)", "Extended Directors Cut FanEdit")]
+    [InlineData("A Fake Movie 2035 2012 Directors.mkv", "Directors")]
+    [InlineData("Movie 2049 Director's Cut.mkv", "Director's Cut")]
+    [InlineData("Movie Title 2012 50th Anniversary Edition.mkv", "50th Anniversary Edition")]
+    [InlineData("Movie 2012 2in1.mkv", "2in1")]
+    [InlineData("Movie 2012 IMAX.mkv", "IMAX")]
+    [InlineData("Movie 2012 Restored.mkv", "Restored")]
+    [InlineData("Movie Title.Special.Edition.Fan Edit.2012..BRRip.x264.AAC-m2g", "Special Edition Fan Edit")]
+    [InlineData("Movie Title (Despecialized) 1999.mkv", "Despecialized")]
+    [InlineData("Movie Title.(Special.Edition.Remastered).2012.[Bluray-1080p].mkv", "Special Edition Remastered")]
+    [InlineData("Movie Title Extended 2012", "Extended")]
+    [InlineData("Movie Title Extended Directors Cut Fan Edit 2012", "Extended Directors Cut Fan Edit")]
+    [InlineData("Movie Title Director's Cut 2012", "Director's Cut")]
+    [InlineData("Movie Title Directors Cut 2012", "Directors Cut")]
+    [InlineData("Movie Title.(Extended.Theatrical.Version.IMAX).2012.BluRay.1080p.asdf", "Extended Theatrical Version IMAX")]
+    [InlineData("Movie Director's Cut (1968).mkv", "Director's Cut")]
+    [InlineData("2021 A Movie (Extended Directors Cut FanEdit) 1968 Bluray 1080p", "Extended Directors Cut FanEdit")]
+    [InlineData("A Fake Movie 2035 Directors 2012.mkv", "Directors")]
+    [InlineData("Movie Director's Cut 2049.mkv", "Director's Cut")]
+    [InlineData("Movie Title 50th Anniversary Edition 2012.mkv", "50th Anniversary Edition")]
+    [InlineData("Movie 2in1 2012.mkv", "2in1")]
+    [InlineData("Movie IMAX 2012.mkv", "IMAX")]
+    [InlineData("Fake Movie Final Cut 2016", "Final Cut")]
+    [InlineData("Fake Movie 2016 Final Cut ", "Final Cut")]
+    [InlineData("My Movie GERMAN Extended Cut 2016", "Extended Cut")]
+    [InlineData("My.Movie.GERMAN.Extended.Cut.2016", "Extended Cut")]
+    [InlineData("My.Movie.GERMAN.Extended.Cut", "Extended Cut")]
+    [InlineData("My.Movie.Assembly.Cut.1992.REPACK.1080p.BluRay.DD5.1.x264-Group", "Assembly Cut")]
+    [InlineData("Movie.1987.Ultimate.Hunter.Edition.DTS-HD.DTS.MULTISUBS.1080p.BluRay.x264.HQ-TUSAHD", "Ultimate Hunter Edition")]
+    [InlineData("Movie.1950.Diamond.Edition.1080p.BluRay.x264-nikt0", "Diamond Edition")]
+    [InlineData("Movie.Title.1990.Ultimate.Rekall.Edition.NORDiC.REMUX.1080p.BluRay.AVC.DTS-HD.MA5.1-TWA", "Ultimate Rekall Edition")]
+    [InlineData("Movie.Title.1971.Signature.Edition.1080p.BluRay.FLAC.2.0.x264-TDD", "Signature Edition")]
+    [InlineData("Movie.1979.The.Imperial.Edition.BluRay.720p.DTS.x264-CtrlHD", "Imperial Edition")]
+    [InlineData("Movie.1997.Open.Matte.1080p.BluRay.x264.DTS-FGT", "Open Matte")]
+    public void Parses_edition(string release, string edition)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed).Equal("Edition", edition, parsed?.Edition).Verify();
+    }
+
+    [Theory]
+    [InlineData("Movie.Holiday.Special.1978.DVD.REMUX.DD.2.0-ViETNAM")]
+    [InlineData("Directors.Cut.German.2006.COMPLETE.PAL.DVDR-LoD")]
+    [InlineData("Movie Impossible: Rogue Movie 2012 Bluray")]
+    [InlineData("Loving.Movie.2018.TS.FRENCH.MD.x264-DROGUERiE")]
+    [InlineData("Uncut.Movie.2019.720p.BluRay.x264-YOL0W")]
+    [InlineData("The.Christmas.Edition.1941.720p.HDTV.x264-CRiMSON")]
+    public void Does_not_parse_edition(string release)
+    {
+        var parsed = ReleaseParser.ParseMovie(release);
+        new ReleaseExpectation(release, parsed).Equal("Edition", null, parsed?.Edition).Verify();
+    }
+
+    [Theory]
+    [InlineData("76El6LcgLzqb426WoVFg1vVVVGx4uCYopQkfjmLe")]
+    [InlineData("Vrq6e1Aba3U amCjuEgV5R2QvdsLEGYF3YQAQkw8")]
+    [InlineData("TDAsqTea7k4o6iofVx3MQGuDK116FSjPobMuh8oB")]
+    [InlineData("yp4nFodAAzoeoRc467HRh1mzuT17qeekmuJ3zFnL")]
+    [InlineData("oxXo8S2272KE1 lfppvxo3iwEJBrBmhlQVK1gqGc")]
+    [InlineData("dPBAtu681Ycy3A4NpJDH6kNVQooLxqtnsW1Umfiv")]
+    [InlineData("password - \"bdc435cb-93c4-4902-97ea-ca00568c3887.337\" yEnc")]
+    [InlineData("185d86a343e39f3341e35c4dad3f9959")]
+    [InlineData("ba27283b17c00d01193eacc02a8ba98eeb523a76")]
+    [InlineData("45a55debe3856da318cc35882ad07e43cd32fd15")]
+    [InlineData("86420f8ee425340d8894bf3bc636b66404b95f18")]
+    [InlineData("ce39afb7da6cf7c04eba3090f0a309f609883862")]
+    [InlineData("THIS SHOULD NEVER PARSE")]
+    [InlineData("Vh1FvU3bJXw6zs8EEUX4bMo5vbbMdHghxHirc.mkv")]
+    [InlineData("0e895c37245186812cb08aab1529cf8ee389dd05.mkv")]
+    [InlineData("08bbc153931ce3ca5fcafe1b92d3297285feb061.mkv")]
+    [InlineData("185d86a343e39f3341e35c4dad3ff159")]
+    [InlineData("ah63jka93jf0jh26ahjas961.mkv")]
+    [InlineData("qrdSD3rYzWb7cPdVIGSn4E7")]
+    [InlineData("QZC4HDl7ncmzyUj9amucWe1ddKU1oFMZDd8r0dEDUsTd")]
+    [InlineData("abc.xyz.af6021c37f7852")]
+    [InlineData("thebiggestmovie1618finale")]
+    [InlineData("Big Movie (S01E18) Complete 360p HDTV AAC H.264-NEXT")]
+    public void Does_not_parse_crap(string release)
+    {
+        ReleaseExpectation.ExpectNull(release, ReleaseParser.ParseMovie(release));
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(40)]
+    public void Does_not_parse_random_hashes(int length)
+    {
+        const string charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var random = new Random(length);
+
+        for (var i = 0; i < 500; i++)
+        {
+            var hash = new string(Enumerable.Range(0, length).Select(_ => charset[random.Next(charset.Length)]).ToArray());
+            Assert.Null(ReleaseParser.ParseMovie(hash));
+        }
+    }
+}

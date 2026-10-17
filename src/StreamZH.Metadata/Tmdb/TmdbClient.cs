@@ -72,7 +72,8 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
             [.. (m.Genres ?? []).Select(g => g.Name).OfType<string>()],
             m.PosterPath,
             m.BackdropPath,
-            m.OriginalLanguage);
+            m.OriginalLanguage,
+            Blank(m.ReleaseDate));
     }
 
     public async Task<TmdbSeries> GetSeriesAsync(int tmdbId, CancellationToken cancellationToken = default)

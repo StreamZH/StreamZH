@@ -29,46 +29,37 @@ public sealed class AutomaticSearchService(
     IEventBus events,
     ILogger<AutomaticSearchService> logger,
     IDownloadQueue? queue = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IndexerOptions? options = null)
 {
     /// <summary>
     /// With the blackhole folder StreamZH cannot see whether a grab is still downloading: items grabbed this recently are
     /// not searched again. With the built-in engine only items that are in its queue are skipped (like Radarr's "already
     /// in the queue"), so a grab that went to the folder, failed or was removed does not block a new search.
     /// </summary>
-    public static readonly TimeSpan RecentGrabWindow = TimeSpan.FromHours(12);
+    public static readonly TimeSpan RecentGrabWindow = PendingGrabs.RecentGrabWindow;
 
-    public const string SkipInQueue = "inQueue";
-    public const string SkipRecentlyGrabbed = "recentlyGrabbed";
+    public const string SkipInQueue = PendingGrabs.SkipInQueue;
+    public const string SkipRecentlyGrabbed = PendingGrabs.SkipRecentlyGrabbed;
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly PendingGrabs _pending = new(history, downloadSettings, queue, timeProvider ?? TimeProvider.System);
 
     // Items of the current run that were skipped, and why (for the "Search" button's note).
     private int _skipped;
     private string? _skipReason;
 
-    private bool UsesQueue => downloadSettings.Client == DownloadClientKind.BuiltIn && queue is not null;
+    private bool UsesQueue => _pending.UsesQueue;
 
-    private string? MovieSkipReason(int movieId)
-    {
-        if (UsesQueue)
-        {
-            return queue!.Active().Any(d => d.Link.MovieId == movieId) ? SkipInQueue : null;
-        }
-
-        return history.MovieHasEventSince(movieId, HistoryEventType.Grabbed, Since()) ? SkipRecentlyGrabbed : null;
-    }
+    private string? MovieSkipReason(int movieId) => _pending.MovieSkipReason(movieId);
 
     /// <summary>Episodes of the series that are not searched now: in the queue (built-in engine) or grabbed recently (folder).</summary>
-    private IReadOnlySet<int> BlockedEpisodes(int seriesId)
-    {
-        if (UsesQueue)
-        {
-            return queue!.Active().Where(d => d.Link.SeriesId == seriesId).SelectMany(d => d.Link.EpisodeIds).ToHashSet();
-        }
+    private IReadOnlySet<int> BlockedEpisodes(int seriesId) => _pending.BlockedEpisodes(seriesId);
 
-        return history.EpisodesWithEventSince(seriesId, HistoryEventType.Grabbed, Since());
-    }
+    /// <summary>Minimum availability from Settings → Indexers (In cinemas with the default settings).</summary>
+    private bool IsAvailable(Movie movie, DateTimeOffset now) =>
+        options?.IsAvailable(movie, now)
+        ?? IndexerOptions.AvailableFrom(movie, IndexerOptions.Defaults.MinimumAvailability, 0, now) is null;
 
     private void Skip(string reason, int count = 1)
     {
@@ -98,12 +89,12 @@ public sealed class AutomaticSearchService(
         return grabbed;
     }
 
-    /// <summary>Monitored movies without a file that are released (or have no known status).</summary>
+    /// <summary>Monitored movies without a file that are available (minimum availability, Settings → Indexers).</summary>
     public async Task<int> SearchMissingMoviesAsync(CancellationToken cancellationToken = default)
     {
-        var thisYear = _time.GetUtcNow().Year;
+        var now = _time.GetUtcNow();
         var missing = movies.All()
-            .Where(m => m.Monitored && m.File is null && (m.Status is "" or "Released" || (m.Year > 0 && m.Year < thisYear)))
+            .Where(m => m.Monitored && m.File is null && IsAvailable(m, now))
             .Select(m => m.Id)
             .ToList();
 
@@ -130,6 +121,56 @@ public sealed class AutomaticSearchService(
 
         var grabbed = await SearchEpisodesCoreAsync(seriesId, seasonNumber, null, wanted, cancellationToken);
         await events.PublishAsync(Finished(MediaType.Series, seriesId, wanted.Count, grabbed), cancellationToken);
+        return grabbed;
+    }
+
+    /// <summary>
+    /// A newly added movie ("Start search for missing movie"): searched only when it has no file and is available
+    /// (minimum availability), otherwise RSS picks it up later. Returns how many were grabbed (0 or 1).
+    /// </summary>
+    public async Task<int> SearchNewMovieAsync(int movieId, CancellationToken cancellationToken = default)
+    {
+        if (movies.Find(movieId) is not { } movie || movie.File is not null || !movie.Monitored)
+        {
+            return 0;
+        }
+
+        if (!IsAvailable(movie, _time.GetUtcNow()))
+        {
+            logger.LogInformation("'{Title}' is not available yet (minimum availability), RSS sync will grab it later", movie.Title);
+            return 0;
+        }
+
+        return await SearchMoviesAsync([movieId], cancellationToken);
+    }
+
+    /// <summary>
+    /// Monitored, aired episodes without a file of one series (Sonarr's "Search for missing episodes"; used after adding a
+    /// series and by the scheduled missing search). A season with several missing episodes is searched as a season (packs
+    /// too), a single missing episode on its own.
+    /// </summary>
+    public async Task<int> SearchMissingEpisodesAsync(int seriesId, CancellationToken cancellationToken = default)
+    {
+        var grabbed = 0;
+        var searched = 0;
+        if (series.Find(seriesId) is { Monitored: true })
+        {
+            var today = _time.GetUtcNow().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var missing = series.Episodes(seriesId)
+                .Where(e => e.Monitored && e.File is null && e.SeasonNumber > 0 && e.AirDate is { } date && string.CompareOrdinal(date, today) <= 0)
+                .GroupBy(e => e.SeasonNumber)
+                .OrderBy(g => g.Key);
+
+            foreach (var season in missing)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var wanted = season.Select(e => e.Id).ToHashSet();
+                searched += wanted.Count;
+                grabbed += await SearchEpisodesCoreAsync(seriesId, season.Key, wanted.Count == 1 ? [.. wanted] : null, wanted, cancellationToken);
+            }
+        }
+
+        await events.PublishAsync(Finished(MediaType.Series, seriesId, searched, grabbed), cancellationToken);
         return grabbed;
     }
 
@@ -289,5 +330,4 @@ public sealed class AutomaticSearchService(
         }
     }
 
-    private DateTime Since() => (_time.GetUtcNow() - RecentGrabWindow).UtcDateTime;
 }

@@ -177,7 +177,10 @@ public sealed record ReleaseSearchResource(int Indexers, IReadOnlyList<IndexerFa
         [.. result.Decisions.Select((d, index) => ReleaseResource.From(d, index + 1, now))]);
 }
 
-/// <summary>One search result. <see cref="Rank"/> is the default order (1 = best); series fields are empty for movies.</summary>
+/// <summary>
+/// One search result. <see cref="Rank"/> is the default order (1 = best); series fields are empty for movies.
+/// <see cref="PreferredScore"/> is the summed score of the release profiles' preferred terms.
+/// </summary>
 public sealed record ReleaseResource(
     string Guid,
     int IndexerId,
@@ -199,7 +202,8 @@ public sealed record ReleaseResource(
     int? SeasonNumber,
     IReadOnlyList<int> EpisodeNumbers,
     bool FullSeason,
-    IReadOnlyList<int> EpisodeIds)
+    IReadOnlyList<int> EpisodeIds,
+    int PreferredScore)
 {
     public static ReleaseResource From(ReleaseDecision d, int rank, DateTimeOffset now)
     {
@@ -226,6 +230,7 @@ public sealed record ReleaseResource(
             parsed?.SeasonNumber,
             parsed?.EpisodeNumbers ?? [],
             parsed?.FullSeason ?? false,
-            d.EpisodeIds);
+            d.EpisodeIds,
+            d.Decision.PreferredScore);
     }
 }

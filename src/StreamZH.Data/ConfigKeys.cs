@@ -27,4 +27,16 @@ public static class ConfigKeys
     public const string DownloadKeepFiles = "DownloadKeepFiles";
     public const string DownloadAbortHopeless = "DownloadAbortHopeless";
     public const string DownloadArticleTries = "DownloadArticleTries";
+
+    // Indexers (0.6): release rules for all indexers and automation (Settings → Indexers); empty = default.
+    public const string IndexerMinimumAge = "IndexerMinimumAge";
+    public const string IndexerRetention = "IndexerRetention";
+    public const string IndexerMaximumSize = "IndexerMaximumSize";
+    public const string IndexerAllowHardcodedSubs = "IndexerAllowHardcodedSubs";
+    public const string IndexerWhitelistedHardcodedSubs = "IndexerWhitelistedHardcodedSubs";
+    public const string IndexerMinimumAvailability = "IndexerMinimumAvailability";
+    public const string IndexerAvailabilityDelay = "IndexerAvailabilityDelay";
+    public const string IndexerRssSyncInterval = "IndexerRssSyncInterval";
+    public const string IndexerMissingSearchInterval = "IndexerMissingSearchInterval";
+    public const string IndexerSearchOnAdd = "IndexerSearchOnAdd";
 }

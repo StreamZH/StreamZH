@@ -47,7 +47,8 @@ public sealed record SeriesDetailResource(SeriesResource Series, IReadOnlyList<S
 
 public sealed record LookupResource(int TmdbId, string Title, string OriginalTitle, int Year, string? Overview, string? PosterPath, int? LibraryId);
 
-public sealed record AddRequest(int TmdbId, int RootFolderId, bool Monitored = true, int? QualityProfileId = null);
+/// <param name="SearchForMissing">Start a search for the missing movie or episodes; null = the default from Settings → Indexers.</param>
+public sealed record AddRequest(int TmdbId, int RootFolderId, bool Monitored = true, int? QualityProfileId = null, bool? SearchForMissing = null);
 
 public sealed record MonitorRequest(bool Monitored);
 

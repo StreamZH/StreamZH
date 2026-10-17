@@ -33,7 +33,10 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
             quality,
             languages,
             movie.Monitored,
-            NoBlocklist);
+            NoBlocklist)
+        {
+            ExistingFileName = movie.File is null ? null : Path.GetFileName(movie.File.RelativePath),
+        };
     }
 
     /// <summary>
@@ -50,10 +53,12 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
 
         QualityModel? quality = null;
         IReadOnlyList<Language> languages = [];
+        string? fileName = null;
         if (episodes.Count > 0 && episodes.All(e => e.File is not null))
         {
-            (quality, languages) = episodes
-                .Select(e => Existing(e.File, series.FolderPath))
+            (quality, languages, fileName) = episodes
+                .Select(e => (Existing: Existing(e.File, series.FolderPath), Name: Path.GetFileName(e.File!.RelativePath)))
+                .Select(x => (x.Existing.Quality, x.Existing.Languages, x.Name))
                 .MinBy(x => (profile.RankOf(x.Quality!.Quality.Id), x.Quality.Revision));
         }
 
@@ -68,7 +73,10 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
             quality,
             languages,
             series.Monitored && (episodes.Count == 0 || episodes.Any(e => e.Monitored)),
-            NoBlocklist);
+            NoBlocklist)
+        {
+            ExistingFileName = fileName,
+        };
     }
 
     /// <summary>Quality and languages of a file on disk, read from the file name and the item folder name.</summary>

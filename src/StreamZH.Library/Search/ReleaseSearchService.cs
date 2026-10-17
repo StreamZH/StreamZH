@@ -28,9 +28,13 @@ public sealed class ReleaseSearchService(
     QualityDefinitionRepository definitions,
     ReleaseCache cache,
     ILogger<ReleaseSearchService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IndexerOptions? options = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
+    /// <summary>Release rules from Settings → Indexers (none in tests that do not pass the options).</summary>
+    private ReleaseRules Rules() => options?.Rules() ?? ReleaseRules.None;
 
     /// <summary>How long one indexer may take before it counts as failed; the others are not held up.</summary>
     public TimeSpan IndexerTimeout { get; set; } = TimeSpan.FromSeconds(60);
@@ -54,6 +58,7 @@ public sealed class ReleaseSearchService(
         var (releases, indexerCount, failures) = await QueryAsync(use, criteria, cancellationToken);
         var now = _time.GetUtcNow();
         var defs = Definitions();
+        var rules = Rules();
         var results = new List<Ranked>();
         var candidates = new List<(ReleaseInfo Info, ReleaseCandidate Candidate)>();
 
@@ -75,13 +80,13 @@ public sealed class ReleaseSearchService(
             candidates.Add((info, Candidate(info, parsed)));
         }
 
-        foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now))
+        foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules))
         {
             var info = candidates.First(c => ReferenceEquals(c.Candidate, decision.Candidate)).Info;
             results.Add(new Ranked(new ReleaseDecision(info, decision.Candidate.Release, decision, subject, []), Tier.Evaluated));
         }
 
-        return Finish(results, target, defs, now, indexerCount, failures);
+        return Finish(results, target, defs, now, rules, indexerCount, failures);
     }
 
     /// <summary>
@@ -120,6 +125,7 @@ public sealed class ReleaseSearchService(
         var (releases, indexerCount, failures) = await QueryAsync(use, criteria, cancellationToken);
         var now = _time.GetUtcNow();
         var defs = Definitions();
+        var rules = Rules();
         var results = new List<Ranked>();
         var groups = new Dictionary<string, (IReadOnlyList<Episode> Episodes, List<(ReleaseInfo Info, ReleaseCandidate Candidate)> Candidates)>();
 
@@ -161,7 +167,7 @@ public sealed class ReleaseSearchService(
         {
             var target = targets.ForEpisodes(show, episodes) with { Monitored = true };
             var ids = episodes.Select(e => e.Id).ToList();
-            foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now))
+            foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules))
             {
                 var info = candidates.First(c => ReferenceEquals(c.Candidate, decision.Candidate)).Info;
                 results.Add(new Ranked(new ReleaseDecision(info, decision.Candidate.Release, decision, subject, ids), Tier.Evaluated));
@@ -169,7 +175,7 @@ public sealed class ReleaseSearchService(
         }
 
         var rankingTarget = targets.ForEpisodes(show, requested) with { Monitored = true };
-        return Finish(results, rankingTarget, defs, now, indexerCount, failures);
+        return Finish(results, rankingTarget, defs, now, rules, indexerCount, failures);
     }
 
     /// <summary>Asks every active indexer in parallel; a slow or failing indexer is recorded and skipped.</summary>
@@ -233,9 +239,9 @@ public sealed class ReleaseSearchService(
 
     private ReleaseSearchResult Finish(
         List<Ranked> results, DecisionTarget rankingTarget, IReadOnlyDictionary<int, QualityDefinition> defs, DateTimeOffset now,
-        int indexerCount, IReadOnlyList<IndexerSearchFailure> failures)
+        ReleaseRules rules, int indexerCount, IReadOnlyList<IndexerSearchFailure> failures)
     {
-        var comparer = new DecisionComparer(new DecisionContext(rankingTarget, defs, now));
+        var comparer = new DecisionComparer(new DecisionContext(rankingTarget, defs, now) { Rules = rules });
         var ranked = results
             .OrderByDescending(r => r.Decision.Accepted)
             .ThenBy(r => r.Tier)
@@ -252,8 +258,8 @@ public sealed class ReleaseSearchService(
     private static IReadOnlyList<string> Titles(string title, string originalTitle) =>
         [.. new[] { title, originalTitle }.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase)];
 
-    private static ReleaseCandidate Candidate(ReleaseInfo info, ParsedRelease parsed) =>
-        new(parsed, info.Size, info.Indexer, info.IndexerPriority, info.PublishDate, info.DownloadUrl, info.Guid);
+    internal static ReleaseCandidate Candidate(ReleaseInfo info, ParsedRelease parsed) =>
+        new(parsed, info.Size, info.Indexer, info.IndexerPriority, info.PublishDate, info.DownloadUrl, info.Guid) { IndexerId = info.IndexerId };
 
     private static ReleaseDecision Decide(ReleaseInfo info, ParsedRelease parsed, IReadOnlyList<Rejection> rejections, SearchSubject subject, IReadOnlyList<int> episodeIds) =>
         new(info, parsed, new Decision(Candidate(info, parsed), rejections), subject, episodeIds);

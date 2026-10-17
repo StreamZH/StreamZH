@@ -22,6 +22,29 @@ public static class RejectionCodes
     public const string DiskUpgradesNotAllowed = "DiskUpgradesNotAllowed";
     public const string DecisionError = "DecisionError";
 
+    // Release rules (Settings → Indexers).
+
+    /// <summary>Younger than the minimum age (Usenet propagation); temporary.</summary>
+    public const string MinimumAge = "MinimumAge";
+
+    /// <summary>Older than the retention.</summary>
+    public const string MaximumAge = "MaximumAge";
+
+    /// <summary>Larger than the maximum size of all releases.</summary>
+    public const string MaximumSizeExceeded = "MaximumSizeExceeded";
+
+    /// <summary>Hardcoded subtitles while they are not allowed.</summary>
+    public const string HardcodedSubs = "HardcodedSubs";
+
+    /// <summary>A release profile's "must contain" terms are all missing.</summary>
+    public const string MustContainMissing = "MustContainMissing";
+
+    /// <summary>A release profile's "must not contain" term is present.</summary>
+    public const string MustNotContainPresent = "MustNotContainPresent";
+
+    /// <summary>The movie is not available yet (minimum availability); temporary.</summary>
+    public const string Availability = "Availability";
+
     /// <summary>The release is for another movie or series (title, year or movie/series mix-up).</summary>
     public const string WrongMedia = "WrongMedia";
 

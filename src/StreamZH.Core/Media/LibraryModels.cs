@@ -40,6 +40,9 @@ public sealed class Movie
     public DateTime Added { get; set; }
     public DateTime? LastRefreshed { get; set; }
     public MediaFile? File { get; set; }
+
+    /// <summary>TMDB release date (yyyy-MM-dd, usually the cinema release), for the minimum availability; null when unknown.</summary>
+    public string? InCinemas { get; set; }
 }
 
 public sealed class Series

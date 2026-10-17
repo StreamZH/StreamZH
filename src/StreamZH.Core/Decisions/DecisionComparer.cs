@@ -12,6 +12,7 @@ namespace StreamZH.Core.Decisions;
 /// <item>Profile quality rank, higher first.</item>
 /// <item>Revision (REAL, then version), higher first.</item>
 /// <item>Dual language first, when the profile prefers it.</item>
+/// <item>Preferred score of the release profiles, higher first (after quality and language, like Sonarr v3).</item>
 /// <item>Indexer priority, lower number first.</item>
 /// <item>Size: closest to the preferred size (per minute × runtime) when one is set, otherwise larger first;
 /// rounded to 200 MB steps like Radarr so tiny differences fall through.</item>
@@ -23,10 +24,32 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
     private const long SizeStep = 200 * SizeRules.Megabyte;
 
     private readonly DecisionContext _context;
+    private readonly Dictionary<ReleaseCandidate, int> _scores = new(ReferenceEqualityComparer.Instance);
 
     public DecisionComparer(DecisionContext context)
     {
         _context = context;
+    }
+
+    /// <summary>Preferred score of the release profiles for this target, computed once per candidate.</summary>
+    public int PreferredScore(ReleaseCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        if (_context.Rules.ReleaseProfiles.Count == 0)
+        {
+            return 0;
+        }
+
+        lock (_scores)
+        {
+            if (!_scores.TryGetValue(candidate, out var score))
+            {
+                score = _context.PreferredScore(candidate);
+                _scores[candidate] = score;
+            }
+
+            return score;
+        }
     }
 
     public int Compare(ReleaseCandidate? x, ReleaseCandidate? y)
@@ -51,6 +74,7 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
             CompareQuality(x, y),
             x.Release.Quality.Revision.CompareTo(y.Release.Quality.Revision),
             CompareDualLanguage(x, y),
+            PreferredScore(x).CompareTo(PreferredScore(y)),
             y.IndexerPriority.CompareTo(x.IndexerPriority),
             SizeScore(x).CompareTo(SizeScore(y)),
             x.PublishDate.CompareTo(y.PublishDate),

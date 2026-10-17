@@ -154,4 +154,8 @@ public static class ConfigKeys
     public const string UiLongDateFormat = "UiLongDateFormat";
     public const string UiTimeFormat = "UiTimeFormat";
     public const string UiShowRelativeDates = "UiShowRelativeDates";
+
+    // Import lists (0.7)
+    public const string ImportListSyncInterval = "ImportListSyncInterval";
+    public const string ImportListCleanLibraryLevel = "ImportListCleanLibraryLevel";
 }

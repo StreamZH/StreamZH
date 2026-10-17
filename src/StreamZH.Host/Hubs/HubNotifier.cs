@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.SignalR;
 using StreamZH.Core.Events;
 using StreamZH.Core.Jobs;
 using StreamZH.Library;
+using StreamZH.Library.Search;
 
 namespace StreamZH.Host.Hubs;
 
@@ -21,6 +22,9 @@ public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub) : 
 
         _subscriptions.Add(events.Subscribe<JobsChanged>((e, ct) =>
             new ValueTask(hub.Clients.All.SendAsync("jobs", e.Status, ct))));
+
+        _subscriptions.Add(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("releaseGrabbed", e, ct))));
+        _subscriptions.Add(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("searchFinished", e, ct))));
 
         return Task.CompletedTask;
     }

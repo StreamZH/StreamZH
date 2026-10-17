@@ -5,7 +5,7 @@ import { api, ApiError, logLevels, type GeneralSettings } from '../api/client'
 import { authQueryKey, useAuth } from '../auth/auth'
 import ui from '../components/ui.module.css'
 import { useScrollToHash } from '../lib/useScrollToHash'
-import { MetadataSection, RootFoldersSection } from './MediaSettings'
+import { DownloadsSection, MetadataSection, RootFoldersSection } from './MediaSettings'
 import page from './Page.module.css'
 import styles from './Settings.module.css'
 
@@ -34,6 +34,7 @@ export default function Settings() {
 
       <div id="media" className={page.page}>
         <RootFoldersSection />
+        <DownloadsSection />
         <MetadataSection />
       </div>
 

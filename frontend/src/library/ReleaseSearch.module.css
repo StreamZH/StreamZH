@@ -1,0 +1,422 @@
+/* Manual search modal, search buttons and the history panel on detail pages. */
+
+/* The release table needs more room than the default dialog. */
+:global(dialog):has(.root) {
+  width: min(1180px, calc(100vw - 32px));
+}
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.state p {
+  margin: 0;
+  max-width: 52ch;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.summary {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.summary strong {
+  color: var(--text);
+}
+
+.okText {
+  color: var(--ok);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sortSelect {
+  display: none;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.warning {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+/* Release table: a grid, so rows can turn into cards on phones. */
+.table {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 92px 62px 70px 128px 104px 52px 104px;
+  align-items: start;
+  gap: 4px 12px;
+  padding: 9px 4px;
+}
+
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-top: 4px;
+  padding-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.headAction {
+  text-align: right;
+}
+
+.sort,
+.reset {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sort:hover,
+.sortActive {
+  color: var(--text);
+}
+
+.reset {
+  color: var(--accent);
+}
+
+.row {
+  border-bottom: 1px solid var(--line);
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+.rejectedRow .title,
+.rejectedRow .meta {
+  opacity: 0.62;
+}
+
+.status {
+  padding-top: 1px;
+}
+
+.statusIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: none;
+  padding: 0;
+}
+
+.statusOk {
+  color: var(--ok);
+  cursor: default;
+}
+
+.statusRejected {
+  color: #ef6b6b;
+  cursor: pointer;
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  padding-top: 2px;
+}
+
+.title a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.title a:hover {
+  text-decoration: underline;
+}
+
+.meta {
+  display: contents;
+}
+
+.cell {
+  padding-top: 3px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mobileLabel {
+  display: none;
+}
+
+.episodes {
+  display: inline-block;
+  margin-right: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--series);
+}
+
+.quality {
+  color: var(--text);
+}
+
+.action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.action button {
+  padding: 7px 12px;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.grabbed {
+  padding-top: 4px;
+  font-weight: 500;
+  color: var(--ok);
+}
+
+.reasons,
+.rowNote {
+  grid-column: 2 / -1;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+}
+
+.reasons {
+  padding-left: 18px;
+  color: #ef9a9a;
+}
+
+.rowNote {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.rowNote code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Search buttons on the detail pages */
+.searchActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.noteDone {
+  color: var(--ok);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--text-faint);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--surface-hover);
+}
+
+.small {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
+.seasonTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+/* Episode table: the search icon column (the cell padding comes from the table). */
+.epSearch {
+  width: 40px;
+  text-align: right;
+}
+
+.epSearch .iconButton {
+  margin: -6px -4px -6px 0;
+}
+
+/* History panel */
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history li {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.history li:first-child {
+  border-top: none;
+}
+
+.historyDate {
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.historyTitle {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.historyMeta {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .head {
+    display: none;
+  }
+
+  .sortSelect {
+    display: inline-block;
+  }
+
+  .row {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 6px 10px;
+    padding: 12px 2px;
+  }
+
+  .meta {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+  }
+
+  .cell {
+    padding-top: 0;
+  }
+
+  .mobileLabel {
+    display: inline;
+  }
+
+  /* Reasons right under the facts, the button after them. */
+  .action {
+    grid-column: 2;
+    justify-content: flex-start;
+    order: 1;
+  }
+
+  .rowNote {
+    order: 2;
+  }
+
+  .confirm {
+    flex-direction: row;
+  }
+
+  .history li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

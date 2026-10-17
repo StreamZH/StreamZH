@@ -2,13 +2,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { libraryApi, queryKeys, type Episode, type Season } from '../api/library'
+import Icon from '../components/Icon'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDate, isAired } from '../lib/format'
 import page from '../pages/Page.module.css'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
+import HistoryPanel from './HistoryPanel'
 import RemoveButton from './RemoveButton'
+import search from './ReleaseSearch.module.css'
+import ReleaseSearchModal from './ReleaseSearchModal'
+import SearchButtons from './SearchButtons'
 import { useDetailActions } from './useDetailActions'
 
 export default function SeriesDetail() {
@@ -71,19 +76,37 @@ export default function SeriesDetail() {
         <SeasonPanel
           key={season.seasonNumber}
           seriesId={s.id}
+          seriesTitle={s.title}
           season={season}
           episodes={episodes.filter((e) => e.seasonNumber === season.seasonNumber)}
           defaultOpen={season.seasonNumber === Math.max(...seasons.map((x) => x.seasonNumber))}
         />
       ))}
+
+      <HistoryPanel seriesId={s.id} />
     </div>
   )
 }
 
-function SeasonPanel({ seriesId, season, episodes, defaultOpen }: { seriesId: number; season: Season; episodes: Episode[]; defaultOpen: boolean }) {
+function SeasonPanel({
+  seriesId,
+  seriesTitle,
+  season,
+  episodes,
+  defaultOpen,
+}: {
+  seriesId: number
+  seriesTitle: string
+  season: Season
+  episodes: Episode[]
+  defaultOpen: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
+  const [manualEpisode, setManualEpisode] = useState<Episode | null>(null)
   const queryClient = useQueryClient()
   const aired = episodes.filter((e) => isAired(e.airDate)).length
+  const seasonName = season.seasonNumber === 0 ? 'Specials' : `Season ${season.seasonNumber}`
+  const code = (e: Episode) => `S${String(e.seasonNumber).padStart(2, '0')}E${String(e.episodeNumber).padStart(2, '0')}`
 
   const monitor = useMutation({
     mutationFn: (monitored: boolean) => libraryApi.setSeasonMonitored(seriesId, season.seasonNumber, monitored),
@@ -95,15 +118,26 @@ function SeasonPanel({ seriesId, season, episodes, defaultOpen }: { seriesId: nu
       <div className={styles.seasonHead}>
         <button type="button" className={styles.seasonToggle} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           <span className={styles.chevron}>{open ? '▾' : '▸'}</span>
-          <span className={styles.seasonTitle}>{season.seasonNumber === 0 ? 'Specials' : `Season ${season.seasonNumber}`}</span>
+          <span className={styles.seasonTitle}>{seasonName}</span>
           <span className={`${ui.badge} ${season.fileCount >= aired && aired > 0 ? ui.ok : season.fileCount > 0 ? ui.waiting : ui.idle}`}>
             {season.fileCount} / {aired} aired
           </span>
         </button>
-        <label className={ui.check}>
-          <input type="checkbox" checked={season.monitored} onChange={(e) => monitor.mutate(e.target.checked)} disabled={monitor.isPending} />
-          <span>Monitored</span>
-        </label>
+        <div className={search.seasonTools}>
+          <SearchButtons
+            command={{ name: 'SeasonSearch', seriesId, seasonNumber: season.seasonNumber }}
+            mediaType="Series"
+            id={seriesId}
+            target={{ kind: 'season', seriesId, seasonNumber: season.seasonNumber }}
+            modalTitle={`${seriesTitle} · ${seasonName}`}
+            searchLabel="Search season"
+            small
+          />
+          <label className={ui.check}>
+            <input type="checkbox" checked={season.monitored} onChange={(e) => monitor.mutate(e.target.checked)} disabled={monitor.isPending} />
+            <span>Monitored</span>
+          </label>
+        </div>
       </div>
 
       {open && (
@@ -120,10 +154,28 @@ function SeasonPanel({ seriesId, season, episodes, defaultOpen }: { seriesId: nu
                 <td className={styles.epStatus}>
                   <EpisodeStatus episode={e} />
                 </td>
+                <td className={search.epSearch}>
+                  <button
+                    type="button"
+                    className={search.iconButton}
+                    onClick={() => setManualEpisode(e)}
+                    title={`Manual search for ${code(e)}`}
+                    aria-label={`Manual search for ${code(e)}`}
+                  >
+                    <Icon name="indexers" size={16} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+      {manualEpisode && (
+        <ReleaseSearchModal
+          title={`${seriesTitle} · ${code(manualEpisode)}`}
+          target={{ kind: 'episode', episodeId: manualEpisode.id }}
+          onClose={() => setManualEpisode(null)}
+        />
       )}
     </section>
   )

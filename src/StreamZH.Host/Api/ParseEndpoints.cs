@@ -6,7 +6,7 @@ using StreamZH.Core.Decisions;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
-using StreamZH.Parsing;
+using StreamZH.Library.Search;
 using StreamZH.Parsing.Releases;
 
 namespace StreamZH.Host.Api;
@@ -25,7 +25,7 @@ public static class ParseEndpoints
             double? sizeMb,
             MovieRepository movies,
             SeriesRepository series,
-            QualityProfileRepository profiles,
+            DecisionTargetFactory targets,
             QualityDefinitionRepository definitions) =>
         {
             var parsed = ReleaseParser.Parse(title.Trim());
@@ -37,32 +37,26 @@ public static class ParseEndpoints
             DecisionResult? decision = null;
             var size = (long)Math.Round((sizeMb ?? 0) * 1024 * 1024);
 
-            if (movieId is { } mid && movies.Find(mid) is { } movie && profiles.Find(movie.QualityProfileId) is { } movieProfile)
+            if (movieId is { } mid && movies.Find(mid) is { } movie)
             {
-                var existingName = movie.File is null ? null : Path.GetFileName(movie.File.RelativePath) + " " + Path.GetFileName(movie.FolderPath);
-                var target = new DecisionTarget(
-                    MediaType.Movie, movie.Title, movie.Year, movie.Runtime, 1, movieProfile,
-                    Language.FindById(movie.OriginalLanguageId),
-                    existingName is null ? null : QualityParser.ParseQuality(existingName),
-                    existingName is null ? [] : LanguageParser.ParseLanguages(Path.GetFileName(movie.FolderPath)),
-                    Monitored: true,
-                    BlocklistedTitles: new HashSet<string>());
-                var match = ReleaseMatcher.Match(parsed, isSeries: false, [movie.Title, movie.OriginalTitle], movie.Year, movie.ImdbId, movie.TmdbId);
-                decision = Decide(parsed, size, target, movieProfile.Name, $"{movie.Title} ({movie.Year})", match, definitions);
+                var name = $"{movie.Title} ({movie.Year})";
+                var target = targets.ForMovie(movie) with { Monitored = true };
+                var mismatch = ReleaseMatching.MismatchRejection(ReleaseMatching.MatchMovie(parsed, movie), parsed, name);
+                decision = Decide(parsed, size, target, name, mismatch, definitions);
             }
-            else if (seriesId is { } sid && series.Find(sid) is { } show && profiles.Find(show.QualityProfileId) is { } showProfile)
+            else if (seriesId is { } sid && series.Find(sid) is { } show)
             {
-                var episodes = parsed.FullSeason && parsed.SeasonNumber is { } season
-                    ? series.Episodes(show.Id).Count(e => e.SeasonNumber == season)
+                var name = $"{show.Title} ({show.Year})";
+                var library = series.Episodes(show.Id);
+                IReadOnlyList<Episode> covered = parsed.IsEpisode ? ReleaseMatching.MapEpisodes(parsed, library).Episodes : [];
+
+                // Episodes that are not in the library (yet): count them from the name.
+                int? count = covered.Count > 0 ? null
+                    : parsed.FullSeason && parsed.SeasonNumber is { } season ? Math.Max(1, library.Count(e => e.SeasonNumber == season))
                     : Math.Max(1, parsed.EpisodeNumbers.Count);
-                var target = new DecisionTarget(
-                    MediaType.Series, show.Title, show.Year, 0, episodes, showProfile,
-                    Language.FindById(show.OriginalLanguageId),
-                    null, [],
-                    Monitored: true,
-                    BlocklistedTitles: new HashSet<string>());
-                var match = ReleaseMatcher.Match(parsed, isSeries: true, [show.Title, show.OriginalTitle], show.Year);
-                decision = Decide(parsed, size, target, showProfile.Name, $"{show.Title} ({show.Year})", match, definitions);
+                var target = targets.ForEpisodes(show, covered, count) with { Monitored = true };
+                var mismatch = ReleaseMatching.MismatchRejection(ReleaseMatching.MatchSeries(parsed, show), parsed, name);
+                decision = Decide(parsed, size, target, name, mismatch, definitions);
             }
 
             return Results.Ok(new ParseResult(ParsedReleaseResource.From(parsed), decision));
@@ -72,29 +66,18 @@ public static class ParseEndpoints
     }
 
     private static DecisionResult Decide(
-        ParsedRelease parsed, long size, DecisionTarget target, string profile, string targetName, ReleaseMatch match, QualityDefinitionRepository definitions)
+        ParsedRelease parsed, long size, DecisionTarget target, string targetName, Rejection? mismatch, QualityDefinitionRepository definitions)
     {
+        // A release for another item only gets that one reason: quality or size rules say nothing useful about it.
+        if (mismatch is not null)
+        {
+            return new DecisionResult(targetName, target.Profile.Name, false, [new RejectionResource(mismatch.Code, mismatch.Message)]);
+        }
+
         var candidate = new ReleaseCandidate(parsed, size, "Manual test", 25, DateTimeOffset.UtcNow, string.Empty, parsed.ReleaseTitle);
         var defs = definitions.All().ToDictionary(d => d.QualityId);
         var result = DecisionEngine.Evaluate([candidate], target, defs, DateTimeOffset.UtcNow).Single();
-
-        // A search only ever offers releases that belong to the item; here the user can type anything, so say so first.
-        List<RejectionResource> rejections = [];
-        var named = parsed.Year > 0 ? $"{parsed.Title} ({parsed.Year})" : parsed.Title;
-        var mismatch = match switch
-        {
-            ReleaseMatch.WrongType => parsed.IsEpisode ? $"This is a series release, {targetName} is a movie" : $"This is a movie release, {targetName} is a series",
-            ReleaseMatch.WrongTitle => $"The release is for {named}, not {targetName}",
-            ReleaseMatch.WrongYear => $"Same title, but the release year {parsed.Year} does not fit {targetName}",
-            _ => null,
-        };
-        if (mismatch is not null)
-        {
-            rejections.Add(new RejectionResource(RejectionCodes.WrongMedia, mismatch));
-        }
-
-        rejections.AddRange(result.Rejections.Select(r => new RejectionResource(r.Code, r.Message)));
-        return new DecisionResult(targetName, profile, rejections.Count == 0, rejections);
+        return new DecisionResult(targetName, target.Profile.Name, result.Accepted, [.. result.Rejections.Select(r => new RejectionResource(r.Code, r.Message))]);
     }
 }
 

@@ -10,6 +10,7 @@ using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Host.Logging;
 using StreamZH.Host.Settings;
+using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
 
 namespace StreamZH.Host.Api;
@@ -101,6 +102,15 @@ public static class SettingsEndpoints
             return Results.Ok(new { ok = true });
         });
 
+        group.MapGet("/downloads", (DownloadSettings downloads) => DownloadSettingsResource.From(downloads));
+
+        group.MapPut("/downloads", (UpdateDownloadSettings request, DownloadSettings downloads, ILogger<DownloadSettings> logger) =>
+        {
+            var folder = downloads.SetNzbFolder(request.NzbFolder);
+            logger.LogInformation("NZB folder set to {Folder}", folder);
+            return Results.Ok(DownloadSettingsResource.From(downloads));
+        });
+
         return app;
     }
 }
@@ -116,6 +126,18 @@ public sealed record MetadataSettings(bool TmdbConfigured, string? TmdbTokenHint
 }
 
 public sealed record UpdateMetadataSettings(string? TmdbToken, string? Language);
+
+/// <summary>Where grabbed NZB files are written; <see cref="Problem"/> is set when StreamZH cannot write there.</summary>
+public sealed record DownloadSettingsResource(string NzbFolder, string DefaultNzbFolder, bool IsDefault, string? Problem)
+{
+    public static DownloadSettingsResource From(DownloadSettings downloads)
+    {
+        var folder = downloads.NzbFolder;
+        return new DownloadSettingsResource(folder, downloads.DefaultNzbFolder, folder == downloads.DefaultNzbFolder, DownloadSettings.CheckWritable(folder));
+    }
+}
+
+public sealed record UpdateDownloadSettings(string? NzbFolder);
 
 public sealed record TestMetadataRequest(string? TmdbToken);
 

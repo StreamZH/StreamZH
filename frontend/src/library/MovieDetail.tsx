@@ -7,7 +7,9 @@ import { formatBytes, formatDate, formatRuntime } from '../lib/format'
 import page from '../pages/Page.module.css'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
+import HistoryPanel from './HistoryPanel'
 import RemoveButton from './RemoveButton'
+import SearchButtons from './SearchButtons'
 import { useDetailActions } from './useDetailActions'
 
 export default function MovieDetail() {
@@ -46,6 +48,13 @@ export default function MovieDetail() {
             <button className={ui.button} type="button" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
               {refresh.isSuccess ? 'Refresh queued' : 'Refresh & rescan'}
             </button>
+            <SearchButtons
+              command={{ name: 'MoviesSearch', movieIds: [m.id] }}
+              mediaType="Movie"
+              id={m.id}
+              target={{ kind: 'movie', movieId: m.id }}
+              modalTitle={m.year > 0 ? `${m.title} (${m.year})` : m.title}
+            />
             <label className={styles.profile}>
               <span>Profile</span>
               <ProfileSelect
@@ -91,6 +100,8 @@ export default function MovieDetail() {
           </dd>
         </dl>
       </section>
+
+      <HistoryPanel movieId={m.id} />
     </div>
   )
 }

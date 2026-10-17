@@ -11,6 +11,7 @@ using StreamZH.Core.Jobs;
 using StreamZH.Data;
 using StreamZH.Library.Indexers;
 using StreamZH.Library.PostProcessing;
+using StreamZH.Library.Usenet;
 
 namespace StreamZH.Host.Status;
 
@@ -232,6 +233,8 @@ public sealed class OngoingService(
                 "/settings/usenet",
                 false));
         }
+
+        UsenetNotices.Add(notices, services.GetService<UsenetServerService>(), time);
     }
 
     /// <summary>Enabled Usenet servers, or null when the table does not exist (download engine not installed).</summary>

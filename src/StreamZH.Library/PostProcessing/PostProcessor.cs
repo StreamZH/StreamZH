@@ -10,7 +10,8 @@ namespace StreamZH.Library.PostProcessing;
 
 /// <summary>
 /// Verify (native par2 reader, with deobfuscation) → repair (external par2, only when needed) → extract (external 7-Zip)
-/// → move the wanted files to the target and delete the work folder. On failure the work folder is kept as it is.
+/// → move the wanted files to the target and delete the work folder (unless <see cref="PostProcessJob.KeepFiles"/>).
+/// On failure the work folder is kept as it is.
 /// </summary>
 public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRunner runner, ILogger<PostProcessor> logger) : IPostProcessor
 {
@@ -73,8 +74,12 @@ public sealed partial class PostProcessor(PostProcessTools tools, IToolProcessRu
                 return Failed(job, "No files left to import after post-processing (only samples, .nfo or .par2 files).");
             }
 
-            progress.Report(new PostProcessProgress(PostProcessStage.Cleaning, 0.8, "Deleting download folder"));
-            DeleteWorkFolder(work);
+            if (!job.KeepFiles)
+            {
+                progress.Report(new PostProcessProgress(PostProcessStage.Cleaning, 0.8, "Deleting download folder"));
+                DeleteWorkFolder(work);
+            }
+
             progress.Report(new PostProcessProgress(PostProcessStage.Cleaning, 1, null));
 
             logger.LogInformation("Post-processing of {Title} done: {Count} file(s) in {Target}{Repaired}", job.Title, files.Count, target, verify.Repaired ? " (repaired)" : string.Empty);

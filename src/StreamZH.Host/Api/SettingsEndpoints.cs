@@ -106,10 +106,28 @@ public static class SettingsEndpoints
 
         group.MapPut("/downloads", (UpdateDownloadSettings request, DownloadSettings downloads, ILogger<DownloadSettings> logger) =>
         {
-            downloads.Update(request.Client, request.NzbFolder, request.IncompleteFolder, request.CompleteFolder, request.SpeedLimitKBps);
+            downloads.Update(
+                request.Client,
+                request.NzbFolder,
+                request.IncompleteFolder,
+                request.CompleteFolder,
+                request.SpeedLimitKBps,
+                request.MinFreeSpaceGb,
+                request.KeepFiles,
+                request.AbortHopeless,
+                request.ArticleTries);
             logger.LogInformation(
-                "Download settings saved: {Client}, incomplete {Incomplete}, complete {Complete}, NZB folder {NzbFolder}, limit {Limit} KB/s",
-                DownloadSettings.ClientValue(downloads.Client), downloads.IncompleteFolder, downloads.CompleteFolder, downloads.NzbFolder, downloads.SpeedLimitKBps);
+                "Download settings saved: {Client}, incomplete {Incomplete}, complete {Complete}, NZB folder {NzbFolder}, limit {Limit} KB/s, "
+                + "min. free {MinFree} GB, keep files {KeepFiles}, abort hopeless {AbortHopeless}, {Tries} tries per article",
+                DownloadSettings.ClientValue(downloads.Client),
+                downloads.IncompleteFolder,
+                downloads.CompleteFolder,
+                downloads.NzbFolder,
+                downloads.SpeedLimitKBps,
+                downloads.MinFreeSpaceGb,
+                downloads.KeepFiles,
+                downloads.AbortHopeless,
+                downloads.ArticleTries);
             return Results.Ok(DownloadSettingsResource.From(downloads));
         });
 
@@ -131,7 +149,9 @@ public sealed record UpdateMetadataSettings(string? TmdbToken, string? Language)
 
 /// <summary>
 /// Download settings. <see cref="Client"/> is "builtin" or "blackhole"; the folders come with their defaults and a
-/// problem text when StreamZH cannot write there. <see cref="SpeedLimitKBps"/> 0 = unlimited.
+/// problem text when StreamZH cannot write there. <see cref="SpeedLimitKBps"/> 0 = unlimited. The last four are the
+/// engine's expert settings: pause below <see cref="MinFreeSpaceGb"/> free (0 = never), keep the download folder after
+/// a successful unpack, fail a download as soon as it cannot be repaired, and tries per server and article.
 /// </summary>
 public sealed record DownloadSettingsResource(
     string NzbFolder,
@@ -145,7 +165,11 @@ public sealed record DownloadSettingsResource(
     string CompleteFolder,
     string DefaultCompleteFolder,
     string? CompleteProblem,
-    long SpeedLimitKBps)
+    long SpeedLimitKBps,
+    double MinFreeSpaceGb,
+    bool KeepFiles,
+    bool AbortHopeless,
+    int ArticleTries)
 {
     public static DownloadSettingsResource From(DownloadSettings downloads)
     {
@@ -164,12 +188,25 @@ public sealed record DownloadSettingsResource(
             complete,
             downloads.DefaultCompleteFolder,
             DownloadSettings.CheckWritable(complete),
-            downloads.SpeedLimitKBps);
+            downloads.SpeedLimitKBps,
+            downloads.MinFreeSpaceGb,
+            downloads.KeepFiles,
+            downloads.AbortHopeless,
+            downloads.ArticleTries);
     }
 }
 
 /// <summary>Null fields keep their value; an empty folder means the default one.</summary>
-public sealed record UpdateDownloadSettings(string? NzbFolder, string? Client = null, string? IncompleteFolder = null, string? CompleteFolder = null, long? SpeedLimitKBps = null);
+public sealed record UpdateDownloadSettings(
+    string? NzbFolder,
+    string? Client = null,
+    string? IncompleteFolder = null,
+    string? CompleteFolder = null,
+    long? SpeedLimitKBps = null,
+    double? MinFreeSpaceGb = null,
+    bool? KeepFiles = null,
+    bool? AbortHopeless = null,
+    int? ArticleTries = null);
 
 public sealed record TestMetadataRequest(string? TmdbToken);
 

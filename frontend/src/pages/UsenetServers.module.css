@@ -10,6 +10,15 @@
   color: var(--text);
 }
 
+/* Title on the left, "Advanced" switch on the right (below the title on phones). */
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 24px;
+}
+
 /* Settings page card */
 .card {
   display: flex;
@@ -290,6 +299,34 @@ button.name:focus-visible {
 
 .unitInput {
   width: 140px;
+}
+
+/* Quota usage under the quota field: "12.3 GB of 500 GB used since …" and the reset button. */
+.usage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.usageFull {
+  color: #ef9a9a;
+}
+
+.notes {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+/* Quota and notes in a server row, after the host. */
+.quota {
+  font-size: 12.5px;
+  color: var(--text-faint);
 }
 
 @media (max-width: 860px) {

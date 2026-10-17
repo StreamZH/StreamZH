@@ -11,6 +11,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading.Channels;
 
 namespace StreamZH.Tests.Usenet;
 
@@ -29,6 +30,7 @@ public sealed class FakeNntpServer : IAsyncDisposable
     private int _maxConcurrent;
     private int _opened;
     private int _bodyRequests;
+    private int _bodiesReceived;
     private int _dropNextBodies;
     private int _disposed;
 
@@ -64,6 +66,12 @@ public sealed class FakeNntpServer : IAsyncDisposable
     public int MaxConcurrentConnections => Volatile.Read(ref _maxConcurrent);
 
     public int BodyRequests => Volatile.Read(ref _bodyRequests);
+
+    /// <summary>BODY commands that arrived, answered or not (more than <see cref="BodyRequests"/> while pipelined ones wait).</summary>
+    public int BodiesReceived => Volatile.Read(ref _bodiesReceived);
+
+    /// <summary>While set and not completed, BODY answers wait for it.</summary>
+    public TaskCompletionSource? BodyGate { get; set; }
 
     public ConcurrentQueue<string> Commands { get; } = new();
 
@@ -173,7 +181,10 @@ public sealed class FakeNntpServer : IAsyncDisposable
 
                     var loggedIn = Username is null;
                     string? user = null;
-                    while (await reader.ReadLineAsync(token) is { } line)
+                    // Lines are read as they arrive (so pipelined commands can be counted) and answered one by one.
+                    var lines = Channel.CreateUnbounded<string>();
+                    _ = Task.Run(() => ReadLinesAsync(reader, lines.Writer, token), CancellationToken.None);
+                    await foreach (var line in lines.Reader.ReadAllAsync(token))
                     {
                         Commands.Enqueue(line);
                         var parts = line.Split(' ', 3);
@@ -221,6 +232,30 @@ public sealed class FakeNntpServer : IAsyncDisposable
         }
     }
 
+    private async Task ReadLinesAsync(StreamReader reader, ChannelWriter<string> lines, CancellationToken token)
+    {
+        try
+        {
+            while (await reader.ReadLineAsync(token) is { } line)
+            {
+                if (line.StartsWith("BODY", StringComparison.OrdinalIgnoreCase))
+                {
+                    Interlocked.Increment(ref _bodiesReceived);
+                }
+
+                await lines.WriteAsync(line, token);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or OperationCanceledException or AuthenticationException)
+        {
+            // Connection closed.
+        }
+        finally
+        {
+            lines.TryComplete();
+        }
+    }
+
     /// <returns>False when the connection was dropped on purpose.</returns>
     private async Task<bool> SendBodyAsync(Stream stream, string messageId, CancellationToken token)
     {
@@ -228,6 +263,11 @@ public sealed class FakeNntpServer : IAsyncDisposable
         if (StallBodies)
         {
             await Task.Delay(Timeout.Infinite, token);
+        }
+
+        if (BodyGate is { } gate)
+        {
+            await gate.Task.WaitAsync(token);
         }
 
         if (BodyDelay > TimeSpan.Zero)

@@ -9,6 +9,13 @@ namespace StreamZH.Core.Downloads;
 /// <summary>A Usenet provider account. Several can be configured: lower <see cref="Priority"/> first, the others fill gaps (backup/block accounts).</summary>
 /// <param name="Priority">0 = primary. Higher numbers are only asked for articles the lower ones do not have.</param>
 /// <param name="RetentionDays">0 = unknown/unlimited; articles older than this are not requested from this server.</param>
+/// <param name="TimeoutSeconds">Read timeout per connection (the connect timeout is at most this long).</param>
+/// <param name="CertificateCheck">How strictly the SSL certificate is checked (only with <see cref="UseSsl"/>).</param>
+/// <param name="ArticlesPerRequest">Pipelining: BODY commands sent on one connection before the first answer is read.</param>
+/// <param name="OnFailure">What happens while the server cannot be used (connection or login errors).</param>
+/// <param name="ExpiresOn">"yyyy-MM-dd" when the account ends; only for a notice in the status window.</param>
+/// <param name="QuotaBytes">Download quota (block account, plan limit); null = none. When used up the server is skipped.</param>
+/// <param name="QuotaUsedBytes">Bytes downloaded since <paramref name="QuotaSince"/> (the quota was set or the counter reset).</param>
 public sealed record UsenetServer(
     int Id,
     string Name,
@@ -20,7 +27,57 @@ public sealed record UsenetServer(
     int Connections,
     int Priority,
     bool Enabled,
-    int RetentionDays);
+    int RetentionDays,
+    int TimeoutSeconds = UsenetServer.DefaultTimeoutSeconds,
+    CertificateCheck CertificateCheck = CertificateCheck.Strict,
+    int ArticlesPerRequest = UsenetServer.DefaultArticlesPerRequest,
+    ServerFailureAction OnFailure = ServerFailureAction.Skip,
+    string? ExpiresOn = null,
+    long? QuotaBytes = null,
+    long QuotaUsedBytes = 0,
+    DateTime? QuotaSince = null,
+    string Notes = "")
+{
+    public const int DefaultTimeoutSeconds = 60;
+    public const int DefaultArticlesPerRequest = 1;
+
+    /// <summary>One "GB" of a quota: providers count in powers of ten.</summary>
+    public const long BytesPerGb = 1_000_000_000;
+
+    /// <summary><see cref="ExpiresOn"/> as a date; null when not set or not a valid date.</summary>
+    public DateOnly? ExpiryDate =>
+        DateOnly.TryParseExact(ExpiresOn, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
+            ? date
+            : null;
+
+    public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds > 0 ? TimeoutSeconds : DefaultTimeoutSeconds);
+}
+
+/// <summary>How the SSL certificate of a Usenet server is checked.</summary>
+public enum CertificateCheck
+{
+    /// <summary>Full validation by the operating system: trusted, not expired, issued for the host name.</summary>
+    Strict,
+
+    /// <summary>A certificate is required and must be issued for the host name, but may be self-signed, untrusted or expired.</summary>
+    Minimal,
+
+    /// <summary>Anything is accepted. Unsafe: someone in between can read the login.</summary>
+    Off,
+}
+
+/// <summary>What happens while a server cannot be used (connection refused, timeouts, login or SSL errors, quota used up).</summary>
+public enum ServerFailureAction
+{
+    /// <summary>The server is skipped for a few minutes; the other servers carry on.</summary>
+    Skip,
+
+    /// <summary>"Required": downloads pause until the server works again, so articles are not wrongly marked as missing.</summary>
+    PauseDownloads,
+
+    /// <summary>"Optional": an unreliable server, skipped for longer; its errors do not show in the status window.</summary>
+    IgnoreLonger,
+}
 
 /// <summary>One decoded yEnc part, ready to be written at <see cref="Offset"/> into <see cref="FileName"/>.</summary>
 public sealed record DecodedArticle(string FileName, long FileSize, long Offset, byte[] Data, bool CrcOk);
@@ -111,7 +168,8 @@ public sealed record DownloadItem
 /// <summary>Input for post-processing a finished download.</summary>
 /// <param name="WorkFolder">Folder with the downloaded files (par2, rar, mkv …).</param>
 /// <param name="TargetFolder">Where the final files go (created if needed).</param>
-public sealed record PostProcessJob(int DownloadId, string Title, string WorkFolder, string TargetFolder, string? Password);
+/// <param name="KeepFiles">After success, leave the work folder (par2, archives, nfo …) instead of deleting it.</param>
+public sealed record PostProcessJob(int DownloadId, string Title, string WorkFolder, string TargetFolder, string? Password, bool KeepFiles = false);
 
 public enum PostProcessStage
 {

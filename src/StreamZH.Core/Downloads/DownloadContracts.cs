@@ -12,7 +12,10 @@ namespace StreamZH.Core.Downloads;
 /// </summary>
 public interface IArticleSource
 {
-    /// <summary>Total connections of all enabled servers; the download engine runs at most this many fetches at once.</summary>
+    /// <summary>
+    /// Fetches the enabled servers can serve at once (their connections, times the articles per request with pipelining);
+    /// the download engine runs at most this many fetches at once. 0: no server.
+    /// </summary>
     int MaxConnections { get; }
 
     /// <exception cref="ArticleNotFoundException">No enabled server has the article.</exception>

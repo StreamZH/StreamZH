@@ -21,4 +21,10 @@ public static class ConfigKeys
     public const string CompleteFolder = "CompleteFolder";
     public const string DownloadSpeedLimit = "DownloadSpeedLimit";
     public const string DownloadsPaused = "DownloadsPaused";
+
+    // Download engine expert settings (Settings → Downloads, advanced); empty = default.
+    public const string DownloadMinFreeSpaceGb = "DownloadMinFreeSpaceGb";
+    public const string DownloadKeepFiles = "DownloadKeepFiles";
+    public const string DownloadAbortHopeless = "DownloadAbortHopeless";
+    public const string DownloadArticleTries = "DownloadArticleTries";
 }

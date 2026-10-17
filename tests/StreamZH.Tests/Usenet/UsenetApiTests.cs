@@ -145,6 +145,109 @@ public sealed class UsenetApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await _factory.CreateClient().GetAsync("/api/v1/usenet/server")).StatusCode);
     }
 
+    [Fact]
+    public async Task Expert_settings_round_trip_and_the_quota_counter_can_be_reset()
+    {
+        var client = await _factory.CreateOwnerClientAsync();
+        var response = await client.PostAsJsonAsync("/api/v1/usenet/server", new
+        {
+            name = "Block",
+            host = "127.0.0.1",
+            port = _server.Port,
+            useSsl = false,
+            username = "user",
+            password = "provider-pass",
+            connections = 2,
+            timeoutSeconds = 90,
+            certificateCheck = "minimal",
+            articlesPerRequest = 2,
+            onFailure = "pause",
+            expiresOn = "2027-01-31",
+            quotaGb = 0.5,
+            notes = "Bought in October",
+        });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = (await response.Content.ReadFromJsonAsync<UsenetServerResource>())!;
+        Assert.Equal(90, created.TimeoutSeconds);
+        Assert.Equal("minimal", created.CertificateCheck);
+        Assert.Equal(2, created.ArticlesPerRequest);
+        Assert.Equal("pause", created.OnFailure);
+        Assert.Equal("2027-01-31", created.ExpiresOn);
+        Assert.Equal(0.5, created.QuotaGb);
+        Assert.Equal(0, created.QuotaUsedBytes);
+        Assert.NotNull(created.QuotaSince);
+        Assert.Equal("Bought in October", created.Notes);
+        Assert.Equal(4, _factory.Services.GetRequiredService<IArticleSource>().MaxConnections);
+
+        _server.AddYenc("a@x", YencArticles.Random(5000));
+        await _factory.Services.GetRequiredService<IArticleSource>().FetchAsync("a@x", [], DateTimeOffset.UtcNow, CancellationToken.None);
+        var listed = (await client.GetFromJsonAsync<UsenetServerResource[]>("/api/v1/usenet/server"))!.Single();
+        Assert.True(listed.QuotaUsedBytes > 5000);
+        var status = await client.GetFromJsonAsync<JsonElement>("/api/v1/usenet/status");
+        Assert.Equal(listed.QuotaUsedBytes, status.GetProperty("servers")[0].GetProperty("quotaUsedBytes").GetInt64());
+        Assert.False(status.GetProperty("servers")[0].GetProperty("quotaExhausted").GetBoolean());
+
+        // Saving the unchanged resource keeps every setting and the counter.
+        var saved = (await (await client.PutAsJsonAsync($"/api/v1/usenet/server/{created.Id}", listed)).Content.ReadFromJsonAsync<UsenetServerResource>())!;
+        Assert.Equal(listed with { QuotaUsedBytes = saved.QuotaUsedBytes }, saved);
+        Assert.Equal(listed.QuotaUsedBytes, saved.QuotaUsedBytes);
+
+        var reset = await client.PostAsync($"/api/v1/usenet/server/{created.Id}/quota/reset", null);
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+        Assert.Equal(0, (await reset.Content.ReadFromJsonAsync<UsenetServerResource>())!.QuotaUsedBytes);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/v1/usenet/server/999/quota/reset", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Rejects_invalid_expert_settings_with_field_errors()
+    {
+        var client = await _factory.CreateOwnerClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/usenet/server", new
+        {
+            name = "A",
+            host = "news.example.com",
+            certificateCheck = "lenient",
+            onFailure = "explode",
+            quotaGb = -1,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            ["certificateCheck", "onFailure", "quotaGb"],
+            problem.GetProperty("errors").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+
+        response = await client.PostAsJsonAsync("/api/v1/usenet/server", new { name = "A", host = "news.example.com", timeoutSeconds = 301, articlesPerRequest = 0, expiresOn = "soon" });
+        problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            ["articlesPerRequest", "expiresOn", "timeoutSeconds"],
+            problem.GetProperty("errors").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task Status_window_shows_an_expiring_account()
+    {
+        var client = await _factory.CreateOwnerClientAsync();
+        var expires = DateOnly.FromDateTime(DateTime.Now).AddDays(3);
+        await client.PostAsJsonAsync("/api/v1/usenet/server", new
+        {
+            name = "Newshosting",
+            host = "news.example.com",
+            username = "user",
+            password = "pw",
+            expiresOn = expires.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        });
+
+        var ongoing = await client.GetFromJsonAsync<JsonElement>("/api/v1/status/ongoing");
+
+        var notice = ongoing.GetProperty("notices").EnumerateArray().Single(n => n.GetProperty("key").GetString()!.StartsWith("usenet-expiry-", StringComparison.Ordinal));
+        Assert.Equal(
+            $"Newshosting account expires on {expires.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture)}",
+            notice.GetProperty("title").GetString());
+        Assert.Equal("warn", notice.GetProperty("level").GetString());
+    }
+
     private static object NewServer(string name, string password) => new { name, host = "news.example.com", username = "user", password };
 
     private object LocalServer(string password) => new

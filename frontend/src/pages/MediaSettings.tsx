@@ -6,6 +6,9 @@ import { libraryApi, queryKeys, type MediaType } from '../api/library'
 import { releaseKeys, releasesApi, type DownloadClient, type DownloadSettingsChange } from '../api/releases'
 import FolderPicker from '../components/FolderPicker'
 import ui from '../components/ui.module.css'
+import form from '../indexers/Form.module.css'
+import { Advanced, AdvancedHint } from '../lib/Advanced'
+import { advancedLabel, setAdvanced, useAdvanced } from '../lib/advancedMode'
 import { formatBytes } from '../lib/format'
 import page from './Page.module.css'
 import styles from './Settings.module.css'
@@ -228,10 +231,42 @@ interface DownloadDraft {
   incompleteFolder?: string
   completeFolder?: string
   speedLimit?: string
+  minFreeSpace?: string
+  keepFiles?: boolean
+  abortHopeless?: boolean
+  articleTries?: string
+}
+
+/** Expert settings of the Downloads card; a save error on one of them switches advanced mode on. */
+const advancedDownloadFields = ['incompleteFolder', 'completeFolder', 'minFreeSpaceGb', 'keepFiles', 'abortHopeless', 'articleTries']
+
+function SwitchField({
+  label,
+  checked,
+  help,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  help: string
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <div className={styles.field}>
+      <span className={advancedLabel}>{label}</span>
+      <label className={form.switch}>
+        <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
+        <span className={form.track} aria-hidden="true" />
+        <span>{checked ? 'On' : 'Off'}</span>
+      </label>
+      <small>{help}</small>
+    </div>
+  )
 }
 
 function FolderRow({
   label,
+  advanced = false,
   value,
   isDefault,
   problem,
@@ -241,6 +276,8 @@ function FolderRow({
   onDefault,
 }: {
   label: string
+  /** An expert setting: the label stands out while advanced mode is on. */
+  advanced?: boolean
   value: string
   isDefault: boolean
   problem: string | null
@@ -251,7 +288,7 @@ function FolderRow({
 }) {
   return (
     <div className={styles.field}>
-      <span>{label}</span>
+      <span className={advanced ? advancedLabel : undefined}>{label}</span>
       <div className={styles.rootForm}>
         <input className={`${ui.input} ${ui.mono}`} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} spellCheck={false} />
         <button className={styles.secondary} type="button" onClick={onBrowse}>
@@ -273,12 +310,16 @@ export function DownloadsSection() {
   const settings = useQuery({ queryKey: releaseKeys.downloads, queryFn: releasesApi.downloadSettings })
   const [draft, setDraft] = useState<DownloadDraft>({})
   const [picking, setPicking] = useState<FolderField | null>(null)
+  const advanced = useAdvanced()
 
   const save = useMutation({
     mutationFn: (change: DownloadSettingsChange) => releasesApi.saveDownloadSettings(change),
     onSuccess: (data) => {
       queryClient.setQueryData(releaseKeys.downloads, data)
       setDraft({})
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && Object.keys(error.fieldErrors).some((name) => advancedDownloadFields.includes(name))) setAdvanced(true)
     },
   })
 
@@ -290,6 +331,15 @@ export function DownloadsSection() {
   const speedText = draft.speedLimit ?? String(current.speedLimitKBps)
   const speed = Number(speedText.trim() === '' ? '0' : speedText)
   const speedValid = Number.isInteger(speed) && speed >= 0
+  const minFreeText = draft.minFreeSpace ?? String(current.minFreeSpaceGb)
+  const minFree = Number(minFreeText.trim() === '' ? '0' : minFreeText)
+  const minFreeValid = Number.isFinite(minFree) && minFree >= 0
+  const triesText = draft.articleTries ?? String(current.articleTries)
+  const tries = Number(triesText)
+  const triesValid = Number.isInteger(tries) && tries >= 1 && tries <= 10
+  const keepFiles = draft.keepFiles ?? current.keepFiles
+  const abortHopeless = draft.abortHopeless ?? current.abortHopeless
+  const valid = speedValid && minFreeValid && triesValid
 
   const change: DownloadSettingsChange = {}
   if (client !== current.client) change.client = client
@@ -298,18 +348,28 @@ export function DownloadsSection() {
     if (value !== undefined && value.trim() !== current[field]) change[field] = value.trim()
   }
   if (speedValid && speed !== current.speedLimitKBps) change.speedLimitKBps = speed
+  if (minFreeValid && minFree !== current.minFreeSpaceGb) change.minFreeSpaceGb = minFree
+  if (triesValid && tries !== current.articleTries) change.articleTries = tries
+  if (keepFiles !== current.keepFiles) change.keepFiles = keepFiles
+  if (abortHopeless !== current.abortHopeless) change.abortHopeless = abortHopeless
   const dirty = Object.keys(change).length > 0
 
   const fieldErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
   const generalError = save.error && Object.keys(fieldErrors).length === 0 ? save.error.message : undefined
   const fieldError = (field: string) => fieldErrors[field]?.[0]
+  const showFolders =
+    advanced ||
+    current.incompleteProblem != null ||
+    current.completeProblem != null ||
+    fieldError('incompleteFolder') != null ||
+    fieldError('completeFolder') != null
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (dirty && speedValid) save.mutate(change)
+    if (dirty && valid) save.mutate(change)
   }
 
-  const setField = (field: keyof DownloadDraft, value: string) => {
+  const setField = (field: keyof DownloadDraft, value: string | boolean) => {
     save.reset()
     setDraft((d) => ({ ...d, [field]: value }))
   }
@@ -321,9 +381,10 @@ export function DownloadsSection() {
     return value === current.defaultCompleteFolder || value === ''
   }
 
-  const row = (field: FolderField, label: string, problem: string | null) => (
+  const row = (field: FolderField, label: string, problem: string | null, expert = false) => (
     <FolderRow
       label={label}
+      advanced={expert}
       value={folder(field)}
       isDefault={isDefault(field)}
       problem={draft[field] === undefined ? problem : null}
@@ -362,8 +423,50 @@ export function DownloadsSection() {
             StreamZH downloads grabbed releases from your Usenet servers, repairs and unpacks them. Files are assembled in the incomplete folder and
             moved to the completed folder (one subfolder per category) when they are done.
           </p>
-          {row('incompleteFolder', 'Incomplete downloads', current.incompleteProblem)}
-          {row('completeFolder', 'Completed downloads', current.completeProblem)}
+          {showFolders && (
+            <>
+              {row('incompleteFolder', 'Incomplete downloads', current.incompleteProblem, true)}
+              {row('completeFolder', 'Completed downloads', current.completeProblem, true)}
+            </>
+          )}
+          <Advanced>
+            <div className={styles.grid}>
+              <label className={styles.field}>
+                <span className={advancedLabel}>Minimum free space (GB)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  value={minFreeText}
+                  onChange={(e) => setField('minFreeSpace', e.target.value)}
+                />
+                <small>Downloads pause when less is free in the incomplete folder and continue with 50 % more. 0 never pauses.</small>
+                {!minFreeValid && <span className={styles.error}>Enter a number, 0 or more.</span>}
+                {minFreeValid && fieldError('minFreeSpaceGb') && <span className={styles.error}>{fieldError('minFreeSpaceGb')}</span>}
+              </label>
+              <label className={styles.field}>
+                <span className={advancedLabel}>Tries per article</span>
+                <input type="number" min={1} max={10} step={1} inputMode="numeric" value={triesText} onChange={(e) => setField('articleTries', e.target.value)} />
+                <small>How often an article is asked for again on one server after a timeout or a dropped connection, before the next server.</small>
+                {!triesValid && <span className={styles.error}>Enter a whole number from 1 to 10.</span>}
+                {triesValid && fieldError('articleTries') && <span className={styles.error}>{fieldError('articleTries')}</span>}
+              </label>
+              <SwitchField
+                label="Abort hopeless downloads"
+                checked={abortHopeless}
+                onChange={(checked) => setField('abortHopeless', checked)}
+                help="A download fails as soon as more is missing than its par2 files can repair, so the next release can be tried. Off: it is downloaded to the end anyway."
+              />
+              <SwitchField
+                label="Keep par2 and archive files"
+                checked={keepFiles}
+                onChange={(checked) => setField('keepFiles', checked)}
+                help="After a successful unpack the download folder (par2, rar, nfo) stays in the incomplete folder instead of being deleted. You clean it up yourself."
+              />
+            </div>
+          </Advanced>
+          <AdvancedHint count={(showFolders ? 0 : 2) + 4} />
         </>
       ) : (
         <>
@@ -376,7 +479,7 @@ export function DownloadsSection() {
       )}
 
       <div className={styles.actions}>
-        <button className={styles.primary} type="submit" disabled={!dirty || !speedValid || save.isPending}>
+        <button className={styles.primary} type="submit" disabled={!dirty || !valid || save.isPending}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
         {dirty && (

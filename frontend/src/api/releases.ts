@@ -77,6 +77,14 @@ export interface DownloadSettings {
   completeProblem: string | null
   /** 0 = unlimited. */
   speedLimitKBps: number
+  /** Expert: the queue pauses below this much free space in the incomplete folder (0 = never). */
+  minFreeSpaceGb: number
+  /** Expert: after a successful unpack the download folder (par2, archives) stays. */
+  keepFiles: boolean
+  /** Expert: a download fails as soon as it cannot be repaired any more. */
+  abortHopeless: boolean
+  /** Expert: tries per server and article after timeouts or dropped connections. */
+  articleTries: number
 }
 
 /** Fields left out keep their value; an empty folder means the default one. */
@@ -86,6 +94,10 @@ export interface DownloadSettingsChange {
   incompleteFolder?: string
   completeFolder?: string
   speedLimitKBps?: number
+  minFreeSpaceGb?: number
+  keepFiles?: boolean
+  abortHopeless?: boolean
+  articleTries?: number
 }
 
 /** Sent over the hub when an automatic search job is done. */

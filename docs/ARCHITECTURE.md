@@ -119,7 +119,9 @@ User ── Owner, Admin, Friend (same roles as CloudZH)
 
 1. **NZB parser**: reads files, segments and groups. Detects par2 sets and archives.
 2. **NNTP pool**: one pool per server, connection limit per server, TLS, `BODY` per
-   article, retry on next server (backup servers by priority).
+   article, retry on next server (backup servers by priority). Per-server expert settings:
+   timeout, certificate check, pipelining (articles per request), required/optional
+   (pause downloads vs. skip longer on failure), download quota, account expiry notice.
 3. **yEnc decoder**: decodes article bodies, checks CRC32 per part. Hot path, written
    with `Span<byte>`; SIMD later if needed.
 4. **Assembler**: writes decoded parts at their offset into the target file (no temp

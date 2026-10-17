@@ -583,6 +583,7 @@ public sealed class DownloadEngine(
         var connections = Math.Max(0, articles.MaxConnections);
         var folder = settings.IncompleteFolder;
         var free = freeSpace.FreeBytes(folder);
+        var minFree = settings.MinFreeSpaceBytes;
         var now = _clock.Elapsed.TotalSeconds;
         List<DownloadProgressItem>? progress = null;
 
@@ -591,14 +592,14 @@ public sealed class DownloadEngine(
             _maxConnections = connections;
             _freeBytes = free;
 
-            if (free is { } bytes && bytes < options.MinFreeBytes && !_diskPaused)
+            if (free is { } bytes && bytes < minFree && !_diskPaused)
             {
                 _diskPaused = true;
-                _diskMessage = $"Paused: only {FormatBytes(bytes)} free in {folder}. Downloads continue when at least {FormatBytes(options.MinFreeBytes)} are free.";
+                _diskMessage = $"Paused: only {FormatBytes(bytes)} free in {folder}. Downloads continue when at least {FormatBytes(minFree)} are free.";
                 logger.LogWarning("Download queue paused, only {Free} bytes free in {Folder}", bytes, folder);
                 QueueChanged();
             }
-            else if (_diskPaused && (free is null || free >= options.MinFreeBytes + (options.MinFreeBytes / 2)))
+            else if (_diskPaused && (free is null || free >= minFree + (minFree / 2)))
             {
                 _diskPaused = false;
                 _diskMessage = null;
@@ -841,7 +842,7 @@ public sealed class DownloadEngine(
             d.ReceivedBytes += received;
             _dirty.Add(d);
 
-            if (result != SegmentResult.Done && TooMuchMissing(d) is { } error)
+            if (result != SegmentResult.Done && settings.AbortHopeless && TooMuchMissing(d) is { } error)
             {
                 Fail(d, error);
                 return;
@@ -998,6 +999,7 @@ public sealed class DownloadEngine(
         ActiveDownload? d;
         PostProcessJob job;
         CancellationToken token;
+        var keepFiles = settings.KeepFiles;
         lock (_lock)
         {
             if (!_items.TryGetValue(id, out d) || !d.IsPostProcessing || d.Closed)
@@ -1010,7 +1012,7 @@ public sealed class DownloadEngine(
             d.StepProgress = 0;
             MarkChanged(d);
             var target = UniqueFolder(Path.Combine(settings.CompleteFolder, CategoryFolder(d.Category)), d.Title, [], onlyIfNotEmpty: true);
-            job = new PostProcessJob(d.Id, d.Title, d.WorkFolder, target, d.Password);
+            job = new PostProcessJob(d.Id, d.Title, d.WorkFolder, target, d.Password, keepFiles);
             token = d.Cancellation.Token;
         }
 
@@ -1041,7 +1043,7 @@ public sealed class DownloadEngine(
             // Clean up before the download shows as completed: whoever sees "completed" sees the final folders.
             var output = Path.GetFullPath(result.OutputFolder);
             var work = Path.GetFullPath(d.WorkFolder);
-            if (Directory.Exists(work) && !output.StartsWith(work, StringComparison.Ordinal) && !work.StartsWith(output, StringComparison.Ordinal))
+            if (!keepFiles && Directory.Exists(work) && !output.StartsWith(work, StringComparison.Ordinal) && !work.StartsWith(output, StringComparison.Ordinal))
             {
                 TryDelete(() => Directory.Delete(work, recursive: true));
             }

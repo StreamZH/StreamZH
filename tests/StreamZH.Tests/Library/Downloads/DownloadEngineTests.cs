@@ -7,6 +7,7 @@ using StreamZH.Core.Downloads;
 using StreamZH.Data;
 using StreamZH.Library;
 using StreamZH.Library.Downloads;
+using StreamZH.Library.Search;
 using StreamZH.Usenet.Nzb;
 
 namespace StreamZH.Tests.Library.Downloads;
@@ -251,6 +252,81 @@ public sealed class DownloadEngineTests : IDisposable
 
         Assert.Equal(0, done.MissingArticles);
         Assert.Null(engine.Status().StatusMessage);
+    }
+
+    [Fact]
+    public async Task Without_abort_a_hopeless_download_is_fetched_completely_and_post_processing_decides()
+    {
+        _bed.Articles.MaxConnections = 1;
+        _bed.Settings.Update(null, null, null, null, null, abortHopeless: false);
+        var release = _bed.Release("Broken.Release.2024.1080p.WEB-GRP", ("data.mkv", 40_000, 4000), ("data.nfo", 200, 4000));
+        var ids = release["data.mkv"].MessageIds;
+        _bed.Articles.Missing[ids[0]] = 0;
+        _bed.Articles.Missing[ids[1]] = 0;
+        var engine = await _bed.StartAsync();
+
+        var added = await engine.AddAsync(DownloadTestBed.Request(release));
+        var done = await DownloadTestBed.WaitForAsync(engine, added.Id, DownloadStatus.Completed);
+
+        Assert.Equal(2, done.MissingArticles);
+        Assert.Equal(11, _bed.Articles.Fetched.Count);
+        Assert.Single(_bed.PostProcessor.Jobs);
+    }
+
+    [Fact]
+    public async Task Keep_files_leaves_the_download_folder_in_place()
+    {
+        _bed.Settings.Update(null, null, null, null, null, keepFiles: true);
+        var release = _bed.Release("Keep.Files.2024.1080p.WEB-GRP", ("data.mkv", 8000, 4000), ("data.par2", 500, 4000));
+        var engine = await _bed.StartAsync();
+
+        var added = await engine.AddAsync(DownloadTestBed.Request(release));
+        var done = await DownloadTestBed.WaitForAsync(engine, added.Id, DownloadStatus.Completed);
+
+        var job = Assert.Single(_bed.PostProcessor.Jobs);
+        Assert.True(job.KeepFiles);
+        Assert.True(File.Exists(Path.Combine(job.WorkFolder, "data.par2")));
+        Assert.True(File.Exists(Path.Combine(done.OutputPath!, "data.mkv")));
+        Assert.False(File.Exists(Path.Combine(_bed.Settings.NzbQueueFolder, $"{added.Id}.nzb")));
+    }
+
+    [Fact]
+    public async Task The_free_space_setting_moves_the_pause_threshold()
+    {
+        _bed.FreeSpace.Free = 500L * 1024 * 1024;
+        _bed.Settings.Update(null, null, null, null, null, minFreeSpaceGb: 0.25);
+        var release = _bed.Release("Small.Disk.2024.1080p.WEB-GRP", ("data.mkv", 8000, 4000));
+        var engine = await _bed.StartAsync();
+
+        var added = await engine.AddAsync(DownloadTestBed.Request(release));
+        await DownloadTestBed.WaitForAsync(engine, added.Id, DownloadStatus.Completed);
+        Assert.False(engine.Status().Paused);
+
+        _bed.FreeSpace.Free = 3L * 1024 * 1024 * 1024;
+        _bed.Settings.Update(null, null, null, null, null, minFreeSpaceGb: 5);
+        await DownloadTestBed.WaitUntilAsync(() => engine.Status().Paused);
+        Assert.Contains("at least 5 GB", engine.Status().StatusMessage, StringComparison.Ordinal);
+
+        _bed.Settings.Update(null, null, null, null, null, minFreeSpaceGb: 0);
+        await DownloadTestBed.WaitUntilAsync(() => !engine.Status().Paused);
+    }
+
+    [Fact]
+    public void Expert_settings_default_to_todays_behaviour_and_are_validated()
+    {
+        var settings = _bed.Settings;
+        Assert.Equal((1d, 1024L * 1024 * 1024, false, true, 3), (settings.MinFreeSpaceGb, settings.MinFreeSpaceBytes, settings.KeepFiles, settings.AbortHopeless, settings.ArticleTries));
+
+        var error = Assert.Throws<ValidationFailedException>(() => settings.Update(null, null, null, null, null, minFreeSpaceGb: double.NaN, articleTries: 0));
+        Assert.Equal(["articleTries", "minFreeSpaceGb"], error.Errors.Keys.Order());
+
+        settings.Update(null, null, null, null, null, 0.5, true, false, 7);
+        var reloaded = new DownloadSettings(_bed.Config, _bed.Paths);
+        Assert.Equal((0.5, true, false, 7), (reloaded.MinFreeSpaceGb, reloaded.KeepFiles, reloaded.AbortHopeless, reloaded.ArticleTries));
+
+        // Unchanged fields stay as they are.
+        settings.Update(null, null, null, null, 100);
+        Assert.Equal((0.5, true, false, 7), (settings.MinFreeSpaceGb, settings.KeepFiles, settings.AbortHopeless, settings.ArticleTries));
     }
 
     [Fact]

@@ -18,7 +18,26 @@ export interface UsenetServer {
   enabled: boolean
   /** 0 = unknown; older articles are not requested from this server. */
   retentionDays: number
+  /** Read timeout per connection, 10 to 300 seconds. */
+  timeoutSeconds: number
+  /** Only with SSL: strict = full check, minimal = self-signed allowed, off = anything (unsafe). */
+  certificateCheck: CertificateCheck
+  /** Pipelining: BODY commands sent before the first answer is read. */
+  articlesPerRequest: number
+  /** skip = default, pause = required server, ignore = optional server. */
+  onFailure: FailureAction
+  /** yyyy-MM-dd or null. */
+  expiresOn: string | null
+  /** GB of 10^9 bytes; null = no quota. */
+  quotaGb: number | null
+  /** Read only: downloaded since quotaSince. */
+  quotaUsedBytes: number
+  quotaSince: string | null
+  notes: string
 }
+
+export type CertificateCheck = 'strict' | 'minimal' | 'off'
+export type FailureAction = 'skip' | 'pause' | 'ignore'
 
 export interface UsenetServerStatus {
   id: number
@@ -31,6 +50,9 @@ export interface UsenetServerStatus {
   bytesToday: number
   /** While unhealthy: when it is tried again. */
   retryAt?: string | null
+  /** Null without a quota. */
+  quotaUsedBytes?: number | null
+  quotaExhausted?: boolean
 }
 
 export interface UsenetStatus {
@@ -59,6 +81,15 @@ export const newUsenetServer = (): UsenetServer => ({
   priority: 0,
   enabled: true,
   retentionDays: 0,
+  timeoutSeconds: 60,
+  certificateCheck: 'strict',
+  articlesPerRequest: 1,
+  onFailure: 'skip',
+  expiresOn: null,
+  quotaGb: null,
+  quotaUsedBytes: 0,
+  quotaSince: null,
+  notes: '',
 })
 
 export const usenetApi = {
@@ -67,6 +98,7 @@ export const usenetApi = {
   update: (server: UsenetServer) => request<UsenetServer>('PUT', `/usenet/server/${server.id}`, server),
   remove: (id: number) => request<void>('DELETE', `/usenet/server/${id}`),
   test: (server: UsenetServer) => request<UsenetTestResult>('POST', '/usenet/server/test', server),
+  resetQuota: (id: number) => request<UsenetServer>('POST', `/usenet/server/${id}/quota/reset`),
   status: () => request<UsenetStatus>('GET', '/usenet/status'),
 }
 
@@ -74,6 +106,17 @@ export const usenetKeys = {
   all: ['usenet'] as const,
   servers: ['usenet', 'servers'] as const,
   status: ['usenet', 'status'] as const,
+}
+
+/** Quota amounts the way providers count them (1 GB = 10^9 bytes): "12.3 GB", "0.45 GB". */
+export function formatQuotaGb(bytes: number): string {
+  const gb = bytes / 1e9
+  return `${gb >= 100 ? Math.round(gb).toLocaleString() : gb >= 10 ? gb.toFixed(1) : gb.toFixed(2)} GB`
+}
+
+/** "12.3 GB of 500 GB used". */
+export function quotaUsage(usedBytes: number, quotaGb: number): string {
+  return `${formatQuotaGb(usedBytes)} of ${formatQuotaGb(quotaGb * 1e9)} used`
 }
 
 /** "1.4 GB", "820 MB", "0 B". */

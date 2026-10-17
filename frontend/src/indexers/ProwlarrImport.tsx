@@ -19,12 +19,12 @@ const modeText: Record<ProwlarrImportMode, { label: string; tone: 'ok' | 'info';
   proxy: {
     label: 'Via Prowlarr',
     tone: 'info',
-    help: 'Prowlarr does not hand out this indexer’s key, so StreamZH searches through Prowlarr’s Newznab proxy. Prowlarr has to keep running.',
+    help: 'Prowlarr does not hand out indexer API keys. Without the indexer’s own key, StreamZH searches through Prowlarr, which then has to keep running. Paste the key from your account page at the indexer to use it directly and switch Prowlarr off.',
   },
 }
 
 function selectable(item: ProwlarrPreviewItem) {
-  return item.supported
+  return item.supported && !item.alreadyExists
 }
 
 /** Wizard: connect to Prowlarr, pick indexers from the preview, import them. */
@@ -33,17 +33,24 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
   const formId = useId()
   const [connection, setConnection] = useState<ProwlarrConnection>({ url: '', apiKey: '' })
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [ownKeys, setOwnKeys] = useState<Record<number, string>>({})
+  const modeOf = (item: ProwlarrPreviewItem): ProwlarrImportMode => (ownKeys[item.prowlarrId]?.trim() ? 'direct' : item.mode)
   const [step, setStep] = useState<0 | 1 | 2>(0)
 
   const preview = useMutation({
     mutationFn: () => indexersApi.prowlarrPreview(connection),
     onSuccess: (items) => {
-      setSelected(new Set(items.filter((i) => selectable(i) && !i.alreadyExists).map((i) => i.prowlarrId)))
+      setSelected(new Set(items.filter(selectable).map((i) => i.prowlarrId)))
       setStep(1)
     },
   })
   const importer = useMutation({
-    mutationFn: () => indexersApi.prowlarrImport(connection, [...selected]),
+    mutationFn: () =>
+      indexersApi.prowlarrImport(
+        connection,
+        [...selected],
+        Object.fromEntries(Object.entries(ownKeys).filter(([, key]) => key.trim() !== '')),
+      ),
     onSuccess: async () => {
       setStep(2)
       await queryClient.invalidateQueries({ queryKey: indexerKeys.all })
@@ -53,7 +60,7 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
   const items = preview.data ?? []
   const choosable = items.filter(selectable)
   const allChosen = choosable.length > 0 && choosable.every((i) => selected.has(i.prowlarrId))
-  const modes = new Set(items.filter(selectable).map((i) => i.mode))
+  const modes = new Set(items.filter(selectable).map(modeOf))
 
   const toggle = (id: number, on: boolean) =>
     setSelected((s) => {
@@ -211,6 +218,7 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
                   <th>Protocol</th>
                   <th>Mode</th>
                   <th>Address</th>
+                  <th>Own API key</th>
                   <th>Note</th>
                 </tr>
               </thead>
@@ -236,15 +244,34 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
                       <td data-label="Protocol">
                         <ProtocolChip protocol={item.protocol} />
                       </td>
-                      <td data-label="Mode">{enabled ? <Pill tone={modeText[item.mode].tone}>{modeText[item.mode].label}</Pill> : '–'}</td>
+                      <td data-label="Mode">{enabled ? <Pill tone={modeText[modeOf(item)].tone}>{modeText[modeOf(item)].label}</Pill> : '–'}</td>
                       <td data-label="Address" className={styles.address}>
-                        {item.baseUrl ? `${hostOf(item.baseUrl)}${item.apiPath && item.apiPath !== '/api' ? item.apiPath : ''}` : '–'}
+                        {modeOf(item) === 'direct' && item.ownUrl
+                          ? hostOf(item.ownUrl)
+                          : item.baseUrl
+                            ? `${hostOf(item.baseUrl)}${item.apiPath && item.apiPath !== '/api' ? item.apiPath : ''}`
+                            : '–'}
+                      </td>
+                      <td data-label="Own API key">
+                        {enabled && item.mode === 'proxy' && item.ownUrl ? (
+                          <input
+                            className={`${ui.input} ${styles.keyInput}`}
+                            type="password"
+                            autoComplete="off"
+                            aria-label={`Own API key for ${item.name}`}
+                            placeholder={`Optional, from ${hostOf(item.ownUrl)}`}
+                            value={ownKeys[item.prowlarrId] ?? ''}
+                            onChange={(e) => setOwnKeys((k) => ({ ...k, [item.prowlarrId]: e.target.value }))}
+                          />
+                        ) : (
+                          '–'
+                        )}
                       </td>
                       <td data-label="Note" className={styles.note}>
                         {!enabled ? (
                           <span className={styles.reason}>{item.reason ?? 'Not supported.'}</span>
                         ) : item.alreadyExists ? (
-                          <span className={styles.exists}>Already in StreamZH. Importing again adds a copy.</span>
+                          <span className={styles.exists}>Already in StreamZH, skipped.</span>
                         ) : (
                           <span className={ui.muted}>New</span>
                         )}

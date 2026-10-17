@@ -289,3 +289,10 @@
     margin-bottom: 6px;
   }
 }
+
+.keyInput {
+  min-width: 180px;
+  max-width: 240px;
+  padding-block: 6px;
+  font-size: 13px;
+}

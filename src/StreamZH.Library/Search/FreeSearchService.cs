@@ -41,6 +41,7 @@ public sealed class FreeSearchService(
     public async Task<FreeSearchResult> SearchAsync(FreeSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var source = IndexerCallContext.Begin(IndexerCallSource.Search);
         var query = (request.Query ?? string.Empty).Trim();
         if (query.Length > MaxQueryLength)
         {
@@ -100,8 +101,11 @@ public sealed class FreeSearchService(
     }
 
     /// <summary>Grabs a release from the latest free search results (see <see cref="GrabService.GrabAsync(int, string, CancellationToken)"/>).</summary>
-    public Task<GrabResult> GrabAsync(int indexerId, string guid, CancellationToken cancellationToken = default) =>
-        grab.GrabAsync(indexerId, guid, cancellationToken);
+    public async Task<GrabResult> GrabAsync(int indexerId, string guid, CancellationToken cancellationToken = default)
+    {
+        using var source = IndexerCallContext.Begin(IndexerCallSource.Search);
+        return await grab.GrabAsync(indexerId, guid, cancellationToken);
+    }
 
     /// <summary>TV categories or a TV search read the name as an episode first, everything else as a movie first.</summary>
     internal static ParsedRelease? Parse(ReleaseInfo info, TextSearchType type)

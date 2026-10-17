@@ -118,6 +118,8 @@ export interface ProwlarrPreviewItem {
   reason: string | null
   alreadyExists: boolean
   mode: ProwlarrImportMode
+  /** The indexer's own address (base URL + API path) when it can be used without Prowlarr given its own API key. */
+  ownUrl: string | null
 }
 
 export interface ProwlarrImportResult {
@@ -156,8 +158,8 @@ export const indexersApi = {
   testAll: () => request<IndexerTestResult[]>('POST', '/indexer/testall'),
   prowlarrPreview: (connection: ProwlarrConnection) =>
     request<ProwlarrPreviewItem[]>('POST', '/indexer/import/prowlarr/preview', connection),
-  prowlarrImport: (connection: ProwlarrConnection, ids: number[]) =>
-    request<ProwlarrImportResult>('POST', '/indexer/import/prowlarr', { ...connection, ids }),
+  prowlarrImport: (connection: ProwlarrConnection, ids: number[], keys: Record<number, string> = {}) =>
+    request<ProwlarrImportResult>('POST', '/indexer/import/prowlarr', { ...connection, ids, keys }),
 }
 
 export const indexerKeys = {

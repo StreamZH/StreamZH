@@ -164,6 +164,23 @@ public sealed class ProwlarrImportTests : IDisposable
     }
 
     [Fact]
+    public async Task Own_api_key_imports_the_indexer_directly_without_prowlarr()
+    {
+        var preview = await _import.PreviewAsync(Url, StubProwlarr.ApiKey, CancellationToken.None);
+        Assert.NotNull(preview[0].OwnUrl);
+        Assert.DoesNotContain("prowlarr", preview[0].OwnUrl!, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(preview[3].OwnUrl);
+
+        var result = await _import.ImportAsync(Url, StubProwlarr.ApiKey, [1], CancellationToken.None, new Dictionary<int, string> { [1] = " my-geek-key " });
+
+        var imported = Assert.Single(result.Imported);
+        Assert.Equal(ProwlarrImportMode.Direct, imported.Mode);
+        var geek = _indexers.Find(imported.Id)!;
+        Assert.Equal("my-geek-key", geek.ApiKey);
+        Assert.Equal(preview[0].OwnUrl, geek.BaseUrl + geek.ApiPath);
+    }
+
+    [Fact]
     public async Task Import_creates_direct_and_proxy_indexers_and_skips_the_rest()
     {
         _indexers.Create(new IndexerDefinition(0, "Keyless", "Newznab", "https://x.example", "/api", "k", [2000], [], 25, true, true, true));

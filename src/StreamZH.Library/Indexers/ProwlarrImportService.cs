@@ -36,7 +36,8 @@ public sealed record ProwlarrIndexerPreview(
     bool Supported,
     string? Reason,
     bool AlreadyExists,
-    ProwlarrImportMode Mode);
+    ProwlarrImportMode Mode,
+    string? OwnUrl);
 
 public sealed record ProwlarrImported(int Id, string Name, ProwlarrImportMode Mode);
 
@@ -65,7 +66,9 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
     }
 
     /// <summary>Imports the selected indexers; the rest of the list (and anything that fails validation) is reported as skipped.</summary>
-    public async Task<ProwlarrImportResult> ImportAsync(string? url, string? apiKey, IReadOnlyCollection<int>? ids, CancellationToken cancellationToken)
+    /// <param name="ownKeys">Per Prowlarr id, the indexer's own API key typed in by the user: the indexer is then used directly, without Prowlarr.</param>
+    public async Task<ProwlarrImportResult> ImportAsync(
+        string? url, string? apiKey, IReadOnlyCollection<int>? ids, CancellationToken cancellationToken, IReadOnlyDictionary<int, string>? ownKeys = null)
     {
         var (baseUrl, key) = ValidateConnection(url, apiKey);
         var wanted = (ids ?? []).ToHashSet();
@@ -81,7 +84,8 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
 
         foreach (var indexer in remote.Where(r => wanted.Contains(r.Id)))
         {
-            var (preview, definition) = Plan(indexer, baseUrl, key, existing);
+            var ownKey = ownKeys is not null && ownKeys.TryGetValue(indexer.Id, out var typed) && !string.IsNullOrWhiteSpace(typed) ? typed.Trim() : null;
+            var (preview, definition) = Plan(indexer, baseUrl, key, existing, ownKey);
             if (!preview.Supported || definition is null)
             {
                 skipped.Add(new ProwlarrSkipped(indexer.Id, indexer.Name, preview.Reason ?? "Not supported."));
@@ -198,14 +202,16 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
     }
 
     /// <summary>Decides support and mode for one Prowlarr indexer and builds the definition to create.</summary>
-    private static (ProwlarrIndexerPreview Preview, IndexerDefinition? Definition) Plan(RemoteIndexer remote, string prowlarrUrl, string prowlarrKey, HashSet<string> existing)
+    private static (ProwlarrIndexerPreview Preview, IndexerDefinition? Definition) Plan(
+        RemoteIndexer remote, string prowlarrUrl, string prowlarrKey, HashSet<string> existing, string? typedKey = null)
     {
         var ownUrl = remote.Text("baseUrl")?.Trim().TrimEnd('/');
-        var ownKey = remote.Text("apiKey");
+        var ownKey = typedKey ?? remote.Text("apiKey");
         var hasKeyField = remote.Fields.ContainsKey("apiKey");
         var newznabLike = string.Equals(remote.Implementation, IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase) || remote.Fields.ContainsKey("apiPath");
-        var direct = remote.Protocol == "usenet" && newznabLike && hasKeyField && !string.IsNullOrEmpty(ownUrl)
-            && Uri.TryCreate(ownUrl, UriKind.Absolute, out _) && ownKey != MaskedValue;
+        var ownReachable = remote.Protocol == "usenet" && newznabLike && hasKeyField && !string.IsNullOrEmpty(ownUrl)
+            && Uri.TryCreate(ownUrl, UriKind.Absolute, out _);
+        var direct = ownReachable && ownKey != MaskedValue;
         var mode = direct ? ProwlarrImportMode.Direct : ProwlarrImportMode.Proxy;
 
         var baseUrl = direct ? ownUrl! : string.Create(CultureInfo.InvariantCulture, $"{prowlarrUrl}/{remote.Id}");
@@ -228,7 +234,8 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             supported,
             reason,
             existing.Contains(remote.Name.Trim()),
-            mode);
+            mode,
+            ownReachable ? ownUrl + (NonEmpty(remote.Text("apiPath")) ?? IndexerService.DefaultApiPath) : null);
 
         if (!supported)
         {

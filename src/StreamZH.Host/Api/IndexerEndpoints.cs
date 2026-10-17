@@ -150,7 +150,7 @@ public static class IndexerEndpoints
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
         indexers.MapPost("/import/prowlarr", (ProwlarrImportRequest request, ProwlarrImportService import, CancellationToken cancellationToken) =>
-            import.ImportAsync(request.Url, request.ApiKey, request.Ids, cancellationToken))
+            import.ImportAsync(request.Url, request.ApiKey, request.Ids, cancellationToken, request.Keys))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
         return app;
@@ -298,4 +298,5 @@ public sealed record IndexerHistoryPage(int Page, int PageSize, int TotalRecords
 
 public sealed record IndexerStatsResource(DateTime From, DateTime To, IReadOnlyList<IndexerStatsRow> Indexers, IReadOnlyList<IndexerDailyRow> Daily);
 
-public sealed record ProwlarrImportRequest(string? Url, string? ApiKey, IReadOnlyList<int>? Ids);
+/// <param name="Keys">Optional: per Prowlarr id the indexer's own API key, so it is used directly instead of through Prowlarr.</param>
+public sealed record ProwlarrImportRequest(string? Url, string? ApiKey, IReadOnlyList<int>? Ids, IReadOnlyDictionary<int, string>? Keys = null);

@@ -106,12 +106,19 @@ public static class MediaManagementEndpoints
 
         // Blocklist
         var blocklist = app.MapGroup("/api/v1/blocklist").WithTags("Blocklist").RequireAuthorization();
-        blocklist.MapGet("/", (int? page, int? pageSize, BlocklistRepository repo) =>
+        // Filters: search (words in the release title), mediaType (movie, series).
+        blocklist.MapGet("/", (int? page, int? pageSize, string? search, string? mediaType, BlocklistRepository repo) =>
         {
+            var media = HistoryEndpoints.ParseMediaType(mediaType);
+            if (media is null && !string.IsNullOrWhiteSpace(mediaType) && !string.Equals(mediaType.Trim(), "all", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["mediaType"] = ["Use movie or series."] });
+            }
+
             var p = Math.Max(1, page ?? 1);
             var size = Math.Clamp(pageSize ?? 20, 1, MaxPageSize);
-            var (records, total) = repo.Page(p, size);
-            return new BlocklistPage(p, size, total, [.. records.Select(BlocklistResource.From)]);
+            var (records, total) = repo.Page(p, size, search, media);
+            return Results.Ok(new BlocklistPage(p, size, total, [.. records.Select(BlocklistResource.From)]));
         });
         blocklist.MapDelete("/{id:int}", (int id, BlocklistRepository repo) =>
             repo.Delete(id) ? Results.NoContent() : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not on the blocklist."))

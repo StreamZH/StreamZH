@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
 using StreamZH.Core.Downloads;
+using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Library.Downloads;
 
@@ -33,12 +34,43 @@ public static class DownloadEndpoints
                 status.StatusMessage);
         });
 
-        api.MapGet("/history", (int? page, int? pageSize, DownloadEngine engine) =>
+        // Filters: status (completed, failed), import (imported, notImported, importFailed), category (movie, series,
+        // other = the kind; anything else = a category name), search (words in the title), since (finished at or after).
+        api.MapGet("/history", (int? page, int? pageSize, string? status, string? import, string? category, string? search, DateTimeOffset? since, DownloadEngine engine) =>
         {
+            var errors = new Dictionary<string, string[]>();
+            DownloadStatus? statusFilter = status?.Trim().ToLowerInvariant() switch
+            {
+                null or "" or "all" => null,
+                "completed" => DownloadStatus.Completed,
+                "failed" => DownloadStatus.Failed,
+                _ => Error<DownloadStatus>(errors, "status", "Use completed or failed."),
+            };
+            DownloadImportFilter? importFilter = import?.Trim().ToLowerInvariant() switch
+            {
+                null or "" or "all" => null,
+                "imported" => DownloadImportFilter.Imported,
+                "notimported" => DownloadImportFilter.NotImported,
+                "importfailed" => DownloadImportFilter.ImportFailed,
+                _ => Error<DownloadImportFilter>(errors, "import", "Use imported, notImported or importFailed."),
+            };
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors);
+            }
+
+            var kind = ParseCategory(category);
+            var filter = new DownloadHistoryFilter(
+                statusFilter,
+                importFilter,
+                kind,
+                kind is null && !string.IsNullOrWhiteSpace(category) && category.Trim() != "all" ? category.Trim() : null,
+                search,
+                since?.UtcDateTime);
             var p = Math.Max(1, page ?? 1);
             var size = Math.Clamp(pageSize ?? 20, 1, MaxHistoryPageSize);
-            var (items, total) = engine.History(p, size);
-            return new DownloadHistoryPage(p, size, total, [.. items.Select(i => DownloadItemResource.From(i))]);
+            var (items, total) = engine.History(p, size, filter);
+            return Results.Ok(new DownloadHistoryPage(p, size, total, [.. items.Select(i => DownloadItemResource.From(i))]));
         });
 
         // For the category pickers (Add NZB, Search page): name, whether it is a default one, and its kind.
@@ -192,6 +224,13 @@ public static class DownloadEndpoints
     private static IResult NotFound(int id) => Results.Problem(
         statusCode: StatusCodes.Status404NotFound, title: $"Download {id} not found.", detail: $"Download {id} not found.",
         extensions: new Dictionary<string, object?> { ["code"] = "not-found" });
+
+    private static T? Error<T>(Dictionary<string, string[]> errors, string field, string message)
+        where T : struct
+    {
+        errors[field] = [message];
+        return null;
+    }
 
     private static IResult Invalid(string field, string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });

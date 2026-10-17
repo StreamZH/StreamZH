@@ -1,0 +1,183 @@
+/* Settings → Downloads: folder fields, the category and scheduler tables. */
+
+.folder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 680px;
+}
+
+.folder input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.wide {
+  max-width: 520px;
+  width: 100%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.name {
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.small {
+  padding: 6px 10px;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+}
+
+.editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px 14px;
+  padding: 14px;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.editorWide {
+  grid-column: 1 / -1;
+}
+
+.editorActions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.editorActions > :first-child {
+  margin-right: auto;
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.day {
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.dayOn {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.empty {
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.error {
+  font-size: 12.5px;
+  color: #ef6b6b;
+}
+
+/* Phones: tables become stacked cards. */
+@media (max-width: 720px) {
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  }
+
+  .table td {
+    padding: 0;
+    border: none;
+  }
+
+  .table td.cellWide {
+    flex-basis: 100%;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}

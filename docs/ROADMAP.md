@@ -10,7 +10,7 @@ SABnzbd and the indexer setup on the CloudZH home server.
 
 | Version | Phase | Content | Done when |
 |---|---|---|---|
-| 0.1 | Foundation | Solution, CI, Docker image, config dir, SQLite + migrations, Owner login, API key, settings API, React shell with CloudZH look | Container starts, login works, empty Home page |
+| 0.1 ✅ | Foundation | Solution, CI, Docker image, config dir, SQLite + migrations, Owner login, API key, settings API, log file, React shell with CloudZH look | Container starts, login works, empty Home page |
 | 0.2 | Metadata & Library | TMDB client, add movie / series, root folders, disk scan, import of an existing library (match folders to TMDB) | Existing movie and TV folders show up in Library |
 | 0.3 | Parser & Profiles | Port release-name, quality and language parser incl. test fixtures; quality profiles; decision engine | Parser test suite green, releases ranked correctly |
 | 0.4 | Indexers & Search | Newznab client, capabilities, manual search (interactive), automatic search for missing items | Manual search shows ranked releases |

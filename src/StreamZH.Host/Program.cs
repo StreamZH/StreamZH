@@ -2,18 +2,21 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
-using System.Security.Cryptography;
 using StreamZH.Core;
 using StreamZH.Core.Events;
 using StreamZH.Data;
 using StreamZH.Host.Api;
+using StreamZH.Host.Auth;
 using StreamZH.Host.Hubs;
+using StreamZH.Host.Logging;
 
-// Content root = install folder, so native installs find wwwroot no matter where they are started from.
+// Installed builds: content root = install folder, so wwwroot is found from any working directory.
+// Development (dotnet run): the default content root plus static web assets from the project.
+var installed = Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot"));
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
-    ContentRootPath = AppContext.BaseDirectory,
+    ContentRootPath = installed ? AppContext.BaseDirectory : null,
 });
 
 // --data <dir> on the command line, STREAMZH_DATA, /config in Docker, else the OS default.
@@ -24,13 +27,31 @@ var database = new Database(paths.DatabaseFile);
 database.Migrate();
 
 var config = new ConfigRepository(database);
-config.GetOrCreate("ApiKey", () => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16)));
+config.GetOrCreate(ConfigKeys.ApiKey, SettingsEndpoints.NewApiKey);
+
+var logLevel = new LogLevelSwitch(Enum.TryParse<LogLevel>(config.Get(ConfigKeys.LogLevel), out var level) ? level : LogLevel.Information);
+var fileLogger = new FileLoggerProvider(paths.LogDirectory, logLevel);
+builder.Logging.AddProvider(fileLogger);
+
+// The file log follows the level from the settings page; framework noise stays at Warning.
+builder.Logging.AddFilter<FileLoggerProvider>(null, LogLevel.Trace);
+builder.Logging.AddFilter<FileLoggerProvider>("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.Hosting.Lifetime", LogLevel.Information);
+
+// Keys are stored unencrypted in the data folder by design (same as Sonarr/Radarr); no warning on every start.
+builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
 
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
 builder.Services.AddSingleton(config);
+builder.Services.AddSingleton(logLevel);
+builder.Services.AddSingleton(fileLogger);
+builder.Services.AddSingleton<UserRepository>();
+builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
+builder.Services.AddStreamZhAuth(paths);
 builder.Services.AddSignalR();
 builder.Services.AddOpenApi("v1");
 
@@ -38,13 +59,21 @@ var app = builder.Build();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapOpenApi("/api/{documentName}/openapi.json");
+app.MapAuthEndpoints();
 app.MapSystemEndpoints();
-app.MapHub<EventsHub>("/hub");
+app.MapSettingsEndpoints();
+app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
-// Client-side routing: unknown non-API paths serve the React app.
+// Unknown API routes are real 404s; everything else is client-side routing in the React app.
+app.MapFallback("/api/{**path}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");
+
+app.Logger.LogInformation("{App} {Version} started, data in {DataDirectory}", AppInfo.Name, AppInfo.Version, paths.DataDirectory);
 
 app.Run();
 

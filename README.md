@@ -34,6 +34,7 @@ cd ..
 
 # Backend on http://localhost:9797, data in ./.devdata
 dotnet run --project src/StreamZH.Host -- --data .devdata
+# Open http://localhost:9797 and create the owner account
 
 # Tests
 dotnet test
@@ -48,6 +49,17 @@ For UI work run `npm run dev` in `frontend/` (http://localhost:5173). It proxies
 docker build -f docker/Dockerfile -t streamzh:dev .
 docker run -d --name streamzh -p 9797:9797 -v /opt/streamzh:/config streamzh:dev
 ```
+
+## API
+
+Interactive clients use the session cookie from the web UI. Scripts and CloudZH send the
+API key (Settings → API key) as header:
+
+```bash
+curl -H "X-Api-Key: <key>" http://localhost:9797/api/v1/system/status
+```
+
+The OpenAPI description is at `/api/v1/openapi.json`. `/health` needs no login.
 
 ## Repository layout
 

@@ -1,0 +1,131 @@
+.screen {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, rgb(192 32 42 / 0.12), transparent 70%),
+    var(--bg);
+}
+
+.loading {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tile {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-small);
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.wordmark {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.wordmark span {
+  color: var(--accent);
+}
+
+.title {
+  font-family: var(--font-title);
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.lead {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.field input {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  padding: 10px 12px;
+}
+
+.field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.check input {
+  accent-color: var(--accent);
+}
+
+.hint {
+  color: var(--text-faint);
+}
+
+.error {
+  margin: 0;
+  color: #ef6b6b;
+  font-size: 13px;
+}
+
+.primary {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-small);
+  padding: 11px 16px;
+  cursor: pointer;
+}
+
+.primary:hover {
+  background: #d02631;
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

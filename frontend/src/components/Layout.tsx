@@ -1,4 +1,7 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet } from 'react-router'
+import { api } from '../api/client'
+import { authQueryKey, useAuth } from '../auth/auth'
 import { useLiveConnection } from '../api/useLiveConnection'
 import Icon, { type IconName } from './Icon'
 import styles from './Layout.module.css'
@@ -31,6 +34,12 @@ const sections: { title?: string; items: NavItem[] }[] = [
 
 export default function Layout() {
   const live = useLiveConnection()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const logout = useMutation({
+    mutationFn: api.logout,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: authQueryKey }),
+  })
 
   return (
     <div className={styles.shell}>
@@ -61,8 +70,17 @@ export default function Layout() {
         ))}
 
         <div className={styles.footer}>
-          <span className={live ? styles.dotOk : styles.dotOff} />
-          {live ? 'Live' : 'Offline'}
+          <div className={styles.user}>
+            <span className={styles.avatar}>{user?.username.slice(0, 1).toUpperCase()}</span>
+            <span className={styles.userName}>{user?.username}</span>
+            <button className={styles.logout} type="button" onClick={() => logout.mutate()} title="Sign out">
+              Sign out
+            </button>
+          </div>
+          <div className={styles.live}>
+            <span className={live ? styles.dotOk : styles.dotOff} />
+            {live ? 'Live' : 'Offline'}
+          </div>
         </div>
       </nav>
 

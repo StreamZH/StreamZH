@@ -12,6 +12,7 @@ export default function Dialog({
   tall = false,
   onClose,
   footer,
+  headerAction,
   children,
 }: {
   title: ReactNode
@@ -21,6 +22,8 @@ export default function Dialog({
   tall?: boolean
   onClose: () => void
   footer?: ReactNode
+  /** Shown left of the close button, e.g. the "Advanced" switch. */
+  headerAction?: ReactNode
   children: ReactNode
 }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -49,9 +52,12 @@ export default function Dialog({
             <h2 id={titleId}>{title}</h2>
             {subtitle && <div className={styles.subtitle}>{subtitle}</div>}
           </div>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-            ×
-          </button>
+          <div className={styles.headerActions}>
+            {headerAction}
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+              ×
+            </button>
+          </div>
         </header>
         <div className={styles.body}>{children}</div>
         {footer && <footer className={styles.footer}>{footer}</footer>}

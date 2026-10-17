@@ -4,6 +4,8 @@ import { Link } from 'react-router'
 import { api, ApiError, logLevels, type GeneralSettings } from '../api/client'
 import { authQueryKey, useAuth } from '../auth/auth'
 import ui from '../components/ui.module.css'
+import { Advanced, AdvancedToggle } from '../lib/Advanced'
+import { advancedLabel } from '../lib/advancedMode'
 import { useScrollToHash } from '../lib/useScrollToHash'
 import { DownloadsSection, MetadataSection, RootFoldersSection } from './MediaSettings'
 import page from './Page.module.css'
@@ -34,6 +36,7 @@ export default function Settings() {
           <Link className={ui.button} to="/settings/usenet">
             Usenet servers
           </Link>
+          <AdvancedToggle />
         </nav>
       </header>
 
@@ -98,17 +101,19 @@ function GeneralSection({ settings }: { settings: GeneralSettings }) {
           <small>Shown in the browser tab and on the sign-in page.</small>
           {fieldErrors.instanceName && <small className={styles.error}>{fieldErrors.instanceName[0]}</small>}
         </label>
-        <label className={styles.field}>
-          <span>Log level</span>
-          <select value={logLevel} onChange={(e) => setLogLevel(e.target.value)}>
-            {logLevels.map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
-          <small>Debug and Trace help with troubleshooting, but write a lot.</small>
-        </label>
+        <Advanced>
+          <label className={styles.field}>
+            <span className={advancedLabel}>Log level</span>
+            <select value={logLevel} onChange={(e) => setLogLevel(e.target.value)}>
+              {logLevels.map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+            <small>Debug and Trace help with troubleshooting, but write a lot.</small>
+          </label>
+        </Advanced>
       </div>
       <div className={styles.actions}>
         <button className={styles.primary} type="submit" disabled={!dirty || save.isPending}>

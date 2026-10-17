@@ -22,6 +22,18 @@ public enum HistoryEventType
 
     /// <summary>The built-in engine gave up on a download (missing articles, repair or unpack failed).</summary>
     DownloadFailed = 3,
+
+    /// <summary>Files of a finished download were moved into the library (completed download handling or manual import).</summary>
+    Imported = 4,
+
+    /// <summary>An import replaced an existing file with a better one (the old file went to the recycle bin or was deleted).</summary>
+    Upgraded = 5,
+
+    /// <summary>A finished download could not be imported; the files stay in the download folder.</summary>
+    ImportFailed = 6,
+
+    /// <summary>A file in the library was renamed to the naming scheme.</summary>
+    Renamed = 7,
 }
 
 /// <summary>One history entry. <see cref="Data"/> holds event-specific details (download URL, NZB path, …).</summary>

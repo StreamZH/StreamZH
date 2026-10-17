@@ -37,7 +37,24 @@ public sealed record DecisionTarget(
     QualityModel? ExistingQuality,
     IReadOnlyList<Language> ExistingLanguages,
     bool Monitored,
-    IReadOnlySet<string> BlocklistedTitles);
+    IReadOnlySet<string> BlocklistedTitles)
+{
+    /// <summary>Settings → Media Management → "Propers and repacks"; the default keeps the old behaviour.</summary>
+    public ProperHandling Propers { get; init; } = ProperHandling.PreferAndUpgrade;
+}
+
+/// <summary>How PROPER, REPACK and REAL releases (a higher revision of the same quality) are treated, like Radarr and Sonarr.</summary>
+public enum ProperHandling
+{
+    /// <summary>A higher revision ranks first and replaces the file on disk (default).</summary>
+    PreferAndUpgrade,
+
+    /// <summary>A higher revision ranks first, but a file on disk is not replaced just for a newer revision.</summary>
+    DoNotUpgrade,
+
+    /// <summary>Revisions are ignored: they neither rank first nor replace files (use release profiles to rank them).</summary>
+    DoNotPrefer,
+}
 
 /// <summary>
 /// Permanent: this release will never be wanted for the target as it is now.

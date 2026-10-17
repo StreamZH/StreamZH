@@ -25,7 +25,8 @@ public sealed class UpgradeSpecification : IDecisionSpecification
             LanguageRules.Normalize(target.ExistingLanguages, target.OriginalLanguage),
             candidate.Release.Quality,
             LanguageRules.EffectiveLanguages(candidate.Release, target.OriginalLanguage),
-            target.OriginalLanguage);
+            target.OriginalLanguage,
+            target.Propers);
 
         return verdict switch
         {

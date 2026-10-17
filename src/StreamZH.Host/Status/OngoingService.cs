@@ -75,6 +75,7 @@ public sealed class OngoingService(
         AddIndexerNotices(notices);
         AddFolderNotices(notices);
         AddFailedNotices(notices, active);
+        ImportNotices.Add(notices, services.GetService<DownloadImportRepository>(), time);
 
         return new OngoingResource(running, notices);
     }

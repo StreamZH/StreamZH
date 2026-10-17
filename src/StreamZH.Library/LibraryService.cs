@@ -38,8 +38,11 @@ public sealed class LibraryService(
     SeriesRepository series,
     QualityProfileService profiles,
     IEventBus events,
-    ILogger<LibraryService> logger)
+    ILogger<LibraryService> logger,
+    Import.MediaManagementSettings? mediaManagement = null)
 {
+    private Import.MediaManagementValues Media => mediaManagement?.Current ?? new Import.MediaManagementValues();
+
     public async Task<Movie> AddMovieAsync(
         int tmdbId, int rootFolderId, bool monitored, int? qualityProfileId = null, string? existingFolder = null, CancellationToken cancellationToken = default)
     {
@@ -58,11 +61,12 @@ public sealed class LibraryService(
             Monitored = monitored,
             QualityProfileId = profileId,
             RootFolderId = root.Id,
-            FolderPath = existingFolder ?? Path.Combine(root.Path, FolderNames.For(details.Title, details.Year)),
             Added = DateTime.UtcNow,
         };
         Apply(movie, details);
+        movie.FolderPath = existingFolder ?? Path.Combine(root.Path, FolderName(new Import.FileNameBuilder(Media).MovieFolderName(movie), details.Title, details.Year));
         movie.File = DiskScanner.ScanMovie(movie.FolderPath);
+        CreateFolderIfWanted(movie.FolderPath);
 
         movies.Add(movie);
         logger.LogInformation("Added movie '{Title} ({Year})' {File}", movie.Title, movie.Year, movie.File is null ? "without file" : "with file");
@@ -88,10 +92,11 @@ public sealed class LibraryService(
             Monitored = monitored,
             QualityProfileId = profileId,
             RootFolderId = root.Id,
-            FolderPath = existingFolder ?? Path.Combine(root.Path, FolderNames.For(details.Title, details.Year)),
             Added = DateTime.UtcNow,
         };
         Apply(item, details);
+        item.FolderPath = existingFolder ?? Path.Combine(root.Path, FolderName(new Import.FileNameBuilder(Media).SeriesFolderName(item), details.Title, details.Year));
+        CreateFolderIfWanted(item.FolderPath);
 
         series.Add(item);
         logger.LogInformation("Added series '{Title} ({Year})'", item.Title, item.Year);
@@ -99,19 +104,32 @@ public sealed class LibraryService(
         return item;
     }
 
-    /// <summary>Fetches fresh metadata and rescans the folder.</summary>
-    public async Task RefreshMovieAsync(int id, CancellationToken cancellationToken = default)
+    /// <summary>Fetches fresh metadata and rescans the folder (a refresh the user asked for).</summary>
+    public Task RefreshMovieAsync(int id, CancellationToken cancellationToken = default) => RefreshMovieAsync(id, manual: true, cancellationToken);
+
+    /// <summary>
+    /// Fetches fresh metadata; the folder is rescanned as "Rescan folder after refresh" says (always, only after a manual
+    /// refresh, never).
+    /// </summary>
+    public async Task RefreshMovieAsync(int id, bool manual, CancellationToken cancellationToken)
     {
         var movie = movies.Find(id) ?? throw new LibraryException("Movie not found.", LibraryError.NotFound);
         Apply(movie, await tmdb.GetMovieAsync(movie.TmdbId, cancellationToken));
-        movie.File = DiskScanner.ScanMovie(movie.FolderPath);
+        if (ShouldRescan(manual))
+        {
+            ApplyScan(movie, DiskScanner.ScanMovie(movie.FolderPath));
+        }
+
         movie.LastRefreshed = DateTime.UtcNow;
         movies.Update(movie);
         await events.PublishAsync(new LibraryChanged(MediaType.Movie, id), cancellationToken);
     }
 
-    /// <summary>Fetches show details and every season from TMDB, then rescans the folder.</summary>
-    public async Task RefreshSeriesAsync(int id, CancellationToken cancellationToken = default)
+    /// <summary>Fetches show details and every season from TMDB, then rescans the folder (a refresh the user asked for).</summary>
+    public Task RefreshSeriesAsync(int id, CancellationToken cancellationToken = default) => RefreshSeriesAsync(id, manual: true, cancellationToken);
+
+    /// <summary>Fetches show details and every season; the folder is rescanned as "Rescan folder after refresh" says.</summary>
+    public async Task RefreshSeriesAsync(int id, bool manual, CancellationToken cancellationToken)
     {
         var item = series.Find(id) ?? throw new LibraryException("Series not found.", LibraryError.NotFound);
         var details = await tmdb.GetSeriesAsync(item.TmdbId, cancellationToken);
@@ -134,7 +152,11 @@ public sealed class LibraryService(
         }
 
         series.UpsertEpisodes(id, episodes, monitorNew: item.Monitored);
-        series.SetEpisodeFiles(id, DiskScanner.ScanSeries(item.FolderPath));
+        if (ShouldRescan(manual))
+        {
+            ApplyScan(item);
+        }
+
         item.LastRefreshed = DateTime.UtcNow;
         series.Update(item);
 
@@ -151,15 +173,19 @@ public sealed class LibraryService(
             var file = DiskScanner.ScanMovie(movie.FolderPath);
             if (file != movie.File)
             {
-                movie.File = file;
+                ApplyScan(movie, file);
                 movies.Update(movie);
+            }
+            else if (file is null)
+            {
+                DeleteFolderIfEmpty(movie.FolderPath);
             }
         }
 
         foreach (var item in series.All())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            series.SetEpisodeFiles(item.Id, DiskScanner.ScanSeries(item.FolderPath));
+            ApplyScan(item);
         }
 
         await events.PublishAsync(new LibraryChanged(MediaType.Movie, null), cancellationToken);
@@ -220,6 +246,93 @@ public sealed class LibraryService(
         logger.LogInformation("Removed series '{Title}' from the library (files kept)", item.Title);
         await events.PublishAsync(new LibraryChanged(MediaType.Series, id));
     }
+
+    private bool ShouldRescan(bool manual) => Media.RescanAfterRefresh switch
+    {
+        Import.RescanAfterRefresh.Never => false,
+        Import.RescanAfterRefresh.AfterManualRefresh => manual,
+        _ => true,
+    };
+
+    /// <summary>Takes the scan result; a file that disappeared unmonitors the movie when "Unmonitor deleted files" is on.</summary>
+    private void ApplyScan(Movie movie, MediaFile? file)
+    {
+        if (movie.File is not null && file is null && Media.UnmonitorDeletedFiles && movie.Monitored)
+        {
+            movie.Monitored = false;
+            logger.LogInformation("The file of '{Title}' is gone; the movie is no longer monitored", movie.Title);
+        }
+
+        movie.File = file;
+        if (file is null)
+        {
+            DeleteFolderIfEmpty(movie.FolderPath);
+        }
+    }
+
+    /// <summary>Scans the series folder; episodes whose file disappeared are unmonitored when "Unmonitor deleted files" is on.</summary>
+    private void ApplyScan(Series item)
+    {
+        var found = DiskScanner.ScanSeries(item.FolderPath);
+        if (Media.UnmonitorDeletedFiles)
+        {
+            foreach (var gone in series.Episodes(item.Id).Where(e => e.File is not null && e.Monitored && !found.ContainsKey((e.SeasonNumber, e.EpisodeNumber))))
+            {
+                series.SetEpisodeMonitored(gone.Id, false);
+                logger.LogInformation("The file of {Title} S{Season:00}E{Episode:00} is gone; the episode is no longer monitored", item.Title, gone.SeasonNumber, gone.EpisodeNumber);
+            }
+        }
+
+        series.SetEpisodeFiles(item.Id, found);
+        if (found.Count == 0)
+        {
+            DeleteFolderIfEmpty(item.FolderPath);
+        }
+    }
+
+    /// <summary>"Create empty movie/series folders": the folder is created when the item is added.</summary>
+    private void CreateFolderIfWanted(string folder)
+    {
+        if (!Media.CreateEmptyFolders)
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Could not create the folder {Folder}: {Message}", folder, ex.Message);
+        }
+    }
+
+    /// <summary>"Delete empty folders": a movie or series folder without any file is removed during the disk scan.</summary>
+    private void DeleteFolderIfEmpty(string folder)
+    {
+        if (!Media.DeleteEmptyFolders || Media.CreateEmptyFolders || !Directory.Exists(folder))
+        {
+            return;
+        }
+
+        try
+        {
+            if (!Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Any())
+            {
+                Directory.Delete(folder, recursive: true);
+                logger.LogInformation("Deleted the empty folder {Folder}", folder);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogDebug("Could not delete the empty folder {Folder}: {Message}", folder, ex.Message);
+        }
+    }
+
+    /// <summary>The name from the folder format, or "Title (Year)" when the format gives nothing.</summary>
+    private static string FolderName(string fromFormat, string title, int year) =>
+        fromFormat.Length > 0 ? fromFormat : FolderNames.For(title, year);
 
     private RootFolder RootFolderFor(int id, MediaType mediaType)
     {

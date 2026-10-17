@@ -36,7 +36,8 @@ public sealed record TmdbMovie(
     IReadOnlyList<string> Genres,
     string? PosterPath,
     string? BackdropPath,
-    string? OriginalLanguage = null);
+    string? OriginalLanguage = null,
+    string? ReleaseDate = null);
 
 public sealed record TmdbSeries(
     int TmdbId,

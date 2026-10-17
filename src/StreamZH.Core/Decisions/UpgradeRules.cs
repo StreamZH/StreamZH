@@ -36,7 +36,8 @@ public enum UpgradeVerdict
 /// <item>The file has the wrong language for the profile and the release has the right one → always
 /// (a German version replaces an English or subbed file, whatever the quality order).</item>
 /// <item>Lower profile rank than the file → never.</item>
-/// <item>Same quality with a higher revision (PROPER/REPACK/REAL) → always, even past the cutoff and with upgrades off.</item>
+/// <item>Same quality with a higher revision (PROPER/REPACK/REAL) → always, even past the cutoff and with upgrades off
+/// (only with <see cref="ProperHandling.PreferAndUpgrade"/>; with <see cref="ProperHandling.DoNotPrefer"/> revisions are ignored).</item>
 /// <item>Same quality with a lower revision → never.</item>
 /// <item>Upgrades disabled in the profile → never.</item>
 /// <item>Dual-language release while the file is not dual-language (profile prefers dual language) → yes, even past the cutoff.</item>
@@ -52,7 +53,8 @@ public static class UpgradeRules
         IReadOnlyList<Language> existingLanguages,
         QualityModel candidate,
         IReadOnlyList<Language> candidateLanguages,
-        Language originalLanguage)
+        Language originalLanguage,
+        ProperHandling propers = ProperHandling.PreferAndUpgrade)
     {
         if (existing is null)
         {
@@ -71,10 +73,11 @@ public static class UpgradeRules
             return UpgradeVerdict.BetterQualityOnDisk;
         }
 
-        var revisionCompare = candidate.Revision.CompareTo(existing.Revision);
+        // "Do not prefer": revisions count as equal; "Do not upgrade": a newer revision alone replaces nothing.
+        var revisionCompare = propers == ProperHandling.DoNotPrefer ? 0 : candidate.Revision.CompareTo(existing.Revision);
 
         // Compare the quality itself, not the rank: a PROPER WEBRip is no revision upgrade for a WEBDL.
-        if (IsRevisionUpgrade(existing, candidate))
+        if (propers == ProperHandling.PreferAndUpgrade && IsRevisionUpgrade(existing, candidate))
         {
             return UpgradeVerdict.Upgrade;
         }

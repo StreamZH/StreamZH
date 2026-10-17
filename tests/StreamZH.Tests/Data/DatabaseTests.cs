@@ -21,7 +21,7 @@ public sealed class DatabaseTests : IDisposable
         config.Set("Theme", "dark");
         config.Set("Theme", "light");
 
-        Assert.Equal(10, database.SchemaVersion());
+        Assert.Equal(11, database.SchemaVersion());
         Assert.Equal("light", config.Get("Theme"));
         Assert.Equal("abc", config.GetOrCreate("ApiKey", () => "abc"));
         Assert.Equal("abc", config.GetOrCreate("ApiKey", () => "other"));

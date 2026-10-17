@@ -11,8 +11,15 @@ using StreamZH.Parsing;
 
 namespace StreamZH.Library.Search;
 
-/// <summary>Builds the <see cref="DecisionTarget"/> for a movie or a set of episodes from the library.</summary>
-public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
+/// <summary>
+/// Builds the <see cref="DecisionTarget"/> for a movie or a set of episodes from the library: the file on disk (quality as the
+/// import stored it, else read from the name), the blocklisted releases and the "Propers and repacks" setting.
+/// </summary>
+public sealed class DecisionTargetFactory(
+    QualityProfileRepository profiles,
+    BlocklistRepository? blocklist = null,
+    MediaFileDetailsRepository? fileDetails = null,
+    Import.MediaManagementSettings? mediaManagement = null)
 {
     private static readonly IReadOnlySet<string> NoBlocklist = new HashSet<string>();
 
@@ -20,7 +27,7 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
     {
         ArgumentNullException.ThrowIfNull(movie);
         var profile = Profile(movie.QualityProfileId);
-        var (quality, languages) = Existing(movie.File, movie.FolderPath);
+        var (quality, languages) = ExistingFile(movie.File, movie.FolderPath);
 
         return new DecisionTarget(
             MediaType.Movie,
@@ -33,7 +40,10 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
             quality,
             languages,
             movie.Monitored,
-            NoBlocklist);
+            blocklist?.TitlesForMovie(movie.Id) ?? NoBlocklist)
+        {
+            Propers = Propers,
+        };
     }
 
     /// <summary>
@@ -53,7 +63,7 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
         if (episodes.Count > 0 && episodes.All(e => e.File is not null))
         {
             (quality, languages) = episodes
-                .Select(e => Existing(e.File, series.FolderPath))
+                .Select(e => ExistingFile(e.File, series.FolderPath))
                 .MinBy(x => (profile.RankOf(x.Quality!.Quality.Id), x.Quality.Revision));
         }
 
@@ -68,7 +78,25 @@ public sealed class DecisionTargetFactory(QualityProfileRepository profiles)
             quality,
             languages,
             series.Monitored && (episodes.Count == 0 || episodes.Any(e => e.Monitored)),
-            NoBlocklist);
+            series.Id > 0 ? blocklist?.TitlesForSeries(series.Id) ?? NoBlocklist : NoBlocklist)
+        {
+            Propers = Propers,
+        };
+    }
+
+    private ProperHandling Propers => mediaManagement?.Current.PropersAndRepacks ?? ProperHandling.PreferAndUpgrade;
+
+    /// <summary>The stored details of an imported file (quality survives renaming), else <see cref="Existing"/>.</summary>
+    private (QualityModel? Quality, IReadOnlyList<Language> Languages) ExistingFile(MediaFile? file, string folderPath)
+    {
+        if (file is not null && fileDetails?.Find(Path.Combine(folderPath, file.RelativePath)) is { } stored)
+        {
+            return (
+                new QualityModel(Quality.FindById(stored.QualityId), new Revision(stored.RevisionVersion, stored.RevisionReal, stored.IsRepack)),
+                [.. stored.LanguageIds.Select(Language.FindById).Where(l => l != Language.Unknown)]);
+        }
+
+        return Existing(file, folderPath);
     }
 
     /// <summary>Quality and languages of a file on disk, read from the file name and the item folder name.</summary>

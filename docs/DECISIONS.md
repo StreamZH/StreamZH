@@ -4,8 +4,9 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | StreamZH installs par2cmdline-turbo 1.5.0 and 7-Zip 26.03 itself (pinned official GitHub releases, SHA-256 checked, into `<data>/tools`), automatically at startup when missing and with "Install" in Settings → Tools; replaces the par2 download in Update-Local.ps1. par2cmdline-turbo replaces par2cmdline | Owner does not want to install tools by hand; the data folder is writable and survives updates. par2cmdline-turbo is much faster, has the same command line and is what SABnzbd uses |
 | 2026-10-17 | Built-in Usenet download engine is the default download client; "Blackhole folder" stays as an option for an external downloader | StreamZH replaces SABnzbd; the folder mode keeps SABnzbd usable during the switch |
-| 2026-10-17 | par2 verify and deobfuscation in own C# code; repair with par2cmdline and unpacking with 7-Zip as external processes (par2 downloaded by Update-Local.ps1 on Windows) | Verify is needed for every download and must not depend on tools; repair and RAR unpacking are best left to the proven tools, not linked |
+| 2026-10-17 | par2 verify and deobfuscation in own C# code; repair with par2cmdline and unpacking with 7-Zip as external processes (par2 downloaded by Update-Local.ps1 on Windows; superseded: StreamZH installs both itself, see above) | Verify is needed for every download and must not depend on tools; repair and RAR unpacking are best left to the proven tools, not linked |
 | 2026-10-17 | Recovery par2 volumes are only fetched when articles are missing (about 1.2× the missing data, all of them if repair still lacks blocks) | Saves bandwidth like SABnzbd |
 | 2026-10-17 | Status window bottom right like CloudZH (running tasks + heads-up notices), Activity page with a pipeline per download | Owner wants to see at a glance what is happening |
 | 2026-10-17 | Logo: letter corners of the wordmark softened (radius 1.5), gap reduced by a quarter to 0.24 | Owner's request: less angular, monogram and name closer together |

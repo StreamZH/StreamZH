@@ -18,6 +18,9 @@ public enum ToolSource
 {
     NotFound,
     Configured,
+
+    /// <summary>Installed by StreamZH into &lt;data&gt;/tools.</summary>
+    Installed,
     Bundled,
     Path,
     WindowsDefault,
@@ -37,6 +40,9 @@ public interface IPostProcessToolSettings
     string? Par2Path { get; }
 
     string? SevenZipPath { get; }
+
+    /// <summary>Install missing tools automatically (at startup and when the settings are saved).</summary>
+    bool AutoInstall => true;
 }
 
 public sealed class ConfigPostProcessToolSettings(ConfigRepository config) : IPostProcessToolSettings
@@ -44,12 +50,24 @@ public sealed class ConfigPostProcessToolSettings(ConfigRepository config) : IPo
     public string? Par2Path => config.Get(ConfigKeys.Par2Path);
 
     public string? SevenZipPath => config.Get(ConfigKeys.SevenZipPath);
+
+    /// <summary>On unless the setting is "false".</summary>
+    public bool AutoInstall => !string.Equals(config.Get(ConfigKeys.ToolsAutoInstall), "false", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>What the tool search looks at; replaceable so tests do not depend on the machine.</summary>
 public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, bool IsWindows, IReadOnlyList<string> ProgramFilesDirectories)
 {
     public Func<string, bool> FileExists { get; init; } = File.Exists;
+
+    /// <summary>
+    /// &lt;data&gt;/tools: where StreamZH installs par2 and 7-Zip (writable, survives app updates). Null: nothing is
+    /// installed or looked for there.
+    /// </summary>
+    public string? InstalledDirectory { get; init; }
+
+    /// <summary>Operating system and processor, for picking the download that StreamZH installs.</summary>
+    public ToolPlatform Platform { get; init; } = ToolPlatform.Current;
 
     public static ToolEnvironment Current { get; } = new(
         AppContext.BaseDirectory,
@@ -62,11 +80,18 @@ public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, 
 
     /// <summary>Folder for tools shipped with (or downloaded next to) StreamZH: &lt;app&gt;/tools.</summary>
     public string BundledDirectory => System.IO.Path.Combine(AppDirectory, "tools");
+
+    /// <summary>&lt;data&gt;/tools/par2 or &lt;data&gt;/tools/7-Zip; null without <see cref="InstalledDirectory"/>.</summary>
+    public string? InstalledToolDirectory(PostProcessTool tool) =>
+        InstalledDirectory is null ? null : System.IO.Path.Combine(InstalledDirectory, InstalledFolderName(tool));
+
+    public static string InstalledFolderName(PostProcessTool tool) => tool == PostProcessTool.Par2 ? "par2" : "7-Zip";
 }
 
 /// <summary>
-/// Finds par2 and 7-Zip: configured path, then &lt;app&gt;/tools, then PATH, then the Windows default
-/// (C:\Program Files\7-Zip\7z.exe). Versions are read once per executable.
+/// Finds par2 and 7-Zip: configured path, then the copy installed by StreamZH (&lt;data&gt;/tools/par2, &lt;data&gt;/tools/7-Zip),
+/// then &lt;app&gt;/tools, then PATH, then the Windows default (C:\Program Files\7-Zip\7z.exe). Versions are read once
+/// per executable.
 /// </summary>
 public sealed partial class PostProcessTools(IPostProcessToolSettings settings, IToolProcessRunner runner, ToolEnvironment environment)
 {
@@ -90,6 +115,18 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
         }
 
         var names = ExecutableNames(tool);
+
+        if (environment.InstalledToolDirectory(tool) is { } installedDirectory)
+        {
+            foreach (var name in names)
+            {
+                var installed = System.IO.Path.Combine(installedDirectory, name);
+                if (environment.FileExists(installed))
+                {
+                    return new ToolLocation(tool, installed, ToolSource.Installed, configured, problem);
+                }
+            }
+        }
 
         foreach (var name in names)
         {

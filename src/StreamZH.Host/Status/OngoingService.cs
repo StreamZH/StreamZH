@@ -10,17 +10,19 @@ using StreamZH.Core.Events;
 using StreamZH.Core.Jobs;
 using StreamZH.Data;
 using StreamZH.Library.Indexers;
+using StreamZH.Library.PostProcessing;
 
 namespace StreamZH.Host.Status;
 
 /// <summary>
-/// What the status window at the bottom right shows (GET /api/v1/status/ongoing): the running job, active downloads and
-/// notices about things that stop the pipeline (no Usenet server, no indexer, back-off, VIP, folders, disk space, failures).
+/// What the status window at the bottom right shows (GET /api/v1/status/ongoing): the running job, active downloads, tool
+/// installations and notices about things that stop the pipeline (no Usenet server, no indexer, back-off, VIP, folders,
+/// disk space, failures, par2 or 7-Zip that could not be installed).
 /// Also tells the browsers to re-read it ("ongoing") when the running job changes or indexer health changes.
 /// </summary>
 /// <remarks>
 /// The download engine is optional here: <see cref="IDownloadQueue"/> is resolved when it is registered, so the status
-/// window works without it (and before it is configured).
+/// window works without it (and before it is configured). The same goes for <see cref="ToolInstaller"/>.
 /// </remarks>
 public sealed class OngoingService(
     JobQueue jobs,
@@ -62,10 +64,12 @@ public sealed class OngoingService(
         var queue = services.GetService<IDownloadQueue>();
         var active = queue?.Active() ?? [];
 
+        AddToolInstalls(running);
         AddDownloads(running, active.Where(d => d.Status is not (DownloadStatus.Queued or DownloadStatus.Paused)));
         AddJob(running);
         AddDownloads(running, active.Where(d => d.Status is DownloadStatus.Queued or DownloadStatus.Paused));
 
+        AddToolNotices(notices);
         AddDownloadClientNotices(notices);
         AddIndexerNotices(notices);
         AddFolderNotices(notices);
@@ -88,6 +92,35 @@ public sealed class OngoingService(
         {
             running.Add(new OngoingRunning(
                 "job", OngoingKinds.Job, "Background jobs", $"{status.Queued} queued", null, null, null, null));
+        }
+    }
+
+    /// <summary>"Installing par2 1.5.0" with the download progress.</summary>
+    private void AddToolInstalls(List<OngoingRunning> running)
+    {
+        if (services.GetService<ToolInstaller>() is not { } installer)
+        {
+            return;
+        }
+
+        foreach (var tool in ToolInstaller.AllTools)
+        {
+            var status = installer.Status(tool);
+            if (!status.Installing)
+            {
+                continue;
+            }
+
+            var version = installer.Package(tool)?.Version;
+            running.Add(new OngoingRunning(
+                $"install-{ToolKey(tool)}",
+                OngoingKinds.Install,
+                $"Installing {PostProcessTools.DisplayName(tool)}{(version is null ? string.Empty : " " + version)}",
+                status.Progress is { } p and > 0 ? $"{status.Step ?? "Installing"} · {Percent(p)}" : status.Step ?? "Starting",
+                status.Progress,
+                null,
+                null,
+                ToolsLink));
         }
     }
 
@@ -147,6 +180,36 @@ public sealed class OngoingService(
     }
 
     // ---- Notices ----
+
+    /// <summary>A failed installation, until the tool is found (installed with the button, configured or installed by hand).</summary>
+    private void AddToolNotices(List<OngoingNotice> notices)
+    {
+        if (services.GetService<ToolInstaller>() is not { } installer || services.GetService<PostProcessTools>() is not { } tools)
+        {
+            return;
+        }
+
+        foreach (var tool in ToolInstaller.AllTools)
+        {
+            var status = installer.Status(tool);
+            if (status.Installing || status.Error is not { } error || tools.Find(tool).Found)
+            {
+                continue;
+            }
+
+            notices.Add(new OngoingNotice(
+                $"install-failed-{ToolKey(tool)}",
+                NoticeLevels.Warn,
+                $"{PostProcessTools.DisplayName(tool)} could not be installed",
+                $"{error.TrimEnd('.')}. Settings → Tools",
+                ToolsLink,
+                false));
+        }
+    }
+
+    private const string ToolsLink = "/settings#tools";
+
+    private static string ToolKey(PostProcessTool tool) => tool == PostProcessTool.Par2 ? "par2" : "7zip";
 
     private void AddDownloadClientNotices(List<OngoingNotice> notices)
     {

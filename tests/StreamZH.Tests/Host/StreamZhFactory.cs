@@ -8,7 +8,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Data;
+using StreamZH.Library.PostProcessing;
 using StreamZH.Metadata.Tmdb;
+using StreamZH.Tests.PostProcessing;
 
 namespace StreamZH.Tests.Host;
 
@@ -22,13 +24,30 @@ public sealed class StreamZhFactory(ITmdbClient? tmdb = null) : WebApplicationFa
 
     public string ApiKey => Services.GetRequiredService<ConfigRepository>().Get(ConfigKeys.ApiKey)!;
 
+    /// <summary>Answers the tool downloads (par2, 7-Zip); unknown URLs get 404, so tests never reach GitHub.</summary>
+    public FakeToolDownloads ToolDownloads { get; } = new();
+
+    /// <summary>The packages the tool installer uses; null = the official ones.</summary>
+    public ToolCatalog? ToolCatalog { get; set; }
+
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         builder.UseSetting("data", DataDirectory);
-        if (tmdb is not null)
+        builder.ConfigureTestServices(services =>
         {
-            builder.ConfigureTestServices(services => services.Replace(ServiceDescriptor.Singleton(tmdb)));
-        }
+            if (tmdb is not null)
+            {
+                services.Replace(ServiceDescriptor.Singleton(tmdb));
+            }
+
+            // No automatic installation at startup; downloads go to the fake.
+            services.Replace(ServiceDescriptor.Singleton(new ToolAutoInstallOptions(TimeSpan.Zero, Enabled: false)));
+            services.AddHttpClient(ToolInstaller.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => ToolDownloads);
+            if (ToolCatalog is not null)
+            {
+                services.Replace(ServiceDescriptor.Singleton(ToolCatalog));
+            }
+        });
     }
 
     /// <summary>Client that has completed the first-run setup and is logged in as Owner.</summary>

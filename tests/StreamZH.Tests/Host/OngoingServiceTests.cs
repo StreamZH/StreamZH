@@ -13,7 +13,9 @@ using StreamZH.Data;
 using StreamZH.Host.Status;
 using StreamZH.Library;
 using StreamZH.Library.Indexers;
+using StreamZH.Library.PostProcessing;
 using StreamZH.Tests.Library;
+using StreamZH.Tests.PostProcessing;
 
 namespace StreamZH.Tests.Host;
 
@@ -310,12 +312,71 @@ public sealed class OngoingServiceTests : IDisposable
         Assert.Equal(4, _published.Count);
     }
 
-    private OngoingService Service(bool withQueue = true, IArticleSource? articleSource = null)
+    [Fact]
+    public async Task Tool_installation_is_a_running_row_and_a_failure_a_notice_until_the_tool_is_found()
+    {
+        AddIndexer("A");
+        using var folder = new TempFolder();
+        using var downloads = new FakeToolDownloads();
+        var (package, _) = TestToolPackages.Par2();
+        var existing = new HashSet<string>(StringComparer.Ordinal);
+        var environment = new ToolEnvironment(folder.Combine("app"), string.Empty, OperatingSystem.IsWindows(), [])
+        {
+            InstalledDirectory = folder.Combine("tools"),
+            FileExists = existing.Contains,
+        };
+        var settings = new FixedToolSettings();
+        var runner = new ToolProcessRunner();
+        var tools = new PostProcessTools(settings, runner, environment);
+        using var installer = new ToolInstaller(
+            new FakeHttpClientFactory(downloads), runner, environment, new ToolCatalog((tool, _) => tool == PostProcessTool.Par2 ? package : null),
+            tools, settings, _events, TimeProvider.System, NullLogger<ToolInstaller>.Instance);
+
+        downloads.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var install = installer.InstallAsync(PostProcessTool.Par2, CancellationToken.None);
+
+        var running = Service(tools: tools, installer: installer).Get();
+        var row = Assert.Single(running.Running);
+        Assert.Equal("install-par2", row.Key);
+        Assert.Equal(OngoingKinds.Install, row.Kind);
+        Assert.Equal("Installing par2 1.5.0", row.Title);
+        Assert.Equal("/settings#tools", row.Link);
+        Assert.Empty(running.Notices);
+
+        // The download is not there: 404.
+        downloads.Gate.SetResult();
+        var result = await install;
+        Assert.False(result.Success);
+        Assert.NotEmpty(_published);
+
+        var failed = Service(tools: tools, installer: installer).Get();
+        Assert.Empty(failed.Running);
+        var notice = Assert.Single(failed.Notices);
+        Assert.Equal("install-failed-par2", notice.Key);
+        Assert.Equal(NoticeLevels.Warn, notice.Level);
+        Assert.Equal("par2 could not be installed", notice.Title);
+        Assert.Contains("HTTP 404", notice.Sub, StringComparison.Ordinal);
+        Assert.EndsWith(". Settings → Tools", notice.Sub, StringComparison.Ordinal);
+        Assert.Equal("/settings#tools", notice.Link);
+        Assert.False(notice.Dismissible);
+
+        // Installed by hand: the notice disappears.
+        existing.Add(Path.Combine(environment.BundledDirectory, tools.ExecutableNames(PostProcessTool.Par2)[0]));
+        Assert.Empty(Service(tools: tools, installer: installer).Get().Notices);
+    }
+
+    private OngoingService Service(bool withQueue = true, IArticleSource? articleSource = null, PostProcessTools? tools = null, ToolInstaller? installer = null)
     {
         var services = new ServiceCollection();
         if (withQueue)
         {
             services.AddSingleton<IDownloadQueue>(_queue);
+        }
+
+        if (tools is not null && installer is not null)
+        {
+            services.AddSingleton(tools);
+            services.AddSingleton(installer);
         }
 
         if (articleSource is not null)

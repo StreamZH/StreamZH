@@ -19,9 +19,33 @@ export interface ToolSettings {
   sevenZipProblem: string | null
   bundledFolder: string
   os: 'Windows' | 'Linux' | 'macOS'
+  /** StreamZH can install the tool on this system. */
+  par2Installable: boolean
+  sevenZipInstallable: boolean
+  /** An installation is running right now. */
+  par2Installing: boolean
+  sevenZipInstalling: boolean
+  /** 0..1 while installing. */
+  par2InstallProgress: number | null
+  sevenZipInstallProgress: number | null
+  /** Why the last installation failed. */
+  par2InstallError: string | null
+  sevenZipInstallError: string | null
+  /** Version of the copy installed by StreamZH. */
+  par2InstalledVersion: string | null
+  sevenZipInstalledVersion: string | null
+  /** The version StreamZH installs. */
+  par2InstallVersion: string | null
+  sevenZipInstallVersion: string | null
+  /** Missing tools are installed automatically. */
+  autoInstall: boolean
+  /** Where StreamZH installs the tools (<data>/tools). */
+  installFolder: string | null
 }
 
-export type ToolSource = 'NotFound' | 'Configured' | 'Bundled' | 'Path' | 'WindowsDefault'
+export type ToolSource = 'NotFound' | 'Configured' | 'Installed' | 'Bundled' | 'Path' | 'WindowsDefault'
+
+export type ToolName = 'par2' | 'sevenZip'
 
 export const toolKeys = {
   settings: ['settings-tools'] as const,
@@ -29,6 +53,8 @@ export const toolKeys = {
 
 export const toolsApi = {
   settings: () => request<ToolSettings>('GET', '/settings/tools'),
-  /** '' switches back to the automatic search. */
-  save: (paths: { par2Path: string; sevenZipPath: string }) => request<ToolSettings>('PUT', '/settings/tools', paths),
+  /** '' switches a path back to the automatic search; a missing field leaves it unchanged. */
+  save: (changes: { par2Path?: string; sevenZipPath?: string; autoInstall?: boolean }) => request<ToolSettings>('PUT', '/settings/tools', changes),
+  /** Installs (or reinstalls) the tool; answers when the installation has finished. */
+  install: (tool: ToolName) => request<ToolSettings>('POST', `/settings/tools/${tool}/install`),
 }

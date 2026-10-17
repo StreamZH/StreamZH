@@ -27,10 +27,17 @@ here with the source path, so every change can be traced back.
 | Instrument Serif | SIL Open Font License 1.1 |
 | Outfit (logo wordmark, outlined to paths; font files only in `tools/brand/fonts`) | SIL Open Font License 1.1 |
 
-External tools called as separate processes (not linked, not shipped in source):
-par2cmdline (GPL-2.0-or-later), 7-Zip (LGPL-2.1 with unRAR restriction).
-`tools/Update-Local.ps1` downloads the unmodified official par2cmdline Windows release from
-https://github.com/Parchive/par2cmdline/releases into the install folder on the user's machine; source code is available there.
+External tools called as separate processes (not linked, not part of StreamZH, not shipped in source):
+
+| Tool | License | Source |
+|---|---|---|
+| [par2cmdline-turbo](https://github.com/animetosho/par2cmdline-turbo) 1.5.0 | GPL-2.0-or-later | https://github.com/animetosho/par2cmdline-turbo/releases |
+| [7-Zip](https://www.7-zip.org) 26.03 | LGPL-2.1-or-later; RAR code under the unRAR license restriction | https://github.com/ip7z/7zip/releases |
+
+When they are missing, StreamZH downloads the unmodified official release files of these pinned versions at runtime
+(SHA-256 checked) into `<data>/tools` on the user's machine, keeps their license files next to them and calls them as
+separate programs. Their source code is available from the release pages above. The Docker image uses the Debian packages
+`par2` and `7zip` instead.
 The PAR 2.0 reader/verifier in `src/StreamZH.Library/PostProcessing` is StreamZH's own code, written from the PAR 2.0 specification.
 
 StreamZH ships no list of indexers. Users add only sources they are permitted to use.

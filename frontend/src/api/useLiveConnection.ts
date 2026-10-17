@@ -7,6 +7,7 @@ import { indexerKeys } from './indexers'
 import { queryKeys, type JobStatus } from './library'
 import { releaseKeys, type SearchFinished } from './releases'
 import { statusKeys } from './status'
+import { toolKeys } from './tools'
 
 /**
  * Keeps one SignalR connection to /hub open, refreshes cached library data when the
@@ -51,6 +52,8 @@ export function useLiveConnection(): boolean {
 
     connection.on('ongoing', () => {
       refetchOngoingSoon()
+      // Also sent when a tool installation starts or ends; refetches only while Settings → Tools is open.
+      void queryClient.invalidateQueries({ queryKey: toolKeys.settings })
     })
 
     connection.on('downloadChanged', () => {

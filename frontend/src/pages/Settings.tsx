@@ -8,6 +8,7 @@ import { useScrollToHash } from '../lib/useScrollToHash'
 import { DownloadsSection, MetadataSection, RootFoldersSection } from './MediaSettings'
 import page from './Page.module.css'
 import styles from './Settings.module.css'
+import { ToolsSection } from './ToolsSettings'
 
 const settingsKey = ['settings-general']
 
@@ -35,6 +36,7 @@ export default function Settings() {
       <div id="media" className={page.page}>
         <RootFoldersSection />
         <DownloadsSection />
+        <ToolsSection />
         <MetadataSection />
       </div>
 

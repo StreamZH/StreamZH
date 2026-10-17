@@ -29,5 +29,8 @@ here with the source path, so every change can be traced back.
 
 External tools called as separate processes (not linked, not shipped in source):
 par2cmdline (GPL-2.0-or-later), 7-Zip (LGPL-2.1 with unRAR restriction).
+`tools/Update-Local.ps1` downloads the unmodified official par2cmdline Windows release from
+https://github.com/Parchive/par2cmdline/releases into the install folder on the user's machine; source code is available there.
+The PAR 2.0 reader/verifier in `src/StreamZH.Library/PostProcessing` is StreamZH's own code, written from the PAR 2.0 specification.
 
 StreamZH ships no list of indexers. Users add only sources they are permitted to use.

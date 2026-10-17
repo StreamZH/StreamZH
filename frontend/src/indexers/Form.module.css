@@ -1,0 +1,283 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.statusNote {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #ef6b6b;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+/* Label on the left, control with its help text below on the right (one field per line, like Prowlarr). */
+.row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 6px 20px;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.label {
+  padding-top: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.control > input,
+.control > select {
+  max-width: 460px;
+}
+
+.help {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.help code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.help a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.invalid input:not([type='checkbox']),
+.invalid select {
+  border-color: #ef6b6b;
+}
+
+.fieldError {
+  font-size: 12.5px;
+  color: #ef6b6b;
+}
+
+.presetValue {
+  color: var(--text-muted);
+}
+
+.number {
+  width: 160px;
+}
+
+.date {
+  width: 180px;
+  color-scheme: dark;
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.inlineLink {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.inlineLink:hover {
+  color: var(--text);
+}
+
+/* Toggle switch on a real checkbox. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 0.15s;
+}
+
+.track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.switch input:checked + .track {
+  background: var(--accent);
+}
+
+.switch input:checked + .track::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.switch input:focus-visible + .track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding-top: 8px;
+}
+
+.pickers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.categories {
+  margin: 0;
+  padding: 10px 12px 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.categories legend {
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.catCount {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.categoryGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.categoryGroup + .categoryGroup {
+  margin-top: 10px;
+}
+
+.subCategories {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 16px;
+  padding-left: 22px;
+}
+
+.catId {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.testResult {
+  flex-basis: 100%;
+  font-size: 13px;
+}
+
+.testResult:empty {
+  display: none;
+}
+
+.testResult > span {
+  overflow-wrap: anywhere;
+}
+
+.delete:hover:not(:disabled) {
+  color: #ef6b6b;
+  border-color: color-mix(in srgb, #ef6b6b 50%, var(--line));
+}
+
+.confirm {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+@media (max-width: 600px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .label {
+    padding-top: 0;
+  }
+
+  .number,
+  .date {
+    width: 100%;
+  }
+
+  .subCategories {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    padding-left: 16px;
+  }
+}

@@ -1,21 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
-import { ApiError } from '../api/client'
+import { useMemo, useState } from 'react'
 import {
+  genericDefinitionKey,
   indexerKeys,
   indexersApi,
-  maskedApiKey,
-  standardCategoryNames,
   type Indexer,
   type IndexerCapabilities,
-  type IndexerCategory,
-  type IndexerStatus,
+  type IndexerDefinition,
 } from '../api/indexers'
 import { useAuth } from '../auth/auth'
-import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
+import Catalog from '../indexers/Catalog'
+import { Pill, PrivacyChip, ProtocolChip } from '../indexers/Chips'
+import IndexerDetails from '../indexers/IndexerDetails'
+import IndexerForm from '../indexers/IndexerForm'
+import { cloneOf, draftFromDefinition, formatUntil, grabUsage, hostOf, queryUsage, rowState, usesList, vipState, type Usage } from '../indexers/model'
+import ProwlarrImport from '../indexers/ProwlarrImport'
+import TestAll from '../indexers/TestAll'
 import page from './Page.module.css'
 import styles from './Indexers.module.css'
+
+type View =
+  | { kind: 'none' }
+  | { kind: 'catalog' }
+  | {
+      kind: 'form'
+      indexer: Indexer
+      definition: IndexerDefinition | null
+      capabilities?: IndexerCapabilities | null
+      fromCatalog?: boolean
+    }
+  | { kind: 'details'; id: number }
+  | { kind: 'testAll' }
+  | { kind: 'import' }
+
+const schemaKey = ['indexer-schema'] as const
 
 export default function Indexers() {
   const { user } = useAuth()
@@ -32,363 +51,220 @@ export default function Indexers() {
   )
 }
 
-function hostOf(url: string) {
-  try {
-    return new URL(url).host
-  } catch {
-    return url
-  }
-}
-
-function formatUntil(value: string) {
-  const date = new Date(value)
-  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-  if (date.toDateString() === new Date().toDateString()) return time
-  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`
-}
-
-function HealthBadge({ status }: { status: IndexerStatus | null }) {
-  if (status && !status.healthy && status.disabledTill) {
-    return <span className={`${ui.badge} ${ui.missing}`}>Disabled until {formatUntil(status.disabledTill)}</span>
-  }
-  return <span className={`${ui.badge} ${ui.ok}`}>OK</span>
-}
-
-function uses(i: Indexer) {
-  const list = [i.enableRss && 'RSS', i.enableAutomaticSearch && 'Automatic', i.enableInteractiveSearch && 'Interactive'].filter(Boolean)
-  return list.length > 0 ? list.join(' · ') : 'Off'
-}
-
 function IndexerList({ canEdit }: { canEdit: boolean }) {
+  const queryClient = useQueryClient()
   const indexers = useQuery({ queryKey: indexerKeys.list, queryFn: indexersApi.list, refetchInterval: 60_000 })
-  const [editing, setEditing] = useState<Indexer | null>(null)
+  // For protocol and privacy chips; the list still works when the catalog cannot be loaded.
+  const definitions = useQuery({ queryKey: indexerKeys.definitions, queryFn: indexersApi.definitions, staleTime: 10 * 60_000, retry: 1 })
+  const [view, setView] = useState<View>({ kind: 'none' })
+  const close = () => setView({ kind: 'none' })
 
-  const create = useMutation({
-    mutationFn: indexersApi.schema,
-    onSuccess: (schema) => setEditing(schema),
+  const byKey = useMemo(() => new Map((definitions.data ?? []).map((d) => [d.key, d])), [definitions.data])
+  const definitionOf = (i: Indexer) => byKey.get(i.definitionKey ?? genericDefinitionKey) ?? null
+
+  const pick = useMutation({
+    mutationFn: async (definition: IndexerDefinition) => {
+      const schema = await queryClient.fetchQuery({ queryKey: schemaKey, queryFn: indexersApi.schema, staleTime: 10 * 60_000 })
+      return { schema, definition }
+    },
+    onSuccess: ({ schema, definition }) =>
+      setView({ kind: 'form', indexer: draftFromDefinition(schema, definition), definition, fromCatalog: true }),
   })
 
   const list = indexers.data ?? []
-  const addButton = canEdit && (
-    <button className={ui.primary} type="button" onClick={() => create.mutate()} disabled={create.isPending}>
-      Add indexer
-    </button>
+  const enabled = list.filter((i) => i.enable).length
+
+  const toolbar = canEdit && (
+    <div className={styles.toolbar}>
+      <button className={ui.button} type="button" onClick={() => setView({ kind: 'import' })}>
+        Import from Prowlarr
+      </button>
+      {list.length > 0 && (
+        <button className={ui.button} type="button" onClick={() => setView({ kind: 'testAll' })}>
+          Test all
+        </button>
+      )}
+      <button className={ui.primary} type="button" onClick={() => setView({ kind: 'catalog' })}>
+        Add indexer
+      </button>
+    </div>
   )
 
   return (
     <section className={page.panel}>
       <div className={styles.panelHead}>
-        <h2 className={page.panelTitle}>Newznab indexers</h2>
-        {list.length > 0 && addButton}
+        <div>
+          <h2 className={page.panelTitle}>Newznab indexers</h2>
+          {list.length > 0 && (
+            <p className={styles.summary}>
+              {list.length} indexer{list.length === 1 ? '' : 's'} · {enabled} enabled
+            </p>
+          )}
+        </div>
+        {toolbar}
       </div>
       {indexers.isError && <p className={ui.error}>{indexers.error.message}</p>}
-      {create.error && <p className={ui.error}>{create.error.message}</p>}
+      {pick.error && <p className={ui.error}>{pick.error.message}</p>}
 
       {indexers.isSuccess && list.length === 0 && (
         <div className={styles.empty}>
           <p>
-            StreamZH searches Usenet indexers through <strong>Newznab</strong>, the API most Usenet indexers offer. You need the indexer&apos;s
-            address and the API key from your account page there.
+            StreamZH searches Usenet indexers through <strong>Newznab</strong>, the API most Usenet indexers offer. Pick yours from the list of
+            known indexers, or bring them all over from Prowlarr in one go.
           </p>
-          <p className={styles.hint}>
-            Using Prowlarr? Add each indexer with Prowlarr&apos;s Newznab URL (<code>http://host:9696/1/</code>) and Prowlarr&apos;s API key.
-          </p>
-          {canEdit ? addButton : <p className={ui.muted}>An admin can add indexers.</p>}
+          {!canEdit && <p className={ui.muted}>An admin can add indexers.</p>}
         </div>
       )}
 
       {list.length > 0 && (
-        <ul className={styles.list}>
-          {list.map((i) => (
-            <li key={i.id} className={styles.row}>
-              <div className={styles.rowMain}>
-                <span className={styles.name}>{i.name}</span>
-                <HealthBadge status={i.status} />
-              </div>
-              <dl className={styles.meta}>
-                <div>
-                  <dt>Host</dt>
-                  <dd className={ui.mono}>{hostOf(i.baseUrl)}</dd>
-                </div>
-                <div>
-                  <dt>Priority</dt>
-                  <dd>{i.priority}</dd>
-                </div>
-                <div>
-                  <dt>Used for</dt>
-                  <dd>{uses(i)}</dd>
-                </div>
-              </dl>
-              <div className={styles.rowActions}>
-                <button className={ui.button} type="button" onClick={() => setEditing(i)}>
-                  {canEdit ? 'Edit' : 'View'}
-                </button>
-              </div>
-              {i.status?.lastError && (
-                <p className={styles.lastError}>
-                  {i.status.healthy ? 'Last error' : 'Error'}: {i.status.lastError}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className={styles.table}>
+          <div className={styles.head} aria-hidden="true">
+            <span>Indexer</span>
+            <span>Priority</span>
+            <span>Used for</span>
+            <span>Queries</span>
+            <span>Grabs</span>
+            <span />
+          </div>
+          <ul className={styles.list}>
+            {list.map((i) => (
+              <IndexerRow
+                key={i.id}
+                indexer={i}
+                definition={definitionOf(i)}
+                canEdit={canEdit}
+                onOpen={() => setView({ kind: 'details', id: i.id })}
+                onEdit={() => setView({ kind: 'form', indexer: i, definition: definitionOf(i) })}
+              />
+            ))}
+          </ul>
+        </div>
       )}
 
-      {editing && <IndexerDialog indexer={editing} canEdit={canEdit} onClose={() => setEditing(null)} />}
+      {view.kind === 'catalog' && (
+        <Catalog existing={list} onSelect={(d) => pick.mutate(d)} onImport={() => setView({ kind: 'import' })} onClose={close} />
+      )}
+      {view.kind === 'form' && (
+        <IndexerForm
+          key={`${view.indexer.id}-${view.indexer.name}`}
+          indexer={view.indexer}
+          definition={view.definition}
+          capabilities={view.capabilities ?? null}
+          canEdit={canEdit}
+          onClose={close}
+          onBack={view.fromCatalog ? () => setView({ kind: 'catalog' }) : undefined}
+        />
+      )}
+      {view.kind === 'details' && (
+        <IndexerDetails
+          id={view.id}
+          fallback={list.find((i) => i.id === view.id) ?? null}
+          canEdit={canEdit}
+          onClose={close}
+          onEdit={(d) => setView({ kind: 'form', indexer: d.indexer, definition: d.definition, capabilities: d.capabilities })}
+          onClone={(d) => setView({ kind: 'form', indexer: cloneOf(d.indexer), definition: d.definition, capabilities: d.capabilities })}
+        />
+      )}
+      {view.kind === 'testAll' && <TestAll onClose={close} onOpen={(id) => setView({ kind: 'details', id })} />}
+      {view.kind === 'import' && <ProwlarrImport onClose={close} onTestAll={() => setView({ kind: 'testAll' })} />}
     </section>
   )
 }
 
-/** Top-level categories in a Newznab range (2000 movies, 5000 TV) with their sub-categories. */
-function categoryTree(caps: IndexerCapabilities | null, base: number): IndexerCategory[] {
-  const inRange = (id: number) => id >= base && id < base + 1000
-  if (caps) return caps.categories.filter((c) => inRange(c.id))
-  const ids = Object.keys(standardCategoryNames)
-    .map(Number)
-    .filter((id) => inRange(id) && id !== base)
-  return [{ id: base, name: standardCategoryNames[base], subCategories: ids.map((id) => ({ id, name: standardCategoryNames[id], subCategories: [] })) }]
-}
-
-function IndexerDialog({ indexer, canEdit, onClose }: { indexer: Indexer; canEdit: boolean; onClose: () => void }) {
-  const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<Indexer>(indexer)
-  const [caps, setCaps] = useState<IndexerCapabilities | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const isNew = indexer.id === 0
-
-  const done = async () => {
-    await queryClient.invalidateQueries({ queryKey: indexerKeys.list })
-    onClose()
-  }
-
-  const save = useMutation({
-    mutationFn: () => (isNew ? indexersApi.create(draft) : indexersApi.update(draft)),
-    onSuccess: done,
-  })
-  const remove = useMutation({ mutationFn: () => indexersApi.remove(indexer.id), onSuccess: done })
-  const test = useMutation({
-    mutationFn: () => indexersApi.test(draft),
-    onSuccess: (data) => setCaps(data),
-  })
-
-  const update = (change: Partial<Indexer>) => setDraft((d) => ({ ...d, ...change }))
-
-  const saveErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
-  const testErrors = test.error instanceof ApiError ? test.error.fieldErrors : {}
-  const fieldError = (name: string) => (saveErrors[name] ?? testErrors[name])?.[0]
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    save.mutate()
-  }
-
-  const status = indexer.status
-  const title = isNew ? 'Add indexer' : canEdit ? `Edit ${indexer.name}` : indexer.name
-
+function Meter({ usage }: { usage: Usage }) {
+  if (usage.ratio == null) return <span className={styles.usage}>{usage.text}</span>
+  const tone = usage.ratio >= 1 ? styles.full : usage.ratio >= 0.8 ? styles.high : ''
   return (
-    <Modal title={title} onClose={onClose}>
-      <form className={styles.form} onSubmit={submit}>
-        {status && !status.healthy && status.disabledTill && (
-          <p className={styles.statusNote}>
-            Skipped until {formatUntil(status.disabledTill)}
-            {status.lastError ? `: ${status.lastError}` : ''}
-          </p>
-        )}
-        <fieldset className={styles.fieldset} disabled={!canEdit}>
-          <div className={styles.grid}>
-            <label className={ui.field}>
-              <span>Name</span>
-              <input className={ui.input} value={draft.name} maxLength={100} onChange={(e) => update({ name: e.target.value })} autoFocus />
-              {fieldError('name') && <small className={`${ui.error} ${styles.fieldError}`}>{fieldError('name')}</small>}
-            </label>
-            <label className={ui.field}>
-              <span>Priority</span>
-              <input
-                className={ui.input}
-                type="number"
-                min={1}
-                max={50}
-                inputMode="numeric"
-                value={Number.isNaN(draft.priority) ? '' : draft.priority}
-                onChange={(e) => update({ priority: e.target.valueAsNumber })}
-              />
-              <small>1 is the highest. Breaks ties between equally good releases.</small>
-              {fieldError('priority') && <small className={`${ui.error} ${styles.fieldError}`}>{fieldError('priority')}</small>}
-            </label>
-          </div>
-
-          <label className={ui.field}>
-            <span>URL</span>
-            <input
-              className={ui.input}
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="https://indexer.example"
-              value={draft.baseUrl}
-              onChange={(e) => update({ baseUrl: e.target.value })}
-            />
-            {fieldError('baseUrl') && <small className={`${ui.error} ${styles.fieldError}`}>{fieldError('baseUrl')}</small>}
-          </label>
-
-          <div className={styles.grid}>
-            <label className={ui.field}>
-              <span>API path</span>
-              <input
-                className={`${ui.input} ${ui.mono}`}
-                spellCheck={false}
-                placeholder="/api"
-                value={draft.apiPath}
-                onChange={(e) => update({ apiPath: e.target.value })}
-              />
-              {fieldError('apiPath') && <small className={`${ui.error} ${styles.fieldError}`}>{fieldError('apiPath')}</small>}
-            </label>
-            <label className={ui.field}>
-              <span>API key</span>
-              <input
-                className={ui.input}
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={draft.apiKey}
-                onFocus={(e) => draft.apiKey === maskedApiKey && e.target.select()}
-                onChange={(e) => update({ apiKey: e.target.value })}
-              />
-              {draft.apiKey === maskedApiKey && <small>Saved. Type a new key to replace it.</small>}
-              {fieldError('apiKey') && <small className={`${ui.error} ${styles.fieldError}`}>{fieldError('apiKey')}</small>}
-            </label>
-          </div>
-
-          <div className={ui.field}>
-            <span>Use for</span>
-            <div className={styles.checks}>
-              <label className={ui.check}>
-                <input type="checkbox" checked={draft.enableRss} onChange={(e) => update({ enableRss: e.target.checked })} />
-                <span>RSS</span>
-              </label>
-              <label className={ui.check}>
-                <input type="checkbox" checked={draft.enableAutomaticSearch} onChange={(e) => update({ enableAutomaticSearch: e.target.checked })} />
-                <span>Automatic search</span>
-              </label>
-              <label className={ui.check}>
-                <input
-                  type="checkbox"
-                  checked={draft.enableInteractiveSearch}
-                  onChange={(e) => update({ enableInteractiveSearch: e.target.checked })}
-                />
-                <span>Interactive search</span>
-              </label>
-            </div>
-          </div>
-
-          {canEdit && (
-            <div className={styles.testRow}>
-              <button className={ui.button} type="button" onClick={() => test.mutate()} disabled={test.isPending}>
-                {test.isPending ? 'Testing…' : 'Test'}
-              </button>
-              {test.isSuccess && (
-                <span className={ui.ok}>
-                  Connection works{test.data.categories.length > 0 ? `, ${test.data.categories.length} category groups loaded` : ''}.
-                </span>
-              )}
-              {test.error && Object.keys(testErrors).length === 0 && <span className={ui.error}>{test.error.message}</span>}
-              {!test.isSuccess && !test.error && <span className={ui.muted}>Checks the connection and loads the indexer&apos;s categories.</span>}
-            </div>
-          )}
-
-          <CategoryPicker
-            legend="Movie categories"
-            tree={categoryTree(caps, 2000)}
-            selected={draft.categories}
-            onChange={(categories) => update({ categories })}
-          />
-          <CategoryPicker
-            legend="TV categories"
-            tree={categoryTree(caps, 5000)}
-            selected={draft.tvCategories}
-            onChange={(tvCategories) => update({ tvCategories })}
-          />
-          {!caps && <small className={ui.muted}>Standard Newznab categories. Test to load the indexer&apos;s own list.</small>}
-          {fieldError('categories') && <small className={`${ui.error} ${styles.fieldError}`}>{fieldError('categories')}</small>}
-        </fieldset>
-
-        {canEdit && (
-          <div className={styles.footer}>
-            <button className={ui.primary} type="submit" disabled={save.isPending}>
-              {save.isPending ? 'Saving…' : 'Save'}
-            </button>
-            <button className={ui.button} type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <span className={styles.spacer} />
-            {!isNew &&
-              (confirmDelete ? (
-                <>
-                  <span className={ui.muted}>Delete this indexer?</span>
-                  <button className={ui.danger} type="button" onClick={() => remove.mutate()} disabled={remove.isPending}>
-                    Yes, delete
-                  </button>
-                  <button className={ui.button} type="button" onClick={() => setConfirmDelete(false)}>
-                    Keep
-                  </button>
-                </>
-              ) : (
-                <button className={ui.button} type="button" onClick={() => setConfirmDelete(true)}>
-                  Delete
-                </button>
-              ))}
-          </div>
-        )}
-        {save.error && Object.keys(saveErrors).length === 0 && <p className={ui.error}>{save.error.message}</p>}
-        {remove.error && <p className={ui.error}>{remove.error.message}</p>}
-      </form>
-    </Modal>
-  )
-}
-
-function CategoryPicker({
-  legend,
-  tree,
-  selected,
-  onChange,
-}: {
-  legend: string
-  tree: IndexerCategory[]
-  selected: number[]
-  onChange: (ids: number[]) => void
-}) {
-  const shown = new Set<number>()
-  tree.forEach((c) => {
-    shown.add(c.id)
-    c.subCategories.forEach((s) => shown.add(s.id))
-  })
-  // Selected ids the list does not know (e.g. saved before the indexer changed its categories).
-  const extra = selected.filter((id) => !shown.has(id))
-
-  const toggle = (id: number, checked: boolean) =>
-    onChange(checked ? [...selected, id].sort((a, b) => a - b) : selected.filter((c) => c !== id))
-
-  const box = (id: number, name: string) => (
-    <label className={ui.check} key={id}>
-      <input type="checkbox" checked={selected.includes(id)} onChange={(e) => toggle(id, e.target.checked)} />
-      <span>
-        {name} <span className={styles.catId}>{id}</span>
+    <span className={`${styles.usage} ${tone}`}>
+      {usage.text}
+      <span className={styles.meter} aria-hidden="true">
+        <span style={{ width: `${Math.round(usage.ratio * 100)}%` }} />
       </span>
-    </label>
+    </span>
   )
+}
+
+function IndexerRow({
+  indexer: i,
+  definition,
+  canEdit,
+  onOpen,
+  onEdit,
+}: {
+  indexer: Indexer
+  definition: IndexerDefinition | null
+  canEdit: boolean
+  onOpen: () => void
+  onEdit: () => void
+}) {
+  const state = rowState(i)
+  const status = i.status
+  const vip = vipState(status)
+  const uses = usesList(i)
 
   return (
-    <fieldset className={styles.categories}>
-      <legend>{legend}</legend>
-      {tree.length === 0 && extra.length === 0 && <p className={ui.muted}>The indexer has no categories in this range.</p>}
-      {tree.map((parent) => (
-        <div key={parent.id} className={styles.categoryGroup}>
-          {box(parent.id, parent.name)}
-          {parent.subCategories.length > 0 && <div className={styles.subCategories}>{parent.subCategories.map((s) => box(s.id, s.name))}</div>}
+    <li className={`${styles.row} ${styles[state]}`} onClick={onOpen}>
+      <div className={styles.main}>
+        <div className={styles.nameLine}>
+          <button
+            type="button"
+            className={styles.name}
+            title={state === 'enabled' ? 'Enabled' : state === 'disabled' ? 'Disabled' : 'Failing'}
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+          >
+            {i.name}
+          </button>
+          <ProtocolChip protocol={definition?.protocol ?? 'usenet'} />
+          {definition && <PrivacyChip privacy={definition.privacy} />}
         </div>
-      ))}
-      {extra.length > 0 && <div className={styles.subCategories}>{extra.map((id) => box(id, standardCategoryNames[id] ?? 'Category'))}</div>}
-    </fieldset>
+        <div className={styles.badges}>
+          <span className={styles.host}>{hostOf(i.baseUrl)}</span>
+          {!i.enable && <Pill tone="off">Disabled</Pill>}
+          {i.enable && status && !status.healthy && status.disabledTill && (
+            <Pill tone="error">Skipped until {formatUntil(status.disabledTill)}</Pill>
+          )}
+          {status?.limitReached && <Pill tone="error">{status.limitReached === 'query' ? 'Query limit reached' : 'Grab limit reached'}</Pill>}
+          {vip && <Pill tone={vip.tone}>{vip.text}</Pill>}
+        </div>
+      </div>
+      <div className={styles.cell}>
+        <span className={styles.cellLabel}>Priority</span>
+        <span className={styles.priority}>{i.priority}</span>
+      </div>
+      <div className={styles.cell}>
+        <span className={styles.cellLabel}>Used for</span>
+        <span className={styles.uses}>{!i.enable ? '–' : uses.length > 0 ? uses.join(' · ') : 'Nothing'}</span>
+      </div>
+      <div className={styles.cell}>
+        <span className={styles.cellLabel}>Queries</span>
+        <Meter usage={queryUsage(i)} />
+      </div>
+      <div className={styles.cell}>
+        <span className={styles.cellLabel}>Grabs</span>
+        <Meter usage={grabUsage(i)} />
+      </div>
+      <div className={styles.actions}>
+        {canEdit && (
+          <button
+            className={ui.button}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit()
+            }}
+          >
+            Edit
+          </button>
+        )}
+      </div>
+      {status?.lastError && (
+        <p className={styles.lastError}>
+          {status.healthy ? 'Last error' : 'Error'}: {status.lastError}
+        </p>
+      )}
+    </li>
   )
 }

@@ -1,0 +1,107 @@
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  --tone: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 5px;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+  white-space: nowrap;
+}
+
+.usenet {
+  --tone: #8fb4e3;
+}
+
+.torrent {
+  --tone: #9cc2a0;
+}
+
+.private {
+  --tone: #e2646b;
+}
+
+.semiPrivate {
+  --tone: var(--warn);
+}
+
+.public {
+  --tone: var(--ok);
+}
+
+.category {
+  --tone: var(--text-muted);
+}
+
+.movies {
+  --tone: var(--movies);
+}
+
+.tv {
+  --tone: var(--series);
+}
+
+.audio {
+  --tone: var(--music);
+}
+
+.books {
+  --tone: var(--books);
+}
+
+.none {
+  color: var(--text-faint);
+}
+
+.pill {
+  --tone: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 9px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--line));
+  color: var(--tone);
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ok {
+  --tone: var(--ok);
+}
+
+.warn {
+  --tone: var(--warn);
+}
+
+.error {
+  --tone: #ef6b6b;
+}
+
+.off {
+  --tone: var(--text-faint);
+}
+
+.info {
+  --tone: #8fb4e3;
+}

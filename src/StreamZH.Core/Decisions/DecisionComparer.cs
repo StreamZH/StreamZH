@@ -74,7 +74,7 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
 
     private bool IsDual(ReleaseCandidate candidate) =>
         LanguageRules.IsDualLanguage(
-            LanguageRules.EffectiveLanguages(candidate.Release),
+            LanguageRules.EffectiveLanguages(candidate.Release, _context.Target.OriginalLanguage),
             _context.Profile,
             _context.Target.OriginalLanguage);
 

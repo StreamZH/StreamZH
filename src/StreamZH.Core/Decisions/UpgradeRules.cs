@@ -33,6 +33,8 @@ public enum UpgradeVerdict
 /// <summary>
 /// Upgrade logic, modelled on Radarr's UpgradableSpecification (without custom formats). Order of checks:
 /// <list type="number">
+/// <item>The file has the wrong language for the profile and the release has the right one → always
+/// (a German version replaces an English or subbed file, whatever the quality order).</item>
 /// <item>Lower profile rank than the file → never.</item>
 /// <item>Same quality with a higher revision (PROPER/REPACK/REAL) → always, even past the cutoff and with upgrades off.</item>
 /// <item>Same quality with a lower revision → never.</item>
@@ -53,6 +55,11 @@ public static class UpgradeRules
         Language originalLanguage)
     {
         if (existing is null)
+        {
+            return UpgradeVerdict.Upgrade;
+        }
+
+        if (IsWrongLanguageFix(profile, existingLanguages, candidateLanguages))
         {
             return UpgradeVerdict.Upgrade;
         }
@@ -93,6 +100,13 @@ public static class UpgradeRules
         }
 
         return qualityCompare == 0 ? UpgradeVerdict.NotBetter : UpgradeVerdict.Upgrade;
+    }
+
+    /// <summary>The profile wants a specific language, the file on disk does not have it and the release does.</summary>
+    public static bool IsWrongLanguageFix(QualityProfile profile, IReadOnlyList<Language> existingLanguages, IReadOnlyList<Language> candidateLanguages)
+    {
+        var wanted = Language.FindById(profile.LanguageId);
+        return LanguageRules.IsReal(wanted) && existingLanguages.Count > 0 && !existingLanguages.Contains(wanted) && candidateLanguages.Contains(wanted);
     }
 
     /// <summary>Same quality, higher revision (REAL first, then version).</summary>

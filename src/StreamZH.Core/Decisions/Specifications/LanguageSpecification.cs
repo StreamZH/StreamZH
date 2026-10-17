@@ -23,7 +23,7 @@ public sealed class LanguageSpecification : IDecisionSpecification
             return null;
         }
 
-        var languages = LanguageRules.EffectiveLanguages(candidate.Release);
+        var languages = LanguageRules.EffectiveLanguages(candidate.Release, context.Target.OriginalLanguage);
 
         if (wanted == Language.Original)
         {

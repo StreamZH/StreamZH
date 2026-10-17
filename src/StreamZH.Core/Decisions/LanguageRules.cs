@@ -11,9 +11,26 @@ namespace StreamZH.Core.Decisions;
 /// <summary>Language helpers shared by the language specification, the upgrade rules and the ranking.</summary>
 public static class LanguageRules
 {
-    /// <summary>Languages of a release; a release without a parsed language counts as English (like Radarr).</summary>
-    public static IReadOnlyList<Language> EffectiveLanguages(ParsedRelease release) =>
-        release.Languages.Count == 0 ? [Language.English] : release.Languages;
+    /// <summary>
+    /// Languages of a release with placeholders resolved, like Radarr does after parsing:
+    /// no language or <see cref="Language.Unknown"/> means the original language of the movie/series
+    /// (English if that is not known), and <see cref="Language.Original"/> ("German.DL") means the original language too.
+    /// </summary>
+    public static IReadOnlyList<Language> EffectiveLanguages(ParsedRelease release, Language originalLanguage) =>
+        Normalize(release.Languages, originalLanguage);
+
+    public static IReadOnlyList<Language> Normalize(IReadOnlyList<Language> languages, Language originalLanguage)
+    {
+        var fallback = IsReal(originalLanguage) ? originalLanguage : Language.English;
+        if (languages.Count == 0)
+        {
+            return [fallback];
+        }
+
+        return [.. languages
+            .Select(l => l == Language.Unknown || l == Language.Original || l == Language.Any ? fallback : l)
+            .Distinct()];
+    }
 
     /// <summary>True for a real language (not Unknown, Any or Original).</summary>
     public static bool IsReal(Language language) => language.Id > 0;

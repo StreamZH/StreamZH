@@ -22,9 +22,9 @@ public sealed class UpgradeSpecification : IDecisionSpecification
         var verdict = UpgradeRules.Check(
             profile,
             existing,
-            target.ExistingLanguages,
+            LanguageRules.Normalize(target.ExistingLanguages, target.OriginalLanguage),
             candidate.Release.Quality,
-            LanguageRules.EffectiveLanguages(candidate.Release),
+            LanguageRules.EffectiveLanguages(candidate.Release, target.OriginalLanguage),
             target.OriginalLanguage);
 
         return verdict switch

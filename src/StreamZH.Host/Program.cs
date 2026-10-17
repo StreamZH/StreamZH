@@ -67,6 +67,10 @@ builder.Services.AddHostedService<HubNotifier>();
 builder.Services.AddSingleton<RootFolderRepository>();
 builder.Services.AddSingleton<MovieRepository>();
 builder.Services.AddSingleton<SeriesRepository>();
+builder.Services.AddSingleton<QualityProfileRepository>();
+builder.Services.AddSingleton<QualityDefinitionRepository>();
+builder.Services.AddSingleton<QualityProfileService>();
+builder.Services.AddSingleton<QualityDefinitionService>();
 builder.Services.AddSingleton<ITmdbSettings, TmdbSettings>();
 builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client =>
 {
@@ -102,6 +106,7 @@ app.MapAuthEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
 app.MapLibraryEndpoints();
+app.MapProfileEndpoints();
 app.MapFileSystemEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { libraryApi, queryKeys, type ImportCandidate, type LookupResult, type MediaType } from '../api/library'
+import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
 import page from '../pages/Page.module.css'
@@ -70,6 +71,7 @@ function ImportTable({ rootFolderId, type }: { rootFolderId: number; type: Media
   })
   const [results, setResults] = useState<Record<string, Match>>({})
   const [monitored, setMonitored] = useState(true)
+  const [qualityProfileId, setQualityProfileId] = useState<number | null>(null)
   const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs, refetchInterval: 4000 })
 
   const rows = useMemo<Row[]>(
@@ -112,6 +114,7 @@ function ImportTable({ rootFolderId, type }: { rootFolderId: number; type: Media
       libraryApi.importFolders(
         rootFolderId,
         monitored,
+        qualityProfileId,
         selected.map((r) => ({ folderName: r.candidate.folderName, tmdbId: r.tmdbId! })),
       ),
   })
@@ -148,6 +151,7 @@ function ImportTable({ rootFolderId, type }: { rootFolderId: number; type: Media
         <span>
           {rows.length} folders · {searching > 0 ? `matching ${rows.length - searching} / ${rows.length}…` : `${selected.length} ready to import`}
         </span>
+        <ProfileSelect value={qualityProfileId} onChange={setQualityProfileId} />
         <label className={ui.check}>
           <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />
           <span>Monitored</span>

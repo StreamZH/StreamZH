@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { libraryApi, queryKeys, type LookupResult, type MediaType } from '../api/library'
 import Modal from '../components/Modal'
 import Poster from '../components/Poster'
+import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import styles from './AddDialog.module.css'
 
@@ -80,10 +81,11 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
   const folders = (rootFolders.data ?? []).filter((r) => r.mediaType === type)
   const [rootFolderId, setRootFolderId] = useState<number | null>(null)
   const [monitored, setMonitored] = useState(true)
+  const [qualityProfileId, setQualityProfileId] = useState<number | null>(null)
   const effectiveRoot = rootFolderId ?? folders[0]?.id ?? null
 
   const add = useMutation({
-    mutationFn: () => libraryApi.add(type, item.tmdbId, effectiveRoot!, monitored),
+    mutationFn: () => libraryApi.add(type, item.tmdbId, effectiveRoot!, monitored, qualityProfileId),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: type === 'Movie' ? queryKeys.movies : queryKeys.series })
       onDone()
@@ -102,6 +104,10 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
             </option>
           ))}
         </select>
+      </label>
+      <label className={ui.field}>
+        <span>Quality profile</span>
+        <ProfileSelect value={qualityProfileId} onChange={setQualityProfileId} />
       </label>
       <label className={ui.check}>
         <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />

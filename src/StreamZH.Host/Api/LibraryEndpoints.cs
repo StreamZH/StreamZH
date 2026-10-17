@@ -24,12 +24,17 @@ public static class LibraryEndpoints
             repo.Find(id) is { } m ? Results.Ok(MovieResource.From(m)) : Results.NotFound());
         movies.MapPost("/", async (AddRequest request, LibraryService library, CancellationToken ct) =>
         {
-            var movie = await library.AddMovieAsync(request.TmdbId, request.RootFolderId, request.Monitored, cancellationToken: ct);
+            var movie = await library.AddMovieAsync(request.TmdbId, request.RootFolderId, request.Monitored, request.QualityProfileId, cancellationToken: ct);
             return Results.Created($"/api/v1/movies/{movie.Id}", MovieResource.From(movie));
         });
         movies.MapPut("/{id:int}/monitor", async (int id, MonitorRequest request, LibraryService library) =>
         {
             await library.SetMovieMonitoredAsync(id, request.Monitored);
+            return Results.NoContent();
+        });
+        movies.MapPut("/{id:int}/profile", async (int id, QualityProfileAssignment request, LibraryService library) =>
+        {
+            await library.SetMovieQualityProfileAsync(id, request.QualityProfileId);
             return Results.NoContent();
         });
         movies.MapPost("/{id:int}/refresh", (int id, MovieRepository repo, JobQueue jobs) =>
@@ -63,7 +68,7 @@ public static class LibraryEndpoints
         });
         series.MapPost("/", async (AddRequest request, LibraryService library, JobQueue jobs, CancellationToken ct) =>
         {
-            var item = await library.AddSeriesAsync(request.TmdbId, request.RootFolderId, request.Monitored, cancellationToken: ct);
+            var item = await library.AddSeriesAsync(request.TmdbId, request.RootFolderId, request.Monitored, request.QualityProfileId, cancellationToken: ct);
             jobs.Enqueue(RefreshSeries(item.Id, item.Title));
             return Results.Created($"/api/v1/series/{item.Id}", SeriesResource.From(item, null));
         });
@@ -75,6 +80,11 @@ public static class LibraryEndpoints
         series.MapPut("/{id:int}/seasons/{season:int}/monitor", async (int id, int season, MonitorRequest request, LibraryService library) =>
         {
             await library.SetSeasonMonitoredAsync(id, season, request.Monitored);
+            return Results.NoContent();
+        });
+        series.MapPut("/{id:int}/profile", async (int id, QualityProfileAssignment request, LibraryService library) =>
+        {
+            await library.SetSeriesQualityProfileAsync(id, request.QualityProfileId);
             return Results.NoContent();
         });
         series.MapPost("/{id:int}/refresh", (int id, SeriesRepository repo, JobQueue jobs) =>
@@ -117,9 +127,11 @@ public static class LibraryEndpoints
         // Import existing folders
         var import = api.MapGroup("/library-import").WithTags("Library import").RequireAuthorization(AuthSchemes.AdminPolicy);
         import.MapGet("/{rootFolderId:int}", (int rootFolderId, LibraryImportService service) => service.Candidates(rootFolderId));
-        import.MapPost("/", (LibraryImportRequest request, LibraryImportService service, RootFolderRepository rootFolders, JobQueue jobs) =>
+        import.MapPost("/", (
+            LibraryImportRequest request, LibraryImportService service, QualityProfileService profiles, RootFolderRepository rootFolders, JobQueue jobs) =>
         {
             var root = rootFolders.Find(request.RootFolderId) ?? throw new LibraryException("Root folder not found.", LibraryError.NotFound);
+            var profileId = profiles.Resolve(request.QualityProfileId);
             var prepared = service.Prepare(request.RootFolderId, request.Items);
 
             foreach (var (item, folder) in prepared)
@@ -128,12 +140,12 @@ public static class LibraryEndpoints
                     ? new Job($"import:{folder}", $"Import {item.FolderName}", async (sp, ct) =>
                     {
                         var library = sp.GetRequiredService<LibraryService>();
-                        await library.AddMovieAsync(item.TmdbId, root.Id, request.Monitored, folder, ct);
+                        await library.AddMovieAsync(item.TmdbId, root.Id, request.Monitored, profileId, folder, ct);
                     })
                     : new Job($"import:{folder}", $"Import {item.FolderName}", async (sp, ct) =>
                     {
                         var library = sp.GetRequiredService<LibraryService>();
-                        var added = await library.AddSeriesAsync(item.TmdbId, root.Id, request.Monitored, folder, ct);
+                        var added = await library.AddSeriesAsync(item.TmdbId, root.Id, request.Monitored, profileId, folder, ct);
                         await library.RefreshSeriesAsync(added.Id, ct);
                     }));
             }

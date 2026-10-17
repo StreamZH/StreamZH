@@ -22,6 +22,12 @@ public enum LibraryError
     NotFound,
     AlreadyExists,
     Invalid,
+
+    /// <summary>Still referenced by other items (e.g. a profile used by movies).</summary>
+    InUse,
+
+    /// <summary>The change conflicts with the current state (e.g. deleting the last profile).</summary>
+    Conflict,
 }
 
 /// <summary>Adds, refreshes and removes movies and series. Never deletes files on disk.</summary>
@@ -30,10 +36,12 @@ public sealed class LibraryService(
     RootFolderRepository rootFolders,
     MovieRepository movies,
     SeriesRepository series,
+    QualityProfileService profiles,
     IEventBus events,
     ILogger<LibraryService> logger)
 {
-    public async Task<Movie> AddMovieAsync(int tmdbId, int rootFolderId, bool monitored, string? existingFolder = null, CancellationToken cancellationToken = default)
+    public async Task<Movie> AddMovieAsync(
+        int tmdbId, int rootFolderId, bool monitored, int? qualityProfileId = null, string? existingFolder = null, CancellationToken cancellationToken = default)
     {
         if (movies.FindByTmdbId(tmdbId) is not null)
         {
@@ -41,12 +49,14 @@ public sealed class LibraryService(
         }
 
         var root = RootFolderFor(rootFolderId, MediaType.Movie);
+        var profileId = profiles.Resolve(qualityProfileId);
         var details = await tmdb.GetMovieAsync(tmdbId, cancellationToken);
 
         var movie = new Movie
         {
             TmdbId = details.TmdbId,
             Monitored = monitored,
+            QualityProfileId = profileId,
             RootFolderId = root.Id,
             FolderPath = existingFolder ?? Path.Combine(root.Path, FolderNames.For(details.Title, details.Year)),
             Added = DateTime.UtcNow,
@@ -60,7 +70,8 @@ public sealed class LibraryService(
         return movie;
     }
 
-    public async Task<Series> AddSeriesAsync(int tmdbId, int rootFolderId, bool monitored, string? existingFolder = null, CancellationToken cancellationToken = default)
+    public async Task<Series> AddSeriesAsync(
+        int tmdbId, int rootFolderId, bool monitored, int? qualityProfileId = null, string? existingFolder = null, CancellationToken cancellationToken = default)
     {
         if (series.TmdbIdToId().ContainsKey(tmdbId))
         {
@@ -68,12 +79,14 @@ public sealed class LibraryService(
         }
 
         var root = RootFolderFor(rootFolderId, MediaType.Series);
+        var profileId = profiles.Resolve(qualityProfileId);
         var details = await tmdb.GetSeriesAsync(tmdbId, cancellationToken);
 
         var item = new Series
         {
             TmdbId = details.TmdbId,
             Monitored = monitored,
+            QualityProfileId = profileId,
             RootFolderId = root.Id,
             FolderPath = existingFolder ?? Path.Combine(root.Path, FolderNames.For(details.Title, details.Year)),
             Added = DateTime.UtcNow,
@@ -165,6 +178,22 @@ public sealed class LibraryService(
     {
         var item = series.Find(id) ?? throw new LibraryException("Series not found.", LibraryError.NotFound);
         item.Monitored = monitored;
+        series.Update(item);
+        await events.PublishAsync(new LibraryChanged(MediaType.Series, id));
+    }
+
+    public async Task SetMovieQualityProfileAsync(int id, int qualityProfileId)
+    {
+        var movie = movies.Find(id) ?? throw new LibraryException("Movie not found.", LibraryError.NotFound);
+        movie.QualityProfileId = profiles.Resolve(qualityProfileId);
+        movies.Update(movie);
+        await events.PublishAsync(new LibraryChanged(MediaType.Movie, id));
+    }
+
+    public async Task SetSeriesQualityProfileAsync(int id, int qualityProfileId)
+    {
+        var item = series.Find(id) ?? throw new LibraryException("Series not found.", LibraryError.NotFound);
+        item.QualityProfileId = profiles.Resolve(qualityProfileId);
         series.Update(item);
         await events.PublishAsync(new LibraryChanged(MediaType.Series, id));
     }

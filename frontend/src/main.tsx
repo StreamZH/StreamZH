@@ -10,6 +10,7 @@ import MovieDetail from './library/MovieDetail'
 import SeriesDetail from './library/SeriesDetail'
 import Home from './pages/Home'
 import Placeholder from './pages/Placeholder'
+import Profiles from './pages/Profiles'
 import Settings from './pages/Settings'
 import './index.css'
 
@@ -33,6 +34,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="activity" element={<Placeholder title="Activity" phase="0.6" />} />
             <Route path="indexers" element={<Placeholder title="Indexers" phase="0.4" />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="settings/profiles" element={<Profiles />} />
             <Route path="*" element={<Placeholder title="Not found" />} />
           </Route>
           </Routes>

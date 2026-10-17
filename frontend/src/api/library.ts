@@ -22,6 +22,7 @@ export interface Movie {
   posterPath: string | null
   backdropPath: string | null
   monitored: boolean
+  qualityProfileId: number
   rootFolderId: number
   folderPath: string
   added: string
@@ -45,6 +46,7 @@ export interface Series {
   posterPath: string | null
   backdropPath: string | null
   monitored: boolean
+  qualityProfileId: number
   rootFolderId: number
   folderPath: string
   added: string
@@ -156,8 +158,8 @@ export const libraryApi = {
   seriesDetail: (id: number) => request<SeriesDetail>('GET', `/series/${id}`),
   lookup: (type: MediaType, term: string, year?: number | null) =>
     request<LookupResult[]>('GET', `/lookup/${path(type)}?term=${encodeURIComponent(term)}${year ? `&year=${year}` : ''}`),
-  add: (type: MediaType, tmdbId: number, rootFolderId: number, monitored: boolean) =>
-    request<Movie | Series>('POST', `/${path(type)}`, { tmdbId, rootFolderId, monitored }),
+  add: (type: MediaType, tmdbId: number, rootFolderId: number, monitored: boolean, qualityProfileId: number | null) =>
+    request<Movie | Series>('POST', `/${path(type)}`, { tmdbId, rootFolderId, monitored, qualityProfileId }),
   setMonitored: (type: MediaType, id: number, monitored: boolean) =>
     request<void>('PUT', `/${path(type)}/${id}/monitor`, { monitored }),
   setSeasonMonitored: (id: number, season: number, monitored: boolean) =>
@@ -173,8 +175,12 @@ export const libraryApi = {
     request<FolderListing>('GET', `/filesystem${folderPath ? `?path=${encodeURIComponent(folderPath)}` : ''}`),
 
   importCandidates: (rootFolderId: number) => request<ImportCandidate[]>('GET', `/library-import/${rootFolderId}`),
-  importFolders: (rootFolderId: number, monitored: boolean, items: { folderName: string; tmdbId: number }[]) =>
-    request<{ queued: number }>('POST', '/library-import', { rootFolderId, monitored, items }),
+  importFolders: (
+    rootFolderId: number,
+    monitored: boolean,
+    qualityProfileId: number | null,
+    items: { folderName: string; tmdbId: number }[],
+  ) => request<{ queued: number }>('POST', '/library-import', { rootFolderId, monitored, qualityProfileId, items }),
 
   stats: () => request<LibraryStats>('GET', '/library/stats'),
   rescan: () => request<JobStatus>('POST', '/library/rescan'),

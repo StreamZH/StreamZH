@@ -16,11 +16,12 @@ import os
 import re
 
 import cairosvg
-from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.basePen import BasePen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from PIL import Image
 from shapely.geometry import Polygon, box
+from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,10 +35,12 @@ NS = 'xmlns="http://www.w3.org/2000/svg"'
 ICON_FRAC = 0.60
 # Corners of the monogram softened with this radius (of 100), so it does not look too angular (17.10.2026)
 ROUND = 1.5
-# Logo side by side: cap height of the wordmark 70 % of the monogram, gap 0.32 x monogram (17.10.2026;
+# Logo side by side: cap height of the wordmark 70 % of the monogram, gap 0.24 x monogram (17.10.2026;
 # CloudZH: 58 % and 0.42)
 LOGO_TEXT = 0.70
-LOGO_GAP = 0.32
+LOGO_GAP = 0.24
+# Corners of the wordmark letters softened as well (radius of the cap height 100), 17.10.2026
+WORD_ROUND = 1.5
 
 
 # ---------------------------------------------------------------- Monogram
@@ -65,29 +68,82 @@ def monogram():
     return soften(h), soften(z)
 
 
-def path(geom):
-    polys = [geom] if geom.geom_type == "Polygon" else list(geom.geoms)
+def path(geom, digits=2):
+    """SVG path of a (multi)polygon; holes run against the outline, so the default nonzero fill keeps them open."""
+    polys = [geom] if geom.geom_type == "Polygon" else [g for g in geom.geoms if g.geom_type == "Polygon"]
     out = []
     for p in polys:
+        p = orient(p, 1.0)
         for ring in [p.exterior, *p.interiors]:
             pts = list(ring.coords)[:-1]
-            out.append("M" + " L".join(f"{x:.2f} {y:.2f}" for x, y in pts) + "Z")
+            fmt = lambda v: f"{v:.{digits}f}".rstrip("0").rstrip(".")
+            out.append("M" + " L".join(f"{fmt(x)} {fmt(y)}" for x, y in pts) + "Z")
     return " ".join(out)
 
 
 # ---------------------------------------------------------------- Wordmark
-def text_path(text, font_file, size, x, baseline, track=-0.02):
+class PolyPen(BasePen):
+    """Collects glyph contours as point lists; curves are flattened finely enough for 8192 px renders."""
+
+    def __init__(self, glyphset, steps=16):
+        super().__init__(glyphset)
+        self.rings, self.cur, self.steps = [], [], steps
+
+    def _moveTo(self, p):
+        self.cur = [p]
+
+    def _lineTo(self, p):
+        self.cur.append(p)
+
+    def _qCurveToOne(self, p1, p2):
+        p0 = self.cur[-1]
+        for i in range(1, self.steps + 1):
+            t = i / self.steps
+            self.cur.append(((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0],
+                             (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]))
+
+    def _curveToOne(self, p1, p2, p3):
+        p0 = self.cur[-1]
+        for i in range(1, self.steps + 1):
+            t = i / self.steps
+            a, b, c, d = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t ** 3
+            self.cur.append((a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]))
+
+    def _closePath(self):
+        if len(self.cur) >= 3:
+            self.rings.append(self.cur)
+        self.cur = []
+
+    _endPath = _closePath
+
+
+def glyph_geom(rings):
+    """Rings of one glyph to a polygon (nonzero rule): rings turning like the largest one are outlines, the rest holes."""
+    polys = [Polygon(r).buffer(0) for r in rings]
+    signs = [Polygon(r).exterior.is_ccw for r in rings]
+    main = signs[max(range(len(polys)), key=lambda i: polys[i].area)]
+    outer = unary_union([p for p, s in zip(polys, signs) if s == main])
+    holes = unary_union([p for p, s in zip(polys, signs) if s != main])
+    return outer.difference(holes)
+
+
+def text_geom(text, font_file, size, x, baseline, track=-0.02, r=WORD_ROUND):
+    """Text as geometry, every glyph softened on its own so neighbouring letters never merge."""
     f = TTFont(font_file)
     gs, cmap, scale = f.getGlyphSet(), f.getBestCmap(), size / f["head"].unitsPerEm
     parts, cx = [], x
     for ch in text:
         gn = cmap[ord(ch)]
-        pen = SVGPathPen(gs)
+        pen = PolyPen(gs)
         gs[gn].draw(TransformPen(pen, (scale, 0, 0, -scale, cx, baseline)))
-        parts.append(pen.getCommands())
+        parts.append(soften(glyph_geom(pen.rings), r).simplify(0.02))
         cx += f["hmtx"][gn][0] * scale + track * size
-    d = re.sub(r"-?\d+\.\d+", lambda m: f"{float(m.group()):.2f}".rstrip("0").rstrip("."), " ".join(parts))
-    return d, cx - x - track * size
+    return unary_union(parts), cx - x - track * size
+
+
+def text_path(text, font_file, size, x, baseline, track=-0.02, r=WORD_ROUND):
+    g, w = text_geom(text, font_file, size, x, baseline, track, r)
+    return path(g), w
 
 
 def wordmark():

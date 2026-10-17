@@ -1,10 +1,10 @@
 /* Proportions (docs/brand/README.md): cap height 70 % of the monogram, so the wordmark box
-   (viewBox height 106) is 0.742 x monogram; gap 0.32 x monogram; wordmark 2.8 % above the centre. */
+   (viewBox height 106) is 0.742 x monogram; gap 0.24 x monogram; wordmark 2.8 % above the centre. */
 .logo {
   --mark-size: 28px;
   display: flex;
   align-items: center;
-  gap: calc(var(--mark-size) * 0.32);
+  gap: calc(var(--mark-size) * 0.24);
   color: var(--text);
 }
 

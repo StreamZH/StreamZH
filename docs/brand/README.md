@@ -2,7 +2,7 @@
 
 StreamZH is part of the CloudZH family and uses the **same logo as CloudZH**, with «Stream» in place of «Cloud».
 Monogram geometry, colours, font and clear space follow the CloudZH brand kit. Refined for StreamZH (17.10.2026):
-monogram corners softened (radius 1.5 of 100), larger wordmark (70 % instead of 58 %), tighter gap (0.32 instead of 0.42),
+monogram and letter corners softened (radius 1.5), larger wordmark (70 % instead of 58 %), tighter gap (0.24 instead of 0.42),
 larger monogram on the app icon (60 % instead of 54 %).
 
 ## Parts
@@ -39,9 +39,10 @@ All SVGs contain only paths, no fonts and no scripts. In the app the logo is the
 
 ## Wordmark
 
-- Font Outfit (SIL Open Font License): «Stream» Medium, «ZH» Bold, tracking −2 %
-- Side by side: cap height of the wordmark 70 % of the monogram, gap 0.32 × monogram (`LOGO_TEXT`, `LOGO_GAP`).
-  In CSS: `gap: calc(M * .32)`, wordmark (viewBox height 106) `height: calc(M * .742); transform: translateY(-2.8%)`
+- Font Outfit (SIL Open Font License): «Stream» Medium, «ZH» Bold, tracking −2 %; letter corners softened with radius 1.5
+  of the cap height (`WORD_ROUND`), each glyph on its own so neighbouring letters never merge
+- Side by side: cap height of the wordmark 70 % of the monogram, gap 0.24 × monogram (`LOGO_TEXT`, `LOGO_GAP`).
+  In CSS: `gap: calc(M * .24)`, wordmark (viewBox height 106) `height: calc(M * .742); transform: translateY(-2.8%)`
   (M = monogram size)
 
 ## Clear space and minimum sizes

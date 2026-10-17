@@ -122,9 +122,30 @@ public sealed class LibraryApiTests : IDisposable
 
         var all = (await client.GetFromJsonAsync<RootFolderInfo[]>("/api/v1/rootfolders"))!;
         Assert.True(Assert.Single(all).Accessible);
+        Assert.True(all[0].Writable);
         Assert.Equal(1, all[0].UnmappedFolders);
 
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/v1/rootfolders/{root.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Folder_browser_lists_subfolders_and_roots()
+    {
+        var client = await _factory.CreateOwnerClientAsync();
+        Directory.CreateDirectory(Path.Combine(_media, "Movies"));
+        Directory.CreateDirectory(Path.Combine(_media, "TV Shows"));
+        Directory.CreateDirectory(Path.Combine(_media, ".hidden"));
+
+        var listing = (await client.GetFromJsonAsync<FolderListing>($"/api/v1/filesystem?path={Uri.EscapeDataString(_media)}"))!;
+        Assert.Equal(["Movies", "TV Shows"], listing.Folders.Select(f => f.Name));
+        Assert.Equal(Path.GetDirectoryName(_media), listing.Parent);
+
+        var roots = (await client.GetFromJsonAsync<FolderListing>("/api/v1/filesystem"))!;
+        Assert.Null(roots.Path);
+        Assert.NotEmpty(roots.Folders);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/filesystem?path={Uri.EscapeDataString(Path.Combine(_media, "nope"))}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _factory.CreateClient().GetAsync("/api/v1/filesystem")).StatusCode);
     }
 
     [Fact]

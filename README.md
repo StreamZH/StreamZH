@@ -47,6 +47,24 @@ Without a TMDB key you can point StreamZH at a TMDB stand-in for development:
 For UI work run `npm run dev` in `frontend/` (http://localhost:5173). It proxies
 `/api` and `/hub` to the backend on port 9797.
 
+### Windows: build and install locally
+
+One command pulls the latest code, builds `StreamZH.exe`, stops the running instance,
+installs it to `C:\Tools\StreamZH` and starts it again. Data in `C:\ProgramData\StreamZH` is kept.
+
+```powershell
+C:\Repos\StreamZH\tools\Update-Local.ps1
+```
+
+Needs Git, the .NET 10 SDK and Node.js LTS (`winget install --id Microsoft.DotNet.SDK.10 -e`,
+`winget install --id OpenJS.NodeJS.LTS -e`).
+
+### CI
+
+Every push builds and tests (about 3 minutes). The Docker image and the packages for
+Windows, Linux and macOS are built only when started by hand (Actions → CI → Run workflow)
+or for a version tag such as `v0.3.0`.
+
 ### Docker
 
 ```bash

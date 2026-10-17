@@ -95,9 +95,23 @@ export interface RootFolder {
   path: string
   mediaType: MediaType
   accessible: boolean
+  writable: boolean
+  writeProblem: string | null
   freeSpace: number | null
   totalSpace: number | null
   unmappedFolders: number
+}
+
+export interface FolderEntry {
+  name: string
+  path: string
+  hint: string | null
+}
+
+export interface FolderListing {
+  path: string | null
+  parent: string | null
+  folders: FolderEntry[]
 }
 
 export interface ImportCandidate {
@@ -155,6 +169,8 @@ export const libraryApi = {
   addRootFolder: (folderPath: string, mediaType: MediaType) =>
     request<RootFolder>('POST', '/rootfolders', { path: folderPath, mediaType }),
   removeRootFolder: (id: number) => request<void>('DELETE', `/rootfolders/${id}`),
+  browse: (folderPath?: string | null) =>
+    request<FolderListing>('GET', `/filesystem${folderPath ? `?path=${encodeURIComponent(folderPath)}` : ''}`),
 
   importCandidates: (rootFolderId: number) => request<ImportCandidate[]>('GET', `/library-import/${rootFolderId}`),
   importFolders: (rootFolderId: number, monitored: boolean, items: { folderName: string; tmdbId: number }[]) =>

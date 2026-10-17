@@ -2,15 +2,23 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using StreamZH.Core.Media;
 using StreamZH.Data;
 
 namespace StreamZH.Library;
 
-public sealed record RootFolderInfo(int Id, string Path, MediaType MediaType, bool Accessible, long? FreeSpace, long? TotalSpace, int UnmappedFolders);
+public sealed record RootFolderInfo(
+    int Id, string Path, MediaType MediaType, bool Accessible, bool Writable, string? WriteProblem, long? FreeSpace, long? TotalSpace, int UnmappedFolders);
 
-public sealed class RootFolderService(RootFolderRepository rootFolders, MovieRepository movies, SeriesRepository series)
+public sealed class RootFolderService(
+    RootFolderRepository rootFolders, MovieRepository movies, SeriesRepository series, ILogger<RootFolderService> logger)
 {
+    // A write probe can trigger security tools (e.g. Windows "Controlled folder access"), so results are cached.
+    private static readonly ConcurrentDictionary<string, (bool Writable, string? Problem, DateTime Checked)> WriteChecks = new(PathComparer.Instance);
+    private static readonly TimeSpan WriteCheckTtl = TimeSpan.FromMinutes(30);
+
     public IReadOnlyList<RootFolderInfo> All() => [.. rootFolders.All().Select(Describe)];
 
     public RootFolderInfo Add(string path, MediaType mediaType)
@@ -32,11 +40,6 @@ public sealed class RootFolderService(RootFolderRepository rootFolders, MovieRep
             throw new LibraryException("This folder does not exist or StreamZH cannot see it.", LibraryError.Invalid);
         }
 
-        if (!IsWritable(full))
-        {
-            throw new LibraryException("StreamZH cannot write to this folder. Check the permissions.", LibraryError.Invalid);
-        }
-
         foreach (var existing in rootFolders.All())
         {
             if (PathComparer.Instance.Equals(existing.Path, full))
@@ -50,8 +53,16 @@ public sealed class RootFolderService(RootFolderRepository rootFolders, MovieRep
             }
         }
 
+        // Read-only folders are allowed: importing and scanning work, moving new downloads in will not.
+        WriteChecks.TryRemove(full, out _);
         var id = rootFolders.Add(full, mediaType);
-        return Describe(rootFolders.Find(id)!);
+        var info = Describe(rootFolders.Find(id)!);
+        if (!info.Writable)
+        {
+            logger.LogWarning("Root folder {Path} is read-only for StreamZH: {Problem}", full, info.WriteProblem);
+        }
+
+        return info;
     }
 
     public void Delete(int id)
@@ -84,8 +95,9 @@ public sealed class RootFolderService(RootFolderRepository rootFolders, MovieRep
             }
         }
 
+        var (writable, problem) = accessible ? CheckWritable(root.Path) : (false, null);
         var unmapped = accessible ? LibraryImportService.UnmappedFolderNames(root, MappedFolders(root.MediaType)).Count() : 0;
-        return new RootFolderInfo(root.Id, root.Path, root.MediaType, accessible, free, total, unmapped);
+        return new RootFolderInfo(root.Id, root.Path, root.MediaType, accessible, writable, problem, free, total, unmapped);
     }
 
     internal IReadOnlySet<string> MappedFolders(MediaType mediaType) =>
@@ -97,18 +109,29 @@ public sealed class RootFolderService(RootFolderRepository rootFolders, MovieRep
         return relative != "." && !relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative);
     }
 
-    private static bool IsWritable(string folder)
+    private static (bool Writable, string? Problem) CheckWritable(string folder)
     {
+        if (WriteChecks.TryGetValue(folder, out var cached) && DateTime.UtcNow - cached.Checked < WriteCheckTtl)
+        {
+            return (cached.Writable, cached.Problem);
+        }
+
         var probe = Path.Combine(folder, $".streamzh-write-test-{Guid.NewGuid():N}");
+        (bool, string?) result;
         try
         {
             File.WriteAllText(probe, string.Empty);
             File.Delete(probe);
-            return true;
+            result = (true, null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return false;
+            result = (false, OperatingSystem.IsWindows()
+                ? $"{ex.Message} If the folder is under Documents, Videos or Pictures, Windows Security \"Controlled folder access\" may block StreamZH."
+                : ex.Message);
         }
+
+        WriteChecks[folder] = (result.Item1, result.Item2, DateTime.UtcNow);
+        return result;
     }
 }

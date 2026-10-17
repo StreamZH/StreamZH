@@ -2,7 +2,13 @@
   <PropertyGroup>
     <AssemblyName>StreamZH</AssemblyName>
     <RootNamespace>StreamZH.Host</RootNamespace>
+    <!-- StreamZH runs on its own (Kestrel), never behind IIS: no web.config in the package. -->
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
+    <IsWebConfigTransformDisabled>true</IsWebConfigTransformDisabled>
   </PropertyGroup>
+  <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../StreamZH.Core/StreamZH.Core.csproj" />
     <ProjectReference Include="../StreamZH.Data/StreamZH.Data.csproj" />

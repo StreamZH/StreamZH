@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
 using StreamZH.Core.Jobs;
 using StreamZH.Library;
@@ -27,6 +29,29 @@ public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub) : 
         _subscriptions.Add(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("releaseGrabbed", e, ct))));
         _subscriptions.Add(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("searchFinished", e, ct))));
         _subscriptions.Add(events.Subscribe<IndexersChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("indexersChanged", ct))));
+
+        // Status window: re-read /api/v1/status/ongoing.
+        _subscriptions.Add(events.Subscribe<OngoingChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("ongoing", ct))));
+
+        // Downloads: state changes (UI refetches) and throttled progress for live bars.
+        _subscriptions.Add(events.Subscribe<DownloadChanged>((e, ct) =>
+            new ValueTask(hub.Clients.All.SendAsync("downloadChanged", new { downloadId = e.DownloadId }, ct))));
+        _subscriptions.Add(events.Subscribe<DownloadProgress>((e, ct) => new ValueTask(hub.Clients.All.SendAsync(
+            "downloadProgress",
+            new
+            {
+                items = e.Items.Select(i => new
+                {
+                    id = i.Id,
+                    status = JsonNamingPolicy.CamelCase.ConvertName(i.Status.ToString()),
+                    progress = i.Progress,
+                    speedBps = i.SpeedBps,
+                    etaSeconds = i.EtaSeconds,
+                    stepProgress = i.StepProgress,
+                    statusMessage = i.StatusMessage,
+                }),
+            },
+            ct))));
 
         return Task.CompletedTask;
     }

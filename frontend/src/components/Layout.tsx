@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { api } from '../api/client'
+import { api, ApiError } from '../api/client'
+import { downloadKeys, downloadsApi } from '../api/downloads'
 import { libraryApi, queryKeys } from '../api/library'
 import { authQueryKey, useAuth } from '../auth/auth'
 import { useLiveConnection } from '../api/useLiveConnection'
+import StatusWindow from '../status/StatusWindow'
+import { useIsAdmin } from '../status/useOngoing'
 import Icon, { type IconName } from './Icon'
 import Logo from './Logo'
 import styles from './Layout.module.css'
@@ -14,6 +17,8 @@ interface NavItem {
   icon: IconName
   color?: string
   count?: 'movies' | 'series'
+  /** Small badge with the number of active downloads. */
+  badge?: 'downloads'
   /** Sub-pages, listed under the item while one of them is open (like Prowlarr's sidebar). */
   children?: { to: string; label: string }[]
 }
@@ -30,7 +35,7 @@ const sections: { title?: string; items: NavItem[] }[] = [
   {
     title: 'System',
     items: [
-      { to: '/activity', label: 'Activity', icon: 'activity' },
+      { to: '/activity', label: 'Activity', icon: 'activity', badge: 'downloads' },
       {
         to: '/indexers',
         label: 'Indexers',
@@ -54,6 +59,16 @@ export default function Layout() {
   const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats })
   const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs })
   const busy = jobs.data && (jobs.data.running || jobs.data.queued > 0)
+  const admin = useIsAdmin()
+  // Same query as the Activity page; the hub ("downloadChanged") refreshes it, the interval is a safety net.
+  const downloads = useQuery({
+    queryKey: downloadKeys.queue,
+    queryFn: downloadsApi.queue,
+    refetchInterval: (q) => (q.state.data?.items.length ? 10_000 : 60_000),
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
+  })
+  const activeDownloads = downloads.data?.items.length ?? 0
+  const downloading = downloads.data?.items.some((i) => i.status !== 'paused' && i.status !== 'queued') ?? false
   const queryClient = useQueryClient()
   const logout = useMutation({
     mutationFn: api.logout,
@@ -83,6 +98,15 @@ export default function Layout() {
                   <Icon name={item.icon} />
                   <span className={styles.label}>{item.label}</span>
                   {item.count && stats.data && <span className={styles.count}>{stats.data[item.count]}</span>}
+                  {item.badge === 'downloads' && activeDownloads > 0 && (
+                    <span
+                      className={`${styles.badge} ${downloading ? styles.badgeActive : ''}`}
+                      title={`${activeDownloads} active ${activeDownloads === 1 ? 'download' : 'downloads'}`}
+                      aria-label={`${activeDownloads} active ${activeDownloads === 1 ? 'download' : 'downloads'}`}
+                    >
+                      {activeDownloads}
+                    </span>
+                  )}
                 </NavLink>,
                 open && (
                   <div key={`${item.to}-sub`} className={styles.sub} aria-label={`${item.label} pages`} role="group">
@@ -111,7 +135,8 @@ export default function Layout() {
               Sign out
             </button>
           </div>
-          {busy && (
+          {/* Administrators see running jobs in the status window at the bottom right. */}
+          {busy && !admin && (
             <div className={styles.job} title={jobs.data?.running ?? undefined}>
               <span className={styles.spinner} />
               <span className={styles.jobText}>
@@ -130,6 +155,8 @@ export default function Layout() {
       <main className={styles.main}>
         <Outlet />
       </main>
+
+      <StatusWindow />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router'
+import ActivityPage from './activity/ActivityPage'
 import AuthGate from './auth/AuthGate'
 import Layout from './components/Layout'
 import ImportPage from './library/ImportPage'
@@ -36,7 +37,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="library/series" element={<LibraryPage key="series" type="Series" />} />
             <Route path="library/series/:id" element={<SeriesDetail />} />
             <Route path="library/import" element={<ImportPage />} />
-            <Route path="activity" element={<Placeholder title="Activity" phase="0.6" />} />
+            <Route path="activity" element={<ActivityPage />} />
             <Route path="indexers" element={<Indexers />} />
             <Route path="indexers/search" element={<SearchPage />} />
             <Route path="indexers/stats" element={<IndexerStatsPage />} />

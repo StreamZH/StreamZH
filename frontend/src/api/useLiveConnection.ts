@@ -1,10 +1,12 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { downloadKeys, type DownloadProgressItem, type LiveProgress } from './downloads'
 import { historyKeys } from './history'
 import { indexerKeys } from './indexers'
 import { queryKeys, type JobStatus } from './library'
 import { releaseKeys, type SearchFinished } from './releases'
+import { statusKeys } from './status'
 
 /**
  * Keeps one SignalR connection to /hub open, refreshes cached library data when the
@@ -33,8 +35,34 @@ export function useLiveConnection(): boolean {
       }
     })
 
+    // The status window re-reads /status/ongoing shortly after a burst of changes, not once per message.
+    let ongoingTimer: number | undefined
+    const refetchOngoingSoon = () => {
+      window.clearTimeout(ongoingTimer)
+      ongoingTimer = window.setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: statusKeys.ongoing })
+      }, 800)
+    }
+
     connection.on('jobs', (status: JobStatus) => {
       queryClient.setQueryData(queryKeys.jobs, status)
+      refetchOngoingSoon()
+    })
+
+    connection.on('ongoing', () => {
+      refetchOngoingSoon()
+    })
+
+    connection.on('downloadChanged', () => {
+      void queryClient.invalidateQueries({ queryKey: downloadKeys.all })
+      refetchOngoingSoon()
+    })
+
+    // Live bars between refetches: the newest progress of every active download.
+    connection.on('downloadProgress', (event: { items: DownloadProgressItem[] }) => {
+      const items: LiveProgress['items'] = {}
+      for (const item of event.items ?? []) items[item.id] = item
+      queryClient.setQueryData<LiveProgress>(downloadKeys.live, { at: Date.now(), items })
     })
 
     // Handlers must not return a value: SignalR treats a return value as a client result and logs an error.
@@ -62,6 +90,7 @@ export function useLiveConnection(): boolean {
       .catch(() => setConnected(false))
 
     return () => {
+      window.clearTimeout(ongoingTimer)
       void connection.stop()
     }
   }, [queryClient])

@@ -1,0 +1,382 @@
+/* Status window at the bottom right, as in CloudZH (.cdock, .st-*, .cchip): collapsed the essentials in one row,
+   expanded the running work and the "Heads-up" notices. */
+.dock {
+  --dock-err: #ef6b6b;
+  --dock-sunk: #171614;
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 59;
+  width: min(380px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 30%);
+  overflow: hidden;
+  animation: pop 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dock:not(.open) {
+  width: auto;
+  min-width: 240px;
+  max-width: min(440px, calc(100% - 32px));
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(60vh, 520px);
+}
+
+.panel[hidden],
+.head[hidden] {
+  display: none;
+}
+
+.ph {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 6px 14px;
+}
+
+.ph b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.count {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iconButton {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.body {
+  overflow-y: auto;
+  padding: 2px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overscroll-behavior: contain;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sec {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 10px 8px 4px;
+}
+
+/* ---- Collapsed header ---- */
+
+.head {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px 8px 14px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.head:hover {
+  background: var(--surface-hover);
+}
+
+.head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
+.ic,
+.st {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--text-faint);
+}
+
+.tx {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.t {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.m {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex: none;
+}
+
+.n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--dock-sunk);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 7px;
+  flex: none;
+}
+
+.chev {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  flex: none;
+}
+
+.bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.85;
+  transition: width 0.6s;
+}
+
+/* ---- Rows ---- */
+
+.chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.cb {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  padding: 7px 10px 9px;
+  cursor: pointer;
+  color: var(--text);
+  border-radius: 10px;
+}
+
+.cb:hover {
+  background: var(--surface-hover);
+}
+
+.cb:focus-visible,
+.cx:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.static {
+  cursor: default;
+}
+
+.static:hover {
+  background: none;
+}
+
+.ctx {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.ct {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex: none;
+  margin-right: 4px;
+}
+
+.cx:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.cbar {
+  position: absolute;
+  left: 10px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.8;
+  transition: width 0.6s;
+}
+
+.idle .cbar {
+  background: var(--text-faint);
+}
+
+/* Tones: header and rows */
+.run .st,
+.run .ic {
+  color: var(--text-muted);
+}
+
+.warn .ic,
+.warn .st,
+.warn .m {
+  color: var(--warn);
+}
+
+.error .ic,
+.error .st,
+.error .m {
+  color: var(--dock-err);
+}
+
+.info .ic,
+.info .st {
+  color: var(--series);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 0.75s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The last list row of a page must stay reachable above the window. */
+:global(body.sz-has-dock) main {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 760px) {
+  .dock,
+  .dock:not(.open) {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .panel {
+    max-height: 55vh;
+  }
+
+  :global(body.sz-has-dock) main {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .cbar {
+    transition: none;
+  }
+
+  .dock {
+    animation: none;
+  }
+
+  .spinner {
+    animation-duration: 2s;
+  }
+}

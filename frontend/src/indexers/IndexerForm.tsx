@@ -117,14 +117,25 @@ export default function IndexerForm({
     onSuccess: (data) => setCaps(data),
   })
 
-  const update = (change: Partial<Indexer>) => setDraft((d) => ({ ...d, ...change }))
+  // Fields changed since the last save or test: their old error no longer applies and is hidden.
+  const [edited, setEdited] = useState<Set<string>>(new Set())
+  const update = (change: Partial<Indexer>) => {
+    setDraft((d) => ({ ...d, ...change }))
+    setEdited((e) => {
+      const next = new Set(e)
+      for (const key of Object.keys(change)) next.add(key === 'tvCategories' ? 'categories' : key)
+      return next
+    })
+  }
 
   const saveErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
   const testErrors = test.error instanceof ApiError ? test.error.fieldErrors : {}
-  const fieldError = (name: string) => (saveErrors[name] ?? testErrors[name])?.[0]
+  const fieldError = (name: string) => (edited.has(name) ? undefined : (saveErrors[name] ?? testErrors[name])?.[0])
+  const openErrors = [...Object.keys(saveErrors), ...Object.keys(testErrors)].some((name) => !edited.has(name))
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
+    setEdited(new Set())
     save.mutate()
   }
 
@@ -171,8 +182,9 @@ export default function IndexerForm({
               Connection works{test.data.categories.length > 0 ? `, ${test.data.categories.length} category groups loaded` : ''}.
             </span>
           )}
-          {test.error && <span className={ui.error}>{Object.keys(testErrors).length > 0 ? 'Check the highlighted fields.' : test.error.message}</span>}
-          {save.error && <span className={ui.error}>{Object.keys(saveErrors).length > 0 ? 'Check the highlighted fields.' : save.error.message}</span>}
+          {test.error && Object.keys(testErrors).length === 0 && <span className={ui.error}>{test.error.message}</span>}
+          {save.error && Object.keys(saveErrors).length === 0 && <span className={ui.error}>{save.error.message}</span>}
+          {openErrors && <span className={ui.error}>Check the highlighted fields.</span>}
           {remove.error && <span className={ui.error}>{remove.error.message}</span>}
         </div>
         {!isNew && (
@@ -186,7 +198,10 @@ export default function IndexerForm({
           </button>
         )}
         <span className={styles.spacer} />
-        <button className={ui.button} type="button" onClick={() => test.mutate()} disabled={test.isPending}>
+        <button className={ui.button} type="button" onClick={() => {
+            setEdited(new Set())
+            test.mutate()
+          }} disabled={test.isPending}>
           {test.isPending ? 'Testing…' : 'Test'}
         </button>
         <button className={ui.button} type="button" onClick={onClose}>

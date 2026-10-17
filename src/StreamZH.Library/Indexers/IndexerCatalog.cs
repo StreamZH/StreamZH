@@ -70,7 +70,7 @@ public static class IndexerCatalog
         Usenet("dognzb", "DOGnzb", "https://dognzb.cr", "https://api.dognzb.cr"),
         Usenet("drunkenslug", "DrunkenSlug", "https://drunkenslug.com", "https://drunkenslug.com", categories: AllCategoriesNoAdult),
         Usenet("gingadaddy", "GingaDADDY", "https://www.gingadaddy.com", "https://www.gingadaddy.com", categories: string.Empty),
-        Usenet("house-of-usenet", "House-of-Usenet", "https://house-of-usenet.com", "https://house-of-usenet.com", apiPath: "/api/v1/api", categories: string.Empty),
+        Usenet("house-of-usenet", "House-of-Usenet", "https://house-of-usenet.com", "https://house-of-usenet.com", apiPath: "/api/v1/api", categories: AllCategoriesNoAdult),
         Usenet("miatrix", "Miatrix", "https://www.miatrix.com", "https://www.miatrix.com"),
         Usenet("newz69", "Newz69", "https://newz69.keagaming.com", "https://newz69.keagaming.com"),
         Usenet("ninjacentral", "NinjaCentral", "https://ninjacentral.co.za", "https://ninjacentral.co.za"),
@@ -83,7 +83,7 @@ public static class IndexerCatalog
         Usenet("nzbplanet", "NzbPlanet", "https://nzbplanet.net", "https://api.nzbplanet.net"),
         Usenet("nzbstars", "NZBStars", "https://nzbstars.com", "https://nzbstars.com", categories: AllCategoriesNoAdult),
         Usenet("tabula-rasa", "Tabula Rasa", "https://www.tabula-rasa.pw", "https://www.tabula-rasa.pw", apiPath: "/api/v1/api", categories: AllCategoriesNoAdult),
-        Usenet("treasure-maps", "Treasure Maps", "https://treasure-maps.com", "https://treasure-maps.com", categories: string.Empty),
+        Usenet("treasure-maps", "Treasure Maps", "https://treasure-maps.com", "https://treasure-maps.com", categories: "2000,5000"),
         Usenet(GenericNewznabKey, "Generic Newznab", null, string.Empty, categories: string.Empty,
             description: "Any Usenet indexer that speaks the Newznab API; enter its URL and API key"),
     ];

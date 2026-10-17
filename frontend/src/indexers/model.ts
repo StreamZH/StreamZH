@@ -84,6 +84,8 @@ export function vipState(status: IndexerStatus | null): VipState | null {
 
 /** Movie (2000) or TV (5000) categories for a new indexer from a catalog entry. */
 function presetCategories(definition: IndexerDefinition, base: number, defaults: number[]): number[] {
+  // The catalog does not know this site's categories: start from the usual ones, Test loads the site's own list.
+  if (definition.categories.length === 0) return defaults
   const inRange = definition.categories.filter((id) => id >= base && id < base + 1000)
   if (inRange.length === 0) return []
   // Only the top-level category listed: the schema defaults are the useful sub-categories of it.

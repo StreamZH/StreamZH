@@ -246,6 +246,7 @@ public sealed class LibraryService(
         movie.PosterPath = d.PosterPath;
         movie.BackdropPath = d.BackdropPath;
         movie.OriginalLanguageId = StreamZH.Core.Quality.Language.FromIsoCode(d.OriginalLanguage).Id;
+        movie.InCinemas = d.ReleaseDate ?? movie.InCinemas;
     }
 
     private static void Apply(Series item, TmdbSeries d)

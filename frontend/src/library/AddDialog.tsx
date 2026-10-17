@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { indexerOptionsApi, indexerOptionsKeys } from '../api/indexerOptions'
 import { libraryApi, queryKeys, type LookupResult, type MediaType } from '../api/library'
 import Modal from '../components/Modal'
 import Poster from '../components/Poster'
@@ -83,9 +84,13 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
   const [monitored, setMonitored] = useState(true)
   const [qualityProfileId, setQualityProfileId] = useState<number | null>(null)
   const effectiveRoot = rootFolderId ?? folders[0]?.id ?? null
+  // "Start search for missing": the default comes from Settings → Indexers ("Search when adding").
+  const options = useQuery({ queryKey: indexerOptionsKeys.options, queryFn: indexerOptionsApi.options, staleTime: 60_000 })
+  const [search, setSearch] = useState<boolean | null>(null)
+  const searchForMissing = monitored && (search ?? options.data?.searchOnAdd ?? false)
 
   const add = useMutation({
-    mutationFn: () => libraryApi.add(type, item.tmdbId, effectiveRoot!, monitored, qualityProfileId),
+    mutationFn: () => libraryApi.add(type, item.tmdbId, effectiveRoot!, monitored, qualityProfileId, searchForMissing),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: type === 'Movie' ? queryKeys.movies : queryKeys.series })
       onDone()
@@ -112,6 +117,10 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
       <label className={ui.check}>
         <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />
         <span>Monitored{type === 'Series' ? ' (all regular seasons)' : ''}</span>
+      </label>
+      <label className={ui.check}>
+        <input type="checkbox" checked={searchForMissing} disabled={!monitored} onChange={(e) => setSearch(e.target.checked)} />
+        <span>Start search for missing {type === 'Movie' ? 'movie' : 'episodes'}</span>
       </label>
       <div className={styles.optionActions}>
         <button className={ui.primary} type="button" disabled={!effectiveRoot || add.isPending} onClick={() => add.mutate()}>

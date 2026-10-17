@@ -21,6 +21,8 @@ public static class SearchServiceCollectionExtensions
         services.AddSingleton<DecisionTargetFactory>();
         services.AddSingleton<ReleaseCache>();
         services.AddSingleton<DownloadSettings>();
+        services.AddSingleton<ReleaseProfileRepository>();
+        services.AddSingleton<IndexerOptions>();
         services.AddScoped<ReleaseSearchService>();
         services.AddScoped<GrabService>();
         services.AddScoped<AutomaticSearchService>();

@@ -5,7 +5,11 @@
 
 namespace StreamZH.Core.Decisions.Specifications;
 
-/// <summary>When a file exists, only real upgrades are accepted (see <see cref="UpgradeRules"/>).</summary>
+/// <summary>
+/// When a file exists, only real upgrades are accepted (see <see cref="UpgradeRules"/>). Release profiles add one way
+/// (Sonarr v3): the same quality and revision with a higher preferred score than the file on disk is an upgrade, when
+/// the profile allows upgrades, even past the cutoff. The file's score comes from its file name.
+/// </summary>
 public sealed class UpgradeSpecification : IDecisionSpecification
 {
     public Rejection? Evaluate(ReleaseCandidate candidate, DecisionContext context)
@@ -27,6 +31,11 @@ public sealed class UpgradeSpecification : IDecisionSpecification
             LanguageRules.EffectiveLanguages(candidate.Release, target.OriginalLanguage),
             target.OriginalLanguage);
 
+        if (verdict is (UpgradeVerdict.NotBetter or UpgradeVerdict.CutoffMet) && IsPreferredScoreUpgrade(candidate, context))
+        {
+            return null;
+        }
+
         return verdict switch
         {
             UpgradeVerdict.Upgrade => null,
@@ -41,5 +50,25 @@ public sealed class UpgradeSpecification : IDecisionSpecification
             _ => new Rejection(
                 RejectionCodes.DiskHigherPreference, $"Existing file has the same quality: {existing}"),
         };
+    }
+
+    /// <summary>Same quality and revision as the file, upgrades allowed, and a higher preferred score than the file name.</summary>
+    public static bool IsPreferredScoreUpgrade(ReleaseCandidate candidate, DecisionContext context)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(context);
+        var target = context.Target;
+        if (!context.Profile.UpgradeAllowed
+            || target.ExistingQuality is not { } existing
+            || existing.Quality != candidate.Release.Quality.Quality
+            || existing.Revision.CompareTo(candidate.Release.Quality.Revision) != 0
+            || !ReleaseProfileRules.HasPreferred(context.Rules, candidate.IndexerId, context.Profile.Id))
+        {
+            return false;
+        }
+
+        // The file on disk came from some indexer: score it with the profiles for all indexers only.
+        var existingScore = ReleaseProfileRules.Score(context.Rules, 0, context.Profile.Id, target.ExistingFileName ?? string.Empty);
+        return context.PreferredScore(candidate) > existingScore;
     }
 }

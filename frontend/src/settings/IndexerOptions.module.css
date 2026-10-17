@@ -1,0 +1,254 @@
+/* Term chips (release profiles, whitelisted subtitle tags). */
+.termField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 5px 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+}
+
+.chips:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.chipsInvalid {
+  border-color: #ef6b6b;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 4px 3px 9px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface-hover);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.chipText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.regex .chipText {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.chipInvalid {
+  border-color: #ef6b6b;
+  color: #ef6b6b;
+}
+
+.chipRemove {
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 5px;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  color: var(--text);
+}
+
+.chipInput {
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 4px 2px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.termError {
+  font-size: 12.5px;
+  color: #ef6b6b;
+  overflow-wrap: anywhere;
+}
+
+.preferred {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.preferredList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preferredRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.preferredRow > .chip {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-small);
+}
+
+.preferredTerm {
+  flex: 1 1 120px;
+}
+
+.score {
+  width: 96px;
+}
+
+.plus {
+  color: var(--ok);
+}
+
+.minus {
+  color: #ef6b6b;
+}
+
+/* Release profile list. */
+.profiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.profile:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+}
+
+.profileOff {
+  opacity: 0.6;
+}
+
+.profileHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.profileLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.profileLine > strong {
+  font-weight: 500;
+  color: var(--text-faint);
+  margin-right: 2px;
+}
+
+.mini {
+  padding: 1px 7px;
+  font-size: 11.5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow-wrap: anywhere;
+}
+
+.miniRegex {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.addProfile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.addProfile:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Release profile dialog. */
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.dialogActions > :first-child {
+  margin-right: auto;
+}
+
+.formError {
+  margin: 0;
+  font-size: 13px;
+  color: #ef6b6b;
+}

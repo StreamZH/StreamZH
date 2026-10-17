@@ -18,7 +18,11 @@ public sealed record ReleaseCandidate(
     int IndexerPriority,
     DateTimeOffset PublishDate,
     string DownloadUrl,
-    string Guid);
+    string Guid)
+{
+    /// <summary>Id of the indexer (0 when unknown, e.g. the release test page); release profiles can be limited to indexers.</summary>
+    public int IndexerId { get; init; }
+}
 
 /// <summary>What the search was for: one movie, or one set of episodes (single episode, multi-episode or season pack).</summary>
 /// <param name="RuntimeMinutes">Runtime of the movie or of one episode; 0 when unknown (size check is skipped).</param>
@@ -37,7 +41,17 @@ public sealed record DecisionTarget(
     QualityModel? ExistingQuality,
     IReadOnlyList<Language> ExistingLanguages,
     bool Monitored,
-    IReadOnlySet<string> BlocklistedTitles);
+    IReadOnlySet<string> BlocklistedTitles)
+{
+    /// <summary>
+    /// Movies: from when the movie counts as available (minimum availability, Settings → Indexers); null = available.
+    /// Only automatic searches and RSS set it; an interactive search ignores availability like Radarr.
+    /// </summary>
+    public DateTimeOffset? AvailableFrom { get; init; }
+
+    /// <summary>File name of the file on disk (for the preferred score of release profiles); null when there is none.</summary>
+    public string? ExistingFileName { get; init; }
+}
 
 /// <summary>
 /// Permanent: this release will never be wanted for the target as it is now.
@@ -58,6 +72,9 @@ public sealed record Rejection(string Code, string Message, RejectionKind Kind =
 /// <summary>The verdict for one candidate: accepted when there are no rejections.</summary>
 public sealed record Decision(ReleaseCandidate Candidate, IReadOnlyList<Rejection> Rejections)
 {
+    /// <summary>Sum of the matching preferred terms of the release profiles (0 without release profiles).</summary>
+    public int PreferredScore { get; init; }
+
     public bool Accepted => Rejections.Count == 0;
 
     /// <summary>Rejected, but only for reasons that may go away later.</summary>
@@ -72,7 +89,14 @@ public sealed record DecisionContext(
     IReadOnlyDictionary<int, QualityDefinition> Definitions,
     DateTimeOffset Now)
 {
+    /// <summary>Release rules from Settings → Indexers; <see cref="ReleaseRules.None"/> when not given.</summary>
+    public ReleaseRules Rules { get; init; } = ReleaseRules.None;
+
     public QualityProfile Profile => Target.Profile;
+
+    /// <summary>Preferred score of a release name for this target's quality profile (see <see cref="ReleaseProfileRules"/>).</summary>
+    public int PreferredScore(ReleaseCandidate candidate) =>
+        ReleaseProfileRules.Score(Rules, candidate.IndexerId, Profile.Id, candidate.Release.ReleaseTitle);
 
     public QualityDefinition? DefinitionFor(int qualityId) =>
         Definitions.TryGetValue(qualityId, out var definition) ? definition : null;

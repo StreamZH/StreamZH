@@ -11,6 +11,7 @@ using StreamZH.Core.Indexers;
 using StreamZH.Core.Media;
 using StreamZH.Data;
 using StreamZH.Library.Downloads;
+using StreamZH.Library.Rss;
 using StreamZH.Library.Search;
 using StreamZH.Tests.Library.Downloads;
 
@@ -68,8 +69,20 @@ public sealed class FakeIndexerClient : IIndexerClient
             : Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
     }
 
-    public Task<IReadOnlyList<ReleaseInfo>> FetchRecentAsync(IndexerDefinition indexer, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
+    /// <summary>RSS: answers per indexer id; indexers without a handler return nothing.</summary>
+    public Dictionary<int, Func<CancellationToken, Task<IReadOnlyList<ReleaseInfo>>>> RecentHandlers { get; } = [];
+    public ConcurrentQueue<int> RecentFetches { get; } = new();
+
+    public void ReturnsRecent(int indexerId, params ReleaseInfo[] releases) =>
+        RecentHandlers[indexerId] = _ => Task.FromResult<IReadOnlyList<ReleaseInfo>>(releases);
+
+    public Task<IReadOnlyList<ReleaseInfo>> FetchRecentAsync(IndexerDefinition indexer, CancellationToken cancellationToken)
+    {
+        RecentFetches.Enqueue(indexer.Id);
+        return RecentHandlers.TryGetValue(indexer.Id, out var handler)
+            ? handler(cancellationToken)
+            : Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
+    }
 
     public Task<byte[]> DownloadNzbAsync(IndexerDefinition indexer, ReleaseInfo release, CancellationToken cancellationToken)
     {
@@ -104,6 +117,8 @@ public sealed class SearchTestBed : IDisposable
         Config = new ConfigRepository(Database);
         Cache = new ReleaseCache(Time);
         Downloads = new DownloadSettings(Config, Paths);
+        ReleaseProfiles = new ReleaseProfileRepository(Database);
+        Options = new IndexerOptions(Config, ReleaseProfiles);
 
         // The search tests check the NZB folder; the built-in engine has its own tests (UseBuiltInClient).
         Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BlackholeValue);
@@ -164,6 +179,10 @@ public sealed class SearchTestBed : IDisposable
     public ConcurrentQueue<AutomaticSearchFinished> Finished { get; } = new();
     public ReleaseCache Cache { get; }
     public DownloadSettings Downloads { get; }
+    public ReleaseProfileRepository ReleaseProfiles { get; }
+
+    /// <summary>Settings → Indexers (release rules, RSS, availability), read by search, automatic search and RSS.</summary>
+    public IndexerOptions Options { get; }
     public DownloadEngine Engine { get; }
     public DownloadClientProvider Clients { get; }
     public Movie Dune { get; }
@@ -174,7 +193,7 @@ public sealed class SearchTestBed : IDisposable
     public Episode Episode(int season, int number) => Episodes.Single(e => e.SeasonNumber == season && e.EpisodeNumber == number);
 
     public ReleaseSearchService Search(TimeSpan? timeout = null) =>
-        new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Cache, NullLogger<ReleaseSearchService>.Instance, Time)
+        new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Cache, NullLogger<ReleaseSearchService>.Instance, Time, Options)
         {
             IndexerTimeout = timeout ?? TimeSpan.FromSeconds(10),
         };
@@ -184,7 +203,14 @@ public sealed class SearchTestBed : IDisposable
     public void UseBuiltInClient() => Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BuiltInValue);
 
     public AutomaticSearchService Automatic() =>
-        new(Search(), Grab(), Movies, Series, History, Downloads, Events, NullLogger<AutomaticSearchService>.Instance, Engine, Time);
+        new(Search(), Grab(), Movies, Series, History, Downloads, Events, NullLogger<AutomaticSearchService>.Instance, Engine, Time, Options);
+
+    public RssSyncService Rss() =>
+        new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Grab(), History, Downloads, Options,
+            NullLogger<RssSyncService>.Instance, Engine, Time)
+        {
+            IndexerTimeout = TimeSpan.FromSeconds(10),
+        };
 
     public IndexerDefinition AddIndexer(int id, string name, int priority = 25)
     {

@@ -19,10 +19,16 @@ public static class DecisionEngine
     public static IReadOnlyList<IDecisionSpecification> DefaultSpecifications { get; } =
     [
         new MonitoredSpecification(),
+        new AvailabilitySpecification(),
         new QualityAllowedByProfileSpecification(),
         new LanguageSpecification(),
         new AcceptableSizeSpecification(),
+        new MaximumSizeSpecification(),
+        new MinimumAgeSpecification(),
+        new RetentionSpecification(),
         new NotSampleSpecification(),
+        new HardcodedSubsSpecification(),
+        new ReleaseProfileSpecification(),
         new BlocklistSpecification(),
         new UpgradeSpecification(),
     ];
@@ -33,7 +39,16 @@ public static class DecisionEngine
         DecisionTarget target,
         IReadOnlyDictionary<int, QualityDefinition> definitions,
         DateTimeOffset now) =>
-        Evaluate(candidates, target, definitions, now, DefaultSpecifications);
+        Evaluate(candidates, target, definitions, now, DefaultSpecifications, ReleaseRules.None);
+
+    /// <summary>The built-in rules plus the release rules from Settings → Indexers.</summary>
+    public static IReadOnlyList<Decision> Evaluate(
+        IEnumerable<ReleaseCandidate> candidates,
+        DecisionTarget target,
+        IReadOnlyDictionary<int, QualityDefinition> definitions,
+        DateTimeOffset now,
+        ReleaseRules rules) =>
+        Evaluate(candidates, target, definitions, now, DefaultSpecifications, rules);
 
     /// <summary>Same as the default overload, with a custom set of specifications.</summary>
     public static IReadOnlyList<Decision> Evaluate(
@@ -41,18 +56,29 @@ public static class DecisionEngine
         DecisionTarget target,
         IReadOnlyDictionary<int, QualityDefinition> definitions,
         DateTimeOffset now,
-        IReadOnlyList<IDecisionSpecification> specifications)
+        IReadOnlyList<IDecisionSpecification> specifications) =>
+        Evaluate(candidates, target, definitions, now, specifications, ReleaseRules.None);
+
+    /// <summary>Custom specifications and release rules.</summary>
+    public static IReadOnlyList<Decision> Evaluate(
+        IEnumerable<ReleaseCandidate> candidates,
+        DecisionTarget target,
+        IReadOnlyDictionary<int, QualityDefinition> definitions,
+        DateTimeOffset now,
+        IReadOnlyList<IDecisionSpecification> specifications,
+        ReleaseRules rules)
     {
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentNullException.ThrowIfNull(specifications);
+        ArgumentNullException.ThrowIfNull(rules);
 
-        var context = new DecisionContext(target, definitions, now);
+        var context = new DecisionContext(target, definitions, now) { Rules = rules };
         var comparer = new DecisionComparer(context);
 
         return candidates
-            .Select(candidate => new Decision(candidate, Check(candidate, context, specifications)))
+            .Select(candidate => new Decision(candidate, Check(candidate, context, specifications)) { PreferredScore = comparer.PreferredScore(candidate) })
             .OrderByDescending(d => d.Accepted)
             .ThenByDescending(d => d.Candidate, comparer)
             .ToList();

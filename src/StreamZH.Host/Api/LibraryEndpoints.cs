@@ -7,6 +7,7 @@ using StreamZH.Core.Media;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Library;
+using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
 
 namespace StreamZH.Host.Api;
@@ -22,9 +23,10 @@ public static class LibraryEndpoints
         movies.MapGet("/", (MovieRepository repo) => repo.All().Select(MovieResource.From));
         movies.MapGet("/{id:int}", (int id, MovieRepository repo) =>
             repo.Find(id) is { } m ? Results.Ok(MovieResource.From(m)) : Results.NotFound());
-        movies.MapPost("/", async (AddRequest request, LibraryService library, CancellationToken ct) =>
+        movies.MapPost("/", async (AddRequest request, LibraryService library, JobQueue jobs, IndexerOptions options, CancellationToken ct) =>
         {
             var movie = await library.AddMovieAsync(request.TmdbId, request.RootFolderId, request.Monitored, request.QualityProfileId, cancellationToken: ct);
+            IndexerOptionsEndpoints.QueueSearchOnAdd(jobs, options, MediaType.Movie, movie.Id, movie.Title, request.SearchForMissing);
             return Results.Created($"/api/v1/movies/{movie.Id}", MovieResource.From(movie));
         });
         movies.MapPut("/{id:int}/monitor", async (int id, MonitorRequest request, LibraryService library) =>
@@ -66,10 +68,11 @@ public static class LibraryEndpoints
             return Results.Ok(new SeriesDetailResource(
                 SeriesResource.From(s, repo.Counts().GetValueOrDefault(id)), seasons, [.. episodes.Select(EpisodeResource.From)]));
         });
-        series.MapPost("/", async (AddRequest request, LibraryService library, JobQueue jobs, CancellationToken ct) =>
+        series.MapPost("/", async (AddRequest request, LibraryService library, JobQueue jobs, IndexerOptions options, CancellationToken ct) =>
         {
             var item = await library.AddSeriesAsync(request.TmdbId, request.RootFolderId, request.Monitored, request.QualityProfileId, cancellationToken: ct);
             jobs.Enqueue(RefreshSeries(item.Id, item.Title));
+            IndexerOptionsEndpoints.QueueSearchOnAdd(jobs, options, MediaType.Series, item.Id, item.Title, request.SearchForMissing);
             return Results.Created($"/api/v1/series/{item.Id}", SeriesResource.From(item, null));
         });
         series.MapPut("/{id:int}/monitor", async (int id, MonitorRequest request, LibraryService library) =>

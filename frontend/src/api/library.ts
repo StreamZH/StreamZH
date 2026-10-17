@@ -158,8 +158,9 @@ export const libraryApi = {
   seriesDetail: (id: number) => request<SeriesDetail>('GET', `/series/${id}`),
   lookup: (type: MediaType, term: string, year?: number | null) =>
     request<LookupResult[]>('GET', `/lookup/${path(type)}?term=${encodeURIComponent(term)}${year ? `&year=${year}` : ''}`),
-  add: (type: MediaType, tmdbId: number, rootFolderId: number, monitored: boolean, qualityProfileId: number | null) =>
-    request<Movie | Series>('POST', `/${path(type)}`, { tmdbId, rootFolderId, monitored, qualityProfileId }),
+  /** `searchForMissing` null: the default from Settings → Indexers. */
+  add: (type: MediaType, tmdbId: number, rootFolderId: number, monitored: boolean, qualityProfileId: number | null, searchForMissing: boolean | null = null) =>
+    request<Movie | Series>('POST', `/${path(type)}`, { tmdbId, rootFolderId, monitored, qualityProfileId, searchForMissing }),
   setMonitored: (type: MediaType, id: number, monitored: boolean) =>
     request<void>('PUT', `/${path(type)}/${id}/monitor`, { monitored }),
   setSeasonMonitored: (id: number, season: number, monitored: boolean) =>

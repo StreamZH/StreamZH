@@ -4,11 +4,16 @@
 
 using StreamZH.Core;
 using StreamZH.Core.Events;
+using StreamZH.Core.Jobs;
 using StreamZH.Data;
 using StreamZH.Host.Api;
 using StreamZH.Host.Auth;
 using StreamZH.Host.Hubs;
+using StreamZH.Host.Jobs;
 using StreamZH.Host.Logging;
+using StreamZH.Host.Settings;
+using StreamZH.Library;
+using StreamZH.Metadata.Tmdb;
 
 // Installed builds: content root = install folder, so wwwroot is found from any working directory.
 // Development (dotnet run): the default content root plus static web assets from the project.
@@ -50,6 +55,21 @@ builder.Services.AddSingleton(fileLogger);
 builder.Services.AddSingleton<UserRepository>();
 builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
+builder.Services.AddSingleton<JobQueue>();
+builder.Services.AddHostedService<JobRunner>();
+builder.Services.AddHostedService<HubNotifier>();
+
+// Library
+builder.Services.AddSingleton<RootFolderRepository>();
+builder.Services.AddSingleton<MovieRepository>();
+builder.Services.AddSingleton<SeriesRepository>();
+builder.Services.AddSingleton<ITmdbSettings, TmdbSettings>();
+builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddScoped<LibraryService>();
+builder.Services.AddScoped<RootFolderService>();
+builder.Services.AddScoped<LibraryImportService>();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
 builder.Services.AddStreamZhAuth(paths);
 builder.Services.AddSignalR();
@@ -57,6 +77,7 @@ builder.Services.AddOpenApi("v1");
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRateLimiter();
@@ -67,6 +88,7 @@ app.MapOpenApi("/api/{documentName}/openapi.json");
 app.MapAuthEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
+app.MapLibraryEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

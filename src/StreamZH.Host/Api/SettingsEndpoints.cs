@@ -8,6 +8,8 @@ using StreamZH.Core.Users;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Host.Logging;
+using StreamZH.Host.Settings;
+using StreamZH.Metadata.Tmdb;
 
 namespace StreamZH.Host.Api;
 
@@ -65,9 +67,48 @@ public static class SettingsEndpoints
             return new ApiKeyResponse(key);
         }).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
 
+        group.MapGet("/metadata", (ConfigRepository config) => MetadataSettings.From(config));
+
+        group.MapPut("/metadata", (UpdateMetadataSettings request, ConfigRepository config) =>
+        {
+            var language = request.Language ?? TmdbSettings.DefaultLanguage;
+            if (!TmdbSettings.Languages.Contains(language))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["language"] = [$"Use one of: {string.Join(", ", TmdbSettings.Languages)}."] });
+            }
+
+            if (request.TmdbToken is { } token)
+            {
+                config.Set(ConfigKeys.TmdbToken, token.Trim());
+            }
+
+            config.Set(ConfigKeys.TmdbLanguage, language);
+            return Results.Ok(MetadataSettings.From(config));
+        });
+
+        group.MapPost("/metadata/test", async (TestMetadataRequest request, ITmdbClient tmdb, CancellationToken ct) =>
+        {
+            await tmdb.TestAsync(string.IsNullOrWhiteSpace(request.TmdbToken) ? null : request.TmdbToken.Trim(), ct);
+            return Results.Ok(new { ok = true });
+        });
+
         return app;
     }
 }
+
+public sealed record MetadataSettings(bool TmdbConfigured, string? TmdbTokenHint, string Language, IReadOnlyList<string> Languages)
+{
+    public static MetadataSettings From(ConfigRepository config)
+    {
+        var token = config.Get(ConfigKeys.TmdbToken);
+        var hint = string.IsNullOrEmpty(token) ? null : $"…{token[^Math.Min(4, token.Length)..]}";
+        return new MetadataSettings(!string.IsNullOrEmpty(token), hint, config.Get(ConfigKeys.TmdbLanguage) ?? TmdbSettings.DefaultLanguage, TmdbSettings.Languages);
+    }
+}
+
+public sealed record UpdateMetadataSettings(string? TmdbToken, string? Language);
+
+public sealed record TestMetadataRequest(string? TmdbToken);
 
 public sealed record GeneralSettings(string InstanceName, string LogLevel, string ApiKey, string DataDirectory, string LogDirectory);
 

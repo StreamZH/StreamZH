@@ -2,9 +2,12 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Text.Json.Serialization;
+
 namespace StreamZH.Core.Media;
 
 /// <summary>Media types handled by the engine. Each type is a module of the same pipeline.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<MediaType>))]
 public enum MediaType
 {
     Movie = 1,

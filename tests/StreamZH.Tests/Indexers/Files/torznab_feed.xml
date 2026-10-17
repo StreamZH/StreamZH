@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Some.Movie.2020.1080p.BluRay.x264-GRP</title>
+      <guid>t1</guid>
+      <pubDate>Mon, 27 Feb 2012 11:09:39 +0000</pubDate>
+      <enclosure url="https://tracker.example/download/1.torrent" length="100" type="application/x-bittorrent" />
+    </item>
+  </channel>
+</rss>

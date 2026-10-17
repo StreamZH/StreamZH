@@ -16,6 +16,12 @@ public enum HistoryEventType
 {
     /// <summary>The NZB was fetched from the indexer and handed to the download step.</summary>
     Grabbed = 1,
+
+    /// <summary>The built-in engine finished a download (repaired and unpacked if needed).</summary>
+    DownloadCompleted = 2,
+
+    /// <summary>The built-in engine gave up on a download (missing articles, repair or unpack failed).</summary>
+    DownloadFailed = 3,
 }
 
 /// <summary>One history entry. <see cref="Data"/> holds event-specific details (download URL, NZB path, …).</summary>

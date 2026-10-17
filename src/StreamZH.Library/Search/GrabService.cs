@@ -6,21 +6,25 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
+using StreamZH.Library.Downloads;
 
 namespace StreamZH.Library.Search;
 
 /// <summary>
-/// Grabs a release: fetches the NZB from the indexer, writes it to the NZB folder and records it in the history.
-/// Until the download engine arrives (0.5) the NZB folder is the hand-off point (e.g. a SABnzbd watch folder).
+/// Grabs a release: fetches the NZB from the indexer, hands it to the download client chosen in the settings (the
+/// built-in engine, or the blackhole folder another downloader watches) and records it in the history.
 /// </summary>
 public sealed class GrabService(
     IIndexerProvider indexers,
     IIndexerClient client,
     ReleaseCache cache,
+    DownloadClientProvider clients,
     DownloadSettings settings,
     HistoryRepository history,
     IEventBus events,
@@ -76,19 +80,24 @@ public sealed class GrabService(
 
         indexers.RecordSuccess(indexer.Id);
 
-        var folder = settings.NzbFolder;
-        string path;
-        try
+        var subject = decision.Subject;
+        var (title, password) = NzbPassword.Split(release.Title);
+        var category = subject.MediaType switch
         {
-            path = NzbFileNames.WriteNew(folder, release.Title, nzb);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            throw new LibraryException($"Could not write the NZB file to {folder}: {ex.Message}", LibraryError.Invalid);
-        }
+            MediaType.Movie => DownloadCategory.Movie,
+            MediaType.Series => DownloadCategory.Series,
+            _ => DownloadCategory.Other,
+        };
+        var downloadClient = clients.Current;
+        var request = new DownloadRequest(
+            nzb, title, category, new MediaLink(subject.MediaType, subject.MovieId, subject.SeriesId, decision.EpisodeIds), Indexer: indexer.Name, Password: password);
+
+        // The engine answers with the download id, the blackhole folder with the written file.
+        var reference = await downloadClient.AddAsync(request, cancellationToken);
+        var builtIn = downloadClient is BuiltInDownloadClient;
+        var path = builtIn ? Path.Combine(settings.NzbQueueFolder, $"{reference}.nzb") : reference;
 
         var parsed = decision.Parsed;
-        var subject = decision.Subject;
         history.Add(new HistoryItem
         {
             Date = _time.GetUtcNow().UtcDateTime,
@@ -111,12 +120,15 @@ public sealed class GrabService(
                 ["infoUrl"] = release.InfoUrl,
                 ["publishDate"] = release.PublishDate.ToString("O", CultureInfo.InvariantCulture),
                 ["nzbPath"] = path,
+                ["downloadClient"] = downloadClient.Name,
+                ["downloadId"] = builtIn ? reference : null,
                 ["accepted"] = decision.Accepted ? "true" : "false",
                 ["rejections"] = decision.Accepted ? null : string.Join("; ", decision.Rejections.Select(r => r.Message)),
             },
         });
 
-        logger.LogInformation("Grabbed '{Title}' from {Indexer} for {Subject}, NZB saved to {Path}", release.Title, indexer.Name, subject.Title, path);
+        logger.LogInformation(
+            "Grabbed '{Title}' from {Indexer} for {Subject}, handed to {Client} ({Reference})", release.Title, indexer.Name, subject.Title, downloadClient.Name, reference);
         await events.PublishAsync(new ReleaseGrabbed(subject.MediaType, subject.MovieId, subject.SeriesId, release.Title, indexer.Name), cancellationToken);
         return new GrabResult(release.Title, indexer.Name, path);
     }

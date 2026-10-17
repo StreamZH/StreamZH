@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Text;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
 using StreamZH.Library;
+using StreamZH.Library.Downloads;
 using StreamZH.Library.Search;
 
 namespace StreamZH.Tests.Library.Search;
@@ -118,6 +120,115 @@ public sealed class GrabServiceTests : IDisposable
 
         _bed.Downloads.SetNzbFolder("");
         Assert.Equal(_bed.Downloads.DefaultNzbFolder, _bed.Downloads.NzbFolder);
+    }
+
+    [Fact]
+    public async Task Built_in_client_queues_the_download_with_media_link_category_and_password()
+    {
+        _bed.UseBuiltInClient();
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Returns(1, _bed.Release(Title + "{{s3cret}}", 12));
+        var result = await _bed.Search().SearchMovieAsync(_bed.Dune.Id, IndexerUse.InteractiveSearch);
+        var release = result.Decisions[0].Release;
+
+        var grabbed = await _bed.Grab().GrabAsync(release.IndexerId, release.Guid);
+
+        var item = Assert.Single(_bed.Engine.Active());
+        Assert.Equal(Path.Combine(_bed.Downloads.NzbQueueFolder, $"{item.Id}.nzb"), grabbed.NzbPath);
+        Assert.Equal(FakeIndexerClient.ValidNzb, await File.ReadAllBytesAsync(grabbed.NzbPath));
+        Assert.Equal((Title, DownloadCategory.Movie, "Alpha", DownloadStatus.Queued), (item.Title, item.Category, item.Indexer, item.Status));
+        Assert.Equal((MediaType.Movie, _bed.Dune.Id), (item.Link.MediaType, item.Link.MovieId));
+        Assert.Equal("s3cret", new DownloadRepository(_bed.Database).Find(item.Id)!.Password);
+        Assert.Empty(_bed.NzbFiles());
+
+        var entry = _bed.History.Page(1, 10).Records[0];
+        Assert.Equal(HistoryEventType.Grabbed, entry.EventType);
+        Assert.Equal(Title + "{{s3cret}}", entry.SourceTitle);
+        Assert.Equal(item.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), entry.Data["downloadId"]);
+        Assert.Equal(BuiltInDownloadClient.ClientName, entry.Data["downloadClient"]);
+    }
+
+    [Fact]
+    public async Task Built_in_client_rejects_an_nzb_without_files_so_the_next_release_can_be_tried()
+    {
+        _bed.UseBuiltInClient();
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Returns(1, _bed.Release(Title));
+        _bed.Client.Nzb = (_, _) => Encoding.UTF8.GetBytes("""<nzb xmlns="http://www.newzbin.com/DTD/2003/nzb"><file subject="x"/></nzb>""");
+        var release = (await _bed.Search().SearchMovieAsync(_bed.Dune.Id, IndexerUse.InteractiveSearch)).Decisions[0].Release;
+
+        var error = await Assert.ThrowsAsync<LibraryException>(() => _bed.Grab().GrabAsync(release.IndexerId, release.Guid));
+
+        Assert.Equal(LibraryError.Invalid, error.Error);
+        Assert.Contains("not a valid NZB", error.Message, StringComparison.Ordinal);
+        Assert.Empty(_bed.Engine.Active());
+        Assert.Equal(0, _bed.History.Page(1, 10).Total);
+    }
+
+    [Fact]
+    public async Task Series_grab_goes_to_the_series_category_with_its_episodes()
+    {
+        _bed.UseBuiltInClient();
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Returns(1, _bed.Release("Breaking.Bad.S01E02.German.DL.1080p.WEB.h264-GRP"));
+        var episode = _bed.Episode(1, 2);
+        var result = await _bed.Search().SearchEpisodesAsync(_bed.Show.Id, 1, [episode.Id], IndexerUse.InteractiveSearch);
+
+        await _bed.Grab().GrabAsync(result.Decisions[0]);
+
+        var item = Assert.Single(_bed.Engine.Active());
+        Assert.Equal(DownloadCategory.Series, item.Category);
+        Assert.Equal((MediaType.Series, _bed.Show.Id), (item.Link.MediaType, item.Link.SeriesId));
+        Assert.Equal([episode.Id], item.Link.EpisodeIds);
+    }
+
+    [Fact]
+    public async Task Blackhole_client_keeps_the_password_in_the_file_name()
+    {
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Returns(1, _bed.Release(Title + "{{pw}}"));
+        var release = (await _bed.Search().SearchMovieAsync(_bed.Dune.Id, IndexerUse.InteractiveSearch)).Decisions[0].Release;
+
+        var grabbed = await _bed.Grab().GrabAsync(release.IndexerId, release.Guid);
+
+        Assert.Equal([$"{Title}{{{{pw}}}}.nzb"], _bed.NzbFiles());
+        Assert.Equal(grabbed.NzbPath, _bed.History.Page(1, 10).Records[0].Data["nzbPath"]);
+        Assert.Equal(BlackholeDownloadClient.ClientName, _bed.History.Page(1, 10).Records[0].Data["downloadClient"]);
+        Assert.Empty(_bed.Engine.Active());
+    }
+
+    [Theory]
+    [InlineData("Some.Release-GRP{{secret}}", "Some.Release-GRP", "secret")]
+    [InlineData("Some.Release-GRP {{pass word}} ", "Some.Release-GRP", "pass word")]
+    [InlineData("Some.Release-GRP", "Some.Release-GRP", null)]
+    [InlineData("{{only}}", "{{only}}", null)]
+    public void Passwords_in_titles(string title, string expectedTitle, string? expectedPassword) =>
+        Assert.Equal((expectedTitle, expectedPassword), NzbPassword.Split(title));
+
+    [Fact]
+    public void Download_settings_validate_client_folders_and_speed_limit()
+    {
+        var downloads = _bed.Downloads;
+        Assert.Equal(Path.Combine(_bed.DataDirectory, "downloads", "incomplete"), downloads.IncompleteFolder);
+        Assert.Equal(Path.Combine(_bed.DataDirectory, "downloads", "complete"), downloads.CompleteFolder);
+        Assert.Equal(0, downloads.SpeedLimitKBps);
+
+        var error = Assert.Throws<ValidationFailedException>(() => downloads.Update("sabnzbd", null, "relative", downloads.IncompleteFolder, -1));
+        Assert.Equal(["client", "incompleteFolder", "speedLimitKBps"], error.Errors.Keys.Order());
+        Assert.Equal(DownloadClientKind.Blackhole, downloads.Client); // nothing saved
+
+        var same = Assert.Throws<ValidationFailedException>(() => downloads.Update(null, null, null, downloads.IncompleteFolder, null));
+        Assert.Equal(["completeFolder"], same.Errors.Keys);
+
+        var incomplete = Path.Combine(_bed.DataDirectory, "work");
+        var complete = Path.Combine(_bed.DataDirectory, "done");
+        downloads.Update("builtin", null, incomplete, complete + Path.DirectorySeparatorChar, 2500);
+        Assert.Equal((DownloadClientKind.BuiltIn, incomplete, complete, 2500L), (downloads.Client, downloads.IncompleteFolder, downloads.CompleteFolder, downloads.SpeedLimitKBps));
+        Assert.True(Directory.Exists(incomplete));
+        Assert.Equal(2500L, new DownloadSettings(_bed.Config, _bed.Paths).SpeedLimitKBps);
+
+        downloads.Update(null, null, "", "", 0);
+        Assert.Equal((downloads.DefaultIncompleteFolder, downloads.DefaultCompleteFolder, 0L), (downloads.IncompleteFolder, downloads.CompleteFolder, downloads.SpeedLimitKBps));
     }
 
     [Theory]

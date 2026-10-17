@@ -64,8 +64,14 @@ public sealed class ReleaseApiTests : IDisposable
         var grab = await client.PostAsJsonAsync("/api/v1/release", new { indexerId = best.IndexerId, guid = best.Guid });
         Assert.Equal(HttpStatusCode.OK, grab.StatusCode);
         var grabbed = (await grab.Content.ReadFromJsonAsync<GrabResource>())!;
-        Assert.Equal("Dune.2021.German.DL.1080p.WEB.H264-GRP.nzb", grabbed.FileName);
-        Assert.True(File.Exists(Path.Combine(_base.DataDirectory, "downloads", "nzb", grabbed.FileName)));
+        // New installs hand grabs to the built-in engine; the NZB is kept in its queue folder as "<id>.nzb".
+        Assert.Equal(Path.Combine(_base.DataDirectory, "downloads", "nzb-queue"), grabbed.Folder);
+        Assert.True(File.Exists(Path.Combine(grabbed.Folder, grabbed.FileName)));
+        var queue = await client.GetFromJsonAsync<JsonElement>("/api/v1/download");
+        var queued = Assert.Single(queue.GetProperty("items").EnumerateArray());
+        Assert.Equal($"{queued.GetProperty("id").GetInt32()}.nzb", grabbed.FileName);
+        Assert.Equal(("Dune.2021.German.DL.1080p.WEB.H264-GRP", "movie", movie.Id), (queued.GetProperty("title").GetString(), queued.GetProperty("category").GetString(), queued.GetProperty("movieId").GetInt32()));
+        Assert.Equal("Movie", queued.GetProperty("mediaType").GetString());
 
         var history = (await client.GetFromJsonAsync<HistoryPage>($"/api/v1/history?movieId={movie.Id}"))!;
         var entry = Assert.Single(history.Records);

@@ -13,4 +13,9 @@ public static class ConfigKeys
     public const string TmdbLanguage = "TmdbLanguage";
     public const string DefaultQualityProfileId = "DefaultQualityProfileId";
     public const string NzbFolder = "NzbFolder";
+    public const string DownloadClient = "DownloadClient";
+    public const string IncompleteFolder = "IncompleteFolder";
+    public const string CompleteFolder = "CompleteFolder";
+    public const string DownloadSpeedLimit = "DownloadSpeedLimit";
+    public const string DownloadsPaused = "DownloadsPaused";
 }

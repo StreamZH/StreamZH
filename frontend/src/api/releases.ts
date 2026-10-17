@@ -60,11 +60,32 @@ export interface Command {
   episodeIds?: number[]
 }
 
+export type DownloadClient = 'builtin' | 'blackhole'
+
+/** Download settings. Each folder comes with its default and a problem text when StreamZH cannot write there. */
 export interface DownloadSettings {
+  client: DownloadClient
   nzbFolder: string
   defaultNzbFolder: string
   isDefault: boolean
   problem: string | null
+  incompleteFolder: string
+  defaultIncompleteFolder: string
+  incompleteProblem: string | null
+  completeFolder: string
+  defaultCompleteFolder: string
+  completeProblem: string | null
+  /** 0 = unlimited. */
+  speedLimitKBps: number
+}
+
+/** Fields left out keep their value; an empty folder means the default one. */
+export interface DownloadSettingsChange {
+  client?: DownloadClient
+  nzbFolder?: string
+  incompleteFolder?: string
+  completeFolder?: string
+  speedLimitKBps?: number
 }
 
 /** Sent over the hub when an automatic search job is done. */
@@ -99,7 +120,7 @@ export const releasesApi = {
   activeIndexers: () => request<{ automaticSearch: number; interactiveSearch: number }>('GET', '/release/indexers'),
   command: (command: Command) => request<{ name: CommandName; queued: number; jobs: JobStatus }>('POST', '/command', command),
   downloadSettings: () => request<DownloadSettings>('GET', '/settings/downloads'),
-  saveDownloadSettings: (nzbFolder: string) => request<DownloadSettings>('PUT', '/settings/downloads', { nzbFolder }),
+  saveDownloadSettings: (change: DownloadSettingsChange) => request<DownloadSettings>('PUT', '/settings/downloads', change),
 }
 
 /** "S01E02", "S01E02-E03", "S01 pack". */

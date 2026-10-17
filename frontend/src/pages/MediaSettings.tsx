@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
-import { releaseKeys, releasesApi } from '../api/releases'
+import { releaseKeys, releasesApi, type DownloadClient, type DownloadSettingsChange } from '../api/releases'
 import FolderPicker from '../components/FolderPicker'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
@@ -220,66 +220,180 @@ export function RootFoldersSection() {
   )
 }
 
+type FolderField = 'nzbFolder' | 'incompleteFolder' | 'completeFolder'
+
+interface DownloadDraft {
+  client?: DownloadClient
+  nzbFolder?: string
+  incompleteFolder?: string
+  completeFolder?: string
+  speedLimit?: string
+}
+
+function FolderRow({
+  label,
+  value,
+  isDefault,
+  problem,
+  error,
+  onChange,
+  onBrowse,
+  onDefault,
+}: {
+  label: string
+  value: string
+  isDefault: boolean
+  problem: string | null
+  error: string | undefined
+  onChange: (value: string) => void
+  onBrowse: () => void
+  onDefault: () => void
+}) {
+  return (
+    <div className={styles.field}>
+      <span>{label}</span>
+      <div className={styles.rootForm}>
+        <input className={`${ui.input} ${ui.mono}`} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} spellCheck={false} />
+        <button className={styles.secondary} type="button" onClick={onBrowse}>
+          Browse…
+        </button>
+        {!isDefault && (
+          <button className={styles.secondary} type="button" onClick={onDefault}>
+            Default
+          </button>
+        )}
+      </div>
+      {(error ?? problem) && <span className={styles.error}>{error ?? problem}</span>}
+    </div>
+  )
+}
+
 export function DownloadsSection() {
   const queryClient = useQueryClient()
   const settings = useQuery({ queryKey: releaseKeys.downloads, queryFn: releasesApi.downloadSettings })
-  const [path, setPath] = useState<string | null>(null)
-  const [picking, setPicking] = useState(false)
-  const value = path ?? settings.data?.nzbFolder ?? ''
+  const [draft, setDraft] = useState<DownloadDraft>({})
+  const [picking, setPicking] = useState<FolderField | null>(null)
 
   const save = useMutation({
-    mutationFn: (folder: string) => releasesApi.saveDownloadSettings(folder),
+    mutationFn: (change: DownloadSettingsChange) => releasesApi.saveDownloadSettings(change),
     onSuccess: (data) => {
       queryClient.setQueryData(releaseKeys.downloads, data)
-      setPath(null)
+      setDraft({})
     },
   })
 
+  if (!settings.data) return null
+  const current = settings.data
+
+  const client = draft.client ?? current.client
+  const folder = (field: FolderField) => draft[field] ?? current[field]
+  const speedText = draft.speedLimit ?? String(current.speedLimitKBps)
+  const speed = Number(speedText.trim() === '' ? '0' : speedText)
+  const speedValid = Number.isInteger(speed) && speed >= 0
+
+  const change: DownloadSettingsChange = {}
+  if (client !== current.client) change.client = client
+  for (const field of ['nzbFolder', 'incompleteFolder', 'completeFolder'] as const) {
+    const value = draft[field]
+    if (value !== undefined && value.trim() !== current[field]) change[field] = value.trim()
+  }
+  if (speedValid && speed !== current.speedLimitKBps) change.speedLimitKBps = speed
+  const dirty = Object.keys(change).length > 0
+
+  const fieldErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
+  const generalError = save.error && Object.keys(fieldErrors).length === 0 ? save.error.message : undefined
+  const fieldError = (field: string) => fieldErrors[field]?.[0]
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    save.mutate(value.trim())
+    if (dirty && speedValid) save.mutate(change)
   }
 
-  if (!settings.data) return null
+  const setField = (field: keyof DownloadDraft, value: string) => {
+    save.reset()
+    setDraft((d) => ({ ...d, [field]: value }))
+  }
 
-  const error = save.error instanceof ApiError ? (save.error.fieldErrors.nzbFolder?.[0] ?? save.error.message) : save.error?.message
-  const dirty = path !== null && path.trim() !== settings.data.nzbFolder
+  const isDefault = (field: FolderField) => {
+    const value = folder(field)
+    if (field === 'nzbFolder') return value === current.defaultNzbFolder || value === ''
+    if (field === 'incompleteFolder') return value === current.defaultIncompleteFolder || value === ''
+    return value === current.defaultCompleteFolder || value === ''
+  }
+
+  const row = (field: FolderField, label: string, problem: string | null) => (
+    <FolderRow
+      label={label}
+      value={folder(field)}
+      isDefault={isDefault(field)}
+      problem={draft[field] === undefined ? problem : null}
+      error={fieldError(field)}
+      onChange={(value) => setField(field, value)}
+      onBrowse={() => setPicking(field)}
+      onDefault={() => setField(field, '')}
+    />
+  )
 
   return (
     <form className={page.panel} onSubmit={submit}>
       <h2 className={page.panelTitle}>Downloads</h2>
-      <p className={styles.text}>
-        Grabbed releases are saved as NZB files in this folder. Until StreamZH&apos;s own download engine arrives, let SABnzbd watch this folder
-        (Config → Folders → Watched Folder) and it downloads them automatically.
-      </p>
-      <div className={styles.rootForm}>
-        <input className={`${ui.input} ${ui.mono}`} value={value} onChange={(e) => setPath(e.target.value)} aria-label="NZB folder" spellCheck={false} />
-        <button className={styles.secondary} type="button" onClick={() => setPicking(true)}>
-          Browse…
-        </button>
-        <button className={styles.primary} type="submit" disabled={!dirty || save.isPending}>
+      <div className={styles.grid}>
+        <label className={styles.field}>
+          <span>Download client</span>
+          <select value={client} onChange={(e) => setField('client', e.target.value)}>
+            <option value="builtin">StreamZH (built-in Usenet downloader)</option>
+            <option value="blackhole">Blackhole folder (SABnzbd, NZBGet …)</option>
+          </select>
+          {fieldError('client') && <span className={styles.error}>{fieldError('client')}</span>}
+        </label>
+        {client === 'builtin' && (
+          <label className={styles.field}>
+            <span>Speed limit (KB/s, 0 = unlimited)</span>
+            <input type="number" min={0} step={1} inputMode="numeric" value={speedText} onChange={(e) => setField('speedLimit', e.target.value)} />
+            {!speedValid && <span className={styles.error}>Enter a whole number, 0 or more.</span>}
+            {speedValid && fieldError('speedLimitKBps') && <span className={styles.error}>{fieldError('speedLimitKBps')}</span>}
+          </label>
+        )}
+      </div>
+
+      {client === 'builtin' ? (
+        <>
+          <p className={styles.text}>
+            StreamZH downloads grabbed releases from your Usenet servers, repairs and unpacks them. Files are assembled in the incomplete folder and
+            moved to the completed folder (one subfolder per category) when they are done.
+          </p>
+          {row('incompleteFolder', 'Incomplete downloads', current.incompleteProblem)}
+          {row('completeFolder', 'Completed downloads', current.completeProblem)}
+        </>
+      ) : (
+        <>
+          <p className={styles.text}>
+            Grabbed releases are saved as NZB files in this folder. Let SABnzbd or NZBGet watch it (SABnzbd: Config → Folders → Watched Folder) and they
+            download them. Passwords are kept in the file name as <code>title{'{{password}}'}.nzb</code>.
+          </p>
+          {row('nzbFolder', 'NZB folder', current.problem)}
+        </>
+      )}
+
+      <div className={styles.actions}>
+        <button className={styles.primary} type="submit" disabled={!dirty || !speedValid || save.isPending}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
-      </div>
-      <div className={styles.actions}>
-        {settings.data.isDefault ? (
-          <span className={styles.muted}>Default folder inside the StreamZH data folder.</span>
-        ) : (
-          <button className={styles.secondary} type="button" onClick={() => save.mutate('')} disabled={save.isPending}>
-            Use default folder
+        {dirty && (
+          <button className={styles.secondary} type="button" onClick={() => setDraft({})} disabled={save.isPending}>
+            Undo changes
           </button>
         )}
         {save.isSuccess && !dirty && <span className={styles.ok}>Saved</span>}
-        {error && <span className={styles.error}>{error}</span>}
-        {!error && settings.data.problem && <span className={styles.error}>{settings.data.problem}</span>}
+        {generalError && <span className={styles.error}>{generalError}</span>}
       </div>
       {picking && (
         <FolderPicker
-          initialPath={value}
-          onClose={() => setPicking(false)}
+          initialPath={folder(picking)}
+          onClose={() => setPicking(null)}
           onSelect={(selected) => {
-            setPath(selected)
-            setPicking(false)
+            setField(picking, selected)
+            setPicking(null)
           }}
         />
       )}

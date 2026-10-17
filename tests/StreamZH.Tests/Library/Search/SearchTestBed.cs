@@ -10,7 +10,9 @@ using StreamZH.Core.Events;
 using StreamZH.Core.Indexers;
 using StreamZH.Core.Media;
 using StreamZH.Data;
+using StreamZH.Library.Downloads;
 using StreamZH.Library.Search;
+using StreamZH.Tests.Library.Downloads;
 
 namespace StreamZH.Tests.Library.Search;
 
@@ -37,7 +39,15 @@ public sealed class FakeIndexerProvider : IIndexerProvider
 public sealed class FakeIndexerClient : IIndexerClient
 {
     public static readonly byte[] ValidNzb = Encoding.UTF8.GetBytes(
-        """<?xml version="1.0" encoding="utf-8"?><nzb xmlns="http://www.newzbin.com/DTD/2003/nzb"><file subject="x"/></nzb>""");
+        """
+        <?xml version="1.0" encoding="utf-8"?>
+        <nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">
+          <file poster="p" date="1760000000" subject="&quot;release.mkv&quot; yEnc (1/1)">
+            <groups><group>alt.binaries.test</group></groups>
+            <segments><segment bytes="1000" number="1">part1@test</segment></segments>
+          </file>
+        </nzb>
+        """);
 
     public Dictionary<int, Func<SearchCriteria, CancellationToken, Task<IReadOnlyList<ReleaseInfo>>>> Handlers { get; } = [];
     public ConcurrentQueue<(int IndexerId, SearchCriteria Criteria)> Searches { get; } = new();
@@ -94,6 +104,13 @@ public sealed class SearchTestBed : IDisposable
         Config = new ConfigRepository(Database);
         Cache = new ReleaseCache(Time);
         Downloads = new DownloadSettings(Config, Paths);
+
+        // The search tests check the NZB folder; the built-in engine has its own tests (UseBuiltInClient).
+        Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BlackholeValue);
+        Engine = new DownloadEngine(
+            new DownloadRepository(Database), History, Downloads, Config, new FakeArticleSource { MaxConnections = 0 }, new FakePostProcessor(),
+            Events, new FakeFreeSpace(), new DownloadEngineOptions(), NullLogger<DownloadEngine>.Instance);
+        Clients = new DownloadClientProvider(Downloads, new BuiltInDownloadClient(Engine), new BlackholeDownloadClient(Downloads));
         Events.Subscribe<ReleaseGrabbed>((e, _) =>
         {
             Grabbed.Enqueue(e);
@@ -147,6 +164,8 @@ public sealed class SearchTestBed : IDisposable
     public ConcurrentQueue<AutomaticSearchFinished> Finished { get; } = new();
     public ReleaseCache Cache { get; }
     public DownloadSettings Downloads { get; }
+    public DownloadEngine Engine { get; }
+    public DownloadClientProvider Clients { get; }
     public Movie Dune { get; }
     public Series Show { get; }
 
@@ -160,7 +179,9 @@ public sealed class SearchTestBed : IDisposable
             IndexerTimeout = timeout ?? TimeSpan.FromSeconds(10),
         };
 
-    public GrabService Grab() => new(Indexers, Client, Cache, Downloads, History, Events, NullLogger<GrabService>.Instance, Time);
+    public GrabService Grab() => new(Indexers, Client, Cache, Clients, Downloads, History, Events, NullLogger<GrabService>.Instance, Time);
+
+    public void UseBuiltInClient() => Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BuiltInValue);
 
     public AutomaticSearchService Automatic() =>
         new(Search(), Grab(), Movies, Series, History, Events, NullLogger<AutomaticSearchService>.Instance, Time);
@@ -191,6 +212,7 @@ public sealed class SearchTestBed : IDisposable
 
     public void Dispose()
     {
+        Engine.Dispose();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         try
         {

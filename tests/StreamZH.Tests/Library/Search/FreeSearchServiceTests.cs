@@ -122,7 +122,13 @@ public sealed class FreeSearchServiceTests : IDisposable
         Assert.Empty(entry.EpisodeIds);
         Assert.Equal((Title, "Alpha", Quality.WebDl1080p.Id), (entry.SourceTitle, entry.Indexer, entry.QualityId));
 
-        var grabbedEvent = Assert.Single(_bed.Grabbed);
+        _bed.UseBuiltInClient();
+        await service.GrabAsync(release.IndexerId, release.Guid);
+        var queued = Assert.Single(_bed.Engine.Active());
+        Assert.Equal(StreamZH.Core.Downloads.DownloadCategory.Other, queued.Category);
+        Assert.Null(queued.Link.MediaType);
+
+        var grabbedEvent = _bed.Grabbed.First();
         Assert.Null(grabbedEvent.MediaType);
 
         await Assert.ThrowsAsync<LibraryException>(() => service.GrabAsync(1, "unknown"));

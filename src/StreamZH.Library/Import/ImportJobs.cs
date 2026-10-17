@@ -200,6 +200,7 @@ public static class ImportServiceCollectionExtensions
     {
         services.AddSingleton<MediaManagementSettings>();
         services.AddSingleton<DownloadImportRepository>();
+        services.AddSingleton<StreamZH.Library.Search.PendingImports>();
         services.AddSingleton<BlocklistRepository>();
         services.AddSingleton<MediaFileDetailsRepository>();
         services.AddSingleton<EpisodeFileRepository>();

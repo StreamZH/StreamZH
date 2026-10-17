@@ -30,7 +30,8 @@ public sealed class AutomaticSearchService(
     ILogger<AutomaticSearchService> logger,
     IDownloadQueue? queue = null,
     TimeProvider? timeProvider = null,
-    IndexerOptions? options = null)
+    IndexerOptions? options = null,
+    PendingImports? pendingImports = null)
 {
     /// <summary>
     /// With the blackhole folder StreamZH cannot see whether a grab is still downloading: items grabbed this recently are
@@ -43,7 +44,7 @@ public sealed class AutomaticSearchService(
     public const string SkipRecentlyGrabbed = PendingGrabs.SkipRecentlyGrabbed;
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
-    private readonly PendingGrabs _pending = new(history, downloadSettings, queue, timeProvider ?? TimeProvider.System);
+    private readonly PendingGrabs _pending = new(history, downloadSettings, queue, timeProvider ?? TimeProvider.System, pendingImports);
 
     // Items of the current run that were skipped, and why (for the "Search" button's note).
     private int _skipped;

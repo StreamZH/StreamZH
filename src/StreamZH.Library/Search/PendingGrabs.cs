@@ -13,7 +13,7 @@ namespace StreamZH.Library.Search;
 /// "already in the queue"). With the built-in engine that is its queue; with the blackhole folder StreamZH cannot see
 /// the downloader, so items grabbed in the last 12 hours count instead.
 /// </summary>
-public sealed class PendingGrabs(HistoryRepository history, DownloadSettings downloadSettings, IDownloadQueue? queue, TimeProvider time)
+public sealed class PendingGrabs(HistoryRepository history, DownloadSettings downloadSettings, IDownloadQueue? queue, TimeProvider time, PendingImports? imports = null)
 {
     /// <summary>Blackhole folder: items grabbed this recently are not grabbed again.</summary>
     public static readonly TimeSpan RecentGrabWindow = TimeSpan.FromHours(12);
@@ -31,7 +31,8 @@ public sealed class PendingGrabs(HistoryRepository history, DownloadSettings dow
     {
         if (UsesQueue)
         {
-            return queue!.Active().Any(d => d.Link.MovieId == movieId) ? SkipInQueue : null;
+            // In the queue, or finished and still waiting for the import.
+            return queue!.Active().Any(d => d.Link.MovieId == movieId) || imports?.HasMovie(movieId) == true ? SkipInQueue : null;
         }
 
         return history.MovieHasEventSince(movieId, HistoryEventType.Grabbed, Since()) ? SkipRecentlyGrabbed : null;
@@ -42,7 +43,13 @@ public sealed class PendingGrabs(HistoryRepository history, DownloadSettings dow
     {
         if (UsesQueue)
         {
-            return queue!.Active().Where(d => d.Link.SeriesId == seriesId).SelectMany(d => d.Link.EpisodeIds).ToHashSet();
+            var blocked = queue!.Active().Where(d => d.Link.SeriesId == seriesId).SelectMany(d => d.Link.EpisodeIds).ToHashSet();
+            if (imports is not null)
+            {
+                blocked.UnionWith(imports.EpisodeIds(seriesId));
+            }
+
+            return blocked;
         }
 
         return history.EpisodesWithEventSince(seriesId, HistoryEventType.Grabbed, Since());

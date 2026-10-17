@@ -176,6 +176,34 @@ public sealed class AutomaticSearchServiceTests : IDisposable
         Assert.Equal((1, AutomaticSearchService.SkipInQueue), (finished.Skipped, finished.SkipReason));
     }
 
+    [Fact]
+    public async Task A_finished_download_waiting_for_the_import_blocks_a_new_search()
+    {
+        _bed.UseBuiltInClient();
+        _bed.AddIndexer(1, "Alpha");
+        _bed.Client.Returns(1, _bed.Release("Dune.2021.German.DL.1080p.BluRay.x264-GRP", 12));
+        var output = Directory.CreateDirectory(Path.Combine(_bed.DataDirectory, "complete", "Dune.2021")).FullName;
+        var downloads = new DownloadRepository(_bed.Database);
+        var record = downloads.Add(new DownloadRecord
+        {
+            Title = "Dune.2021.German.DL.1080p.BluRay.x264-GRP",
+            MediaType = MediaType.Movie,
+            MovieId = _bed.Dune.Id,
+            NzbPath = Path.Combine(_bed.DataDirectory, "x.nzb"),
+            WorkFolder = output,
+            Added = DateTime.UtcNow,
+        }, []);
+        downloads.Update(record with { Status = Core.Downloads.DownloadStatus.Completed, OutputPath = output, Completed = DateTime.UtcNow });
+
+        Assert.Equal(0, await _bed.Automatic().SearchMoviesAsync([_bed.Dune.Id]));
+        Assert.Empty(_bed.Client.Searches);
+        Assert.Equal(AutomaticSearchService.SkipInQueue, Assert.Single(_bed.Finished).SkipReason);
+
+        // Imported (or the folder is gone): searching works again.
+        Directory.Delete(output);
+        Assert.Equal(1, await _bed.Automatic().SearchMoviesAsync([_bed.Dune.Id]));
+    }
+
     private static (MediaType, int?, int, int) Fields(AutomaticSearchFinished e) => (e.MediaType, e.Id, e.Searched, e.Grabbed);
 
     public void Dispose() => _bed.Dispose();

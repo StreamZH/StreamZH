@@ -203,7 +203,8 @@ public sealed class SearchTestBed : IDisposable
     public void UseBuiltInClient() => Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BuiltInValue);
 
     public AutomaticSearchService Automatic() =>
-        new(Search(), Grab(), Movies, Series, History, Downloads, Events, NullLogger<AutomaticSearchService>.Instance, Engine, Time, Options);
+        new(Search(), Grab(), Movies, Series, History, Downloads, Events, NullLogger<AutomaticSearchService>.Instance, Engine, Time, Options,
+            new PendingImports(new DownloadRepository(Database), new DownloadImportRepository(Database)));
 
     public RssSyncService Rss() =>
         new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Grab(), History, Downloads, Options,

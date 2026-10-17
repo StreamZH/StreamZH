@@ -174,6 +174,16 @@ public sealed class DownloadRepository(Database database)
             .Select(r => r.ToRecord())];
     }
 
+    /// <summary>Completed downloads that belong to a movie or series (candidates for the import).</summary>
+    public IReadOnlyList<DownloadRecord> CompletedWithLink()
+    {
+        using var connection = database.Open();
+        return [.. connection.Query<DownloadRow>(
+                $"SELECT {Columns} FROM Downloads WHERE Status = @completed AND (MovieId IS NOT NULL OR SeriesId IS NOT NULL) ORDER BY Id",
+                new { completed = (int)DownloadStatus.Completed })
+            .Select(r => r.ToRecord())];
+    }
+
     /// <summary>Completed and failed downloads, newest first. <paramref name="page"/> starts at 1.</summary>
     public (IReadOnlyList<DownloadRecord> Records, int Total) History(int page, int pageSize)
     {

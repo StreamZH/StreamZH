@@ -50,7 +50,8 @@ public sealed class RssSyncService(
     IndexerOptions options,
     ILogger<RssSyncService> logger,
     IDownloadQueue? queue = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    PendingImports? pendingImports = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -75,7 +76,7 @@ public sealed class RssSyncService(
         var now = _time.GetUtcNow();
         var defs = definitions.All().ToDictionary(d => d.QualityId);
         var rules = options.Rules();
-        var pending = new PendingGrabs(history, downloadSettings, queue, _time);
+        var pending = new PendingGrabs(history, downloadSettings, queue, _time, pendingImports);
         var index = new LibraryIndex(movies.All(), series.All());
         var run = new Run();
 

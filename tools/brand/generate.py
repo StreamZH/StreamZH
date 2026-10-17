@@ -30,6 +30,8 @@ FONT_BOLD = os.path.join(HERE, "fonts", "outfit-latin-700-normal.woff2")
 # CloudZH family colours: graphite, cream
 NAVY, NAVY_2, PAPER = "#1F1E1D", "#2A2927", "#F4F2EC"
 NS = 'xmlns="http://www.w3.org/2000/svg"'
+# App icon: monogram 60 % of the tile (CloudZH: 54 %); a bit larger on the dark tile, chosen 17.10.2026
+ICON_FRAC = 0.60
 
 
 # ---------------------------------------------------------------- Monogram
@@ -91,7 +93,7 @@ def build(accent, dark):
     def mark(hc, zc):
         return f'<svg {NS} viewBox="0 0 100 100"><path d="{path(H)}" fill="{hc}"/><path d="{path(Z)}" fill="{zc}"/></svg>'
 
-    def icon(bg, hc, zc, h=H, z=Z, frac=0.54, radius=112, grad=True):
+    def icon(bg, hc, zc, h=H, z=Z, frac=ICON_FRAC, radius=112, grad=True):
         s = 512 * frac / 100
         t = (512 - 100 * s) / 2
         defs = (f'<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{NAVY_2}"/>'

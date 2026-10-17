@@ -1,0 +1,114 @@
+.root {
+  position: relative;
+  min-width: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  padding: 8px 10px 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trigger:hover {
+  border-color: #3d3c37;
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.trigger svg {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.label {
+  color: var(--text-faint);
+}
+
+.value {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popover {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-height: 280px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface-hover);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.option:hover,
+.option:focus-within {
+  background: rgb(255 255 255 / 0.04);
+}
+
+.option input {
+  accent-color: var(--accent);
+}
+
+.optionLabel {
+  flex: 1;
+}
+
+.hint {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.clear {
+  align-self: flex-start;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--text);
+}

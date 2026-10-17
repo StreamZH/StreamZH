@@ -2,8 +2,25 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 12px;
+  margin-bottom: 8px;
+}
+
+.panelHead h2 {
+  margin-bottom: 2px;
+}
+
+.summary {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .empty {
@@ -25,19 +42,20 @@
   font-weight: 600;
 }
 
-.hint {
-  padding: 10px 12px;
-  font-size: 13px;
-  border-left: 2px solid var(--accent);
-  background: var(--bg);
-  border-radius: 0 var(--radius-small) var(--radius-small) 0;
+/* Columns shared by the header line and the rows. */
+.head,
+.row {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) 64px minmax(140px, 1.1fr) minmax(150px, 1.1fr) minmax(130px, 1fr) 72px;
+  column-gap: 18px;
+  align-items: center;
 }
 
-.hint code {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  color: var(--text);
-  overflow-wrap: anywhere;
+.head {
+  padding: 8px 14px 8px 17px;
+  font-size: 12px;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--line);
 }
 
 .list {
@@ -47,168 +65,227 @@
 }
 
 .row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 24px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+  position: relative;
+  row-gap: 6px;
+  padding: 12px 14px 12px 17px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
 }
 
-.rowMain {
-  flex: 1 1 200px;
+.row:hover {
+  background: var(--surface-hover);
+}
+
+/* Status bar on the left edge. */
+.row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--state);
+}
+
+.enabled {
+  --state: var(--ok);
+}
+
+.disabled {
+  --state: var(--text-faint);
+}
+
+.error {
+  --state: #ef6b6b;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nameLine {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 6px 8px;
   min-width: 0;
 }
 
 .name {
+  font: inherit;
+  font-size: 14.5px;
   font-weight: 600;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  margin-right: 2px;
+  text-align: left;
+  cursor: pointer;
   overflow-wrap: anywhere;
 }
 
-.meta {
+.disabled .name {
+  color: var(--text-muted);
+}
+
+.name:hover {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  text-underline-offset: 3px;
+}
+
+.name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 24px;
-  margin: 0;
-  font-size: 13px;
-  min-width: 0;
+  align-items: center;
+  gap: 6px;
 }
 
-.meta div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 80px;
-}
-
-.meta dt {
-  font-size: 11.5px;
+.host {
+  font-family: var(--font-mono);
+  font-size: 12px;
   color: var(--text-faint);
-}
-
-.meta dd {
-  margin: 0;
-  color: var(--text-muted);
+  margin-right: 4px;
   overflow-wrap: anywhere;
 }
 
-.rowActions {
+.cell {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cellLabel {
+  display: none;
+}
+
+.priority {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.uses {
+  overflow-wrap: anywhere;
+}
+
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.meter {
+  display: block;
+  width: 100%;
+  max-width: 140px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text-muted);
+}
+
+.high .meter span {
+  background: var(--warn);
+}
+
+.high {
+  color: var(--warn);
+}
+
+.full .meter span {
+  background: #ef6b6b;
+}
+
+.full {
+  color: #ef6b6b;
+}
+
+.actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-left: auto;
 }
 
 .lastError {
-  flex-basis: 100%;
-  margin: -4px 0 0;
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
   font-size: 12.5px;
   color: var(--text-faint);
   overflow-wrap: anywhere;
 }
 
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.error .lastError {
+  color: #ef9a9a;
 }
 
-.statusNote {
-  margin: 0;
-  padding: 10px 12px;
-  font-size: 13px;
-  color: #ef6b6b;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
-  overflow-wrap: anywhere;
+@media (max-width: 1000px) {
+  .head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .main {
+    grid-column: 1;
+  }
+
+  .actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .cell {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .cellLabel {
+    display: inline;
+    flex: none;
+    width: 76px;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .usage {
+    flex: 1;
+  }
 }
 
-.fieldset {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  min-width: 0;
-}
+@media (max-width: 600px) {
+  .toolbar {
+    width: 100%;
+  }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
+  .toolbar > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 
-.checks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 24px;
-}
-
-.testRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  font-size: 13px;
-}
-
-.categories {
-  margin: 0;
-  padding: 10px 12px 12px;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
-}
-
-.categories legend {
-  padding: 0 6px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.categoryGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.categoryGroup + .categoryGroup {
-  margin-top: 10px;
-}
-
-.subCategories {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 6px 16px;
-  padding-left: 22px;
-}
-
-.catId {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-faint);
-}
-
-.footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.spacer {
-  flex: 1;
-}
-
-/* Beats the muted colour of hints inside .field. */
-.form .fieldError {
-  color: #ef6b6b;
+  .row {
+    padding: 12px 4px 12px 13px;
+  }
 }

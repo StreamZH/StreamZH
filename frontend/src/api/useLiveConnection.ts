@@ -2,6 +2,7 @@ import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/s
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { historyKeys } from './history'
+import { indexerKeys } from './indexers'
 import { queryKeys, type JobStatus } from './library'
 import { releaseKeys, type SearchFinished } from './releases'
 
@@ -42,6 +43,10 @@ export function useLiveConnection(): boolean {
     })
     connection.on('searchFinished', (event: SearchFinished) => {
       queryClient.setQueryData(releaseKeys.searchFinished(event.mediaType, event.id), { ...event, at: Date.now() })
+    })
+
+    connection.on('indexersChanged', () => {
+      void queryClient.invalidateQueries({ queryKey: indexerKeys.all })
     })
 
     connection.onreconnecting(() => setConnected(false))

@@ -1,0 +1,26 @@
+/* CloudZH family design tokens (see StreamZH design canvas, 17.10.2026). */
+:root {
+  --bg: #131312;
+  --bg-sidebar: #161614;
+  --surface: #1c1b19;
+  --surface-hover: #24231f;
+  --line: #2e2d29;
+  --text: #f2f0ea;
+  --text-muted: #a9a59b;
+  --text-faint: #8a867d;
+  --accent: #c0202a;
+  --ok: #6fbf73;
+  --warn: #d9b25a;
+
+  --movies: #e58b6d;
+  --series: #7aa7db;
+  --music: #d9b25a;
+  --books: #9cc2a0;
+
+  --font-ui: 'Geist Sans', 'Geist', system-ui, sans-serif;
+  --font-title: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  --radius: 10px;
+  --radius-small: 8px;
+}

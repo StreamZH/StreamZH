@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>StreamZH</AssemblyName>
+    <RootNamespace>StreamZH.Host</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../StreamZH.Core/StreamZH.Core.csproj" />
+    <ProjectReference Include="../StreamZH.Data/StreamZH.Data.csproj" />
+    <ProjectReference Include="../StreamZH.Parsing/StreamZH.Parsing.csproj" />
+    <ProjectReference Include="../StreamZH.Metadata/StreamZH.Metadata.csproj" />
+    <ProjectReference Include="../StreamZH.Indexers/StreamZH.Indexers.csproj" />
+    <ProjectReference Include="../StreamZH.Usenet/StreamZH.Usenet.csproj" />
+    <ProjectReference Include="../StreamZH.Library/StreamZH.Library.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+  </ItemGroup>
+</Project>

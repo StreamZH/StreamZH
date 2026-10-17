@@ -1,0 +1,90 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1200px;
+}
+
+.title {
+  font-family: var(--font-title);
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+.lead {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.card,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+}
+
+.valueSmall {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.panelTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  counter-reset: stage;
+}
+
+.pipeline li {
+  counter-increment: stage;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pipeline li::before {
+  content: counter(stage) '  ';
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-faint);
+}
+
+.error {
+  margin: 0;
+  color: var(--accent);
+}

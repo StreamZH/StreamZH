@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StreamZH.Core/StreamZH.Core.csproj" />
+    <Project Path="src/StreamZH.Data/StreamZH.Data.csproj" />
+    <Project Path="src/StreamZH.Host/StreamZH.Host.csproj" />
+    <Project Path="src/StreamZH.Indexers/StreamZH.Indexers.csproj" />
+    <Project Path="src/StreamZH.Library/StreamZH.Library.csproj" />
+    <Project Path="src/StreamZH.Metadata/StreamZH.Metadata.csproj" />
+    <Project Path="src/StreamZH.Parsing/StreamZH.Parsing.csproj" />
+    <Project Path="src/StreamZH.Usenet/StreamZH.Usenet.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StreamZH.Tests/StreamZH.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../StreamZH.Core/StreamZH.Core.csproj" />
+    <ProjectReference Include="../StreamZH.Parsing/StreamZH.Parsing.csproj" />
+    <ProjectReference Include="../StreamZH.Metadata/StreamZH.Metadata.csproj" />
+  </ItemGroup>
+</Project>

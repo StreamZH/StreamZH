@@ -9,6 +9,7 @@ import LibraryPage from './library/LibraryPage'
 import MovieDetail from './library/MovieDetail'
 import SeriesDetail from './library/SeriesDetail'
 import Home from './pages/Home'
+import Indexers from './pages/Indexers'
 import Placeholder from './pages/Placeholder'
 import Profiles from './pages/Profiles'
 import ParseTest from './pages/ParseTest'
@@ -33,7 +34,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="library/series/:id" element={<SeriesDetail />} />
             <Route path="library/import" element={<ImportPage />} />
             <Route path="activity" element={<Placeholder title="Activity" phase="0.6" />} />
-            <Route path="indexers" element={<Placeholder title="Indexers" phase="0.4" />} />
+            <Route path="indexers" element={<Indexers />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/profiles" element={<Profiles />} />
             <Route path="settings/release-test" element={<ParseTest />} />

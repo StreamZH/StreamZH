@@ -85,6 +85,7 @@ builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client =>
 builder.Services.AddScoped<LibraryService>();
 builder.Services.AddScoped<RootFolderService>();
 builder.Services.AddScoped<LibraryImportService>();
+builder.Services.AddIndexerManagement();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
@@ -107,6 +108,7 @@ app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
 app.MapLibraryEndpoints();
 app.MapProfileEndpoints();
+app.MapIndexerEndpoints();
 app.MapFileSystemEndpoints();
 app.MapParseEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();

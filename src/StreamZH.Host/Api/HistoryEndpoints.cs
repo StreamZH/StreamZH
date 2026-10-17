@@ -32,7 +32,7 @@ public sealed record HistoryResource(
     int Id,
     DateTime Date,
     HistoryEventType EventType,
-    MediaType MediaType,
+    MediaType? MediaType,
     int? MovieId,
     int? SeriesId,
     IReadOnlyList<int> EpisodeIds,

@@ -11,8 +11,8 @@ using StreamZH.Core.Quality;
 
 namespace StreamZH.Library.Search;
 
-/// <summary>What a search was for: a movie, or episodes of a series.</summary>
-public sealed record SearchSubject(MediaType MediaType, int? MovieId, int? SeriesId, string Title);
+/// <summary>What a search was for: a movie, or episodes of a series. <see cref="MediaType"/> is null for a free text search (Search page).</summary>
+public sealed record SearchSubject(MediaType? MediaType, int? MovieId, int? SeriesId, string Title);
 
 /// <summary>One search result with its verdict. <see cref="Parsed"/> is null when the name could not be read.</summary>
 /// <param name="EpisodeIds">Series: the library episodes the release covers (empty when unknown).</param>
@@ -33,8 +33,8 @@ public sealed record ReleaseSearchResult(IReadOnlyList<ReleaseDecision> Decision
 
 public sealed record GrabResult(string Title, string Indexer, string NzbPath);
 
-/// <summary>A release was grabbed (manually or by an automatic search).</summary>
-public sealed record ReleaseGrabbed(MediaType MediaType, int? MovieId, int? SeriesId, string Title, string Indexer) : IAppEvent;
+/// <summary>A release was grabbed (manually, by an automatic search, or from the Search page with <see cref="MediaType"/> null).</summary>
+public sealed record ReleaseGrabbed(MediaType? MediaType, int? MovieId, int? SeriesId, string Title, string Indexer) : IAppEvent;
 
 /// <summary>An automatic search job finished. <see cref="Id"/> is the movie or series id, null for "all missing movies".</summary>
 public sealed record AutomaticSearchFinished(MediaType MediaType, int? Id, int Searched, int Grabbed) : IAppEvent;

@@ -116,6 +116,7 @@ app.MapIndexerEndpoints();
 app.MapFileSystemEndpoints();
 app.MapParseEndpoints();
 app.MapReleaseEndpoints();
+app.MapSearchEndpoints();
 app.MapHistoryEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useLocation } from 'react-router'
 import { api } from '../api/client'
 import { libraryApi, queryKeys } from '../api/library'
 import { authQueryKey, useAuth } from '../auth/auth'
@@ -14,6 +14,8 @@ interface NavItem {
   icon: IconName
   color?: string
   count?: 'movies' | 'series'
+  /** Sub-pages, listed under the item while one of them is open (like Prowlarr's sidebar). */
+  children?: { to: string; label: string }[]
 }
 
 const sections: { title?: string; items: NavItem[] }[] = [
@@ -29,7 +31,17 @@ const sections: { title?: string; items: NavItem[] }[] = [
     title: 'System',
     items: [
       { to: '/activity', label: 'Activity', icon: 'activity' },
-      { to: '/indexers', label: 'Indexers', icon: 'indexers' },
+      {
+        to: '/indexers',
+        label: 'Indexers',
+        icon: 'indexers',
+        children: [
+          { to: '/indexers', label: 'Indexers' },
+          { to: '/indexers/search', label: 'Search' },
+          { to: '/indexers/stats', label: 'Stats' },
+          { to: '/indexers/history', label: 'History' },
+        ],
+      },
       { to: '/settings', label: 'Settings', icon: 'settings' },
     ],
   },
@@ -37,6 +49,7 @@ const sections: { title?: string; items: NavItem[] }[] = [
 
 export default function Layout() {
   const live = useLiveConnection()
+  const { pathname } = useLocation()
   const { user } = useAuth()
   const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats })
   const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs })
@@ -57,19 +70,36 @@ export default function Layout() {
         {sections.map((section, index) => (
           <div key={section.title ?? index} className={styles.section}>
             {section.title && <div className={styles.sectionTitle}>{section.title}</div>}
-            {section.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) => (isActive ? `${styles.link} ${styles.active}` : styles.link)}
-                style={item.color ? { ['--item-color' as string]: item.color } : undefined}
-              >
-                <Icon name={item.icon} />
-                <span className={styles.label}>{item.label}</span>
-                {item.count && stats.data && <span className={styles.count}>{stats.data[item.count]}</span>}
-              </NavLink>
-            ))}
+            {section.items.map((item) => {
+              const open = item.children && (pathname === item.to || pathname.startsWith(`${item.to}/`))
+              return [
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/'}
+                  className={({ isActive }) => (isActive ? `${styles.link} ${styles.active}` : styles.link)}
+                  style={item.color ? { ['--item-color' as string]: item.color } : undefined}
+                >
+                  <Icon name={item.icon} />
+                  <span className={styles.label}>{item.label}</span>
+                  {item.count && stats.data && <span className={styles.count}>{stats.data[item.count]}</span>}
+                </NavLink>,
+                open && (
+                  <div key={`${item.to}-sub`} className={styles.sub} aria-label={`${item.label} pages`} role="group">
+                    {item.children!.map((child) => (
+                      <NavLink
+                        key={child.to}
+                        to={child.to}
+                        end
+                        className={({ isActive }) => (isActive ? `${styles.subLink} ${styles.subActive}` : styles.subLink)}
+                      >
+                        {child.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                ),
+              ]
+            })}
           </div>
         ))}
 

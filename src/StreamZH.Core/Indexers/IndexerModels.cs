@@ -114,6 +114,30 @@ public sealed record EpisodeSearchCriteria : SearchCriteria
     public bool IsSeasonSearch => EpisodeNumbers.Count == 0 && AirDate is null;
 }
 
+/// <summary>Which Newznab function a free text search uses.</summary>
+public enum TextSearchType
+{
+    /// <summary>t=search: everything the indexer has.</summary>
+    Search,
+
+    /// <summary>t=movie with q (falls back to t=search when the indexer has no movie text search).</summary>
+    Movie,
+
+    /// <summary>t=tvsearch with q (falls back to t=search when the indexer has no TV text search).</summary>
+    Tv,
+}
+
+/// <summary>
+/// Free text search without a library item (the Search page, like Prowlarr's). An empty <see cref="Query"/> lists the newest
+/// releases. Empty <see cref="Categories"/> means the indexer's movie categories (Movie), TV categories (Tv) or no filter (Search).
+/// </summary>
+public sealed record TextSearchCriteria : SearchCriteria
+{
+    public string Query { get; init; } = string.Empty;
+    public TextSearchType Type { get; init; }
+    public IReadOnlyList<int> Categories { get; init; } = [];
+}
+
 /// <summary>An indexer answered with an error. <see cref="RetryAfter"/> is set for request limits.</summary>
 public sealed class IndexerException : Exception
 {

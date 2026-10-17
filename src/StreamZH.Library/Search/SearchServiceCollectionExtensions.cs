@@ -24,6 +24,7 @@ public static class SearchServiceCollectionExtensions
         services.AddScoped<ReleaseSearchService>();
         services.AddScoped<GrabService>();
         services.AddScoped<AutomaticSearchService>();
+        services.AddScoped<FreeSearchService>();
         return services;
     }
 }

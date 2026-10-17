@@ -39,7 +39,7 @@ the existing apps.
 | Frontend | React 19 + TypeScript + Vite | Same family as Sonarr/Radarr UI, largest ecosystem |
 | Frontend data | TanStack Query + React Router | Caching, background refresh, routing |
 | Styling | CSS modules + design tokens (CloudZH family) | No UI kit lock-in |
-| Packaging | Single-file self-contained build + Docker image | Bare metal or container, CloudZH App Store |
+| Packaging | Self-contained native packages (Windows, Linux, macOS) + Docker image | Runs natively like Sonarr/Radarr, or in a container; see Platforms in ROADMAP.md |
 
 External tools called as processes (not linked): `par2` (par2cmdline-turbo) for
 verify/repair and `unrar` / `7z` for extraction. Same approach as SABnzbd.
@@ -140,7 +140,7 @@ User ── Owner, Admin, Friend (same roles as CloudZH)
 | Item | Default |
 |---|---|
 | Port | 9797 |
-| Config/data dir | `/config` in Docker, `~/.config/streamzh` on Linux, `%AppData%\StreamZH` on Windows |
+| Config/data dir | `/config` in Docker, `C:\ProgramData\StreamZH` on Windows, `~/Library/Application Support/StreamZH` on macOS, `~/.config/streamzh` on Linux (`/var/lib/streamzh` as systemd service via `STREAMZH_DATA`) |
 | Database | `<data>/streamzh.db` |
 | Logs | `<data>/logs/` |
 | Incomplete downloads | `<data>/downloads/incomplete` (configurable) |

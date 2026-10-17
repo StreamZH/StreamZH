@@ -9,7 +9,12 @@ using StreamZH.Data;
 using StreamZH.Host.Api;
 using StreamZH.Host.Hubs;
 
-var builder = WebApplication.CreateBuilder(args);
+// Content root = install folder, so native installs find wwwroot no matter where they are started from.
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory,
+});
 
 // --data <dir> on the command line, STREAMZH_DATA, /config in Docker, else the OS default.
 var paths = AppPaths.Resolve(builder.Configuration["data"]);

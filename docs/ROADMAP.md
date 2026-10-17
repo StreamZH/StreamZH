@@ -36,7 +36,26 @@ SABnzbd and the indexer setup on the CloudZH home server.
 | Users & roles | Owner, Admin, Friend as in CloudZH |
 | Compatibility | Optional Sonarr/Radarr-compatible API endpoints for third-party tools |
 | UI | German as second UI language, mobile layout |
-| Packaging | Docker image on GHCR, single-file builds (linux-x64, linux-arm64, win-x64), CloudZH App Store entry |
+| Packaging | Native installers and packages for every platform below, Docker image on GHCR, CloudZH App Store entry |
+
+## Platforms
+
+Like Sonarr and Radarr, StreamZH runs natively on every major platform, not only in
+Docker. .NET 10 builds a self-contained app per platform (no .NET install needed).
+par2 and 7-Zip are bundled with the native packages so post-processing works out of the box.
+
+| Platform | Delivery | Runs as | Data dir | Available from |
+|---|---|---|---|---|
+| Linux x64 / arm64 | `.tar.gz` + install script (systemd unit) | systemd service | `/var/lib/streamzh` | 0.1 (CI build), script 0.7 |
+| Docker | Image on GHCR (amd64, arm64) | Container | `/config` | 0.1 |
+| Windows x64 | Installer (Inno Setup) + portable `.zip` | Windows service or tray app | `C:\ProgramData\StreamZH` | 0.1 (CI build), installer 0.7 |
+| macOS (Apple Silicon, Intel) | `.app` in `.zip` | Login item | `~/Library/Application Support/StreamZH` | 1.0 |
+| NAS (Synology, QNAP, Unraid, TrueNAS) | Docker image + Unraid template, Synology package later | Container / package | `/config` | 1.0 |
+| CloudZH | App Store entry, preconfigured | Container | managed by CloudZH | 1.0 |
+| FreeBSD | not planned: .NET has no official FreeBSD support | | | |
+
+The in-app updater (download, verify signature, restart) follows in 1.0 for the native
+packages; Docker updates by pulling the new image.
 
 ### Checklist before the repository goes public
 

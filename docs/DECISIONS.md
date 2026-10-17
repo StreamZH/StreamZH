@@ -4,6 +4,7 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Native packages for Windows, Linux and macOS like Sonarr/Radarr, plus Docker; no FreeBSD | Most home users run Windows or a NAS, not only Docker |
 | 2026-10-17 | First test version: Movies + Series, Usenet only | Replaces the stack that runs on the home server today (Radarr, Sonarr, SABnzbd); fastest path to a real test |
 | 2026-10-17 | Frontend: React + TypeScript + Vite | Largest ecosystem, same family as the Sonarr/Radarr UI |
 | 2026-10-17 | Backend: .NET 10 / C# | Sonarr, Radarr and Prowlarr are GPL-3.0 on .NET 10, their parser code and tests can be ported directly |

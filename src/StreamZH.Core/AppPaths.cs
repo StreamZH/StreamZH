@@ -26,7 +26,8 @@ public sealed class AppPaths
         Directory.CreateDirectory(IncompleteDirectory);
     }
 
-    /// <summary>Explicit value, then STREAMZH_DATA, then /config in containers, then the OS default.</summary>
+    /// <summary>Explicit value, then STREAMZH_DATA, then /config in containers, then the OS default
+    /// (ProgramData on Windows, Application Support on macOS, ~/.config on Linux).</summary>
     public static AppPaths Resolve(string? explicitDirectory = null)
     {
         if (!string.IsNullOrWhiteSpace(explicitDirectory))
@@ -45,10 +46,16 @@ public sealed class AppPaths
             return new AppPaths("/config");
         }
 
-        var baseDir = OperatingSystem.IsWindows()
-            ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+        if (OperatingSystem.IsWindows())
+        {
+            // ProgramData so the same data works for the Windows service and the tray app.
+            return new AppPaths(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "StreamZH"));
+        }
 
-        return new AppPaths(Path.Combine(baseDir, OperatingSystem.IsWindows() ? "StreamZH" : "streamzh"));
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        return OperatingSystem.IsMacOS()
+            ? new AppPaths(Path.Combine(home, "Library", "Application Support", "StreamZH"))
+            : new AppPaths(Path.Combine(home, ".config", "streamzh"));
     }
 }

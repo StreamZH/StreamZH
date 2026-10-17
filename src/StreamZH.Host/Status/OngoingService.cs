@@ -208,7 +208,7 @@ public sealed class OngoingService(
         }
     }
 
-    private const string ToolsLink = "/settings#tools";
+    private const string ToolsLink = "/settings/downloads#tools";
 
     private static string ToolKey(PostProcessTool tool) => tool == PostProcessTool.Par2 ? "par2" : "7zip";
 
@@ -322,7 +322,7 @@ public sealed class OngoingService(
             if (!access.Exists)
             {
                 notices.Add(new OngoingNotice(
-                    $"root-missing-{root.Id}", NoticeLevels.Error, "Root folder not found", $"{root.Path} · is the drive mounted?", "/settings#media", false));
+                    $"root-missing-{root.Id}", NoticeLevels.Error, "Root folder not found", $"{root.Path} · is the drive mounted?", "/settings/media-management", false));
             }
             else if (!access.Writable)
             {
@@ -331,7 +331,7 @@ public sealed class OngoingService(
                     NoticeLevels.Warn,
                     "Root folder is read-only",
                     $"{root.Path} · finished downloads cannot be moved in",
-                    "/settings#media",
+                    "/settings/media-management",
                     false));
             }
         }

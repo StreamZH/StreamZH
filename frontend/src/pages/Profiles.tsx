@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { profileKeys, profilesApi, type Language, type QualityDefinition, type QualityProfile } from '../api/profiles'
 import { useAuth } from '../auth/auth'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
-import { Advanced, AdvancedToggle } from '../lib/Advanced'
+import { SettingsPage } from '../settings/SettingsKit'
 import page from './Page.module.css'
 import styles from './Profiles.module.css'
 
@@ -15,23 +14,9 @@ export default function Profiles() {
   const canEdit = user?.role === 'Owner' || user?.role === 'Admin'
 
   return (
-    <div className={page.page}>
-      <header className={styles.header}>
-        <div>
-          <Link className={styles.back} to="/settings">
-            ← Settings
-          </Link>
-          <h1 className={page.title}>Profiles</h1>
-          <p className={page.lead}>Which qualities and languages StreamZH grabs, and until when it keeps upgrading.</p>
-        </div>
-        <AdvancedToggle />
-      </header>
+    <SettingsPage title="Profiles" lead="Which qualities and languages StreamZH grabs, and until when it keeps upgrading. Size limits per quality are under Quality.">
       <ProfileList canEdit={canEdit} />
-      {/* Size limits per quality are an expert setting, like Radarr's Quality page. */}
-      <Advanced>
-        <SizeLimits canEdit={canEdit} />
-      </Advanced>
-    </div>
+    </SettingsPage>
   )
 }
 
@@ -348,9 +333,9 @@ const toDraft = (d: QualityDefinition): DefinitionDraft => ({
 
 const toNumber = (value: string) => (value.trim() === '' ? null : Number(value))
 
-function SizeLimits({ canEdit }: { canEdit: boolean }) {
+export function SizeLimits({ canEdit, defaultOpen = false }: { canEdit: boolean; defaultOpen?: boolean }) {
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const definitions = useQuery({ queryKey: profileKeys.definitions, queryFn: profilesApi.definitions, enabled: open })
   const [drafts, setDrafts] = useState<DefinitionDraft[] | null>(null)
   const [saved, setSaved] = useState(false)

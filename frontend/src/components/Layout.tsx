@@ -7,6 +7,7 @@ import { authQueryKey, useAuth } from '../auth/auth'
 import { useLiveConnection } from '../api/useLiveConnection'
 import StatusWindow from '../status/StatusWindow'
 import { useIsAdmin } from '../status/useOngoing'
+import { settingsAreas, systemAreas } from '../settings/areas'
 import Icon, { type IconName } from './Icon'
 import Logo from './Logo'
 import styles from './Layout.module.css'
@@ -47,7 +48,8 @@ const sections: { title?: string; items: NavItem[] }[] = [
           { to: '/indexers/history', label: 'History' },
         ],
       },
-      { to: '/settings', label: 'Settings', icon: 'settings' },
+      { to: '/settings', label: 'Settings', icon: 'settings', children: settingsAreas.map(({ to, label }) => ({ to, label })) },
+      { to: '/system', label: 'System', icon: 'system', children: systemAreas.map(({ to, label }) => ({ to, label })) },
     ],
   },
 ]

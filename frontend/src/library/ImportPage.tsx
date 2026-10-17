@@ -54,7 +54,7 @@ export default function ImportPage() {
 
       {rootFolders.data && folders.length === 0 && (
         <p className={ui.muted}>
-          No root folder for {type === 'Movie' ? 'movies' : 'series'} yet. <Link to="/settings#media">Add one in settings.</Link>
+          No root folder for {type === 'Movie' ? 'movies' : 'series'} yet. <Link to="/settings/media-management">Add one in settings.</Link>
         </p>
       )}
 

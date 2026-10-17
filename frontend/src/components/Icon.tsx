@@ -19,6 +19,12 @@ const paths = {
       <path d="m20 20-3.5-3.5" />
     </>
   ),
+  system: (
+    <>
+      <rect x="3" y="4" width="18" height="12" rx="2" />
+      <path d="M8 20h8M12 16v4" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />

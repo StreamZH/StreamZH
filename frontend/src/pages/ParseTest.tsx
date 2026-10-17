@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
 import { libraryApi, queryKeys } from '../api/library'
 import { parseRelease, type ParsedRelease } from '../api/parse'
 import ui from '../components/ui.module.css'
+import { SettingsPage } from '../settings/SettingsKit'
 import page from './Page.module.css'
 import styles from './ParseTest.module.css'
 
@@ -36,14 +36,7 @@ export default function ParseTest() {
   }
 
   return (
-    <div className={page.page}>
-      <header>
-        <Link className={styles.back} to="/settings">
-          ← Settings
-        </Link>
-        <h1 className={page.title}>Release test</h1>
-        <p className={page.lead}>Paste a release name to see how StreamZH reads it and whether it would grab it.</p>
-      </header>
+    <SettingsPage title="Release test" lead="Paste a release name to see how StreamZH reads it and whether it would grab it.">
 
       <form className={page.panel} onSubmit={submit}>
         <label className={ui.field}>
@@ -110,7 +103,7 @@ export default function ParseTest() {
         </section>
       )}
       {result.data?.parsed && <ParsedTable parsed={result.data.parsed} />}
-    </div>
+    </SettingsPage>
   )
 }
 

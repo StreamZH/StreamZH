@@ -18,7 +18,7 @@ export function SetupHint({ tmdbMissing, noRoot, type }: { tmdbMissing: boolean;
           Add a root folder for {type === 'Movie' ? 'movies' : 'series'}, e.g. <code>{type === 'Movie' ? 'D:\\Movies' : '/media/tv'}</code>.
         </li>
       </ol>
-      <Link to="/settings#media">Open settings</Link>
+      <Link to="/settings/media-management">Open settings</Link>
     </div>
   )
 }

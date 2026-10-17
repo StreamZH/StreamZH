@@ -57,3 +57,10 @@ public sealed record DownloadProgressItem(int Id, DownloadStatus Status, double 
 
 /// <summary>Something the status window should re-read (jobs, notices). No payload: the UI fetches /api/v1/status/ongoing.</summary>
 public sealed record OngoingChanged : IAppEvent;
+
+/// <summary>
+/// A download reached <see cref="DownloadStatus.Completed"/> (files in <see cref="DownloadItem.OutputPath"/>) or
+/// <see cref="DownloadStatus.Failed"/> (<see cref="DownloadItem.Error"/>). Published once, after the state is saved;
+/// the import (completed download handling) and failed download handling start from here.
+/// </summary>
+public sealed record DownloadFinished(DownloadItem Item) : IAppEvent;

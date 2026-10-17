@@ -1,54 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
 import { api, ApiError, logLevels, type GeneralSettings } from '../api/client'
 import { authQueryKey, useAuth } from '../auth/auth'
-import ui from '../components/ui.module.css'
-import { Advanced, AdvancedToggle } from '../lib/Advanced'
+import { Advanced } from '../lib/Advanced'
 import { advancedLabel } from '../lib/advancedMode'
-import { useScrollToHash } from '../lib/useScrollToHash'
-import { DownloadsSection, MetadataSection, RootFoldersSection } from './MediaSettings'
-import page from './Page.module.css'
-import { UsenetServersCard } from './UsenetServers'
-import styles from './Settings.module.css'
-import { ToolsSection } from './ToolsSettings'
+import page from '../pages/Page.module.css'
+import styles from '../pages/Settings.module.css'
+import { SettingsPage } from './SettingsKit'
 
 const settingsKey = ['settings-general']
 
-export default function Settings() {
+/** Settings → General: instance, API key, storage. Host, security, proxy, logging, backups and updates follow. */
+export default function GeneralPage() {
   const settings = useQuery({ queryKey: settingsKey, queryFn: api.generalSettings })
-  useScrollToHash()
 
   return (
-    <div className={page.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={page.title}>Settings</h1>
-          <p className={page.lead}>Media folders, metadata, API access and logs.</p>
-        </div>
-        <nav className={styles.subnav} aria-label="More settings">
-          <Link className={ui.button} to="/settings/profiles">
-            Profiles
-          </Link>
-          <Link className={ui.button} to="/settings/release-test">
-            Release test
-          </Link>
-          <Link className={ui.button} to="/settings/usenet">
-            Usenet servers
-          </Link>
-          <AdvancedToggle />
-        </nav>
-      </header>
-
-      <UsenetServersCard />
-
-      <div id="media" className={page.page}>
-        <RootFoldersSection />
-        <DownloadsSection />
-        <ToolsSection />
-        <MetadataSection />
-      </div>
-
+    <SettingsPage title="General" lead="Instance name, API access, storage and logging.">
       {settings.isError && <p className={page.error}>{settings.error.message}</p>}
       {settings.data && (
         <>
@@ -57,8 +24,7 @@ export default function Settings() {
           <StorageSection settings={settings.data} />
         </>
       )}
-      <LogSection />
-    </div>
+    </SettingsPage>
   )
 }
 
@@ -205,33 +171,6 @@ function StorageSection({ settings }: { settings: GeneralSettings }) {
           <code>{settings.logDirectory}</code>
         </dd>
       </dl>
-    </section>
-  )
-}
-
-function LogSection() {
-  const logs = useQuery({ queryKey: ['logs'], queryFn: () => api.logs(300), refetchInterval: 10_000 })
-
-  return (
-    <section className={page.panel}>
-      <div className={styles.panelHead}>
-        <h2 className={page.panelTitle}>Log</h2>
-        <button className={styles.secondary} type="button" onClick={() => void logs.refetch()}>
-          Refresh
-        </button>
-      </div>
-      {logs.isError && <p className={styles.error}>{logs.error.message}</p>}
-      <pre className={styles.log}>
-        {(logs.data?.lines ?? []).length === 0 && <span className={styles.muted}>No entries yet.</span>}
-        {[...(logs.data?.lines ?? [])].reverse().map((line, index) => {
-          const level = line.split('|')[1] ?? ''
-          return (
-            <div key={index} className={styles[`level${level}`]}>
-              {line}
-            </div>
-          )
-        })}
-      </pre>
     </section>
   )
 }

@@ -975,6 +975,7 @@ public sealed class DownloadEngine(
         MarkChanged(d);
         _outbox.Enqueue(new OngoingChanged());
         _historyOutbox.Enqueue(HistoryFor(d, HistoryEventType.DownloadFailed));
+        _outbox.Enqueue(new DownloadFinished(d.ToItem()));
         logger.LogWarning("Download {Id} '{Title}' failed: {Error}", d.Id, d.Title, error);
     }
 
@@ -1074,6 +1075,7 @@ public sealed class DownloadEngine(
                 MarkChanged(d);
                 _outbox.Enqueue(new OngoingChanged());
                 _historyOutbox.Enqueue(HistoryFor(d, HistoryEventType.DownloadCompleted));
+                _outbox.Enqueue(new DownloadFinished(d.ToItem()));
                 logger.LogInformation("Download {Id} '{Title}' completed: {Output}", d.Id, d.Title, result.OutputFolder);
             }
             else if (held.Count > 0 && result.Error?.StartsWith(NotEnoughRecoveryBlocks, StringComparison.OrdinalIgnoreCase) == true)
@@ -1419,6 +1421,9 @@ public sealed class DownloadEngine(
                         break;
                     case OngoingChanged ongoing:
                         await events.PublishAsync(ongoing);
+                        break;
+                    case DownloadFinished finished:
+                        await events.PublishAsync(finished);
                         break;
                 }
             }

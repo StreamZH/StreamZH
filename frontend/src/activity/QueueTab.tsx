@@ -116,7 +116,7 @@ export default function QueueTab() {
           another downloader picks it up from there, so nothing shows up in this queue.
         </p>
         <div className={styles.emptyActions}>
-          <Link className={ui.button} to="/settings#media">
+          <Link className={ui.button} to="/settings/media-management">
             Settings → Downloads
           </Link>
           <Link className={ui.button} to="/activity?tab=history">

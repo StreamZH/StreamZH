@@ -340,7 +340,7 @@ public sealed class OngoingServiceTests : IDisposable
         Assert.Equal("install-par2", row.Key);
         Assert.Equal(OngoingKinds.Install, row.Kind);
         Assert.Equal("Installing par2 1.5.0", row.Title);
-        Assert.Equal("/settings#tools", row.Link);
+        Assert.Equal("/settings/downloads#tools", row.Link);
         Assert.Empty(running.Notices);
 
         // The download is not there: 404.
@@ -357,7 +357,7 @@ public sealed class OngoingServiceTests : IDisposable
         Assert.Equal("par2 could not be installed", notice.Title);
         Assert.Contains("HTTP 404", notice.Sub, StringComparison.Ordinal);
         Assert.EndsWith(". Settings → Tools", notice.Sub, StringComparison.Ordinal);
-        Assert.Equal("/settings#tools", notice.Link);
+        Assert.Equal("/settings/downloads#tools", notice.Link);
         Assert.False(notice.Dismissible);
 
         // Installed by hand: the notice disappears.

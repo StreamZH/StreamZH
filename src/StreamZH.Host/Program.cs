@@ -65,6 +65,8 @@ builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
 builder.Services.AddSingleton<JobQueue>();
 builder.Services.AddHostedService<JobRunner>();
+builder.Services.AddSingleton<ScheduledTaskRunner>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduledTaskRunner>());
 builder.Services.AddHostedService<HubNotifier>();
 
 // Library
@@ -117,6 +119,7 @@ app.MapAuthEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
 app.MapToolSettingsEndpoints();
+app.MapSystemTaskEndpoints();
 app.MapLibraryEndpoints();
 app.MapProfileEndpoints();
 app.MapIndexerEndpoints();

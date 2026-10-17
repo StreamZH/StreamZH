@@ -20,6 +20,7 @@ import { Pill } from '../indexers/Chips'
 import Dialog from '../indexers/Dialog'
 import form from '../indexers/Form.module.css'
 import { Advanced, AdvancedHint, AdvancedToggle } from '../lib/Advanced'
+import { SettingsPage } from '../settings/SettingsKit'
 import { advancedLabel, setAdvanced } from '../lib/advancedMode'
 import { formatDate } from '../lib/format'
 import page from './Page.module.css'
@@ -59,23 +60,12 @@ export default function UsenetServers() {
   const canEdit = useCanEdit()
 
   return (
-    <div className={page.page}>
-      <header>
-        <Link className={styles.back} to="/settings">
-          ← Settings
-        </Link>
-        <div className={styles.pageHead}>
-          <div>
-            <h1 className={page.title}>Usenet servers</h1>
-            <p className={page.lead}>
-              Where StreamZH downloads from. The primary server is asked first; backup servers, such as a block account, fill in what it is missing.
-            </p>
-          </div>
-          <AdvancedToggle />
-        </div>
-      </header>
+    <SettingsPage
+      title="Usenet servers"
+      lead="Where StreamZH downloads from. The primary server is asked first; backup servers, such as a block account, fill in what it is missing."
+    >
       <ServerList canEdit={canEdit} />
-    </div>
+    </SettingsPage>
   )
 }
 

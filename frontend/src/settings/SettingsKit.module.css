@@ -1,0 +1,282 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1100px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 24px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.title {
+  font-family: var(--font-title);
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+.lead {
+  margin: 6px 0 0;
+  max-width: 760px;
+  color: var(--text-muted);
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  scroll-margin-top: 16px;
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sectionText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 760px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Label on the left, control with help below on the right (like Radarr). */
+.row {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 6px 24px;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.label {
+  padding-top: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.control > input:not([type='checkbox']),
+.control > select,
+.control > textarea {
+  max-width: 520px;
+}
+
+.help {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+  max-width: 640px;
+}
+
+.help code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.error {
+  font-size: 12.5px;
+  color: #ef6b6b;
+}
+
+.invalid input:not([type='checkbox']),
+.invalid select,
+.invalid textarea {
+  border-color: #ef6b6b;
+}
+
+.select {
+  max-width: 320px;
+}
+
+.withUnit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.number {
+  width: 140px;
+}
+
+.numberWide {
+  width: 200px;
+}
+
+.unit {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 0.15s;
+}
+
+.track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.switch input:checked + .track {
+  background: var(--accent);
+}
+
+.switch input:checked + .track::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.switch input:focus-visible + .track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.switch input:disabled + .track {
+  opacity: 0.5;
+}
+
+.footer {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.saveBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.saveState {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.coming {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-small);
+}
+
+/* Overview cards on /settings. */
+.areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.area:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: var(--surface-hover);
+}
+
+.areaTitle {
+  font-weight: 600;
+}
+
+.areaText {
+  font-size: 13px;
+  color: var(--text-muted);
+}

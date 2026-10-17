@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import ActivityPage from './activity/ActivityPage'
 import AuthGate from './auth/AuthGate'
 import Layout from './components/Layout'
@@ -17,8 +17,20 @@ import SearchPage from './indexerTools/SearchPage'
 import Placeholder from './pages/Placeholder'
 import Profiles from './pages/Profiles'
 import ParseTest from './pages/ParseTest'
-import Settings from './pages/Settings'
 import UsenetServers from './pages/UsenetServers'
+import DownloadsPage from './settings/DownloadsPage'
+import GeneralPage from './settings/GeneralPage'
+import MediaManagementPage from './settings/MediaManagementPage'
+import MetadataPage from './settings/MetadataPage'
+import ConnectPage from './settings/ConnectPage'
+import IndexerOptionsPage from './settings/IndexerOptionsPage'
+import UiPage from './settings/UiPage'
+import QualityPage from './settings/QualityPage'
+import SettingsOverview from './settings/SettingsOverview'
+import LogsPage from './system/LogsPage'
+import BackupPage from './system/BackupPage'
+import StatusPage from './system/StatusPage'
+import TasksPage from './system/TasksPage'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -43,10 +55,23 @@ createRoot(document.getElementById('root')!).render(
             <Route path="indexers/search" element={<SearchPage />} />
             <Route path="indexers/stats" element={<IndexerStatsPage />} />
             <Route path="indexers/history" element={<IndexerHistoryPage />} />
-            <Route path="settings" element={<Settings />} />
+            <Route path="settings" element={<SettingsOverview />} />
+            <Route path="settings/media-management" element={<MediaManagementPage />} />
             <Route path="settings/profiles" element={<Profiles />} />
-            <Route path="settings/release-test" element={<ParseTest />} />
+            <Route path="settings/quality" element={<QualityPage />} />
+            <Route path="settings/indexers" element={<IndexerOptionsPage />} />
+            <Route path="settings/downloads" element={<DownloadsPage />} />
             <Route path="settings/usenet" element={<UsenetServers />} />
+            <Route path="settings/connect" element={<ConnectPage />} />
+            <Route path="settings/metadata" element={<MetadataPage />} />
+            <Route path="settings/general" element={<GeneralPage />} />
+            <Route path="settings/ui" element={<UiPage />} />
+            <Route path="settings/release-test" element={<ParseTest />} />
+            <Route path="system" element={<Navigate to="/system/status" replace />} />
+            <Route path="system/status" element={<StatusPage />} />
+            <Route path="system/tasks" element={<TasksPage />} />
+            <Route path="system/backup" element={<BackupPage />} />
+            <Route path="system/logs" element={<LogsPage />} />
             <Route path="*" element={<Placeholder title="Not found" />} />
           </Route>
           </Routes>

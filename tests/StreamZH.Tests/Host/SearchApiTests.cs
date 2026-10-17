@@ -62,7 +62,10 @@ public sealed class SearchApiTests : IDisposable
         var grab = await client.PostAsJsonAsync("/api/v1/search/grab", new { indexerId = 1, guid = release.Guid });
         Assert.Equal(HttpStatusCode.OK, grab.StatusCode);
         var grabbed = (await grab.Content.ReadFromJsonAsync<GrabResource>())!;
-        Assert.Equal(("Dune.Part.Two.2024.German.DL.2160p.WEB.H265-GRP.nzb", "Alpha"), (grabbed.FileName, grabbed.Indexer));
+        // The built-in engine got it (category Other: no library item); its queue keeps the NZB as "<id>.nzb".
+        Assert.Equal(("1.nzb", "Alpha"), (grabbed.FileName, grabbed.Indexer));
+        var queued = Assert.Single((await client.GetFromJsonAsync<JsonElement>("/api/v1/download")).GetProperty("items").EnumerateArray());
+        Assert.Equal(("other", JsonValueKind.Null), (queued.GetProperty("category").GetString(), queued.GetProperty("mediaType").ValueKind));
         Assert.True(File.Exists(Path.Combine(grabbed.Folder, grabbed.FileName)));
 
         var history = await client.GetFromJsonAsync<JsonElement>("/api/v1/history");

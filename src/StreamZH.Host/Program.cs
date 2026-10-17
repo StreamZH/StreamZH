@@ -15,6 +15,7 @@ using StreamZH.Host.Settings;
 using StreamZH.Host.Status;
 using StreamZH.Indexers;
 using StreamZH.Library;
+using StreamZH.Library.Downloads;
 using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
 
@@ -94,6 +95,7 @@ builder.Services.AddReleaseSearch();
 builder.Services.AddOngoingStatus();
 builder.Services.AddPostProcessing();
 builder.Services.AddUsenet();
+builder.Services.AddDownloadEngine();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
@@ -125,6 +127,7 @@ app.MapSearchEndpoints();
 app.MapHistoryEndpoints();
 app.MapStatusEndpoints();
 app.MapUsenetEndpoints();
+app.MapDownloadEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

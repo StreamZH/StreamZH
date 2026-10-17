@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using Microsoft.AspNetCore.SignalR;
-using System.Text.Json;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
 using StreamZH.Core.Jobs;
+using StreamZH.Host.Api;
 using StreamZH.Library;
 using StreamZH.Library.Indexers;
 using StreamZH.Library.Search;
@@ -43,13 +43,13 @@ public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub) : 
                 items = e.Items.Select(i => new
                 {
                     id = i.Id,
-                    status = JsonNamingPolicy.CamelCase.ConvertName(i.Status.ToString()),
+                    status = DownloadEndpoints.Camel(i.Status.ToString()),
                     progress = i.Progress,
                     speedBps = i.SpeedBps,
-                    etaSeconds = i.EtaSeconds,
+                    etaSeconds = i.EtaSeconds is { } eta ? Math.Round(eta) : (double?)null,
                     stepProgress = i.StepProgress,
                     statusMessage = i.StatusMessage,
-                }),
+                }).ToList(),
             },
             ct))));
 

@@ -106,8 +106,10 @@ public static class SettingsEndpoints
 
         group.MapPut("/downloads", (UpdateDownloadSettings request, DownloadSettings downloads, ILogger<DownloadSettings> logger) =>
         {
-            var folder = downloads.SetNzbFolder(request.NzbFolder);
-            logger.LogInformation("NZB folder set to {Folder}", folder);
+            downloads.Update(request.Client, request.NzbFolder, request.IncompleteFolder, request.CompleteFolder, request.SpeedLimitKBps);
+            logger.LogInformation(
+                "Download settings saved: {Client}, incomplete {Incomplete}, complete {Complete}, NZB folder {NzbFolder}, limit {Limit} KB/s",
+                DownloadSettings.ClientValue(downloads.Client), downloads.IncompleteFolder, downloads.CompleteFolder, downloads.NzbFolder, downloads.SpeedLimitKBps);
             return Results.Ok(DownloadSettingsResource.From(downloads));
         });
 
@@ -127,17 +129,47 @@ public sealed record MetadataSettings(bool TmdbConfigured, string? TmdbTokenHint
 
 public sealed record UpdateMetadataSettings(string? TmdbToken, string? Language);
 
-/// <summary>Where grabbed NZB files are written; <see cref="Problem"/> is set when StreamZH cannot write there.</summary>
-public sealed record DownloadSettingsResource(string NzbFolder, string DefaultNzbFolder, bool IsDefault, string? Problem)
+/// <summary>
+/// Download settings. <see cref="Client"/> is "builtin" or "blackhole"; the folders come with their defaults and a
+/// problem text when StreamZH cannot write there. <see cref="SpeedLimitKBps"/> 0 = unlimited.
+/// </summary>
+public sealed record DownloadSettingsResource(
+    string NzbFolder,
+    string DefaultNzbFolder,
+    bool IsDefault,
+    string? Problem,
+    string Client,
+    string IncompleteFolder,
+    string DefaultIncompleteFolder,
+    string? IncompleteProblem,
+    string CompleteFolder,
+    string DefaultCompleteFolder,
+    string? CompleteProblem,
+    long SpeedLimitKBps)
 {
     public static DownloadSettingsResource From(DownloadSettings downloads)
     {
         var folder = downloads.NzbFolder;
-        return new DownloadSettingsResource(folder, downloads.DefaultNzbFolder, folder == downloads.DefaultNzbFolder, DownloadSettings.CheckWritable(folder));
+        var incomplete = downloads.IncompleteFolder;
+        var complete = downloads.CompleteFolder;
+        return new DownloadSettingsResource(
+            folder,
+            downloads.DefaultNzbFolder,
+            folder == downloads.DefaultNzbFolder,
+            DownloadSettings.CheckWritable(folder),
+            DownloadSettings.ClientValue(downloads.Client),
+            incomplete,
+            downloads.DefaultIncompleteFolder,
+            DownloadSettings.CheckWritable(incomplete),
+            complete,
+            downloads.DefaultCompleteFolder,
+            DownloadSettings.CheckWritable(complete),
+            downloads.SpeedLimitKBps);
     }
 }
 
-public sealed record UpdateDownloadSettings(string? NzbFolder);
+/// <summary>Null fields keep their value; an empty folder means the default one.</summary>
+public sealed record UpdateDownloadSettings(string? NzbFolder, string? Client = null, string? IncompleteFolder = null, string? CompleteFolder = null, long? SpeedLimitKBps = null);
 
 public sealed record TestMetadataRequest(string? TmdbToken);
 

@@ -176,6 +176,7 @@ public sealed class ReleaseSearchService(
     private async Task<(IReadOnlyList<ReleaseInfo> Releases, int IndexerCount, IReadOnlyList<IndexerSearchFailure> Failures)> QueryAsync(
         IndexerUse use, SearchCriteria criteria, CancellationToken cancellationToken)
     {
+        using var source = IndexerCallContext.Begin(use);
         var active = indexers.Active(use);
         if (active.Count == 0)
         {

@@ -211,6 +211,7 @@ public sealed class AutomaticSearchService(
 
     private async Task<bool> TryGrabAsync(ReleaseDecision decision, CancellationToken cancellationToken)
     {
+        using var source = IndexerCallContext.Begin(IndexerCallSource.Automatic);
         try
         {
             await grab.GrabAsync(decision, cancellationToken);

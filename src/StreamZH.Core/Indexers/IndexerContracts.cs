@@ -4,6 +4,16 @@
 
 namespace StreamZH.Core.Indexers;
 
+/// <summary>DI keys around <see cref="IIndexerClient"/>.</summary>
+public static class IndexerClientKeys
+{
+    /// <summary>
+    /// The protocol client (Newznab), registered as keyed <see cref="IIndexerClient"/>. The plain <see cref="IIndexerClient"/>
+    /// is the tracking decorator around it (indexer history and limits).
+    /// </summary>
+    public const string Inner = "indexer-client-inner";
+}
+
 /// <summary>Talks to one kind of indexer (Newznab). Stateless; the definition is passed in on every call.</summary>
 public interface IIndexerClient
 {

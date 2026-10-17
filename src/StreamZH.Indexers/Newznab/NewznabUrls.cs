@@ -58,6 +58,9 @@ public static partial class NewznabUrls
         }
 
         url.Append(parameters);
+
+        // The indexer's "Additional parameters" go on every API call (caps, search, RSS), never on NZB downloads.
+        url.Append(NewznabRequestBuilder.AdditionalParameters(indexer.AdditionalParameters));
         return new Uri(url.ToString(), UriKind.Absolute);
     }
 

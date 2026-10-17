@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="frontend/public/favicon.svg" width="64" height="64" alt="StreamZH">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/streamzh-logo-dark.svg">
+    <img src="docs/brand/streamzh-logo.svg" width="360" alt="StreamZH">
+  </picture>
 </p>
-
-<h1 align="center">StreamZH</h1>
 
 <p align="center">One app for your whole media pipeline.</p>
 

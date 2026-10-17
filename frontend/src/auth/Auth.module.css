@@ -31,28 +31,6 @@
   gap: 10px;
 }
 
-.tile {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-small);
-  background: var(--accent);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 13px;
-}
-
-.wordmark {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.3px;
-}
-
-.wordmark span {
-  color: var(--accent);
-}
-
 .title {
   font-family: var(--font-title);
   font-size: 34px;

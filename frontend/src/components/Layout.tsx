@@ -5,6 +5,7 @@ import { libraryApi, queryKeys } from '../api/library'
 import { authQueryKey, useAuth } from '../auth/auth'
 import { useLiveConnection } from '../api/useLiveConnection'
 import Icon, { type IconName } from './Icon'
+import Logo from './Logo'
 import styles from './Layout.module.css'
 
 interface NavItem {
@@ -50,10 +51,7 @@ export default function Layout() {
     <div className={styles.shell}>
       <nav className={styles.sidebar} aria-label="Main">
         <div className={styles.brand}>
-          <div className={styles.tile}>ZH</div>
-          <div className={styles.wordmark}>
-            Stream<span>ZH</span>
-          </div>
+          <Logo size={28} />
         </div>
 
         {sections.map((section, index) => (

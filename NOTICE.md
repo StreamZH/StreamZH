@@ -25,6 +25,7 @@ here with the source path, so every change can be traced back.
 | @microsoft/signalr | MIT |
 | Geist, Geist Mono | SIL Open Font License 1.1 |
 | Instrument Serif | SIL Open Font License 1.1 |
+| Outfit (logo wordmark, outlined to paths; font files only in `tools/brand/fonts`) | SIL Open Font License 1.1 |
 
 External tools called as separate processes (not linked, not shipped in source):
 par2cmdline (GPL-2.0-or-later), 7-Zip (LGPL-2.1 with unRAR restriction).

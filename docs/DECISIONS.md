@@ -4,6 +4,7 @@ Short log of decisions that shape the project. Newest first.
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-17 | Logo: same as CloudZH (monogram Z in front of H, Zurich red #C0202A, Outfit wordmark) with «Stream» in place of «Cloud» | StreamZH is part of the CloudZH family; one brand system, generator in `tools/brand` |
 | 2026-10-17 | Quality and language ids identical to Radarr | Profiles and history can be imported from Radarr/Sonarr later (0.8) |
 | 2026-10-17 | One quality profile model for all media types, with required language and "prefer dual language" | German scene releases (German.DL) are the main use case of the first user |
 | 2026-10-17 | Default profile "Deutsch 1080p" in the test phase | Matches the owner's library; public 1.0 will default to "HD-1080p" with original language |

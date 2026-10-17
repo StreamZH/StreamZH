@@ -1,0 +1,32 @@
+/* Proportions as the CloudZH logo (docs/brand/README.md): gap 0.418 x monogram,
+   wordmark height 0.616 x monogram, wordmark 5 % above the centre. */
+.logo {
+  --mark-size: 28px;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--mark-size) * 0.418);
+  color: var(--text);
+}
+
+.mark {
+  width: var(--mark-size);
+  height: var(--mark-size);
+  display: block;
+  flex: none;
+}
+
+.word {
+  height: calc(var(--mark-size) * 0.616);
+  width: auto;
+  display: block;
+  overflow: visible;
+  transform: translateY(-5%);
+}
+
+.ink {
+  fill: currentColor;
+}
+
+.red {
+  fill: var(--logo-red, #c0202a);
+}

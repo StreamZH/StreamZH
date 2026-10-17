@@ -202,7 +202,7 @@ public sealed class DownloadImportService(
                 Path.GetRelativePath(folder, file.FullName),
                 file.Length,
                 info.Quality.ToString(),
-                [.. info.Languages.Where(l => l != Language.Unknown).Select(l => l.Name)],
+                [.. info.Languages.Where(l => l.Id > 0).Select(l => l.Name)],
                 parsed?.SeasonNumber,
                 parsed?.EpisodeNumbers ?? [],
                 ids,

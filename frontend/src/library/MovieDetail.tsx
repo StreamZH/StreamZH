@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { libraryApi, queryKeys } from '../api/library'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDate, formatRuntime } from '../lib/format'
+import RenameDialog from '../mediaManagement/RenameDialog'
 import page from '../pages/Page.module.css'
+import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
@@ -16,6 +19,8 @@ export default function MovieDetail() {
   const id = Number(useParams().id)
   const movie = useQuery({ queryKey: queryKeys.movie(id), queryFn: () => libraryApi.movie(id) })
   const { monitor, refresh, remove, assignProfile } = useDetailActions('Movie', id)
+  const admin = useIsAdmin()
+  const [renaming, setRenaming] = useState(false)
 
   if (movie.isError) return <p className={ui.error}>{movie.error.message}</p>
   if (!movie.data) return <div className={page.page} aria-busy="true" />
@@ -64,6 +69,11 @@ export default function MovieDetail() {
                 disabled={assignProfile.isPending}
               />
             </label>
+            {admin && m.hasFile && (
+              <button className={ui.button} type="button" onClick={() => setRenaming(true)}>
+                Rename files
+              </button>
+            )}
             <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
@@ -102,6 +112,7 @@ export default function MovieDetail() {
       </section>
 
       <HistoryPanel movieId={m.id} />
+      {renaming && <RenameDialog type="Movie" id={m.id} title={m.year > 0 ? `${m.title} (${m.year})` : m.title} onClose={() => setRenaming(false)} />}
     </div>
   )
 }

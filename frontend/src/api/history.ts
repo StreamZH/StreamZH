@@ -4,7 +4,7 @@ import type { MediaType } from './library'
 export interface HistoryRecord {
   id: number
   date: string
-  eventType: 'Grabbed' | 'DownloadCompleted' | 'DownloadFailed'
+  eventType: 'Grabbed' | 'DownloadCompleted' | 'DownloadFailed' | 'Imported' | 'Upgraded' | 'ImportFailed' | 'Renamed'
   mediaType: MediaType | null
   movieId: number | null
   seriesId: number | null

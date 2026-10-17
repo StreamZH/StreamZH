@@ -8,15 +8,29 @@ import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
 import { formatBytes } from '../lib/format'
 import { joinParts, relativeTime } from '../status/format'
-import StatusIcon from '../status/icons'
+import StatusIcon, { type StatusIconName } from '../status/icons'
 import { useIsAdmin } from '../status/useOngoing'
 import { RemoveDialog } from './Dialogs'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
+import { useImportActions, useImportStates } from './importHooks'
+import { ImportLine } from './imports'
+import ManualImportDialog from './ManualImportDialog'
 import { categoryLabels } from './labels'
 import { Empty } from './QueueTab'
 import styles from './Activity.module.css'
 
 const pageSize = 25
+
+/** How each history event shows in the event list. */
+const eventLabels: Record<HistoryRecord['eventType'], { label: string; icon: StatusIconName; failed?: boolean; neutral?: boolean }> = {
+  Grabbed: { label: 'Grabbed', icon: 'download', neutral: true },
+  DownloadCompleted: { label: 'Downloaded', icon: 'check' },
+  DownloadFailed: { label: 'Download failed', icon: 'error', failed: true },
+  Imported: { label: 'Imported', icon: 'folder' },
+  Upgraded: { label: 'Upgraded', icon: 'up' },
+  ImportFailed: { label: 'Import failed', icon: 'error', failed: true },
+  Renamed: { label: 'Renamed', icon: 'retry', neutral: true },
+}
 
 /** Finished and failed downloads, and the grab history (what StreamZH sent to the downloader). */
 export default function HistoryTab() {
@@ -40,7 +54,7 @@ export default function HistoryTab() {
           Downloads
         </button>
         <button type="button" aria-pressed={view === 'grabs'} onClick={() => update({ view: 'grabs', page: undefined })}>
-          Grabs
+          Events
         </button>
       </div>
       {view === 'downloads' ? (
@@ -64,6 +78,12 @@ function DownloadHistory({ page, onPage }: { page: number; onPage: (page: number
   const media = useMediaLinks(records)
   const { toasts, push, dismiss } = useToasts()
   const [removing, setRemoving] = useState<DownloadItem | null>(null)
+  const imports = useImportStates(records.filter((r) => r.status === 'completed').map((r) => r.id))
+  const importActions = useImportActions(
+    (title, message) => push('error', title, message),
+    (title) => push('ok', title),
+  )
+  const [manual, setManual] = useState<DownloadItem | null>(null)
   const retry = useDownloadAction(downloadsApi.retry, (m) => push('error', 'Could not retry', m), () => push('ok', 'Queued again'))
   const remove = useDownloadAction(
     ({ id, deleteFiles }: { id: number; deleteFiles: boolean }) => downloadsApi.remove(id, deleteFiles),
@@ -127,12 +147,22 @@ function DownloadHistory({ page, onPage }: { page: number; onPage: (page: number
                 {failed ? (
                   <span className={styles.historyError}>{item.error ?? 'Failed'}</span>
                 ) : (
-                  item.outputPath && (
-                    <span className={styles.historyPath} title={item.outputPath}>
-                      <StatusIcon name="folder" size={13} />
-                      {item.outputPath}
-                    </span>
-                  )
+                  <>
+                    {item.outputPath && imports(item.id)?.state !== 'imported' && (
+                      <span className={styles.historyPath} title={item.outputPath}>
+                        <StatusIcon name="folder" size={13} />
+                        {item.outputPath}
+                      </span>
+                    )}
+                    <ImportLine
+                      item={item}
+                      state={imports(item.id)}
+                      admin={admin}
+                      busy={importActions.importNow.isPending}
+                      onImport={() => importActions.importNow.mutate(item.id)}
+                      onManual={() => setManual(item)}
+                    />
+                  </>
                 )}
               </div>
               {admin && (
@@ -154,6 +184,17 @@ function DownloadHistory({ page, onPage }: { page: number; onPage: (page: number
       <Pager page={page} total={history.data.totalRecords} size={history.data.pageSize} noun="downloads" onPage={onPage} />
       {removing && (
         <RemoveDialog item={removing} busy={remove.isPending} onClose={() => setRemoving(null)} onConfirm={(deleteFiles) => remove.mutate({ id: removing.id, deleteFiles })} />
+      )}
+      {manual && (
+        <ManualImportDialog
+          item={manual}
+          onClose={() => setManual(null)}
+          onQueued={(title) => {
+            setManual(null)
+            push('ok', 'Import queued', title)
+            void importActions.refresh()
+          }}
+        />
       )}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </>
@@ -177,45 +218,54 @@ function GrabHistory({ page, onPage }: { page: number; onPage: (page: number) =>
     return (
       <div className={styles.loading} role="status">
         <span className={styles.bigSpinner} aria-hidden="true" />
-        Loading the grab history…
+        Loading the history…
       </div>
     )
   }
   if (records.length === 0) {
     return (
-      <Empty icon="download" title="Nothing grabbed yet">
-        <p>Every release StreamZH grabs, automatically or from a search, is recorded here.</p>
+      <Empty icon="download" title="Nothing happened yet">
+        <p>Every grab, download, import and rename is recorded here.</p>
       </Empty>
     )
   }
 
   return (
     <>
-      <ul className={`${styles.historyList} ${history.isPlaceholderData ? styles.stale : ''}`} aria-label="Grab history">
+      <ul className={`${styles.historyList} ${history.isPlaceholderData ? styles.stale : ''}`} aria-label="Events">
         {records.map((record: HistoryRecord) => {
           const link = media(record)
+          const event = eventLabels[record.eventType] ?? eventLabels.Grabbed
+          const detail = record.data.importedPath ?? record.data.to ?? record.data.message ?? record.data.error ?? null
           return (
-            <li key={record.id} className={styles.historyItem}>
-              <span className={`${styles.historyIcon} ${styles.historyGrab}`} title="Grabbed">
-                <StatusIcon name="download" size={16} />
+            <li key={record.id} className={`${styles.historyItem} ${event.failed ? styles.historyFailed : ''}`}>
+              <span className={`${styles.historyIcon} ${event.neutral ? styles.historyGrab : ''}`} title={event.label}>
+                <StatusIcon name={event.icon} size={16} />
               </span>
               <div className={styles.historyMain}>
                 <span className={styles.dlTitle}>{record.sourceTitle}</span>
                 <span className={styles.meta}>
-                  <span className={styles.quality}>{record.quality}</span>
+                  <span className={styles.eventType}>{event.label}</span>
+                  {record.quality !== 'Unknown' && <span className={styles.quality}>{record.quality}</span>}
                   {link && (
                     <Link className={styles.mediaLink} to={link.to}>
                       {link.label}
                     </Link>
                   )}
-                  <span>{joinParts(formatBytes(record.size), record.indexer, `grabbed ${relativeTime(record.date)}`)}</span>
+                  <span>{joinParts(record.size > 0 ? formatBytes(record.size) : null, record.indexer, relativeTime(record.date))}</span>
                 </span>
+                {detail && (
+                  <span className={event.failed ? styles.historyError : styles.historyPath} title={detail}>
+                    {!event.failed && <StatusIcon name="folder" size={13} />}
+                    {detail}
+                  </span>
+                )}
               </div>
             </li>
           )
         })}
       </ul>
-      <Pager page={page} total={history.data.totalRecords} size={history.data.pageSize} noun="grabs" onPage={onPage} />
+      <Pager page={page} total={history.data.totalRecords} size={history.data.pageSize} noun="events" onPage={onPage} />
     </>
   )
 }

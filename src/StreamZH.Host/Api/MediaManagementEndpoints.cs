@@ -185,7 +185,7 @@ public sealed record BlocklistResource(
 {
     public static BlocklistResource From(BlocklistItem b) => new(
         b.Id, b.Date, b.MediaType?.ToString(), b.MovieId, b.SeriesId, b.EpisodeIds, b.SourceTitle, Core.Quality.Quality.FindById(b.QualityId).Name,
-        [.. b.LanguageIds.Select(Language.FindById).Where(l => l != Language.Unknown).Select(l => l.Name)], b.Indexer, b.Size, b.Message);
+        [.. b.LanguageIds.Select(Language.FindById).Where(l => l.Id > 0).Select(l => l.Name)], b.Indexer, b.Size, b.Message);
 }
 
 /// <summary>Example names for the settings page, built from sample items with the formats being edited.</summary>

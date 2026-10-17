@@ -12,6 +12,7 @@ import { useIsAdmin, useLiveProgress, useOngoing } from '../status/useOngoing'
 import DownloadCard, { type DownloadActions } from './DownloadCard'
 import { RemoveDialog, UploadDialog } from './Dialogs'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
+import { PendingImports } from './imports'
 import styles from './Activity.module.css'
 
 const lowSpace = 10 * 1024 ** 3
@@ -196,6 +197,7 @@ export default function QueueTab() {
     <>
       {!blackhole && header}
       {body}
+      {!blackhole && <PendingImports admin={admin} onToast={push} />}
       {removing && (
         <RemoveDialog
           item={removing}

@@ -14,7 +14,7 @@ public class TmdbClientTests
     public async Task Uses_bearer_token_and_parses_movie()
     {
         var handler = new StubHandler(_ => """
-            {"id":438631,"title":"Dune","original_title":"Dune","release_date":"2021-09-15","runtime":155,"status":"Released",
+            {"id":438631,"title":"Dune","original_title":"Dune","original_language":"en","release_date":"2021-09-15","runtime":155,"status":"Released",
              "imdb_id":"tt1160419","overview":"Paul Atreides...","genres":[{"id":878,"name":"Science Fiction"}],
              "poster_path":"/d5NXSklXo0qyIYkgV94XAgMIckC.jpg","backdrop_path":"/back.jpg"}
             """);
@@ -26,6 +26,10 @@ public class TmdbClientTests
         Assert.Equal(2021, movie.Year);
         Assert.Equal(155, movie.Runtime);
         Assert.Equal(["Science Fiction"], movie.Genres);
+        Assert.Equal("en", movie.OriginalLanguage);
+        Assert.Equal(StreamZH.Core.Quality.Language.English, StreamZH.Core.Quality.Language.FromIsoCode(movie.OriginalLanguage));
+        Assert.Equal(StreamZH.Core.Quality.Language.German, StreamZH.Core.Quality.Language.FromIsoCode("de"));
+        Assert.Equal(StreamZH.Core.Quality.Language.Unknown, StreamZH.Core.Quality.Language.FromIsoCode("xx"));
         Assert.Equal("Bearer", handler.Last!.Headers.Authorization!.Scheme);
         Assert.Contains("language=de-DE", handler.Last.RequestUri!.Query, StringComparison.Ordinal);
     }

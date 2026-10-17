@@ -96,6 +96,24 @@ public sealed class Language : IEquatable<Language>
 
     public static Language FindById(int id) => ById.TryGetValue(id, out var language) ? language : Unknown;
 
+    private static readonly Dictionary<string, Language> ByIso = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["en"] = English, ["fr"] = French, ["es"] = Spanish, ["de"] = German, ["it"] = Italian, ["da"] = Danish,
+        ["nl"] = Dutch, ["ja"] = Japanese, ["is"] = Icelandic, ["zh"] = Chinese, ["cn"] = Chinese, ["ru"] = Russian,
+        ["pl"] = Polish, ["vi"] = Vietnamese, ["sv"] = Swedish, ["no"] = Norwegian, ["nb"] = Norwegian, ["nn"] = Norwegian,
+        ["fi"] = Finnish, ["tr"] = Turkish, ["pt"] = Portuguese, ["el"] = Greek, ["ko"] = Korean, ["hu"] = Hungarian,
+        ["he"] = Hebrew, ["lt"] = Lithuanian, ["cs"] = Czech, ["hi"] = Hindi, ["ro"] = Romanian, ["th"] = Thai,
+        ["bg"] = Bulgarian, ["ar"] = Arabic, ["uk"] = Ukrainian, ["fa"] = Persian, ["bn"] = Bengali, ["sk"] = Slovak,
+        ["lv"] = Latvian, ["ca"] = Catalan, ["hr"] = Croatian, ["sr"] = Serbian, ["bs"] = Bosnian, ["et"] = Estonian,
+        ["ta"] = Tamil, ["id"] = Indonesian, ["te"] = Telugu, ["mk"] = Macedonian, ["sl"] = Slovenian, ["ml"] = Malayalam,
+        ["kn"] = Kannada, ["sq"] = Albanian, ["af"] = Afrikaans, ["mr"] = Marathi, ["tl"] = Tagalog, ["ur"] = Urdu,
+        ["rm"] = Romansh, ["mn"] = Mongolian, ["ka"] = Georgian,
+    };
+
+    /// <summary>Language from an ISO 639-1 code as TMDB delivers it ("en", "de"); Unknown if not mapped.</summary>
+    public static Language FromIsoCode(string? code) =>
+        code is not null && ByIso.TryGetValue(code.Trim(), out var language) ? language : Unknown;
+
     public bool Equals(Language? other) => other is not null && other.Id == Id;
 
     public override bool Equals(object? obj) => Equals(obj as Language);

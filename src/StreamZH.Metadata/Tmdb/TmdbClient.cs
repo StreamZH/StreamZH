@@ -71,7 +71,8 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
             m.Status ?? string.Empty,
             [.. (m.Genres ?? []).Select(g => g.Name).OfType<string>()],
             m.PosterPath,
-            m.BackdropPath);
+            m.BackdropPath,
+            m.OriginalLanguage);
     }
 
     public async Task<TmdbSeries> GetSeriesAsync(int tmdbId, CancellationToken cancellationToken = default)
@@ -90,7 +91,8 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
             [.. (t.Genres ?? []).Select(g => g.Name).OfType<string>()],
             t.PosterPath,
             t.BackdropPath,
-            [.. (t.Seasons ?? []).Select(s => s.SeasonNumber).Order()]);
+            [.. (t.Seasons ?? []).Select(s => s.SeasonNumber).Order()],
+            t.OriginalLanguage);
     }
 
     public async Task<IReadOnlyList<TmdbEpisode>> GetSeasonAsync(int tmdbId, int seasonNumber, CancellationToken cancellationToken = default)

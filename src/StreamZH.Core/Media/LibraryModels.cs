@@ -32,6 +32,9 @@ public sealed class Movie
     public string? BackdropPath { get; set; }
     public bool Monitored { get; set; } = true;
     public int QualityProfileId { get; set; }
+
+    /// <summary>Original language from TMDB (Radarr language id, 0 = unknown).</summary>
+    public int OriginalLanguageId { get; set; }
     public int RootFolderId { get; set; }
     public string FolderPath { get; set; } = string.Empty;
     public DateTime Added { get; set; }
@@ -57,6 +60,9 @@ public sealed class Series
     public string? BackdropPath { get; set; }
     public bool Monitored { get; set; } = true;
     public int QualityProfileId { get; set; }
+
+    /// <summary>Original language from TMDB (Radarr language id, 0 = unknown).</summary>
+    public int OriginalLanguageId { get; set; }
     public int RootFolderId { get; set; }
     public string FolderPath { get; set; } = string.Empty;
     public DateTime Added { get; set; }

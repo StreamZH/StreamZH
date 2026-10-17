@@ -35,7 +35,8 @@ public sealed record TmdbMovie(
     string Status,
     IReadOnlyList<string> Genres,
     string? PosterPath,
-    string? BackdropPath);
+    string? BackdropPath,
+    string? OriginalLanguage = null);
 
 public sealed record TmdbSeries(
     int TmdbId,
@@ -50,7 +51,8 @@ public sealed record TmdbSeries(
     IReadOnlyList<string> Genres,
     string? PosterPath,
     string? BackdropPath,
-    IReadOnlyList<int> SeasonNumbers);
+    IReadOnlyList<int> SeasonNumbers,
+    string? OriginalLanguage = null);
 
 public sealed record TmdbEpisode(int SeasonNumber, int EpisodeNumber, string Title, string? AirDate, string? Overview);
 
@@ -75,6 +77,7 @@ internal sealed class MovieDto
     public int? Runtime { get; set; }
     public string? Status { get; set; }
     public string? ImdbId { get; set; }
+    public string? OriginalLanguage { get; set; }
     public List<NamedDto>? Genres { get; set; }
     public string? PosterPath { get; set; }
     public string? BackdropPath { get; set; }
@@ -85,6 +88,7 @@ internal sealed class TvDto
     public int Id { get; set; }
     public string? Name { get; set; }
     public string? OriginalName { get; set; }
+    public string? OriginalLanguage { get; set; }
     public string? FirstAirDate { get; set; }
     public string? Overview { get; set; }
     public string? Status { get; set; }

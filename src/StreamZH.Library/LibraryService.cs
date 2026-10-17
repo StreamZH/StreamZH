@@ -245,6 +245,7 @@ public sealed class LibraryService(
         movie.Genres = d.Genres;
         movie.PosterPath = d.PosterPath;
         movie.BackdropPath = d.BackdropPath;
+        movie.OriginalLanguageId = StreamZH.Core.Quality.Language.FromIsoCode(d.OriginalLanguage).Id;
     }
 
     private static void Apply(Series item, TmdbSeries d)
@@ -261,5 +262,6 @@ public sealed class LibraryService(
         item.Genres = d.Genres;
         item.PosterPath = d.PosterPath;
         item.BackdropPath = d.BackdropPath;
+        item.OriginalLanguageId = StreamZH.Core.Quality.Language.FromIsoCode(d.OriginalLanguage).Id;
     }
 }

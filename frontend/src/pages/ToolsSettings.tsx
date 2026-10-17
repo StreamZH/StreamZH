@@ -1,14 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ApiError } from '../api/client'
 import { toolKeys, toolsApi, type ToolName, type ToolSettings, type ToolSource } from '../api/tools'
 import ui from '../components/ui.module.css'
 import { Pill } from '../indexers/Chips'
-import form from '../indexers/Form.module.css'
-import { Advanced, AdvancedHint } from '../lib/Advanced'
-import { advancedLabel, useAdvanced } from '../lib/advancedMode'
+import { useAdvanced } from '../lib/advancedMode'
+import { Row, SaveBar, Section, Toggle } from '../settings/SettingsKit'
 import { percent } from '../status/format'
-import page from './Page.module.css'
 import styles from './Settings.module.css'
 
 /** One tool as the page shows it. */
@@ -125,18 +123,32 @@ export function ToolsSection() {
   const fieldErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
   const manual = tools.filter((t) => !t.found && !t.installable)
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    save.mutate({ par2Path: par2.trim(), sevenZipPath: sevenZip.trim(), autoInstall: auto })
-  }
+  const fieldError = (field: string) => (save.error instanceof ApiError ? fieldErrors[field]?.[0] : undefined)
 
   return (
-    <form id="tools" className={page.panel} onSubmit={submit}>
-      <h2 className={page.panelTitle}>Tools</h2>
-      <p className={styles.text}>
-        Finished downloads are repaired with par2 and unpacked with 7-Zip.
-        {tools.some((t) => t.installable) && ' StreamZH installs both by itself when they are missing.'}
-      </p>
+    <Section
+      id="tools"
+      title="Tools"
+      description={`Finished downloads are repaired with par2 and unpacked with 7-Zip.${tools.some((t) => t.installable) ? ' StreamZH installs both by itself when they are missing.' : ''}`}
+      hiddenCount={advanced ? 0 : 3}
+      footer={
+        advanced && (
+          <SaveBar
+            dirty={dirty}
+            saving={save.isPending}
+            saved={save.isSuccess && !dirty}
+            error={save.error && Object.keys(fieldErrors).length === 0 ? save.error.message : null}
+            onSave={() => save.mutate({ par2Path: par2.trim(), sevenZipPath: sevenZip.trim(), autoInstall: auto })}
+            onReset={() => {
+              setPar2Path(null)
+              setSevenZipPath(null)
+              setAutoInstall(null)
+              save.reset()
+            }}
+          />
+        )
+      }
+    >
       <ul className={styles.toolList}>
         {tools.map((tool) => (
           <ToolRow
@@ -151,48 +163,39 @@ export function ToolsSection() {
         ))}
       </ul>
       {manual.length > 0 && <ManualHint settings={data} tools={manual} />}
-
-      <Advanced>
-        <div className={styles.toolAdvanced}>
-          <div className={styles.grid}>
-            <PathField
-              label="par2 path"
-              value={par2}
-              onChange={setPar2Path}
-              placeholder={data.os === 'Windows' ? 'C:\\Tools\\par2.exe' : '/usr/bin/par2'}
-              error={fieldErrors.par2Path?.[0]}
-            />
-            <PathField
-              label="7-Zip path"
-              value={sevenZip}
-              onChange={setSevenZipPath}
-              placeholder={data.os === 'Windows' ? 'C:\\Program Files\\7-Zip\\7z.exe' : '/usr/bin/7zz'}
-              error={fieldErrors.sevenZipPath?.[0]}
-            />
-          </div>
-          <div className={styles.field}>
-            <span className={advancedLabel}>Install automatically</span>
-            <label className={form.switch}>
-              <input type="checkbox" role="switch" checked={auto} onChange={(e) => setAutoInstall(e.target.checked)} />
-              <span className={form.track} aria-hidden="true" />
-              <span>{auto ? 'On' : 'Off'}</span>
-            </label>
-            <small>
-              Missing tools are installed at startup into <code className={ui.mono}>{data.installFolder ?? 'the data folder'}</code>, from their
-              official releases (checked by SHA-256).
-            </small>
-          </div>
-          <div className={styles.actions}>
-            <button className={styles.primary} type="submit" disabled={!dirty || save.isPending}>
-              {save.isPending ? 'Saving…' : 'Save'}
-            </button>
-            {save.isSuccess && !dirty && <span className={styles.ok}>Saved</span>}
-            {save.error && Object.keys(fieldErrors).length === 0 && <span className={styles.error}>{save.error.message}</span>}
-          </div>
-        </div>
-      </Advanced>
-      <AdvancedHint count={3} />
-    </form>
+      <Row label="par2 path" htmlFor="tool-par2" advanced help="Empty: use the copy StreamZH installs or finds." error={fieldError('par2Path')}>
+        <input
+          id="tool-par2"
+          className={`${ui.input} ${ui.mono}`}
+          value={par2}
+          placeholder={data.os === 'Windows' ? 'C:\\Tools\\par2.exe' : '/usr/bin/par2'}
+          onChange={(e) => setPar2Path(e.target.value)}
+          spellCheck={false}
+        />
+      </Row>
+      <Row label="7-Zip path" htmlFor="tool-7zip" advanced help="Empty: use the copy StreamZH installs or finds." error={fieldError('sevenZipPath')}>
+        <input
+          id="tool-7zip"
+          className={`${ui.input} ${ui.mono}`}
+          value={sevenZip}
+          placeholder={data.os === 'Windows' ? 'C:\\Program Files\\7-Zip\\7z.exe' : '/usr/bin/7zz'}
+          onChange={(e) => setSevenZipPath(e.target.value)}
+          spellCheck={false}
+        />
+      </Row>
+      <Row
+        label="Install automatically"
+        advanced
+        help={
+          <>
+            Missing tools are installed at startup into <code>{data.installFolder ?? 'the data folder'}</code>, from their official releases (checked by
+            SHA-256).
+          </>
+        }
+      >
+        <Toggle checked={auto} onChange={setAutoInstall} />
+      </Row>
+    </Section>
   )
 }
 
@@ -264,25 +267,6 @@ function where(tool: Tool, installing: boolean, autoInstall: boolean): ReactNode
     default:
       return <code>{tool.resolved}</code>
   }
-}
-
-interface PathFieldProps {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-  error: string | undefined
-}
-
-function PathField({ label, value, onChange, placeholder, error }: PathFieldProps) {
-  return (
-    <label className={styles.field}>
-      <span className={advancedLabel}>{label}</span>
-      <input className={ui.mono} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} spellCheck={false} />
-      <small>Empty: use the copy StreamZH installs or finds.</small>
-      {error && <small className={styles.error}>{error}</small>}
-    </label>
-  )
 }
 
 /** Only for systems where StreamZH cannot install a tool by itself (e.g. 32-bit or FreeBSD). */

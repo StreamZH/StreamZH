@@ -39,4 +39,35 @@ public static class ConfigKeys
     public const string IndexerRssSyncInterval = "IndexerRssSyncInterval";
     public const string IndexerMissingSearchInterval = "IndexerMissingSearchInterval";
     public const string IndexerSearchOnAdd = "IndexerSearchOnAdd";
+
+    // Downloads (0.6): SABnzbd-style folders, queue and post-processing switches, history, special; empty = default.
+    public const string DownloadNzbBackupFolder = "DownloadNzbBackupFolder";
+    public const string DownloadWatchFolder = "DownloadWatchFolder";
+    public const string DownloadWatchInterval = "DownloadWatchInterval";
+    public const string DownloadPauseOnStart = "DownloadPauseOnStart";
+    public const string DownloadPreCheck = "DownloadPreCheck";
+    public const string DownloadMaxActive = "DownloadMaxActive";
+    public const string DownloadPropagationDelay = "DownloadPropagationDelay";
+    public const string DownloadDuplicateAction = "DownloadDuplicateAction";
+    public const string DownloadAutoSort = "DownloadAutoSort";
+    public const string DownloadUnwantedExtensions = "DownloadUnwantedExtensions";
+    public const string DownloadUnwantedAction = "DownloadUnwantedAction";
+    public const string DownloadEncryptedAction = "DownloadEncryptedAction";
+    public const string DownloadAllPar2 = "DownloadAllPar2";
+    public const string DownloadOnlyVerified = "DownloadOnlyVerified";
+    public const string DownloadRecursiveUnpack = "DownloadRecursiveUnpack";
+    public const string DownloadIgnoreSamples = "DownloadIgnoreSamples";
+    public const string DownloadCleanupList = "DownloadCleanupList";
+    public const string DownloadDeobfuscate = "DownloadDeobfuscate";
+    public const string DownloadTemporaryFolderName = "DownloadTemporaryFolderName";
+    public const string DownloadPar2Arguments = "DownloadPar2Arguments";
+    public const string DownloadSevenZipArguments = "DownloadSevenZipArguments";
+    public const string DownloadToolPriority = "DownloadToolPriority";
+    public const string DownloadPostProcessWorkers = "DownloadPostProcessWorkers";
+    public const string DownloadMaxLineSpeed = "DownloadMaxLineSpeed";
+    public const string DownloadHistoryKeepDays = "DownloadHistoryKeepDays";
+    public const string DownloadHistoryKeepItems = "DownloadHistoryKeepItems";
+    public const string DownloadHistoryKeepFailed = "DownloadHistoryKeepFailed";
+    public const string DownloadPausedCategories = "DownloadPausedCategories";
+    public const string DownloadPausedBySchedule = "DownloadPausedBySchedule";
 }

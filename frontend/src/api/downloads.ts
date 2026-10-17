@@ -113,8 +113,8 @@ export const downloadKeys = {
   settings: ['download-settings'] as const,
 }
 
-/** multipart/form-data upload; the shared request helper only sends JSON. */
-async function upload(file: File, title?: string, category?: DownloadCategory): Promise<DownloadItem> {
+/** multipart/form-data upload; the shared request helper only sends JSON. `category`: movie, series, other or a category name. */
+async function upload(file: File, title?: string, category?: string): Promise<DownloadItem> {
   const form = new FormData()
   form.set('file', file)
   if (title) form.set('title', title)

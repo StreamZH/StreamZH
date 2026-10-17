@@ -21,6 +21,8 @@ public static class PostProcessingServiceCollectionExtensions
     public static IServiceCollection AddPostProcessing(this IServiceCollection services)
     {
         services.TryAddSingleton(sp => ToolEnvironment.Current with { InstalledDirectory = sp.GetService<AppPaths>()?.ToolsDirectory });
+        // The post-processing switches live in the download settings; without them (tests) the defaults apply.
+        services.TryAddSingleton<IPostProcessSwitches>(sp => sp.GetService<Search.DownloadSettings>() ?? (IPostProcessSwitches)FixedPostProcessSwitches.Default);
         services.TryAddSingleton<IToolProcessRunner, ToolProcessRunner>();
         services.TryAddSingleton<IPostProcessToolSettings, ConfigPostProcessToolSettings>();
         services.TryAddSingleton<PostProcessTools>();

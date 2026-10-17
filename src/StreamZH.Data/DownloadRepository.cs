@@ -34,7 +34,19 @@ public sealed record DownloadRecord
     public DateTime Added { get; init; }
     public DateTime? Completed { get; init; }
     public int SortOrder { get; init; }
+
+    /// <summary>Download category by name; null = the default one of <see cref="Category"/>.</summary>
+    public string? CategoryName { get; init; }
+
+    /// <summary>Fingerprint of the NZB (its article ids) for duplicate detection.</summary>
+    public string? NzbHash { get; init; }
+
+    /// <summary>Tagged by duplicate detection.</summary>
+    public bool Duplicate { get; init; }
 }
+
+/// <summary>What duplicate detection and the history cleanup need of a download.</summary>
+public sealed record DownloadSummary(int Id, string Title, string? NzbHash, DownloadStatus Status, DateTime Added, DateTime? Completed);
 
 /// <summary>
 /// One file of a download's NZB. <see cref="Done"/> and <see cref="Missing"/> hold one bit per segment (NZB order);
@@ -58,9 +70,13 @@ public sealed record DownloadFileRecord
 
 public sealed class DownloadRepository(Database database)
 {
+    /// <summary>The database this repository uses (for helpers that need another repository on the same database).</summary>
+    public Database Database => database;
+
     private const string Columns = """
         Id, Title, Category, Status, Priority, TotalBytes, DownloadedBytes, MissingArticles, Error, StatusMessage, Indexer,
-        MediaType, MovieId, SeriesId, EpisodeIds, Password, NzbPath, WorkFolder, OutputPath, Added, Completed, SortOrder
+        MediaType, MovieId, SeriesId, EpisodeIds, Password, NzbPath, WorkFolder, OutputPath, Added, Completed, SortOrder,
+        CategoryName, NzbHash, Duplicate
         """;
 
     private const string FileColumns = """
@@ -77,9 +93,11 @@ public sealed class DownloadRepository(Database database)
         var id = connection.ExecuteScalar<int>(
             """
             INSERT INTO Downloads (Title, Category, Status, Priority, TotalBytes, DownloadedBytes, MissingArticles, Error, StatusMessage, Indexer,
-                MediaType, MovieId, SeriesId, EpisodeIds, Password, NzbPath, WorkFolder, OutputPath, Added, Completed, SortOrder)
+                MediaType, MovieId, SeriesId, EpisodeIds, Password, NzbPath, WorkFolder, OutputPath, Added, Completed, SortOrder,
+                CategoryName, NzbHash, Duplicate)
             VALUES (@Title, @Category, @Status, @Priority, @TotalBytes, @DownloadedBytes, @MissingArticles, @Error, @StatusMessage, @Indexer,
-                    @MediaType, @MovieId, @SeriesId, @EpisodeIds, @Password, @NzbPath, @WorkFolder, @OutputPath, @Added, @Completed, @SortOrder);
+                    @MediaType, @MovieId, @SeriesId, @EpisodeIds, @Password, @NzbPath, @WorkFolder, @OutputPath, @Added, @Completed, @SortOrder,
+                    @CategoryName, @NzbHash, @Duplicate);
             SELECT last_insert_rowid();
             """,
             Parameters(stored),
@@ -114,7 +132,8 @@ public sealed class DownloadRepository(Database database)
             """
             UPDATE Downloads SET Title = @Title, Category = @Category, Status = @Status, Priority = @Priority, TotalBytes = @TotalBytes,
                 DownloadedBytes = @DownloadedBytes, MissingArticles = @MissingArticles, Error = @Error, StatusMessage = @StatusMessage,
-                Password = @Password, NzbPath = @NzbPath, WorkFolder = @WorkFolder, OutputPath = @OutputPath, Completed = @Completed, SortOrder = @SortOrder
+                Password = @Password, NzbPath = @NzbPath, WorkFolder = @WorkFolder, OutputPath = @OutputPath, Completed = @Completed, SortOrder = @SortOrder,
+                CategoryName = @CategoryName, Duplicate = @Duplicate
             WHERE Id = @Id
             """,
             Parameters(download));
@@ -173,6 +192,21 @@ public sealed class DownloadRepository(Database database)
         return ([.. rows.Select(r => r.ToRecord())], total);
     }
 
+    /// <summary>Every download (queue and history), newest first, without the details.</summary>
+    public IReadOnlyList<DownloadSummary> Summaries()
+    {
+        using var connection = database.Open();
+        return [.. connection.Query<(long Id, string Title, string? NzbHash, long Status, DateTime Added, DateTime? Completed)>(
+                "SELECT Id, Title, NzbHash, Status, Added, Completed FROM Downloads ORDER BY IFNULL(Completed, Added) DESC, Id DESC")
+            .Select(r => new DownloadSummary(
+                (int)r.Id,
+                r.Title,
+                r.NzbHash,
+                (DownloadStatus)r.Status,
+                DateTime.SpecifyKind(r.Added, DateTimeKind.Utc),
+                r.Completed is { } c ? DateTime.SpecifyKind(c, DateTimeKind.Utc) : null))];
+    }
+
     public IReadOnlyList<DownloadFileRecord> Files(int downloadId)
     {
         using var connection = database.Open();
@@ -223,6 +257,9 @@ public sealed class DownloadRepository(Database database)
         d.Added,
         d.Completed,
         d.SortOrder,
+        d.CategoryName,
+        d.NzbHash,
+        d.Duplicate,
     };
 
     private sealed class DownloadRow
@@ -249,6 +286,9 @@ public sealed class DownloadRepository(Database database)
         public DateTime Added { get; init; }
         public DateTime? Completed { get; init; }
         public long SortOrder { get; init; }
+        public string? CategoryName { get; init; }
+        public string? NzbHash { get; init; }
+        public bool Duplicate { get; init; }
 
         public DownloadRecord ToRecord() => new()
         {
@@ -276,6 +316,9 @@ public sealed class DownloadRepository(Database database)
             Added = DateTime.SpecifyKind(Added, DateTimeKind.Utc),
             Completed = Completed is { } c ? DateTime.SpecifyKind(c, DateTimeKind.Utc) : null,
             SortOrder = (int)SortOrder,
+            CategoryName = CategoryName,
+            NzbHash = NzbHash,
+            Duplicate = Duplicate,
         };
     }
 

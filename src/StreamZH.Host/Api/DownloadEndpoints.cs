@@ -41,12 +41,16 @@ public static class DownloadEndpoints
             return new DownloadHistoryPage(p, size, total, [.. items.Select(i => DownloadItemResource.From(i))]);
         });
 
+        // For the category pickers (Add NZB, Search page): name, whether it is a default one, and its kind.
+        api.MapGet("/categories", (DownloadCategoryService categories) =>
+            categories.All().Select(c => new DownloadCategoryChoice(c.Name, c.IsDefault, Camel(DownloadCategoryService.KindOf(c.Name).ToString()))).ToList());
+
         api.MapGet("/{id:int}", (int id, DownloadEngine engine) =>
             engine.Find(id) is { } item && engine.Files(id) is { } files
                 ? Results.Ok(DownloadItemResource.From(item, files))
                 : NotFound(id));
 
-        api.MapPost("/", async (HttpRequest http, DownloadEngine engine, CancellationToken ct) =>
+        api.MapPost("/", async (HttpRequest http, DownloadEngine engine, DownloadCategoryService categories, CancellationToken ct) =>
         {
             if (!http.HasFormContentType)
             {
@@ -75,14 +79,21 @@ public static class DownloadEndpoints
             }
 
             var category = DownloadCategory.Other;
+            string? categoryName = null;
             if (form.TryGetValue("category", out var categoryValue) && !string.IsNullOrWhiteSpace(categoryValue))
             {
-                if (ParseCategory(categoryValue.ToString()) is not { } parsed)
+                if (ParseCategory(categoryValue.ToString()) is { } parsed)
                 {
-                    return Invalid("category", "Use movie, series or other.");
+                    category = parsed;
                 }
-
-                category = parsed;
+                else if (categories.Find(categoryValue.ToString()) is { } named)
+                {
+                    categoryName = named.Name;
+                }
+                else
+                {
+                    return Invalid("category", "Use movie, series, other or the name of a download category.");
+                }
             }
 
             var rawTitle = form.TryGetValue("title", out var titleValue) && !string.IsNullOrWhiteSpace(titleValue)
@@ -98,7 +109,7 @@ public static class DownloadEndpoints
                 content = buffer.ToArray();
             }
 
-            var item = await engine.AddAsync(new DownloadRequest(content, title, category, MediaLink.None, Password: password), ct);
+            var item = await engine.AddAsync(new DownloadRequest(content, title, category, MediaLink.None, Password: password, CategoryName: categoryName), ct);
             return Results.Created($"/api/v1/download/{item.Id}", DownloadItemResource.From(item));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
@@ -111,7 +122,7 @@ public static class DownloadEndpoints
         api.MapPost("/{id:int}/retry", async (int id, DownloadEngine engine) => Result(id, await engine.RetryAsync(id), "Only failed downloads can be retried."))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        api.MapPut("/{id:int}", async (int id, UpdateDownloadRequest request, DownloadEngine engine) =>
+        api.MapPut("/{id:int}", async (int id, UpdateDownloadRequest request, DownloadEngine engine, DownloadCategoryService categories) =>
         {
             var errors = new Dictionary<string, string[]>();
             if (request.Priority is < DownloadEngine.MinPriority or > DownloadEngine.MaxPriority)
@@ -120,9 +131,10 @@ public static class DownloadEndpoints
             }
 
             var category = ParseCategory(request.Category);
-            if (request.Category is not null && category is null)
+            var categoryName = category is null && request.Category is not null ? categories.Find(request.Category)?.Name : null;
+            if (request.Category is not null && category is null && categoryName is null)
             {
-                errors["category"] = ["Use movie, series or other."];
+                errors["category"] = ["Use movie, series, other or the name of a download category."];
             }
 
             if (request.Position is < 0)
@@ -135,7 +147,7 @@ public static class DownloadEndpoints
                 return Results.ValidationProblem(errors);
             }
 
-            var item = await engine.UpdateAsync(id, request.Priority, category, request.Position);
+            var item = await engine.UpdateAsync(id, request.Priority, category, request.Position, categoryName, request.Password);
             return item is null ? NotFound(id) : Results.Ok(DownloadItemResource.From(item));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
@@ -197,7 +209,11 @@ public sealed record DownloadFileResource(string Name, long Size, long Downloade
 /// <param name="Priority">-1 low, 0 normal, 1 high, 2 force. Null keeps it.</param>
 /// <param name="Category">movie, series or other. Null keeps it.</param>
 /// <param name="Position">New place in the queue (0 = top; the order applies within a priority). Null keeps it.</param>
-public sealed record UpdateDownloadRequest(int? Priority, string? Category, int? Position);
+/// <param name="Password">Archive password ("" removes it), e.g. for a download paused because it is password protected. Null keeps it.</param>
+public sealed record UpdateDownloadRequest(int? Priority, string? Category, int? Position, string? Password = null);
+
+/// <summary>A download category for pickers. <see cref="Kind"/>: movie, series or other.</summary>
+public sealed record DownloadCategoryChoice(string Name, bool IsDefault, string Kind);
 
 /// <summary>A download; status, category and file kinds are camelCase strings, mediaType like elsewhere ("Movie", "Series"). <see cref="Files"/> only in the detail response.</summary>
 public sealed record DownloadItemResource(
@@ -223,7 +239,9 @@ public sealed record DownloadItemResource(
     string? OutputPath,
     DateTimeOffset Added,
     DateTimeOffset? Completed,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<DownloadFileResource>? Files)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<DownloadFileResource>? Files,
+    string CategoryName,
+    bool Duplicate)
 {
     public static DownloadItemResource From(DownloadItem item, IReadOnlyList<DownloadFileInfo>? files = null) => new(
         item.Id,
@@ -248,5 +266,7 @@ public sealed record DownloadItemResource(
         item.OutputPath,
         item.Added,
         item.Completed,
-        files?.Select(f => new DownloadFileResource(f.Name, f.Size, f.Downloaded, DownloadEndpoints.Camel(f.Kind.ToString()), f.MissingArticles, f.Wanted)).ToList());
+        files?.Select(f => new DownloadFileResource(f.Name, f.Size, f.Downloaded, DownloadEndpoints.Camel(f.Kind.ToString()), f.MissingArticles, f.Wanted)).ToList(),
+        item.CategoryName ?? DownloadCategoryService.DefaultName(item.Category),
+        item.Duplicate);
 }

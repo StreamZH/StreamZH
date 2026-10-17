@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useCallback, useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { downloadSettingsApi, downloadSettingsKeys } from '../api/downloadSettings'
 import { historyKeys } from '../api/history'
 import { indexerActivityKeys } from '../api/indexerActivity'
 import { indexerKeys, indexersApi } from '../api/indexers'
@@ -238,12 +239,14 @@ function Results({
   const [limit, setLimit] = useState(pageStep)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const [grabbed, setGrabbed] = useState<Record<string, string>>({})
+  const [category, setCategory] = useState('other')
+  const categories = useQuery({ queryKey: downloadSettingsKeys.choices, queryFn: downloadSettingsApi.choices })
 
   const dismiss = useCallback((id: number) => setToasts((all) => all.filter((t) => t.id !== id)), [])
   const notify = (toast: Omit<ToastMessage, 'id'>) => setToasts((all) => [...all.slice(-3), { ...toast, id: Date.now() + Math.random() }])
 
   const grab = useMutation({
-    mutationFn: (release: FreeRelease) => searchApi.grab(release.indexerId, release.guid),
+    mutationFn: (release: FreeRelease) => searchApi.grab(release.indexerId, release.guid, category),
     onSuccess: (result, release) => {
       setGrabbed((all) => ({ ...all, [releaseKey(release)]: result.fileName }))
       notify({ tone: 'ok', title: `Grabbed from ${result.indexer}`, detail: result.fileName })
@@ -360,6 +363,21 @@ function Results({
             <option value="indexer:asc">Indexer</option>
             <option value="title:asc">Title</option>
           </select>
+          {categories.data && (
+            <select
+              className={`${ui.select} ${styles.sortSelect}`}
+              aria-label="Download category for grabs"
+              title="Download category for grabs"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {categories.data.map((c) => (
+                <option key={c.name} value={c.name}>
+                  Grab as {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

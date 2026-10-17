@@ -57,16 +57,20 @@ public sealed class Par2Repairer(IToolProcessRunner runner)
 {
     /// <param name="mainPar2">The .par2 index file (or any file of the set when the index is missing).</param>
     /// <param name="extraPar2">The other .par2 files of the set; passed explicitly so obfuscated names are found too.</param>
+    /// <param name="options">Extra par2 options from the settings (e.g. "-t4"), already checked.</param>
     public async Task<ToolRunResult> RepairAsync(
         string par2Executable,
         string folder,
         string mainPar2,
         IEnumerable<string> extraPar2,
+        IReadOnlyList<string> options,
         IProgress<double> progress,
         CancellationToken cancellationToken)
     {
         var parser = new Par2RepairProgress();
-        var arguments = new List<string> { "r", mainPar2 };
+        var arguments = new List<string> { "r" };
+        arguments.AddRange(options);
+        arguments.Add(mainPar2);
         arguments.AddRange(extraPar2.Where(p => p != mainPar2));
 
         var result = await runner.RunAsync(par2Executable, arguments, folder, segment =>
@@ -113,16 +117,18 @@ public sealed record ExtractResult(bool Success, ExtractFailure Failure, string?
 public sealed class SevenZipExtractor(IToolProcessRunner runner)
 {
     /// <param name="password">Null: archives must not be encrypted (7-Zip gets "-" so it never asks).</param>
+    /// <param name="options">Extra 7-Zip switches from the settings (e.g. "-mmt4"), already checked.</param>
     public async Task<ExtractResult> ExtractAsync(
         string sevenZipExecutable,
         string firstVolume,
         string targetFolder,
         string? password,
+        IReadOnlyList<string> options,
         IProgress<double> progress,
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(targetFolder);
-        string[] arguments =
+        List<string> arguments =
         [
             "x",
             "-y",
@@ -130,6 +136,8 @@ public sealed class SevenZipExtractor(IToolProcessRunner runner)
             "-bb0",
             "-p" + (string.IsNullOrEmpty(password) ? "-" : password),
             "-o" + targetFolder,
+            .. options,
+            "--",
             firstVolume,
         ];
 

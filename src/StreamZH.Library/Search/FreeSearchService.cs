@@ -101,10 +101,11 @@ public sealed class FreeSearchService(
     }
 
     /// <summary>Grabs a release from the latest free search results (see <see cref="GrabService.GrabAsync(int, string, CancellationToken)"/>).</summary>
-    public async Task<GrabResult> GrabAsync(int indexerId, string guid, CancellationToken cancellationToken = default)
+    /// <param name="categoryName">Download category for the built-in engine; null = "other".</param>
+    public async Task<GrabResult> GrabAsync(int indexerId, string guid, CancellationToken cancellationToken = default, string? categoryName = null)
     {
         using var source = IndexerCallContext.Begin(IndexerCallSource.Search);
-        return await grab.GrabAsync(indexerId, guid, cancellationToken);
+        return await grab.GrabAsync(indexerId, guid, categoryName, cancellationToken);
     }
 
     /// <summary>TV categories or a TV search read the name as an episode first, everything else as a movie first.</summary>

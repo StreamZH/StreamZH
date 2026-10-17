@@ -45,7 +45,8 @@ export const searchApi = {
     if (params.indexerIds.length > 0) query.set('indexerIds', params.indexerIds.join(','))
     return request<FreeSearch>('GET', `/search?${query}`)
   },
-  grab: (indexerId: number, guid: string) => request<GrabResult>('POST', '/search/grab', { indexerId, guid }),
+  /** `category`: the download category for the built-in engine (default: other). */
+  grab: (indexerId: number, guid: string, category?: string) => request<GrabResult>('POST', '/search/grab', { indexerId, guid, category }),
 }
 
 export interface CategoryGroup {

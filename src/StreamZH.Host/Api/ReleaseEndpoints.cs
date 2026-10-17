@@ -156,7 +156,8 @@ public static class ReleaseEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 }
 
-public sealed record GrabRequest(int IndexerId, string? Guid);
+/// <param name="Category">Search page only: the download category (built-in engine); null = "other".</param>
+public sealed record GrabRequest(int IndexerId, string? Guid, string? Category = null);
 
 public sealed record GrabResource(string Title, string Indexer, string FileName, string Folder);
 

@@ -14,6 +14,7 @@ using StreamZH.Core.Events;
 using StreamZH.Data;
 using StreamZH.Library.Downloads;
 using StreamZH.Library.Search;
+using StreamZH.Usenet.Pool;
 using StreamZH.Usenet.Yenc;
 
 namespace StreamZH.Tests.Library.Downloads;
@@ -22,9 +23,18 @@ namespace StreamZH.Tests.Library.Downloads;
 /// Usenet in memory: yEnc encoded articles by message id, decoded on fetch like the real source does.
 /// Articles can be missing, slow, blocked behind a gate, or the "server" can be down for a number of calls.
 /// </summary>
-public sealed class FakeArticleSource : IArticleSource
+public sealed class FakeArticleSource : IArticleSource, IArticleChecker
 {
     public int ServerFailures;
+
+    /// <summary>Message ids asked for with STAT (pre-check).</summary>
+    public ConcurrentQueue<string> Checked { get; } = new();
+
+    public Task<bool> ExistsAsync(string messageId, DateTimeOffset posted, CancellationToken cancellationToken)
+    {
+        Checked.Enqueue(messageId);
+        return Task.FromResult(!Missing.ContainsKey(messageId) && Articles.ContainsKey(messageId));
+    }
 
     public int MaxConnections { get; set; } = 4;
     public ConcurrentDictionary<string, byte[]> Articles { get; } = new();
@@ -212,6 +222,7 @@ public sealed class DownloadTestBed : IDisposable
         Database.Migrate();
         Config = new ConfigRepository(Database);
         Settings = new DownloadSettings(Config, Paths);
+        Categories = new DownloadCategoryService(new DownloadCategoryRepository(Database), Settings, NullLogger<DownloadCategoryService>.Instance);
         Repository = new DownloadRepository(Database);
         History = new HistoryRepository(Database);
         Events.Subscribe<DownloadChanged>((e, _) =>
@@ -231,6 +242,7 @@ public sealed class DownloadTestBed : IDisposable
     public Database Database { get; }
     public ConfigRepository Config { get; }
     public DownloadSettings Settings { get; }
+    public DownloadCategoryService Categories { get; }
     public DownloadRepository Repository { get; }
     public HistoryRepository History { get; }
     public InProcessEventBus Events { get; } = new();
@@ -244,7 +256,7 @@ public sealed class DownloadTestBed : IDisposable
     public DownloadEngine CreateEngine()
     {
         var engine = new DownloadEngine(
-            Repository, History, Settings, Config, Articles, PostProcessor, Events, FreeSpace, Options, NullLogger<DownloadEngine>.Instance);
+            Repository, History, Settings, Config, Articles, PostProcessor, Events, FreeSpace, Options, NullLogger<DownloadEngine>.Instance, Categories);
         _engines.Add(engine);
         return engine;
     }
@@ -259,8 +271,8 @@ public sealed class DownloadTestBed : IDisposable
     public TestRelease Release(string title, params (string Name, int Size, int SegmentSize)[] files) =>
         TestReleases.Build(Articles, title, files);
 
-    public static DownloadRequest Request(TestRelease release, DownloadCategory category = DownloadCategory.Movie, int priority = 0) =>
-        new(release.Nzb, release.Title, category, MediaLink.None, priority, "Alpha");
+    public static DownloadRequest Request(TestRelease release, DownloadCategory category = DownloadCategory.Movie, int? priority = 0, string? categoryName = null) =>
+        new(release.Nzb, release.Title, category, MediaLink.None, priority, "Alpha", CategoryName: categoryName);
 
     public static async Task<DownloadItem> WaitForAsync(DownloadEngine engine, int id, DownloadStatus status, int timeoutMs = 20000)
     {

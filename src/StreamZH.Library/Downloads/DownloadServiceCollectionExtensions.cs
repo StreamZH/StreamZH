@@ -5,6 +5,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Core.Downloads;
+using StreamZH.Core.Jobs;
 using StreamZH.Data;
 using StreamZH.Library.Search;
 
@@ -24,6 +25,11 @@ public static class DownloadServiceCollectionExtensions
         services.TryAddSingleton<DownloadSettings>();
         services.TryAddSingleton<HistoryRepository>();
         services.TryAddSingleton<DownloadRepository>();
+        services.TryAddSingleton<DownloadCategoryRepository>();
+        services.TryAddSingleton<DownloadScheduleRepository>();
+        services.TryAddSingleton<DownloadCategoryService>();
+        services.TryAddSingleton<DownloadScheduleService>();
+        services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<DownloadEngineOptions>();
         services.TryAddSingleton<IFreeSpaceProvider, DriveFreeSpaceProvider>();
         services.TryAddSingleton<IArticleSource, UnconfiguredArticleSource>();
@@ -36,6 +42,13 @@ public static class DownloadServiceCollectionExtensions
         services.AddSingleton<BuiltInDownloadClient>();
         services.AddSingleton<BlackholeDownloadClient>();
         services.AddSingleton<DownloadClientProvider>();
+
+        // Settings → Downloads: watched folder, scheduler (minute by minute) and the history cleanup (System → Tasks).
+        services.AddSingleton<WatchedFolderService>();
+        services.AddHostedService(sp => sp.GetRequiredService<WatchedFolderService>());
+        services.AddSingleton<DownloadScheduler>();
+        services.AddHostedService(sp => sp.GetRequiredService<DownloadScheduler>());
+        services.AddSingleton<IScheduledTask, DownloadHistoryCleanupTask>();
         return services;
     }
 }

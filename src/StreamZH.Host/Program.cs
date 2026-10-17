@@ -121,6 +121,7 @@ app.MapAuthEndpoints();
 app.MapSystemEndpoints();
 app.MapSettingsEndpoints();
 app.MapToolSettingsEndpoints();
+app.MapDownloadSettingsEndpoints();
 app.MapSystemTaskEndpoints();
 app.MapLibraryEndpoints();
 app.MapProfileEndpoints();

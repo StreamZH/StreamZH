@@ -1,5 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { downloadsApi, type DownloadCategory, type DownloadItem } from '../api/downloads'
+import { downloadSettingsApi, downloadSettingsKeys } from '../api/downloadSettings'
+import { downloadsApi, type DownloadItem } from '../api/downloads'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import { ConfirmRemove } from './DownloadCard'
@@ -37,7 +39,8 @@ export function RemoveDialog({
 export function UploadDialog({ onClose, onUploaded }: { onClose: () => void; onUploaded: (title: string) => void }) {
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState<DownloadCategory>('other')
+  const [category, setCategory] = useState('other')
+  const categories = useQuery({ queryKey: downloadSettingsKeys.choices, queryFn: downloadSettingsApi.choices })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -80,10 +83,12 @@ export function UploadDialog({ onClose, onUploaded }: { onClose: () => void; onU
         </label>
         <label className={ui.field}>
           Category
-          <select className={ui.select} value={category} onChange={(e) => setCategory(e.target.value as DownloadCategory)}>
-            <option value="movie">Movie</option>
-            <option value="series">Series</option>
-            <option value="other">Other</option>
+          <select className={ui.select} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {(categories.data ?? [{ name: 'movies' }, { name: 'series' }, { name: 'other' }]).map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </label>
         {error && (

@@ -51,7 +51,7 @@ public sealed record UsenetPoolStatus(IReadOnlyList<UsenetServerStatus> Servers,
 /// </list>
 /// Thread-safe. <see cref="Configure"/> swaps the server list at any time; fetches already running finish on the old pools.
 /// </summary>
-public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
+public sealed class UsenetArticleSource : IArticleSource, IArticleChecker, IAsyncDisposable
 {
     private readonly TimeProvider _time;
     private readonly ILogger<UsenetArticleSource> _logger;
@@ -195,6 +195,56 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
             ? failures[0].Message
             : string.Join(" ", failures.Select(f => $"{f.Server}: {f.Message}"));
         throw new UsenetServerException(message, isAuthError: failures.Count > 0 && failures.All(f => f.IsAuth));
+    }
+
+    /// <summary>
+    /// STAT on the servers by priority (like <see cref="FetchAsync"/>, but nothing is downloaded): true as soon as one has
+    /// the article, false when every server was asked (or is skipped by retention) and none had it.
+    /// </summary>
+    /// <exception cref="UsenetServerException">No server could be asked.</exception>
+    public async Task<bool> ExistsAsync(string messageId, DateTimeOffset posted, CancellationToken cancellationToken)
+    {
+        var id = NntpConnection.NormalizeMessageId(messageId);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var pools = Volatile.Read(ref _pools);
+        if (pools.Length == 0)
+        {
+            throw new UsenetServerException("No Usenet server is enabled. Add one under Settings → Usenet servers.");
+        }
+
+        var askedAndMissing = false;
+        var failures = new List<string>();
+        foreach (var pool in pools)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var server = pool.Server;
+            var now = _time.GetUtcNow();
+            if (server.RetentionDays > 0 && posted > DateTimeOffset.MinValue && posted < now.AddDays(-server.RetentionDays))
+            {
+                askedAndMissing = true;
+                continue;
+            }
+
+            if (Unusable(pool, now) is { } skipped)
+            {
+                failures.Add(skipped.Message);
+                continue;
+            }
+
+            switch (await StatFromAsync(pool, id, cancellationToken))
+            {
+                case true:
+                    return true;
+                case false:
+                    askedAndMissing = true;
+                    break;
+                default:
+                    failures.Add(pool.LastError ?? $"{server.Name} could not be asked.");
+                    break;
+            }
+        }
+
+        return askedAndMissing ? false : throw new UsenetServerException(string.Join(" ", failures));
     }
 
     /// <summary>Connections in use, health and bytes of every enabled server (by priority), plus the total speed.</summary>
@@ -429,6 +479,53 @@ public sealed class UsenetArticleSource : IArticleSource, IAsyncDisposable
         }
 
         return FetchOutcome.Failed(lastError ?? "Failed.", isAuthError: false);
+    }
+
+    /// <summary>True/false from the server, null when it could not be asked (after the usual tries).</summary>
+    private async Task<bool?> StatFromAsync(ServerPool pool, string messageId, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= _options.Attempts; attempt++)
+        {
+            PooledConnection connection;
+            try
+            {
+                connection = await pool.AcquireAsync(cancellationToken);
+            }
+            catch (NntpException ex)
+            {
+                if (ex.Kind is NntpErrorKind.Auth or NntpErrorKind.Tls or NntpErrorKind.Rejected || pool.Open == 0)
+                {
+                    MarkUnavailable(pool, ex.Message, ex.Kind == NntpErrorKind.Auth);
+                    return null;
+                }
+
+                pool.RecordError(ex.Message);
+                continue;
+            }
+
+            var reuse = false;
+            try
+            {
+                var exists = await connection.StatAsync(messageId, cancellationToken);
+                reuse = true;
+                return exists;
+            }
+            catch (NntpException ex) when (ex.Kind == NntpErrorKind.Auth)
+            {
+                MarkUnavailable(pool, ex.Message, isAuthError: true);
+                return null;
+            }
+            catch (NntpException ex)
+            {
+                pool.RecordError(ex.Message);
+            }
+            finally
+            {
+                pool.Release(connection, reuse);
+            }
+        }
+
+        return null;
     }
 
     private void MarkUnavailable(ServerPool pool, string message, bool isAuthError)

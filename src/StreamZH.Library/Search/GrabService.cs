@@ -36,14 +36,20 @@ public sealed class GrabService(
     /// <summary>Grabs a release from the latest search results. Rejected releases may be grabbed too (the user decides).</summary>
     /// <exception cref="LibraryException">The release is not in the cache (any more) or its indexer is gone.</exception>
     /// <exception cref="IndexerException">The indexer did not deliver an NZB; the message is meant for the user.</exception>
-    public Task<GrabResult> GrabAsync(int indexerId, string guid, CancellationToken cancellationToken = default)
+    public Task<GrabResult> GrabAsync(int indexerId, string guid, CancellationToken cancellationToken = default) =>
+        GrabAsync(indexerId, guid, null, cancellationToken);
+
+    /// <param name="categoryName">Download category for the built-in engine (Search page); null = by the media type.</param>
+    public Task<GrabResult> GrabAsync(int indexerId, string guid, string? categoryName, CancellationToken cancellationToken = default)
     {
         var decision = cache.Find(indexerId, guid)
             ?? throw new LibraryException("This release is no longer in the search results. Search again.", LibraryError.NotFound);
-        return GrabAsync(decision, cancellationToken);
+        return GrabAsync(decision, categoryName, cancellationToken);
     }
 
-    public async Task<GrabResult> GrabAsync(ReleaseDecision decision, CancellationToken cancellationToken = default)
+    public Task<GrabResult> GrabAsync(ReleaseDecision decision, CancellationToken cancellationToken = default) => GrabAsync(decision, null, cancellationToken);
+
+    public async Task<GrabResult> GrabAsync(ReleaseDecision decision, string? categoryName, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(decision);
         var release = decision.Release;
@@ -90,7 +96,13 @@ public sealed class GrabService(
         };
         var downloadClient = clients.Current;
         var request = new DownloadRequest(
-            nzb, title, category, new MediaLink(subject.MediaType, subject.MovieId, subject.SeriesId, decision.EpisodeIds), Indexer: indexer.Name, Password: password);
+            nzb,
+            title,
+            category,
+            new MediaLink(subject.MediaType, subject.MovieId, subject.SeriesId, decision.EpisodeIds),
+            Indexer: indexer.Name,
+            Password: password,
+            CategoryName: string.IsNullOrWhiteSpace(categoryName) ? null : categoryName.Trim());
 
         // The engine answers with the download id, the blackhole folder with the written file.
         var reference = await downloadClient.AddAsync(request, cancellationToken);

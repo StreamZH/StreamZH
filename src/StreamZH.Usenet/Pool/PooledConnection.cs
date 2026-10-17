@@ -92,6 +92,52 @@ internal sealed class PooledConnection(NntpConnection connection, int articlesPe
         }
     }
 
+    /// <summary>STAT on this connection, in turn with pipelined BODY commands (sent and read in the same order).</summary>
+    public async Task<bool> StatAsync(string messageId, CancellationToken cancellationToken)
+    {
+        if (articlesPerRequest <= 1)
+        {
+            return await Connection.StatAsync(messageId, cancellationToken);
+        }
+
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _send.WaitAsync(cancellationToken);
+        var turn = _lastRead;
+        _lastRead = done.Task;
+        try
+        {
+            await Connection.SendStatAsync(messageId, cancellationToken);
+        }
+        catch
+        {
+            CompleteAfter(turn, done);
+            throw;
+        }
+        finally
+        {
+            _send.Release();
+        }
+
+        try
+        {
+            try
+            {
+                await turn.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                Connection.MarkBroken();
+                throw;
+            }
+
+            return await Connection.ReceiveStatAsync(cancellationToken);
+        }
+        finally
+        {
+            CompleteAfter(turn, done);
+        }
+    }
+
     private static void CompleteAfter(Task turn, TaskCompletionSource done)
     {
         if (turn.IsCompleted)

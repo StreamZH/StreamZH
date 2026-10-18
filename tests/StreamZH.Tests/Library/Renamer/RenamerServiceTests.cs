@@ -494,6 +494,104 @@ public sealed class RenamerServiceTests : IDisposable
         Assert.All(noMedia.Rows, r => Assert.Equal(RowStatus.Error, r.Status));
     }
 
+    private static RenamerRequest SeasonFolders(string folder) =>
+        Request(folder, new MediaRule { EpisodeFormat = EpisodeFormat }) with { Options = new RenamerOptions { FolderFormat = "Season {season:00}" } };
+
+    [Fact]
+    public async Task Files_in_a_season_folder_move_to_the_sibling_season_folder_and_the_empty_one_is_removed()
+    {
+        Touch("Dark/Season 1/dark.s01e01.mkv");
+        Touch("Dark/Season 1/dark.s01e02.mkv");
+        Touch("Dark/Staffel 2/dark.s02e01.mkv");
+        Directory.CreateDirectory(Path.Combine(Work, "Dark", "Extras"));
+        var source = Path.Combine(Work, "Dark");
+        var service = Service();
+        var request = SeasonFolders(source);
+        var before = Names(source);
+
+        var preview = await service.PreviewAsync(request);
+        Assert.Equal(["Season 01", "Season 01", "Season 02"], preview.Rows.Select(r => r.NewFolder));
+        Assert.All(preview.Rows, r => Assert.Equal(RowStatus.Rename, r.Status));
+
+        var run = await ApplyAsync(service, request);
+        Assert.Equal(RunState.Completed, run.State);
+        Assert.Equal(
+            [
+                "Extras",
+                "Season 01",
+                "Season 01/Dark - S01E01 - Secrets.mkv",
+                "Season 01/Dark - S01E02 - Lies.mkv",
+                "Season 02",
+                "Season 02/Dark - S02E01 - Beginnings and Endings.mkv",
+            ],
+            Names(source));
+        var items = service.Run(run.Id).Items;
+        Assert.Equal(
+            [Path.Combine(source, "Season 1"), Path.Combine(source, "Staffel 2")],
+            items.Where(i => i.Kind == RunItemKind.RemoveFolder).Select(i => i.OldPath).Order(StringComparer.Ordinal));
+        Assert.All(items.Where(i => i.Kind == RunItemKind.RemoveFolder), i => Assert.Equal((RunItemState.Done, true, ""), (i.State, i.IsFolder, i.NewPath)));
+        Assert.Equal((3, 0), (run.Done, run.Failed));
+
+        // Already in the right folder: nothing to do.
+        Assert.All((await service.PreviewAsync(request)).Rows, r => Assert.Equal(RowStatus.Unchanged, r.Status));
+
+        await service.UndoAsync(service.QueueUndo(run.Id));
+        Assert.Equal(before, Names(source));
+        Assert.Equal(RunState.Undone, service.Run(run.Id).Run.State);
+        Assert.All(service.Run(run.Id).Items, i => Assert.Equal(RunItemState.Undone, i.State));
+    }
+
+    [Fact]
+    public async Task A_season_folder_chosen_as_the_source_gets_the_target_as_a_subfolder()
+    {
+        Touch("Dark/Season 1/dark.s01e01.mkv");
+        var source = Path.Combine(Work, "Dark", "Season 1");
+        var service = Service();
+        var request = SeasonFolders(source);
+
+        Assert.Equal("Season 01", (await service.PreviewAsync(request)).Rows.Single().NewFolder);
+        var run = await ApplyAsync(service, request);
+        Assert.Equal(RunState.Completed, run.State);
+        Assert.Equal(["Season 01", "Season 01/Dark - S01E01 - Secrets.mkv"], Names(source));
+        Assert.DoesNotContain(service.Run(run.Id).Items, i => i.Kind == RunItemKind.RemoveFolder);
+
+        await service.UndoAsync(service.QueueUndo(run.Id));
+        Assert.Equal(["dark.s01e01.mkv"], Names(source));
+    }
+
+    [Fact]
+    public async Task Files_in_other_folders_still_get_the_target_as_a_subfolder()
+    {
+        Touch("Downloads/dark.s01e01.mkv");
+        var service = Service();
+        var request = SeasonFolders(Work);
+
+        Assert.Equal("Downloads/Season 01", (await service.PreviewAsync(request)).Rows.Single().NewFolder);
+        var run = await ApplyAsync(service, request);
+        Assert.Equal(["Downloads", "Downloads/Season 01", "Downloads/Season 01/Dark - S01E01 - Secrets.mkv"], Names(Work));
+        Assert.DoesNotContain(service.Run(run.Id).Items, i => i.Kind == RunItemKind.RemoveFolder);
+    }
+
+    [Fact]
+    public async Task A_season_folder_that_still_holds_files_is_kept()
+    {
+        Touch("Dark/Season 1/dark.s01e01.mkv");
+        Touch("Dark/Season 1/dark.s01e02.mkv");
+        var source = Path.Combine(Work, "Dark");
+        var service = Service();
+        var request = SeasonFolders(source) with { Excluded = ["Season 1/dark.s01e02.mkv"] };
+
+        var run = await ApplyAsync(service, request);
+        Assert.Equal(RunState.Completed, run.State);
+        Assert.Equal(
+            ["Season 01", "Season 01/Dark - S01E01 - Secrets.mkv", "Season 1", "Season 1/dark.s01e02.mkv"],
+            Names(source));
+        Assert.DoesNotContain(service.Run(run.Id).Items, i => i.Kind == RunItemKind.RemoveFolder);
+
+        await service.UndoAsync(service.QueueUndo(run.Id));
+        Assert.Equal(["Season 1", "Season 1/dark.s01e01.mkv", "Season 1/dark.s01e02.mkv"], Names(source));
+    }
+
     [Fact]
     public async Task Library_files_keep_their_library_entry_and_details()
     {

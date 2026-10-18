@@ -444,6 +444,9 @@ public enum RunItemKind
 
     /// <summary>A folder the run created for "move into folder"; undo removes it when empty.</summary>
     CreateFolder,
+
+    /// <summary>A source folder the run left empty and removed (OldPath); undo creates it again before moving files back.</summary>
+    RemoveFolder,
 }
 
 public sealed record RenamerRunItem(int Order, RunItemKind Kind, string OldPath, string NewPath, bool IsFolder, RunItemState State, string? Error);

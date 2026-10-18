@@ -148,7 +148,7 @@ public sealed partial class RenamerService(
                     var target = BuildFolder(folderFormat, item, media);
                     if (!PathComparer.Instance.Equals(target, item.Folder))
                     {
-                        row.NewFolder = entry.Folder.Length == 0 ? target : $"{entry.Folder}/{target}";
+                        row.NewFolder = TargetFolder(entry.Folder, target, media);
                     }
                 }
             }
@@ -464,6 +464,8 @@ public sealed partial class RenamerService(
                 failed += bad;
                 nextOrder += created;
             }
+
+            RemoveEmptiedFolders(runId, run.Folder, done, library, nextOrder);
         }
         catch (OperationCanceledException)
         {
@@ -500,6 +502,7 @@ public sealed partial class RenamerService(
         try
         {
             var ops = items.Select(i => new Op(i.Order, i.NewPath, i.OldPath, i.IsFolder)).ToList();
+            RecreateRemovedFolders(runId, all);
 
             // Stages in reverse: folders from the top down, then the files.
             foreach (var stage in ops.GroupBy(o => o.IsFolder ? Depth(o.To) : int.MaxValue).OrderBy(g => g.Key))
@@ -697,6 +700,70 @@ public sealed partial class RenamerService(
 
         repository.AddItems(runId, [new RenamerRunItem(order, RunItemKind.CreateFolder, string.Empty, folder, true, RunItemState.Done, null)]);
         return (null, true);
+    }
+
+    /// <summary>
+    /// Folders inside the source that this run emptied ("Season 1" after its files moved to "Season 01") are removed,
+    /// deepest first, and logged for the undo. Folders that still hold anything, library item folders and the source
+    /// folder itself stay.
+    /// </summary>
+    private void RemoveEmptiedFolders(int runId, string root, IReadOnlyList<Op> done, LibraryIndex library, int order)
+    {
+        var targets = done.Where(o => o.IsFolder).Select(o => o.To).ToHashSet(PathComparer.Instance);
+        var candidates = new HashSet<string>(PathComparer.Instance);
+        foreach (var op in done.Where(o => !o.IsFolder))
+        {
+            for (var folder = Path.GetDirectoryName(op.From); folder is not null && IsBelow(folder, root); folder = Path.GetDirectoryName(folder))
+            {
+                // Folders renamed later in the run: the emptied folder now sits under the new name.
+                candidates.Add(Translate(folder, done));
+            }
+        }
+
+        var removed = new List<RenamerRunItem>();
+        foreach (var folder in candidates.Where(f => IsBelow(f, root) && !targets.Contains(f)).OrderByDescending(Depth).ThenBy(f => f, StringComparer.Ordinal))
+        {
+            try
+            {
+                if (!Directory.Exists(folder) || library.IsLibraryFolder(folder) || Directory.EnumerateFileSystemEntries(folder).Any())
+                {
+                    continue;
+                }
+
+                Directory.Delete(folder);
+                removed.Add(new RenamerRunItem(order + removed.Count, RunItemKind.RemoveFolder, folder, string.Empty, true, RunItemState.Done, null));
+                logger.LogDebug("Removed the emptied folder {Folder}", folder);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning("Could not remove the emptied folder {Folder}: {Message}", folder, ex.Message);
+            }
+        }
+
+        if (removed.Count > 0)
+        {
+            repository.AddItems(runId, removed);
+        }
+
+        static bool IsBelow(string folder, string root) => RenamerPaths.IsInside(folder, root) && !PathComparer.Instance.Equals(folder, root);
+    }
+
+    /// <summary>The undo puts the folders the run removed back first (from the top down), so the files can return.</summary>
+    private void RecreateRemovedFolders(int runId, IReadOnlyList<RenamerRunItem> all)
+    {
+        foreach (var removed in all.Where(i => i.Kind == RunItemKind.RemoveFolder && i.State == RunItemState.Done).OrderBy(i => Depth(i.OldPath)).ThenBy(i => i.Order))
+        {
+            try
+            {
+                files.CreateFolder(removed.OldPath, settings.Current);
+                repository.SetItemState(runId, removed.Order, RunItemState.Undone, null);
+            }
+            catch (ImportException ex)
+            {
+                repository.SetItemState(runId, removed.Order, RunItemState.Failed, ex.Message);
+                logger.LogWarning("Could not recreate {Folder}: {Message}", removed.OldPath, ex.Message);
+            }
+        }
     }
 
     private static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
@@ -1003,6 +1070,52 @@ public sealed partial class RenamerService(
         return name.Length == 0 ? throw new RuleException("The folder format gave an empty folder name.") : name;
     }
 
+    /// <summary>
+    /// Where "move into a folder" puts a file: a subfolder of its folder, or, when the file already sits in a season
+    /// folder and the target is one too ("Season 1" → "Season 01"), the sibling next to it. Never above the source.
+    /// </summary>
+    private string TargetFolder(string current, string target, MediaContext? media)
+    {
+        if (current.Length == 0)
+        {
+            return target;
+        }
+
+        var slash = current.LastIndexOf('/');
+        var name = current[(slash + 1)..];
+        if (!IsSeasonFolder(name, media) || !IsSeasonFolder(target, media))
+        {
+            return $"{current}/{target}";
+        }
+
+        return slash < 0 ? target : $"{current[..slash]}/{target}";
+    }
+
+    /// <summary>"Season 1", "Staffel 02", "S3", "Specials", or what the season and specials folder formats give for this series.</summary>
+    private bool IsSeasonFolder(string name, MediaContext? media)
+    {
+        if (SeasonFolderRegex().IsMatch(name))
+        {
+            return true;
+        }
+
+        var values = settings.Current with { UseSeasonFolders = true };
+        if (media?.Series is not { } show)
+        {
+            var specials = values.SpecialsFolderFormat.Trim();
+            return specials.Length > 0 && !specials.Contains('{', StringComparison.Ordinal) && PathComparer.Instance.Equals(name, specials);
+        }
+
+        var builder = new FileNameBuilder(values);
+        if (PathComparer.Instance.Equals(name, builder.SeasonFolderName(show, 0) ?? string.Empty))
+        {
+            return true;
+        }
+
+        return NumberRegex().Matches(name).Any(m => int.TryParse(m.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var season)
+            && PathComparer.Instance.Equals(name, builder.SeasonFolderName(show, season) ?? string.Empty));
+    }
+
     private static string Summary(IReadOnlyList<RenameRule> rules, RenamerOptions options)
     {
         var parts = rules.Where(r => r.Enabled).Select(r => r switch
@@ -1048,6 +1161,12 @@ public sealed partial class RenamerService(
 
     [GeneratedRegex(@"(?<!\{)\{(?!\{)[^{}]+\}")]
     private static partial Regex MediaTokenRegex();
+
+    [GeneratedRegex(@"^(?:(?:season|staffel|saison|temporada|stagione|series)[ ._-]*\d{1,4}|s\d{1,4}|specials?)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SeasonFolderRegex();
+
+    [GeneratedRegex(@"\d{1,4}")]
+    private static partial Regex NumberRegex();
 
     [GeneratedRegex(@"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$", RegexOptions.IgnoreCase)]
     private static partial Regex ReservedNameRegex();

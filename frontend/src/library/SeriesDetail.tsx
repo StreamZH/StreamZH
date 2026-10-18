@@ -200,6 +200,7 @@ function SeasonPanel({
                   <td className={styles.epNumber}>{String(e.episodeNumber).padStart(2, '0')}</td>
                   <AbsCell episode={e} show={anime} />
                   <td>
+                    {e.file && <EpisodeMediaInfo seriesId={seriesId} episodeId={e.id} label={code(e)} />}
                     <span className={styles.epTitle}>{e.title}</span>
                     <SceneTag episode={e} />
                     {e.file && <span className={styles.epFile}>{e.file.relativePath}</span>}
@@ -207,7 +208,6 @@ function SeasonPanel({
                   <td className={styles.epDate}>{formatDate(e.airDate)}</td>
                   <td className={styles.epStatus}>
                     <EpisodeStatus episode={e} />
-                    {e.file && <EpisodeMediaInfo seriesId={seriesId} episodeId={e.id} label={code(e)} />}
                   </td>
                   <td className={styles.epSearch}>
                     <button

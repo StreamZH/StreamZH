@@ -123,11 +123,12 @@
 
 /* ---- Episode popover ---- */
 
+/* In the episode's title cell, at the right end of the row's title column. */
 .popoverAnchor {
   position: relative;
+  float: right;
   display: inline-flex;
-  vertical-align: middle;
-  margin-left: 4px;
+  margin: -2px 0 0 8px;
 }
 
 .infoButton {
@@ -170,4 +171,19 @@
 
 .compact .language {
   min-width: 70px;
+}
+
+/* Phone: the popover sits at the bottom of the screen, full width, instead of hanging off the left edge. */
+@media (max-width: 640px) {
+  .popover {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+    max-height: 70vh;
+    overflow-y: auto;
+    animation-name: global(rise);
+  }
 }

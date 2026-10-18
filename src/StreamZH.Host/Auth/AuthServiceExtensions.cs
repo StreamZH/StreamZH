@@ -76,6 +76,8 @@ public static class AuthServiceExtensions
         {
             if (context.User.Identity?.IsAuthenticated != true
                 && !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
+                // The tray icon signs in with its own token on its endpoints (StreamZH.Host.Tray).
+                && !context.Request.Path.StartsWithSegments(StreamZH.Core.Tray.TrayContract.ApiPath, StringComparison.OrdinalIgnoreCase)
                 && context.RequestServices.GetRequiredService<SecuritySettings>().Method == AuthenticationMethod.Basic
                 && context.RequestServices.GetRequiredService<UserRepository>().Count() > 0)
             {

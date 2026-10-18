@@ -51,8 +51,31 @@ public sealed class RenamerCatalog(
     SeriesRepository series,
     MediaFileDetailsRepository details,
     RenamerTmdbCache cache,
-    ITmdbClient? tmdb = null)
+    ITmdbClient? tmdb = null,
+    CustomFormatRepository? customFormats = null)
 {
+    private readonly Dictionary<MediaType, IReadOnlyList<Core.CustomFormats.CustomFormat>> _formats = [];
+
+    /// <summary>The custom formats of a media type, read once per catalog (for the {Custom Formats} token).</summary>
+    public IReadOnlyList<Core.CustomFormats.CustomFormat> Formats(MediaType mediaType)
+    {
+        if (customFormats is null)
+        {
+            return [];
+        }
+
+        lock (_formats)
+        {
+            if (!_formats.TryGetValue(mediaType, out var list))
+            {
+                list = customFormats.ForMediaType(mediaType);
+                _formats[mediaType] = list;
+            }
+
+            return list;
+        }
+    }
+
     private IReadOnlyList<Series>? _series;
     private IReadOnlyList<Movie>? _movies;
     private readonly Dictionary<int, IReadOnlyList<Episode>> _episodes = [];

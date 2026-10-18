@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Globalization;
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Events;
 using StreamZH.Core.Media;
 using StreamZH.Core.Profiles;
@@ -102,7 +103,23 @@ public sealed class WantedService(
         IReadOnlyDictionary<int, QualityProfile> Profiles,
         QueueSnapshot Queue,
         IReadOnlyDictionary<int, DateTime> MovieSearches,
-        IReadOnlyDictionary<int, DateTime> EpisodeSearches);
+        IReadOnlyDictionary<int, DateTime> EpisodeSearches,
+        IReadOnlyList<CustomFormat> MovieFormats,
+        IReadOnlyList<CustomFormat> SeriesFormats);
+
+    /// <summary>
+    /// The file's custom format score, or null when the profile has no custom format cutoff to reach (no score, or no
+    /// formats at all), so the formats are only matched where they can matter.
+    /// </summary>
+    private static int? FormatScore(QualityProfile profile, IReadOnlyList<CustomFormat> formats, Func<IReadOnlyList<CustomFormat>> fileFormats)
+    {
+        if (!profile.UpgradeAllowed || (formats.Count == 0 && profile.CutoffFormatScore <= 0))
+        {
+            return null;
+        }
+
+        return CustomFormatCalculator.Score(profile, formats.Count == 0 ? [] : fileFormats());
+    }
 
     private ListContext Context()
     {
@@ -113,7 +130,9 @@ public sealed class WantedService(
             profiles.All().ToDictionary(p => p.Id),
             queue.Take(),
             lastSearches.Movies(),
-            lastSearches.Episodes());
+            lastSearches.Episodes(),
+            targets.Formats(MediaType.Movie),
+            targets.Formats(MediaType.Series));
     }
 
     private WantedPage PageOf(
@@ -196,7 +215,9 @@ public sealed class WantedService(
 
             var (quality, languages) = targets.ExistingFile(movie.File, movie.FolderPath);
             quality ??= QualityModel.Unknown;
-            var reasons = CutoffRules.Unmet(profile, quality, languages, Language.FindById(movie.OriginalLanguageId));
+            var original = Language.FindById(movie.OriginalLanguageId);
+            var score = FormatScore(profile, context.MovieFormats, () => targets.FileFormats(MediaType.Movie, movie.File, movie.FolderPath, original, movie.Year, context.MovieFormats));
+            var reasons = CutoffRules.Unmet(profile, quality, languages, original, score);
             if (reasons.Count > 0)
             {
                 list.Add(MovieRecord(movie, profile, context, WantedStatus.CutoffUnmet, null, quality, languages, reasons));
@@ -250,7 +271,9 @@ public sealed class WantedService(
 
             var (quality, languages) = targets.ExistingFile(episode.File, show.FolderPath);
             quality ??= QualityModel.Unknown;
-            var reasons = CutoffRules.Unmet(profile, quality, languages, Language.FindById(show.OriginalLanguageId));
+            var original = Language.FindById(show.OriginalLanguageId);
+            var score = FormatScore(profile, context.SeriesFormats, () => targets.FileFormats(MediaType.Series, episode.File, show.FolderPath, original, show.Year, context.SeriesFormats));
+            var reasons = CutoffRules.Unmet(profile, quality, languages, original, score);
             if (reasons.Count > 0)
             {
                 list.Add(EpisodeRecord(show, episode, profile, context, WantedStatus.CutoffUnmet, quality, languages, reasons));

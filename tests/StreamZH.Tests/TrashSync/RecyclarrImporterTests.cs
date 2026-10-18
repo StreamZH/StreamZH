@@ -9,7 +9,7 @@ using StreamZH.Library;
 using StreamZH.Library.Import;
 using StreamZH.Library.Trash;
 
-namespace StreamZH.Tests.Trash;
+namespace StreamZH.Tests.TrashSync;
 
 public sealed class RecyclarrImporterTests : IDisposable
 {

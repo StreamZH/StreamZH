@@ -161,6 +161,25 @@ public sealed class WantedServiceTests : IDisposable
     }
 
     [Fact]
+    public void Cutoff_unmet_movies_include_files_below_the_custom_format_cutoff_score()
+    {
+        var formats = new CustomFormatRepository(_bed.Database);
+        var good = formats.Add(CustomFormats.CustomFormatTestData.Movie("Good group", 0, CustomFormats.CustomFormatTestData.Title("-GOOD$")));
+        _bed.Profiles.Update(_bed.Profiles.Find(QualityDefaults.DefaultProfileId)! with
+        {
+            FormatItems = [new Core.CustomFormats.ProfileFormatItem(good, 100)],
+            CutoffFormatScore = 100,
+        });
+
+        SetMovieFile(_bed.Dune, "Dune.2021.German.DL.1080p.BluRay.x264-OTHER.mkv");
+        var below = Assert.Single(_bed.Wanted().Cutoff(Movies()).Records);
+        Assert.Equal([CutoffRules.ReasonFormatScore], below.Reasons);
+
+        SetMovieFile(_bed.Dune, "Dune.2021.German.DL.1080p.BluRay.x264-GOOD.mkv");
+        Assert.Empty(_bed.Wanted().Cutoff(Movies()).Records);
+    }
+
+    [Fact]
     public void Cutoff_unmet_episodes_check_quality_and_language_per_episode()
     {
         SetEpisodeFiles(

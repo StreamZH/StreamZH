@@ -13,7 +13,7 @@ using StreamZH.Library.Import;
 using StreamZH.Library.Trash;
 using StreamZH.Tests.Library.ImportLists;
 
-namespace StreamZH.Tests.Trash;
+namespace StreamZH.Tests.TrashSync;
 
 /// <summary>A database with the profile, Media Management and TRaSH services; the guides come from the fixture subset (no network).</summary>
 internal sealed class TrashTestBed : IDisposable
@@ -21,7 +21,7 @@ internal sealed class TrashTestBed : IDisposable
     public static readonly DateTimeOffset Now = new(2026, 10, 18, 12, 0, 0, TimeSpan.Zero);
 
     /// <summary>A subset of the TRaSH Guides (MIT): the [German] HD Bluray + WEB, HD Bluray + WEB and WEB-1080p templates with their formats and groups.</summary>
-    public static string GuidesFolder => Path.Combine(AppContext.BaseDirectory, "Trash", "Guides");
+    public static string GuidesFolder => Path.Combine(AppContext.BaseDirectory, "TrashSync", "Guides");
 
     public const string MovieGerman = "2b90e905c99490edc7c7a5787443748b";
     public const string SeriesGerman = "dca7e5e9e99c703bcbdaaa471dd40e98";
@@ -41,7 +41,8 @@ internal sealed class TrashTestBed : IDisposable
         Trash = new TrashRepository(Database);
         Settings = new TrashSettings(Config);
         Media = new MediaManagementSettings(Config);
-        ProfileService = new QualityProfileService(Profiles, Config, NullLogger<QualityProfileService>.Instance, [new TrashProfileObserver(Trash)]);
+        ProfileService = new QualityProfileService(
+            Profiles, Config, NullLogger<QualityProfileService>.Instance, Formats, observers: [new TrashProfileObserver(Trash)]);
         Apply = new TrashApplyService(
             Formats, Profiles, ProfileService, new QualityDefinitionService(Definitions, NullLogger<QualityDefinitionService>.Instance), Media, Trash,
             Settings, Config, NullLogger<TrashApplyService>.Instance);

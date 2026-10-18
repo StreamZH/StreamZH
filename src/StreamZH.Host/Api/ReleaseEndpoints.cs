@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using Microsoft.AspNetCore.Mvc;
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Indexers;
 using StreamZH.Core.Jobs;
 using StreamZH.Core.Quality;
@@ -178,9 +179,17 @@ public sealed record ReleaseSearchResource(int Indexers, IReadOnlyList<IndexerFa
         [.. result.Decisions.Select((d, index) => ReleaseResource.From(d, index + 1, now))]);
 }
 
+/// <summary>A custom format a release matches (id and name only).</summary>
+public sealed record CustomFormatRefResource(int Id, string Name)
+{
+    public static IReadOnlyList<CustomFormatRefResource> From(IEnumerable<CustomFormat> formats) =>
+        [.. formats.Select(f => new CustomFormatRefResource(f.Id, f.Name))];
+}
+
 /// <summary>
 /// One search result. <see cref="Rank"/> is the default order (1 = best); series fields are empty for movies.
-/// <see cref="PreferredScore"/> is the summed score of the release profiles' preferred terms.
+/// <see cref="PreferredScore"/> is the summed score of the release profiles' preferred terms, <see cref="CustomFormatScore"/>
+/// the summed score of the matching <see cref="CustomFormats"/> in the item's quality profile.
 /// </summary>
 public sealed record ReleaseResource(
     string Guid,
@@ -206,6 +215,10 @@ public sealed record ReleaseResource(
     IReadOnlyList<int> EpisodeIds,
     int PreferredScore)
 {
+    public IReadOnlyList<CustomFormatRefResource> CustomFormats { get; init; } = [];
+
+    public int CustomFormatScore { get; init; }
+
     public static ReleaseResource From(ReleaseDecision d, int rank, DateTimeOffset now)
     {
         var parsed = d.Parsed;
@@ -232,6 +245,10 @@ public sealed record ReleaseResource(
             parsed?.EpisodeNumbers ?? [],
             parsed?.FullSeason ?? false,
             d.EpisodeIds,
-            d.Decision.PreferredScore);
+            d.Decision.PreferredScore)
+        {
+            CustomFormats = CustomFormatRefResource.From(d.Decision.CustomFormats),
+            CustomFormatScore = d.Decision.CustomFormatScore,
+        };
     }
 }

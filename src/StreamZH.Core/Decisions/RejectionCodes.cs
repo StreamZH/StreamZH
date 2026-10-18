@@ -22,6 +22,20 @@ public static class RejectionCodes
     public const string DiskUpgradesNotAllowed = "DiskUpgradesNotAllowed";
     public const string DecisionError = "DecisionError";
 
+    // Custom formats (Radarr's names).
+
+    /// <summary>The custom format score is below the profile's minimum.</summary>
+    public const string CustomFormatMinimumScore = "CustomFormatMinimumScore";
+
+    /// <summary>The file on disk already reaches the profile's custom format cutoff score.</summary>
+    public const string DiskCustomFormatCutoffMet = "DiskCustomFormatCutoffMet";
+
+    /// <summary>The file on disk has the same quality and an equal or higher custom format score.</summary>
+    public const string DiskCustomFormatScore = "DiskCustomFormatScore";
+
+    /// <summary>The release raises the custom format score by less than the profile's minimum upgrade step.</summary>
+    public const string DiskCustomFormatScoreIncrement = "DiskCustomFormatScoreIncrement";
+
     // Release rules (Settings → Indexers).
 
     /// <summary>Younger than the minimum age (Usenet propagation); temporary.</summary>

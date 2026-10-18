@@ -8,7 +8,7 @@ using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Library.Trash;
 
-namespace StreamZH.Tests.Trash;
+namespace StreamZH.Tests.TrashSync;
 
 public sealed class TrashGuideParserTests
 {

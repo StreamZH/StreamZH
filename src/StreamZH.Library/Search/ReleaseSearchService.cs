@@ -241,7 +241,25 @@ public sealed class ReleaseSearchService(
         List<Ranked> results, DecisionTarget rankingTarget, IReadOnlyDictionary<int, QualityDefinition> defs, DateTimeOffset now,
         ReleaseRules rules, int indexerCount, IReadOnlyList<IndexerSearchFailure> failures)
     {
-        var comparer = new DecisionComparer(new DecisionContext(rankingTarget, defs, now) { Rules = rules });
+        var context = new DecisionContext(rankingTarget, defs, now) { Rules = rules };
+        var comparer = new DecisionComparer(context);
+
+        // Releases for another item were not decided; still show which custom formats they match.
+        for (var i = 0; i < results.Count; i++)
+        {
+            if (results[i] is { Tier: Tier.NotForTarget } r && r.Decision.Parsed is not null)
+            {
+                var formats = context.CustomFormatsFor(r.Decision.Decision.Candidate);
+                results[i] = r with
+                {
+                    Decision = r.Decision with
+                    {
+                        Decision = r.Decision.Decision with { CustomFormats = formats.Formats, CustomFormatScore = formats.Score },
+                    },
+                };
+            }
+        }
+
         var ranked = results
             .OrderByDescending(r => r.Decision.Accepted)
             .ThenBy(r => r.Tier)

@@ -28,10 +28,19 @@ public enum UpgradeVerdict
 
     /// <summary>Same quality and revision, nothing gained.</summary>
     NotBetter,
+
+    /// <summary>Same quality rank, and the file on disk already reaches the profile's custom format cutoff score.</summary>
+    FormatCutoffMet,
+
+    /// <summary>Same quality rank, and the file on disk has an equal or higher custom format score.</summary>
+    FormatScoreNotBetter,
+
+    /// <summary>Same quality rank, a higher score, but less than the profile's minimum upgrade step.</summary>
+    FormatScoreIncrement,
 }
 
 /// <summary>
-/// Upgrade logic, modelled on Radarr's UpgradableSpecification (without custom formats). Order of checks:
+/// Upgrade logic, modelled on Radarr's UpgradableSpecification. Order of checks:
 /// <list type="number">
 /// <item>The file has the wrong language for the profile and the release has the right one → always
 /// (a German version replaces an English or subbed file, whatever the quality order).</item>
@@ -41,8 +50,11 @@ public enum UpgradeVerdict
 /// <item>Same quality with a lower revision → never.</item>
 /// <item>Upgrades disabled in the profile → never.</item>
 /// <item>Dual-language release while the file is not dual-language (profile prefers dual language) → yes, even past the cutoff.</item>
-/// <item>File already meets the cutoff → no.</item>
-/// <item>Same quality → no; better quality → yes.</item>
+/// <item>Better quality rank → yes while the file is below the quality cutoff, otherwise no (cutoff met; also when only the
+/// custom format cutoff is unmet, like Radarr).</item>
+/// <item>Same quality rank (custom formats decide, like Radarr): no when the file meets the quality cutoff and the custom
+/// format cutoff score; no when the release's score is not higher than the file's; no when the file's score already reaches
+/// the cutoff score; no when the score rises by less than the minimum upgrade step; otherwise yes.</item>
 /// </list>
 /// </summary>
 public static class UpgradeRules
@@ -54,7 +66,9 @@ public static class UpgradeRules
         QualityModel candidate,
         IReadOnlyList<Language> candidateLanguages,
         Language originalLanguage,
-        ProperHandling propers = ProperHandling.PreferAndUpgrade)
+        ProperHandling propers = ProperHandling.PreferAndUpgrade,
+        int existingFormatScore = 0,
+        int candidateFormatScore = 0)
     {
         if (existing is null)
         {
@@ -97,12 +111,39 @@ public static class UpgradeRules
             return UpgradeVerdict.Upgrade;
         }
 
-        if (profile.RankOf(existing.Quality.Id) >= CutoffRank(profile))
+        var qualityCutoffMet = profile.RankOf(existing.Quality.Id) >= CutoffRank(profile);
+        if (qualityCompare > 0)
+        {
+            return qualityCutoffMet ? UpgradeVerdict.CutoffMet : UpgradeVerdict.Upgrade;
+        }
+
+        if (qualityCutoffMet && existingFormatScore >= profile.CutoffFormatScore)
         {
             return UpgradeVerdict.CutoffMet;
         }
 
-        return qualityCompare == 0 ? UpgradeVerdict.NotBetter : UpgradeVerdict.Upgrade;
+        if (candidateFormatScore <= existingFormatScore)
+        {
+            return candidateFormatScore == 0 && existingFormatScore == 0 ? UpgradeVerdict.NotBetter : UpgradeVerdict.FormatScoreNotBetter;
+        }
+
+        if (existingFormatScore >= profile.CutoffFormatScore)
+        {
+            return UpgradeVerdict.FormatCutoffMet;
+        }
+
+        return candidateFormatScore < (long)existingFormatScore + profile.MinUpgradeFormatScore
+            ? UpgradeVerdict.FormatScoreIncrement
+            : UpgradeVerdict.Upgrade;
+    }
+
+    /// <summary>
+    /// Radarr's CustomFormatCutoffNotMet: with upgrades allowed, the file's custom format score is below the profile's cutoff score.
+    /// </summary>
+    public static bool IsFormatCutoffUnmet(QualityProfile profile, int existingFormatScore)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        return profile.UpgradeAllowed && existingFormatScore < profile.CutoffFormatScore;
     }
 
     /// <summary>The profile wants a specific language, the file on disk does not have it and the release does.</summary>

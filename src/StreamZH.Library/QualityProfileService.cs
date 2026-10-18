@@ -4,6 +4,7 @@
 
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
@@ -17,11 +18,21 @@ public sealed class ValidationFailedException(IReadOnlyDictionary<string, string
     public IReadOnlyDictionary<string, string[]> Errors { get; } = errors;
 }
 
-/// <summary>Creates, validates and removes quality profiles and keeps track of the default profile.</summary>
+/// <summary>
+/// Creates, validates and removes quality profiles and keeps track of the default profile. Custom format scores of
+/// formats that no longer exist are dropped when a profile is saved; only non-zero scores are stored.
+/// </summary>
 public sealed class QualityProfileService(
-    QualityProfileRepository profiles, ConfigRepository config, ILogger<QualityProfileService> logger, IEnumerable<IQualityProfileObserver>? observers = null)
+    QualityProfileRepository profiles,
+    ConfigRepository config,
+    ILogger<QualityProfileService> logger,
+    CustomFormatRepository? customFormats = null,
+    IEnumerable<IQualityProfileObserver>? observers = null)
 {
     public const int MaxNameLength = 100;
+
+    /// <summary>Custom format scores (and the minimum, cutoff and upgrade step) must lie within ±this value, like Radarr's UI.</summary>
+    public const int MaxFormatScore = 1_000_000;
 
     private static readonly IReadOnlySet<int> KnownQualityIds = Quality.All.Select(q => q.Id).ToHashSet();
 
@@ -77,7 +88,7 @@ public sealed class QualityProfileService(
 
     public QualityProfile Create(QualityProfile profile)
     {
-        var normalized = Normalize(profile);
+        var normalized = Normalize(profile) with { Id = 0 };
         Validate(normalized, null);
         var id = profiles.Add(normalized);
         logger.LogInformation("Quality profile '{Name}' created", normalized.Name);
@@ -174,6 +185,9 @@ public sealed class QualityProfileService(
             errors["languageId"] = ["Unknown language."];
         }
 
+        ValidateGroups(profile, errors);
+        ValidateFormats(profile, errors);
+
         if (errors.Count > 0)
         {
             throw new ValidationFailedException(errors);
@@ -184,9 +198,92 @@ public sealed class QualityProfileService(
     public static bool IsValidLanguage(int languageId) =>
         languageId == Language.Any.Id || languageId == Language.Original.Id || (languageId > 0 && Language.FindById(languageId).Id == languageId);
 
-    private static QualityProfile Normalize(QualityProfile profile) => profile with
+    private static void ValidateGroups(QualityProfile profile, Dictionary<string, string[]> errors)
     {
-        Name = profile.Name?.Trim() ?? string.Empty,
-        Items = profile.Items ?? [],
-    };
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < profile.Items.Count; i++)
+        {
+            var group = profile.Items[i].Group;
+            if (group is null)
+            {
+                continue;
+            }
+
+            if (group.Length > MaxNameLength)
+            {
+                errors[$"items[{i}].group"] = [$"Use at most {MaxNameLength} characters."];
+            }
+            else if ((i == 0 || profile.Items[i - 1].Group != group) && !seen.Add(group))
+            {
+                errors[$"items[{i}].group"] = ["The qualities of a group must be next to each other."];
+            }
+        }
+    }
+
+    private void ValidateFormats(QualityProfile profile, Dictionary<string, string[]> errors)
+    {
+        var known = customFormats?.All().Select(f => f.Id).ToHashSet();
+        var seen = new HashSet<int>();
+        for (var i = 0; i < profile.FormatItems.Count; i++)
+        {
+            var item = profile.FormatItems[i];
+            if (known is not null && !known.Contains(item.CustomFormatId))
+            {
+                errors[$"formatItems[{i}].customFormatId"] = [$"Unknown custom format id: {item.CustomFormatId}."];
+            }
+            else if (!seen.Add(item.CustomFormatId))
+            {
+                errors[$"formatItems[{i}].customFormatId"] = ["Each custom format may only appear once."];
+            }
+
+            if (Math.Abs((long)item.Score) > MaxFormatScore)
+            {
+                errors[$"formatItems[{i}].score"] = [OutOfRange];
+            }
+        }
+
+        if (Math.Abs((long)profile.MinFormatScore) > MaxFormatScore)
+        {
+            errors["minFormatScore"] = [OutOfRange];
+        }
+
+        if (Math.Abs((long)profile.CutoffFormatScore) > MaxFormatScore)
+        {
+            errors["cutoffFormatScore"] = [OutOfRange];
+        }
+
+        if (profile.MinUpgradeFormatScore < 1 || profile.MinUpgradeFormatScore > MaxFormatScore)
+        {
+            errors["minUpgradeFormatScore"] = ["Use a value from 1 to 1000000."];
+        }
+    }
+
+    private const string OutOfRange = "Use a value from -1000000 to 1000000.";
+
+    private QualityProfile Normalize(QualityProfile profile)
+    {
+        var items = profile.Items ?? [];
+        var formatItems = profile.FormatItems ?? [];
+        return profile with
+        {
+            Name = profile.Name?.Trim() ?? string.Empty,
+            Items = [.. items.Select(i => i with { Group = string.IsNullOrWhiteSpace(i.Group) ? null : i.Group.Trim() })],
+            FormatItems = [.. formatItems.Where(i => i.Score != 0)],
+            TrashMovieTemplate = string.IsNullOrWhiteSpace(profile.TrashMovieTemplate) ? null : profile.TrashMovieTemplate.Trim(),
+            TrashSeriesTemplate = string.IsNullOrWhiteSpace(profile.TrashSeriesTemplate) ? null : profile.TrashSeriesTemplate.Trim(),
+        };
+    }
+
+    /// <summary>The stored scores without those of formats that no longer exist (they may have been deleted meanwhile).</summary>
+    public IReadOnlyList<ProfileFormatItem> ExistingFormatItems(QualityProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (customFormats is null)
+        {
+            return profile.FormatItems;
+        }
+
+        var known = customFormats.All().Select(f => f.Id).ToHashSet();
+        return [.. profile.FormatItems.Where(i => known.Contains(i.CustomFormatId))];
+    }
 }

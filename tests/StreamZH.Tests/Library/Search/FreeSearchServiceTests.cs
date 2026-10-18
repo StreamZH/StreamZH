@@ -134,5 +134,26 @@ public sealed class FreeSearchServiceTests : IDisposable
         await Assert.ThrowsAsync<LibraryException>(() => service.GrabAsync(1, "unknown"));
     }
 
+    [Fact]
+    public async Task Results_show_the_custom_formats_of_the_media_type_the_name_looks_like()
+    {
+        var formats = new CustomFormatRepository(_bed.Database);
+        formats.Add(CustomFormats.CustomFormatTestData.Movie("x265 movie", 0, CustomFormats.CustomFormatTestData.Title("x265")));
+        formats.Add(CustomFormats.CustomFormatTestData.Format(
+            Core.Media.MediaType.Series, "x265 series", 0, CustomFormats.CustomFormatTestData.Title("x265")));
+        _bed.Indexers.Indexers.Add(FakeIndexerProvider.Definition(1, "Alpha"));
+        _bed.Client.Returns(1,
+            _bed.Release("Dune.2021.1080p.WEB.x265-GRP", ageDays: 1),
+            _bed.Release("Show.S01E01.1080p.WEB.x265-GRP", ageDays: 2),
+            _bed.Release("Dune.2021.1080p.WEB.x264-GRP", ageDays: 3));
+
+        var service = new FreeSearchService(_bed.Indexers, _bed.Client, _bed.Cache, _bed.Grab(), NullLogger<FreeSearchService>.Instance, formats);
+        var result = await service.SearchAsync(Request("x"));
+
+        Assert.Equal(
+            [["x265 movie"], ["x265 series"], []],
+            result.Releases.Select(r => r.CustomFormats.Select(f => f.Name).ToArray()));
+    }
+
     public void Dispose() => _bed.Dispose();
 }

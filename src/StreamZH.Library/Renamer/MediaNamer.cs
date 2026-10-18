@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
+using StreamZH.Library.CustomFormats;
 using StreamZH.Library.Import;
 using StreamZH.Metadata.Tmdb;
 using StreamZH.Parsing;
@@ -270,7 +271,9 @@ public sealed partial class MediaNamer(MediaManagementValues settings, RenamerCa
 
         var values = Values(rule);
         var builder = new FileNameBuilder(values);
-        var info = FileInfoFor(fullPath, item);
+        var info = FileInfoFor(fullPath, item).WithCustomFormats(
+            catalog.Formats(MediaType.Series), MediaType.Series, Language.FindById(series.OriginalLanguageId), series.Year, Path.GetFileName(fullPath),
+            CustomFormatNaming.SizeOf(fullPath), CustomFormatNaming.EpisodeFileType(episodes.Count));
         var name = builder.EpisodeFileName(series, episodes, info, FileNameBuilder.FormatFor(series, daily));
         if (name.Length == 0)
         {
@@ -383,7 +386,10 @@ public sealed partial class MediaNamer(MediaManagementValues settings, RenamerCa
             movie = new Movie { Title = title, Year = year };
         }
 
-        var name = new FileNameBuilder(Values(rule)).MovieFileName(movie, FileInfoFor(fullPath, item));
+        var info = FileInfoFor(fullPath, item).WithCustomFormats(
+            catalog.Formats(MediaType.Movie), MediaType.Movie, Language.FindById(movie.OriginalLanguageId), movie.Year, Path.GetFileName(fullPath),
+            CustomFormatNaming.SizeOf(fullPath));
+        var name = new FileNameBuilder(Values(rule)).MovieFileName(movie, info);
         if (name.Length == 0)
         {
             throw new RuleException("The movie format gave an empty name.");

@@ -65,7 +65,8 @@ public static class TrashEndpoints
             Guides(mediaType, store, (guide, _) => guide.Groups.Select(g => TrashGroupResource.From(g, guide))));
 
         group.MapPost("/apply", async (
-            TrashApplyBody body, TrashGuideStore store, TrashApplyService apply, TrashRepository trash, CancellationToken ct) =>
+            TrashApplyBody body, TrashGuideStore store, TrashApplyService apply, TrashRepository trash, CustomFormatRepository formats,
+            CancellationToken ct) =>
         {
             await EnsureCopyAsync(store, ct);
             var previous = body.ProfileId is { } id ? trash.Options(id) : null;
@@ -94,7 +95,7 @@ public static class TrashEndpoints
                 body.Naming?.ToNaming(),
                 store.Current);
             return Results.Ok(new TrashApplyResultResource(
-                QualityProfileResource.From(result.Profile), result.ProfileCreated, result.Created, result.Updated, result.Warnings));
+                QualityProfileResource.From(result.Profile, formats.All()), result.ProfileCreated, result.Created, result.Updated, result.Warnings));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
         group.MapPost("/recyclarr", async (RecyclarrBody body, TrashGuideStore store, RecyclarrImporter importer, CancellationToken ct) =>

@@ -13,16 +13,20 @@ namespace StreamZH.Library.Wanted;
 /// "Cutoff unmet" (Radarr/Sonarr Wanted): a file the decision engine would still replace with a better release. Uses the
 /// same rules as <see cref="UpgradeRules"/>: the file's languages are normalised like the engine does (unknown = the
 /// original language), a file in the wrong language for the profile is always unmet (the engine fixes it even with
-/// upgrades off), and with upgrades allowed a quality below the cutoff or a missing dual-language track is unmet.
+/// upgrades off), and with upgrades allowed a quality below the cutoff, a custom format score below the profile's cutoff
+/// score (Radarr's CustomFormatCutoffNotMet) or a missing dual-language track is unmet.
 /// </summary>
 public static class CutoffRules
 {
     public const string ReasonQuality = "quality";
     public const string ReasonLanguage = "language";
     public const string ReasonDualLanguage = "dualLanguage";
+    public const string ReasonFormatScore = "formatScore";
 
     /// <summary>Why the file does not meet the profile; empty when it does.</summary>
-    public static IReadOnlyList<string> Unmet(QualityProfile profile, QualityModel quality, IReadOnlyList<Language> fileLanguages, Language originalLanguage)
+    /// <param name="formatScore">Custom format score of the file in the profile; null skips the custom format cutoff.</param>
+    public static IReadOnlyList<string> Unmet(
+        QualityProfile profile, QualityModel quality, IReadOnlyList<Language> fileLanguages, Language originalLanguage, int? formatScore = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(quality);
@@ -46,6 +50,11 @@ public static class CutoffRules
         if (profile.RankOf(quality.Quality.Id) < UpgradeRules.CutoffRank(profile))
         {
             reasons.Add(ReasonQuality);
+        }
+
+        if (formatScore is { } score && UpgradeRules.IsFormatCutoffUnmet(profile, score))
+        {
+            reasons.Add(ReasonFormatScore);
         }
 
         if (!wrongLanguage && profile.PreferDualLanguage && LanguageRules.IsReal(wanted)

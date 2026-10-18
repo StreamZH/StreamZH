@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StreamZH.Data;
 using StreamZH.Library.Trash;
 
-namespace StreamZH.Tests.Trash;
+namespace StreamZH.Tests.TrashSync;
 
 public sealed class TrashGuideStoreTests : IDisposable
 {

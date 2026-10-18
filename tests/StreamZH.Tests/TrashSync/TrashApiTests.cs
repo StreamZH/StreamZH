@@ -10,7 +10,7 @@ using StreamZH.Host.Status;
 using StreamZH.Library.Trash;
 using StreamZH.Tests.Host;
 
-namespace StreamZH.Tests.Trash;
+namespace StreamZH.Tests.TrashSync;
 
 /// <summary>The TRaSH endpoints over HTTP, with the fixture folder as local repository (no network).</summary>
 public sealed class TrashApiTests : IDisposable
@@ -152,6 +152,9 @@ public sealed class TrashApiTests : IDisposable
         var profile = body.GetProperty("profile");
         Assert.Equal("Deutsch HD", profile.GetProperty("name").GetString());
         var id = profile.GetProperty("id").GetInt32();
+        Assert.Contains(profile.GetProperty("formatItems").EnumerateArray(), f =>
+            f.GetProperty("name").GetString() == "German DL" && f.GetProperty("mediaType").GetString() == "series" && f.GetProperty("score").GetInt32() == 11000);
+        Assert.Equal(TrashTestBed.MovieGerman, profile.GetProperty("trashMovieTemplate").GetString());
 
         var formats = await client.GetFromJsonAsync<JsonElement[]>("/api/v1/trash/formats?mediaType=movie");
         Assert.True(formats!.Single(f => f.GetProperty("name").GetString() == "German DL").GetProperty("installed").GetBoolean());

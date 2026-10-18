@@ -6,6 +6,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
@@ -50,6 +51,9 @@ public sealed record NamingFileInfo
     /// <summary>File name without extension as downloaded ({Original Filename}).</summary>
     public string? OriginalFileName { get; init; }
 
+    /// <summary>The custom formats the file matches, ordered by name ({Custom Formats} shows those with "include in rename").</summary>
+    public IReadOnlyList<CustomFormat> CustomFormats { get; init; } = [];
+
     public static NamingFileInfo From(ParsedRelease? parsed, string? sceneName, string? originalFileName) => new()
     {
         Quality = parsed?.Quality ?? QualityModel.Unknown,
@@ -81,7 +85,9 @@ public sealed record NamingFileInfo
 /// Radarr and Sonarr: <c>{Movie Title}</c>, <c>{Movie.Title}</c> (dots instead of spaces), <c>{MOVIE TITLE}</c> (upper case),
 /// <c>{season:00}</c> (number format), <c>{[Quality Full]}</c> and <c>{-Release Group}</c> (prefix and suffix that disappear
 /// with an empty value), <c>{{</c> and <c>}}</c> for literal braces. Colons and characters Windows does not allow are
-/// replaced as configured, so the names work on every system.
+/// replaced as configured, so the names work on every system. <c>{Custom Formats}</c> lists the matching custom formats
+/// marked "include in rename" (space separated, like Radarr); <c>{Custom Formats:-DV,HDR}</c> leaves some out,
+/// <c>{Custom Formats:DV,HDR}</c> keeps only those, and <c>{Custom Format:DV}</c> shows one format by name.
 /// </summary>
 public sealed partial class FileNameBuilder(MediaManagementValues settings)
 {
@@ -106,8 +112,11 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
     private static readonly string[] FileTokens =
     [
         "quality full", "quality title", "quality proper", "quality real", "release group", "edition tags", "mediainfo videocodec", "mediainfo audiocodec", "mediainfo simple",
-        "mediainfo videodynamicrange", "mediainfo audiolanguages", "original title", "original filename",
+        "mediainfo videodynamicrange", "mediainfo audiolanguages", "original title", "original filename", "custom formats", "custom format",
     ];
+
+    /// <summary>Tokens that take a filter after the colon (<c>{Custom Formats:-x265}</c>) instead of a number format.</summary>
+    private static readonly IReadOnlySet<string> FilterTokens = new HashSet<string> { "custom formats", "custom format" };
 
     private static readonly IReadOnlySet<string> MovieIdTokens = new HashSet<string> { "imdb id", "imdbid", "tmdb id", "tmdbid" };
     private static readonly IReadOnlySet<string> SeriesIdTokens = new HashSet<string> { "imdb id", "imdbid", "tmdb id", "tmdbid", "tvdb id", "tvdbid" };
@@ -218,15 +227,23 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
         var used = new List<string>();
         var rest = LabelRegex().Replace(text, m => m.Groups["inner"].Value);
+        var badFilter = false;
         rest = TokenRegex().Replace(rest, m =>
         {
             if (!m.Groups["escaped"].Success)
             {
-                used.Add(Key(m.Groups["token"].Value));
+                var key = Key(m.Groups["token"].Value);
+                used.Add(key);
+                badFilter |= m.Groups["filter"].Success && !FilterTokens.Contains(key);
             }
 
             return string.Empty;
         });
+
+        if (badFilter)
+        {
+            return "Only number formats like {season:00} may follow a colon here; {Custom Formats:…} takes format names.";
+        }
 
         if (rest.Contains('{', StringComparison.Ordinal) || rest.Contains('}', StringComparison.Ordinal))
         {
@@ -286,7 +303,10 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             }
 
             var token = m.Groups["token"].Value;
-            var value = Value(Key(token), m.Groups["format"].Value, context);
+            var key = Key(token);
+            var value = FilterTokens.Contains(key)
+                ? CustomFormatValue(key, m.Groups["filter"].Value, context.File)
+                : m.Groups["filter"].Success ? null : Value(key, m.Groups["format"].Value, context);
             if (string.IsNullOrEmpty(value))
             {
                 return string.Empty;
@@ -357,6 +377,34 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             "tvdb id" or "tvdbid" => series?.TvdbId is > 0 and var tvdb ? tvdb.ToString(CultureInfo.InvariantCulture) : null,
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Radarr's custom format tokens: the matching formats marked "include in rename", joined with spaces; a filter
+    /// "-A,B" leaves A and B out, "A,B" keeps only them; {Custom Format:A} is format A when it matches.
+    /// </summary>
+    private static string? CustomFormatValue(string key, string filter, NamingFileInfo? file)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        var formats = file.CustomFormats.Where(f => f.IncludeInRename).ToList();
+        var names = filter.TrimStart('-').Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        bool Named(CustomFormat f) => names.Contains(f.Name, StringComparer.OrdinalIgnoreCase);
+
+        if (key == "custom format")
+        {
+            return filter.Length == 0 ? null : formats.FirstOrDefault(Named)?.Name;
+        }
+
+        if (filter.Length > 0)
+        {
+            formats = filter.StartsWith('-') ? [.. formats.Where(f => !Named(f))] : [.. formats.Where(Named)];
+        }
+
+        return formats.Count == 0 ? null : string.Join(' ', formats.Select(f => f.Name));
     }
 
     /// <summary>
@@ -552,7 +600,7 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
     private static string Display(string key) => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(key);
 
-    [GeneratedRegex(@"(?<escaped>\{\{|\}\})|\{(?<prefix>[- ._\[(]*)(?<token>[a-z0-9]+(?:(?<separator>[- ._]+)[a-z0-9]+)?)(?::(?<format>0+))?(?<suffix>[- ._)\]]*)\}", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(?<escaped>\{\{|\}\})|\{(?<prefix>[- ._\[(]*)(?<token>[a-z0-9]+(?:(?<separator>[- ._]+)[a-z0-9]+)?)(?::(?:(?<format>0+)|(?<filter>[ ,a-z0-9+-]+(?<![- ]))))?(?<suffix>[- ._)\]]*)\}", RegexOptions.IgnoreCase)]
     private static partial Regex TokenRegex();
 
     [GeneratedRegex(@"\{(?<label>[a-z]+)-(?<inner>\{[^{}]+\})\}", RegexOptions.IgnoreCase)]

@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Update="Indexers/Files/**" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="Trash/Guides/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="TrashSync/Guides/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="CustomFormats/Files/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

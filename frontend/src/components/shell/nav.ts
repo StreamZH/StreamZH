@@ -31,6 +31,7 @@ const settingsIcons: Record<string, IconName> = {
   '/settings/media-management': 'folder',
   '/settings/import-lists': 'list',
   '/settings/profiles': 'star',
+  '/settings/custom-formats': 'tag',
   '/settings/quality': 'gauge',
   '/settings/indexers': 'filter',
   '/settings/downloads': 'download',

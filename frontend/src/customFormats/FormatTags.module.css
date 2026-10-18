@@ -1,0 +1,69 @@
+/* Matched custom formats (small tags) and the format score pill, used in every release list. */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 5px;
+}
+
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 7px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--fg-2);
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.more {
+  color: var(--muted);
+  cursor: help;
+}
+
+.score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 21px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border-radius: 99px;
+}
+
+.scoreLabel {
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.plus {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.minus {
+  color: var(--err);
+  background: var(--err-soft);
+}
+
+.zero {
+  color: var(--muted);
+  background: var(--sunk);
+}

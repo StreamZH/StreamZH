@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { MatchedFormat } from './customFormats'
 import type { GrabResult } from './releases'
 
 /** Search page: free text search over the indexers, without a library item (contract §7). */
@@ -25,6 +26,9 @@ export interface FreeRelease {
   /** Read from the release name, display only. */
   quality: string
   languages: string[]
+  /** Custom formats the name matches (0.8, when the server sends them; no profile, so the score is display only). */
+  customFormats?: MatchedFormat[]
+  customFormatScore?: number
 }
 
 export interface FreeSearch {

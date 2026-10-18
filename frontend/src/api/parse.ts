@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { MatchedFormat } from './customFormats'
 
 export interface ParsedRelease {
   kind: 'Movie' | 'Episode'
@@ -32,6 +33,9 @@ export interface DecisionResult {
   accepted: boolean
   rejections: { code: string; message: string }[]
   preferredScore: number
+  /** Custom formats the release matched (0.8) and their score in the target's profile. */
+  customFormats?: MatchedFormat[]
+  customFormatScore?: number
 }
 
 /** What one release profile says about the name. `limited`: it only applies to some indexers or quality profiles. */

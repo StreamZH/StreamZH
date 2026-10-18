@@ -19,6 +19,16 @@ export interface QualityProfileItem {
   qualityId: number
   name: string
   allowed: boolean
+  /** Qualities with the same group name sit next to each other and rank equally (TRaSH's "Merged QPs"). */
+  group?: string | null
+}
+
+/** Score of one custom format in a profile; every format is listed (score 0 when not set). */
+export interface ProfileFormatItem {
+  customFormatId: number
+  name: string
+  mediaType: 'movie' | 'series'
+  score: number
 }
 
 export interface QualityProfile {
@@ -29,6 +39,17 @@ export interface QualityProfile {
   upgradeAllowed: boolean
   languageId: number
   preferDualLanguage: boolean
+  /** Custom format scores (contract 0.8); optional so an older server still works. */
+  formatItems?: ProfileFormatItem[]
+  /** Releases below this custom format score are rejected. */
+  minFormatScore?: number
+  /** Upgrades stop once the cutoff quality and this score are reached (0 = quality cutoff only). */
+  cutoffFormatScore?: number
+  /** An upgrade of the same quality must raise the score by at least this much. */
+  minUpgradeFormatScore?: number
+  /** TRaSH Guides templates the profile follows (null = own profile). */
+  trashMovieTemplate?: string | null
+  trashSeriesTemplate?: string | null
 }
 
 export interface QualityDefinition {

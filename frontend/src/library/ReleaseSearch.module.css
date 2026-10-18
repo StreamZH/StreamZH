@@ -133,6 +133,22 @@
   grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 52px 48px 92px;
 }
 
+/* With custom format scores: one more column before the preferred score / Grabs. */
+.withFormats .head,
+.withFormats .row {
+  grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 72px 48px 92px;
+}
+
+.withFormats.withScore .head,
+.withFormats.withScore .row {
+  grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 72px 52px 48px 92px;
+}
+
+.formatTags {
+  display: flex;
+  margin-top: 5px;
+}
+
 .head {
   position: sticky;
   top: 0;
@@ -384,7 +400,8 @@
   }
 
   .row,
-  .withScore .row {
+  .withScore .row,
+  .withFormats .row {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 12px;

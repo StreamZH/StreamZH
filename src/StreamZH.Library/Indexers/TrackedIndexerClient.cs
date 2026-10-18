@@ -131,6 +131,11 @@ public sealed class TrackedIndexerClient(
                     Add(string.Create(CultureInfo.InvariantCulture, $"S{episode.SeasonNumber:00}{numbers}"));
                 }
 
+                if (episode.AbsoluteEpisodeNumbers.Count > 0)
+                {
+                    Add("abs " + string.Join(',', episode.AbsoluteEpisodeNumbers.Order().Select(n => n.ToString("00", CultureInfo.InvariantCulture))));
+                }
+
                 if (episode.TvdbId > 0)
                 {
                     Add(string.Create(CultureInfo.InvariantCulture, $"tvdbid={episode.TvdbId}"));

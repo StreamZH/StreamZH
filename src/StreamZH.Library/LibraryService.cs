@@ -40,6 +40,7 @@ public sealed class LibraryService(
     IEventBus events,
     ILogger<LibraryService> logger,
     Import.MediaManagementSettings? mediaManagement = null,
+    SceneNumbering.XemService? xem = null,
     Titles.AlternativeTitleService? alternativeTitles = null)
 {
     private Import.MediaManagementValues Media => mediaManagement?.Current ?? new Import.MediaManagementValues();
@@ -82,8 +83,15 @@ public sealed class LibraryService(
         return movie;
     }
 
+    /// <param name="seriesType">Standard, Daily or Anime; null = guessed from TMDB (Japanese animation, talk shows and news).</param>
     public async Task<Series> AddSeriesAsync(
-        int tmdbId, int rootFolderId, bool monitored, int? qualityProfileId = null, string? existingFolder = null, CancellationToken cancellationToken = default)
+        int tmdbId,
+        int rootFolderId,
+        bool monitored,
+        int? qualityProfileId = null,
+        string? existingFolder = null,
+        SeriesType? seriesType = null,
+        CancellationToken cancellationToken = default)
     {
         if (series.TmdbIdToId().ContainsKey(tmdbId))
         {
@@ -101,6 +109,7 @@ public sealed class LibraryService(
             QualityProfileId = profileId,
             RootFolderId = root.Id,
             Added = DateTime.UtcNow,
+            SeriesType = seriesType ?? SeriesTypes.Suggest(details.GenreIds, details.Genres, details.OriginCountries, details.OriginalLanguage),
         };
         Apply(item, details);
         item.FolderPath = existingFolder ?? Path.Combine(root.Path, FolderName(new Import.FileNameBuilder(Media).SeriesFolderName(item), details.Title, details.Year));
@@ -170,7 +179,15 @@ public sealed class LibraryService(
             }
         }
 
+        EpisodeNumbering.AssignAbsoluteNumbers(episodes);
         series.UpsertEpisodes(id, episodes, monitorNew: item.Monitored);
+
+        // TheXEM scene numbering and scene names (series with a TVDB id from TMDB's external ids); never fails the refresh.
+        if (xem is not null)
+        {
+            await xem.UpdateSeriesAsync(item, cancellationToken);
+        }
+
         if (ShouldRescan(manual))
         {
             ApplyScan(item);
@@ -240,6 +257,13 @@ public sealed class LibraryService(
         await events.PublishAsync(new LibraryChanged(MediaType.Movie, id));
     }
 
+    public async Task SetSeriesTypeAsync(int id, SeriesType seriesType)
+    {
+        _ = series.Find(id) ?? throw new LibraryException("Series not found.", LibraryError.NotFound);
+        series.SetSeriesType(id, seriesType);
+        await events.PublishAsync(new LibraryChanged(MediaType.Series, id));
+    }
+
     public async Task SetSeriesQualityProfileAsync(int id, int qualityProfileId)
     {
         var item = series.Find(id) ?? throw new LibraryException("Series not found.", LibraryError.NotFound);
@@ -299,7 +323,7 @@ public sealed class LibraryService(
     /// <summary>Scans the series folder; episodes whose file disappeared are unmonitored when "Unmonitor deleted files" is on.</summary>
     private void ApplyScan(Series item)
     {
-        var found = DiskScanner.ScanSeries(item.FolderPath);
+        var found = DiskScanner.ScanSeries(item.FolderPath, item, series.Episodes(item.Id));
         if (Media.UnmonitorDeletedFiles)
         {
             foreach (var gone in series.Episodes(item.Id).Where(e => e.File is not null && e.Monitored && !found.ContainsKey((e.SeasonNumber, e.EpisodeNumber))))

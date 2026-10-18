@@ -82,12 +82,47 @@ public static partial class NewznabRequestBuilder
     /// Sonarr's series search: one plan per episode (several episode numbers mean several plans), a season pack
     /// searches with season only, a daily episode with season=yyyy and ep=MM/dd. Tier 1 searches by id
     /// (tvdbid, imdbid, tmdbid, aggregated when the indexer lists its tv-search parameters), tier 2 by title.
+    /// Anime episodes add one plan per absolute number: t=search with q="Title 12" (Sonarr's anime search).
     /// </summary>
     public static IReadOnlyList<NewznabSearchPlan> ForEpisodes(EpisodeSearchCriteria criteria, IReadOnlyList<int> categories, NewznabCaps caps)
     {
         ArgumentNullException.ThrowIfNull(criteria);
+        if (categories.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. StandardEpisodePlans(criteria, categories, caps), .. AbsolutePlans(criteria, categories, caps)];
+    }
+
+    /// <summary>"Title 12" for each title and absolute number: t=search, or t=tvsearch with q when the indexer has no plain search.</summary>
+    private static List<NewznabSearchPlan> AbsolutePlans(EpisodeSearchCriteria criteria, IReadOnlyList<int> categories, NewznabCaps caps)
+    {
+        if (criteria.AbsoluteEpisodeNumbers.Count == 0)
+        {
+            return [];
+        }
+
+        var (function, engine) = NewznabCaps.Supports(caps.SearchParams, "q") ? ("search", caps.TextSearchEngine)
+            : NewznabCaps.Supports(caps.TvSearchParams, "q") ? ("tvsearch", caps.TvTextSearchEngine)
+            : (null, string.Empty);
+        if (function is null)
+        {
+            return [];
+        }
+
+        var titles = QueryTitles(criteria.Titles, engine).ToList();
+        return Plans(criteria.AbsoluteEpisodeNumbers.Distinct().Select(number => Tiers(
+        [
+            .. titles.Select(title => new NewznabQuery(
+                function, categories, $"&q={Newznabify($"{title} {number.ToString("00", CultureInfo.InvariantCulture)}")}")),
+        ])));
+    }
+
+    private static List<NewznabSearchPlan> StandardEpisodePlans(EpisodeSearchCriteria criteria, IReadOnlyList<int> categories, NewznabCaps caps)
+    {
         var tv = caps.TvSearchParams;
-        if (categories.Count == 0 || tv is null)
+        if (tv is null)
         {
             return [];
         }

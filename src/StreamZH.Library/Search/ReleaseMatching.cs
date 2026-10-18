@@ -116,38 +116,170 @@ public static class ReleaseMatching
     }
 
     /// <summary>
-    /// The library episodes a series release covers: one or more episodes, a season pack or a daily episode.
+    /// The library episodes a series release covers, like Sonarr's ParsingService.GetEpisodes: a daily episode (air date),
+    /// absolute numbers (anime, "[Group] Title - 26"), a season pack or one or more SxxEyy episodes. Releases and downloads
+    /// are scene numbered (<paramref name="sceneSource"/>): with TheXEM data, scene S02E01 maps to the TMDB episode that
+    /// scene episode stands for (e.g. S01E13). Files already in the library use TMDB numbering (sceneSource false).
     /// Returns a rejection when the release cannot be mapped (multi-season pack, unknown episode).
     /// </summary>
-    public static (IReadOnlyList<Episode> Episodes, Rejection? Rejection) MapEpisodes(ParsedRelease parsed, IReadOnlyList<Episode> library)
+    /// <param name="series">The series (its type decides between absolute and SxxEyy numbers); null = Standard.</param>
+    /// <param name="sceneSeasonNumber">The scene season a TheXEM name in the release title stands for ("Title Season 2").</param>
+    public static (IReadOnlyList<Episode> Episodes, Rejection? Rejection) MapEpisodes(
+        ParsedRelease parsed, IReadOnlyList<Episode> library, Series? series = null, bool sceneSource = true, int? sceneSeasonNumber = null)
     {
+        ArgumentNullException.ThrowIfNull(parsed);
+        ArgumentNullException.ThrowIfNull(library);
         if (parsed.MultiSeason)
         {
             return ([], new Rejection(RejectionCodes.MultiSeason, "Multi-season pack"));
         }
 
+        var type = series?.SeriesType ?? SeriesType.Standard;
         if (parsed.AirDate is { } airDate)
         {
             var daily = library.Where(e => e.AirDate == airDate).ToList();
             return daily.Count > 0 ? (daily, null) : ([], new Rejection(RejectionCodes.UnknownEpisode, $"No episode aired on {airDate}"));
         }
 
-        if (parsed.SeasonNumber is not { } season)
+        if (parsed.FullSeason && parsed.SeasonNumber is { } packSeason)
         {
-            return ([], new Rejection(RejectionCodes.UnknownEpisode, "Absolute episode numbers are not supported yet"));
+            var pack = sceneSource ? library.Where(e => e.SceneSeasonNumber == packSeason).ToList() : [];
+            if (pack.Count == 0)
+            {
+                pack = [.. library.Where(e => e.SeasonNumber == packSeason)];
+            }
+
+            return pack.Count > 0 ? (pack, null) : ([], new Rejection(RejectionCodes.UnknownEpisode, $"Season {packSeason} is not in the library"));
         }
 
-        if (parsed.FullSeason)
+        // Absolute numbers: always for anime series, otherwise when the release has nothing else (Sonarr's IsAbsoluteNumbering).
+        var hasStandard = parsed.SeasonNumber is not null && parsed.EpisodeNumbers.Count > 0;
+        if (parsed.AbsoluteEpisodeNumbers.Count > 0 && (type == SeriesType.Anime || !hasStandard))
         {
-            var pack = library.Where(e => e.SeasonNumber == season).ToList();
-            return pack.Count > 0 ? (pack, null) : ([], new Rejection(RejectionCodes.UnknownEpisode, $"Season {season} is not in the library"));
+            var anime = AnimeEpisodes(parsed, library, sceneSource, sceneSeasonNumber);
+            if (anime.Count > 0)
+            {
+                return (anime, null);
+            }
+
+            if (!hasStandard)
+            {
+                return ([], new Rejection(RejectionCodes.UnknownEpisode, $"{AbsoluteLabel(parsed.AbsoluteEpisodeNumbers)} is not in the library"));
+            }
         }
 
-        var episodes = library.Where(e => e.SeasonNumber == season && parsed.EpisodeNumbers.Contains(e.EpisodeNumber)).ToList();
+        if (parsed.SeasonNumber is not { } season || parsed.EpisodeNumbers.Count == 0)
+        {
+            return ([], new Rejection(RejectionCodes.UnknownEpisode, "The release names no episode"));
+        }
+
+        var episodes = StandardEpisodes(season, parsed.EpisodeNumbers, library, sceneSource);
+
+        // Anime "Title.E13" reads as S01E13; past the end of TMDB's season 1 it is the absolute number.
+        if (episodes.Count == 0 && type == SeriesType.Anime && season == 1 && parsed.AbsoluteEpisodeNumbers.Count == 0)
+        {
+            episodes = AnimeEpisodes(parsed with { AbsoluteEpisodeNumbers = parsed.EpisodeNumbers }, library, sceneSource, sceneSeasonNumber);
+        }
+
         return episodes.Count > 0
             ? (episodes, null)
             : ([], new Rejection(RejectionCodes.UnknownEpisode, $"{Label(season, parsed.EpisodeNumbers)} is not in the library"));
     }
+
+    /// <summary>
+    /// The scene season a release title stands for: TheXEM names come with one ("Title Season 2" → 2), so an absolute
+    /// number in "[Group] Title Season 2 - 05" counts within that scene season. Null when no such name matches.
+    /// </summary>
+    public static int? SceneSeasonFor(ParsedRelease parsed, IEnumerable<AlternativeTitle> titles)
+    {
+        ArgumentNullException.ThrowIfNull(parsed);
+        ArgumentNullException.ThrowIfNull(titles);
+        return titles
+            .Where(t => t.SceneSeasonNumber is >= 0 && t.CleanTitle.Length > 0 && t.CleanTitle == parsed.CleanTitle)
+            .Select(t => t.SceneSeasonNumber)
+            .FirstOrDefault();
+    }
+
+    /// <summary>Sonarr's GetStandardEpisodes: scene numbering first (TheXEM), then the TMDB season and episode.</summary>
+    private static List<Episode> StandardEpisodes(int season, IReadOnlyList<int> numbers, IReadOnlyList<Episode> library, bool sceneSource)
+    {
+        var result = new List<Episode>();
+        foreach (var number in numbers)
+        {
+            if (sceneSource)
+            {
+                var scene = library.Where(e => e.SceneSeasonNumber == season && e.SceneEpisodeNumber == number).ToList();
+                if (scene.Count > 0)
+                {
+                    result.AddRange(scene);
+                    continue;
+                }
+            }
+
+            if (library.FirstOrDefault(e => e.SeasonNumber == season && e.EpisodeNumber == number) is { } episode)
+            {
+                result.Add(episode);
+            }
+        }
+
+        return [.. result.Distinct()];
+    }
+
+    /// <summary>
+    /// Sonarr's GetAnimeEpisodes: per absolute number the scene absolute number (TheXEM), within a scene season when the
+    /// title names one, and the counted absolute number as fallback; specials by episode number.
+    /// </summary>
+    private static List<Episode> AnimeEpisodes(ParsedRelease parsed, IReadOnlyList<Episode> library, bool sceneSource, int? sceneSeasonNumber)
+    {
+        var result = new List<Episode>();
+        foreach (var absolute in parsed.AbsoluteEpisodeNumbers)
+        {
+            var found = new List<Episode>();
+            if (parsed.IsSpecial)
+            {
+                found.AddRange(library.Where(e => e.SeasonNumber == 0 && e.EpisodeNumber == absolute));
+            }
+            else if (sceneSource)
+            {
+                var season = sceneSeasonNumber ?? (parsed.SeasonNumber is > 1 && parsed.EpisodeNumbers.Count == 0 ? parsed.SeasonNumber : null);
+                if (season is { } s)
+                {
+                    found.AddRange(library.Where(e => e.SceneSeasonNumber == s && e.SceneEpisodeNumber == absolute));
+                    if (found.Count == 0 && library.FirstOrDefault(e => e.SeasonNumber == s && e.EpisodeNumber == absolute) is { } inSeason)
+                    {
+                        found.Add(inSeason);
+                    }
+                }
+                else
+                {
+                    found.AddRange(library.Where(e => e.SceneAbsoluteEpisodeNumber == absolute));
+
+                    // Several hits without a scene name for the season are ambiguous (Sonarr does the same).
+                    if (found.Count > 1)
+                    {
+                        found.Clear();
+                    }
+                }
+            }
+
+            if (found.Count == 0 && library.FirstOrDefault(e => e.AbsoluteEpisodeNumber == absolute) is { } byAbsolute)
+            {
+                found.Add(byAbsolute);
+            }
+
+            result.AddRange(found);
+        }
+
+        return [.. result.Distinct()];
+    }
+
+    /// <summary>"Absolute episode 12", "Absolute episodes 12-14".</summary>
+    public static string AbsoluteLabel(IReadOnlyList<int> numbers) => numbers.Count switch
+    {
+        0 => "Absolute episode",
+        1 => $"Absolute episode {numbers[0]}",
+        _ => $"Absolute episodes {numbers.Min()}-{numbers.Max()}",
+    };
 
     /// <summary>
     /// Sonarr's SeasonMatch, SingleEpisodeSearchMatch and EpisodeRequested specifications in one check:

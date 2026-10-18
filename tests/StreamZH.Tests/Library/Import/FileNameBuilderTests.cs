@@ -147,7 +147,7 @@ public sealed class FileNameBuilderTests
     public void Daily_and_anime_formats()
     {
         Assert.Equal("The Office - 2005-03-24 - Pilot Bluray-1080p Proper", Builder().EpisodeFileName(Show, [Ep(1, 1, "Pilot")], File, EpisodeFormat.Daily));
-        var anime = new Series { Title = "Frieren", OriginalLanguageId = Language.Japanese.Id, Genres = ["Animation", "Fantasy"] };
+        var anime = new Series { Title = "Frieren", OriginalLanguageId = Language.Japanese.Id, Genres = ["Animation", "Fantasy"], SeriesType = SeriesType.Anime };
         Assert.Equal(EpisodeFormat.Anime, FileNameBuilder.FormatFor(anime, namedByAirDate: false));
         Assert.Equal(EpisodeFormat.Standard, FileNameBuilder.FormatFor(Show, namedByAirDate: false));
         Assert.Equal(EpisodeFormat.Daily, FileNameBuilder.FormatFor(Show, namedByAirDate: true));

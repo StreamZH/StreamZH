@@ -31,6 +31,7 @@ public sealed class ReleaseSearchService(
     ILogger<ReleaseSearchService> logger,
     TimeProvider? timeProvider = null,
     IndexerOptions? options = null,
+    SceneNumbering.EpisodeMapper? episodeMapper = null,
     AlternativeTitleRepository? alternativeTitles = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -126,7 +127,7 @@ public sealed class ReleaseSearchService(
             EpisodeNumbers = seasonSearch ? [] : [.. requested.Select(e => e.EpisodeNumber).Order()],
         };
 
-        var (releases, indexerCount, failures) = await QueryAsync(use, criteria, cancellationToken);
+        var (releases, indexerCount, failures) = await QueryAllAsync(use, SeriesSearchCriteria.For(show, criteria, requested, seasonSearch), cancellationToken);
         var now = _time.GetUtcNow();
         var defs = Definitions();
         var rules = Rules();
@@ -148,7 +149,7 @@ public sealed class ReleaseSearchService(
                 continue;
             }
 
-            var (covered, unmapped) = ReleaseMatching.MapEpisodes(parsed, library);
+            var (covered, unmapped) = episodeMapper.MapEpisodes(parsed, show, library);
             var coveredIds = covered.Select(e => e.Id).ToList();
             if ((unmapped ?? ReleaseMatching.CheckRequested(parsed, covered, seasonNumber, requestedIds, seasonSearch)) is { } rejection)
             {
@@ -180,6 +181,30 @@ public sealed class ReleaseSearchService(
 
         var rankingTarget = targets.ForEpisodes(show, requested) with { Monitored = true };
         return Finish(results, rankingTarget, defs, now, rules, indexerCount, failures);
+    }
+
+    /// <summary>Several searches for one request (daily episodes by date, scene seasons): results merged, failures of each.</summary>
+    private async Task<(IReadOnlyList<ReleaseInfo> Releases, int IndexerCount, IReadOnlyList<IndexerSearchFailure> Failures)> QueryAllAsync(
+        IndexerUse use, IReadOnlyList<SearchCriteria> criteria, CancellationToken cancellationToken)
+    {
+        if (criteria.Count == 1)
+        {
+            return await QueryAsync(use, criteria[0], cancellationToken);
+        }
+
+        var seen = new HashSet<(int, string)>();
+        var releases = new List<ReleaseInfo>();
+        var failures = new List<IndexerSearchFailure>();
+        var indexerCount = 0;
+        foreach (var one in criteria)
+        {
+            var (found, count, failed) = await QueryAsync(use, one, cancellationToken);
+            releases.AddRange(found.Where(r => seen.Add((r.IndexerId, r.Guid))));
+            failures.AddRange(failed.Where(f => failures.All(x => x.IndexerId != f.IndexerId)));
+            indexerCount = Math.Max(indexerCount, count);
+        }
+
+        return (releases, indexerCount, failures);
     }
 
     /// <summary>Asks every active indexer in parallel; a slow or failing indexer is recorded and skipped.</summary>

@@ -106,6 +106,52 @@ public static class DiskScanner
         return result;
     }
 
+    /// <summary>
+    /// Like <see cref="ScanSeries(string)"/>, plus files named by air date ("Show - 2026-10-18 - Title.mkv", daily series) and,
+    /// for anime series, by absolute number ("Show - 012.mkv"), mapped to the episodes of the library (TMDB numbering).
+    /// </summary>
+    public static IReadOnlyDictionary<(int Season, int Episode), MediaFile> ScanSeries(string folder, Series series, IReadOnlyList<Episode> library)
+    {
+        ArgumentNullException.ThrowIfNull(series);
+        ArgumentNullException.ThrowIfNull(library);
+        var result = new Dictionary<(int, int), MediaFile>();
+
+        void Add((int, int) key, MediaFile mediaFile)
+        {
+            if (!result.TryGetValue(key, out var existing) || existing.Size < mediaFile.Size)
+            {
+                result[key] = mediaFile;
+            }
+        }
+
+        foreach (var file in VideoFiles(folder))
+        {
+            var mediaFile = ToMediaFile(folder, file);
+            if (EpisodeFileParser.Parse(file.Name) is { } simple)
+            {
+                foreach (var episode in simple.Episodes)
+                {
+                    Add((simple.Season, episode), mediaFile);
+                }
+
+                continue;
+            }
+
+            var parsed = Parsing.Releases.ReleaseParser.ParseEpisode(Path.GetFileNameWithoutExtension(file.Name));
+            if (parsed is null || (parsed.AirDate is null && (series.SeriesType != SeriesType.Anime || parsed.AbsoluteEpisodeNumbers.Count == 0)))
+            {
+                continue;
+            }
+
+            foreach (var episode in Search.ReleaseMatching.MapEpisodes(parsed, library, series, sceneSource: false).Episodes)
+            {
+                Add((episode.SeasonNumber, episode.EpisodeNumber), mediaFile);
+            }
+        }
+
+        return result;
+    }
+
     public static IEnumerable<FileInfo> VideoFiles(string folder)
     {
         var root = new DirectoryInfo(folder);

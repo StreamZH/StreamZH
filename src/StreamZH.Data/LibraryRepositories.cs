@@ -219,11 +219,12 @@ public sealed class SeriesRepository(Database database)
 {
     private const string Columns = """
         Id, TmdbId, TvdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Status, Network, Genres, PosterPath, BackdropPath,
-        Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed
+        Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed, SeriesType
         """;
 
     private const string EpisodeColumns = """
-        Id, SeriesId, SeasonNumber, EpisodeNumber, Title, AirDate, Overview, Monitored, FileRelativePath, FileSize, FileModified
+        Id, SeriesId, SeasonNumber, EpisodeNumber, Title, AirDate, Overview, Monitored, FileRelativePath, FileSize, FileModified,
+        AbsoluteEpisodeNumber, SceneSeasonNumber, SceneEpisodeNumber, SceneAbsoluteEpisodeNumber
         """;
 
     public IReadOnlyList<Series> All()
@@ -256,9 +257,9 @@ public sealed class SeriesRepository(Database database)
         series.Id = connection.ExecuteScalar<int>(
             """
             INSERT INTO Series (TmdbId, TvdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Status, Network, Genres, PosterPath, BackdropPath,
-                Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed)
+                Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed, SeriesType)
             VALUES (@TmdbId, @TvdbId, @ImdbId, @Title, @OriginalTitle, @SortTitle, @Year, @Overview, @Status, @Network, @Genres, @PosterPath, @BackdropPath,
-                @Monitored, @QualityProfileId, @OriginalLanguageId, @RootFolderId, @FolderPath, @Added, @LastRefreshed);
+                @Monitored, @QualityProfileId, @OriginalLanguageId, @RootFolderId, @FolderPath, @Added, @LastRefreshed, @SeriesType);
             SELECT last_insert_rowid();
             """,
             SeriesRow.From(series));
@@ -339,18 +340,28 @@ public sealed class SeriesRepository(Database database)
             if (existing.TryGetValue(key, out var row))
             {
                 connection.Execute(
-                    "UPDATE Episodes SET Title = @Title, AirDate = @AirDate, Overview = @Overview WHERE Id = @Id",
-                    new { Id = row.Id, episode.Title, episode.AirDate, episode.Overview },
+                    "UPDATE Episodes SET Title = @Title, AirDate = @AirDate, Overview = @Overview, AbsoluteEpisodeNumber = @AbsoluteEpisodeNumber WHERE Id = @Id",
+                    new { Id = row.Id, episode.Title, episode.AirDate, episode.Overview, episode.AbsoluteEpisodeNumber },
                     transaction);
             }
             else
             {
                 connection.Execute(
                     """
-                    INSERT INTO Episodes (SeriesId, SeasonNumber, EpisodeNumber, Title, AirDate, Overview, Monitored)
-                    VALUES (@seriesId, @SeasonNumber, @EpisodeNumber, @Title, @AirDate, @Overview, @monitored)
+                    INSERT INTO Episodes (SeriesId, SeasonNumber, EpisodeNumber, Title, AirDate, Overview, Monitored, AbsoluteEpisodeNumber)
+                    VALUES (@seriesId, @SeasonNumber, @EpisodeNumber, @Title, @AirDate, @Overview, @monitored, @AbsoluteEpisodeNumber)
                     """,
-                    new { seriesId, episode.SeasonNumber, episode.EpisodeNumber, episode.Title, episode.AirDate, episode.Overview, monitored = monitorNew && episode.SeasonNumber > 0 },
+                    new
+                    {
+                        seriesId,
+                        episode.SeasonNumber,
+                        episode.EpisodeNumber,
+                        episode.Title,
+                        episode.AirDate,
+                        episode.Overview,
+                        monitored = monitorNew && episode.SeasonNumber > 0,
+                        episode.AbsoluteEpisodeNumber,
+                    },
                     transaction);
             }
         }
@@ -405,6 +416,42 @@ public sealed class SeriesRepository(Database database)
         connection.Execute("UPDATE Episodes SET Monitored = @monitored WHERE Id = @episodeId", new { episodeId, monitored });
     }
 
+    /// <summary>
+    /// Standard, Daily or Anime (Sonarr's series type). Only here and in <see cref="Add"/>: <see cref="Update"/> leaves it alone,
+    /// so a refresh that runs while the user changes the type does not undo the change.
+    /// </summary>
+    public void SetSeriesType(int id, SeriesType seriesType)
+    {
+        using var connection = database.Open();
+        connection.Execute("UPDATE Series SET SeriesType = @type WHERE Id = @id", new { id, type = (int)seriesType });
+    }
+
+    /// <summary>
+    /// Replaces the scene numbering (TheXEM) of a series: episodes missing from <paramref name="numbering"/> (episode id → scene
+    /// numbers) lose theirs.
+    /// </summary>
+    public void SetSceneNumbering(int seriesId, IReadOnlyDictionary<int, SceneNumber> numbering)
+    {
+        using var connection = database.Open();
+        using var transaction = connection.BeginTransaction();
+        connection.Execute(
+            "UPDATE Episodes SET SceneSeasonNumber = NULL, SceneEpisodeNumber = NULL, SceneAbsoluteEpisodeNumber = NULL WHERE SeriesId = @seriesId",
+            new { seriesId },
+            transaction);
+        foreach (var (episodeId, scene) in numbering)
+        {
+            connection.Execute(
+                """
+                UPDATE Episodes SET SceneSeasonNumber = @SeasonNumber, SceneEpisodeNumber = @EpisodeNumber, SceneAbsoluteEpisodeNumber = @AbsoluteEpisodeNumber
+                WHERE Id = @episodeId AND SeriesId = @seriesId
+                """,
+                new { episodeId, seriesId, scene.SeasonNumber, scene.EpisodeNumber, scene.AbsoluteEpisodeNumber },
+                transaction);
+        }
+
+        transaction.Commit();
+    }
+
     private sealed class SeriesRow
     {
         public long Id { get; init; }
@@ -428,6 +475,7 @@ public sealed class SeriesRepository(Database database)
         public string FolderPath { get; init; } = string.Empty;
         public DateTime Added { get; init; }
         public DateTime? LastRefreshed { get; init; }
+        public long SeriesType { get; init; }
 
         public static SeriesRow From(Series s) => new()
         {
@@ -452,6 +500,7 @@ public sealed class SeriesRepository(Database database)
             FolderPath = s.FolderPath,
             Added = s.Added,
             LastRefreshed = s.LastRefreshed,
+            SeriesType = (int)s.SeriesType,
         };
 
         public Series ToSeries() => new()
@@ -477,6 +526,7 @@ public sealed class SeriesRepository(Database database)
             FolderPath = FolderPath,
             Added = DateTime.SpecifyKind(Added, DateTimeKind.Utc),
             LastRefreshed = LastRefreshed is { } r ? DateTime.SpecifyKind(r, DateTimeKind.Utc) : null,
+            SeriesType = SeriesType is >= 0 and <= 2 ? (Core.Media.SeriesType)SeriesType : Core.Media.SeriesType.Standard,
         };
     }
 
@@ -493,6 +543,10 @@ public sealed class SeriesRepository(Database database)
         public string? FileRelativePath { get; init; }
         public long? FileSize { get; init; }
         public DateTime? FileModified { get; init; }
+        public long? AbsoluteEpisodeNumber { get; init; }
+        public long? SceneSeasonNumber { get; init; }
+        public long? SceneEpisodeNumber { get; init; }
+        public long? SceneAbsoluteEpisodeNumber { get; init; }
 
         public Episode ToEpisode() => new()
         {
@@ -504,6 +558,10 @@ public sealed class SeriesRepository(Database database)
             AirDate = AirDate,
             Overview = Overview,
             Monitored = Monitored,
+            AbsoluteEpisodeNumber = (int?)AbsoluteEpisodeNumber,
+            SceneSeasonNumber = (int?)SceneSeasonNumber,
+            SceneEpisodeNumber = (int?)SceneEpisodeNumber,
+            SceneAbsoluteEpisodeNumber = (int?)SceneAbsoluteEpisodeNumber,
             File = FileRelativePath is null
                 ? null
                 : new MediaFile(FileRelativePath, FileSize ?? 0, DateTime.SpecifyKind(FileModified ?? DateTime.MinValue, DateTimeKind.Utc)),

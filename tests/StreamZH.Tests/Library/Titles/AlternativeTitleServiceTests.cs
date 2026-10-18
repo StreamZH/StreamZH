@@ -151,7 +151,7 @@ public sealed class AlternativeTitleServiceTests : IDisposable
         _tmdb.Movie = new TmdbTitles([], [new("de", "DE", "Arrival (DE)")]);
         var library = new LibraryService(
             new ArrivalTmdb(), new RootFolderRepository(_bed.Database), _bed.Movies, _bed.Series, new QualityProfileService(_bed.Profiles, _bed.Config, NullLogger<QualityProfileService>.Instance),
-            _bed.Events, NullLogger<LibraryService>.Instance, null, Service());
+            _bed.Events, NullLogger<LibraryService>.Instance, null, alternativeTitles: Service());
         var root = new RootFolderRepository(_bed.Database).All().Single();
 
         var movie = await library.AddMovieAsync(329865, root.Id, monitored: true);
@@ -177,7 +177,7 @@ public sealed class AlternativeTitleServiceTests : IDisposable
         _bed.Client.ReturnsRecent(1, release);
         var search = new ReleaseSearchService(
             _bed.Indexers, _bed.Client, _bed.Movies, _bed.Series, new DecisionTargetFactory(_bed.Profiles), _bed.Definitions, _bed.Cache,
-            NullLogger<ReleaseSearchService>.Instance, _bed.Time, _bed.Options, _repository);
+            NullLogger<ReleaseSearchService>.Instance, _bed.Time, _bed.Options, alternativeTitles: _repository);
 
         var result = await search.SearchMovieAsync(_bed.Dune.Id, IndexerUse.InteractiveSearch);
 
@@ -205,7 +205,7 @@ public sealed class AlternativeTitleServiceTests : IDisposable
         _bed.AddIndexer(1, "Alpha");
         var search = new ReleaseSearchService(
             _bed.Indexers, _bed.Client, _bed.Movies, _bed.Series, new DecisionTargetFactory(_bed.Profiles), _bed.Definitions, _bed.Cache,
-            NullLogger<ReleaseSearchService>.Instance, _bed.Time, _bed.Options, _repository);
+            NullLogger<ReleaseSearchService>.Instance, _bed.Time, _bed.Options, alternativeTitles: _repository);
 
         await search.SearchMovieAsync(_bed.Dune.Id, IndexerUse.InteractiveSearch);
 
@@ -229,7 +229,7 @@ public sealed class AlternativeTitleServiceTests : IDisposable
         _bed.AddIndexer(1, "Alpha");
         var search = new ReleaseSearchService(
             _bed.Indexers, _bed.Client, _bed.Movies, _bed.Series, new DecisionTargetFactory(_bed.Profiles), _bed.Definitions, _bed.Cache,
-            NullLogger<ReleaseSearchService>.Instance, _bed.Time, _bed.Options, _repository);
+            NullLogger<ReleaseSearchService>.Instance, _bed.Time, _bed.Options, alternativeTitles: _repository);
 
         await search.SearchEpisodesAsync(_bed.Show.Id, 2, [_bed.Episode(2, 1).Id], IndexerUse.InteractiveSearch);
 

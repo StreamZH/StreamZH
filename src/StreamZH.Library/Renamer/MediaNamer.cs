@@ -231,12 +231,17 @@ public sealed partial class MediaNamer(MediaManagementValues settings, RenamerCa
             episodes = [];
             foreach (var number in absolute.Select(n => n + rule.EpisodeOffset))
             {
-                if (number < 1 || number > ordered.Count)
+                // Library series: TheXEM's scene absolute number first (release names), then the counted absolute number.
+                var scene = known.Where(e => e.SceneAbsoluteEpisodeNumber == number).ToList();
+                var found = scene.Count == 1 ? scene[0]
+                    : known.FirstOrDefault(e => e.AbsoluteEpisodeNumber == number)
+                    ?? (number >= 1 && number <= ordered.Count ? ordered[number - 1] : null);
+                if (found is null)
                 {
                     throw new RuleException($"Absolute episode {number.ToString(CultureInfo.InvariantCulture)} is not known.");
                 }
 
-                episodes.Add(ordered[number - 1]);
+                episodes.Add(found);
             }
 
             season = episodes[0].SeasonNumber;

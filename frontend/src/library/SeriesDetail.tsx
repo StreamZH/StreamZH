@@ -12,6 +12,7 @@ import page from '../pages/Page.module.css'
 import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
+import { AbsCell, AbsHeader, SceneTag } from './EpisodeNumbering'
 import HistoryPanel from './HistoryPanel'
 import MoreMenu, { type MoreItem } from './MoreMenu'
 import OrganizeDialog from './OrganizeDialog'
@@ -20,6 +21,7 @@ import RemoveButton from './RemoveButton'
 import RemoveDialog from './RemoveDialog'
 import ReleaseSearchModal from './ReleaseSearchModal'
 import SearchButtons from './SearchButtons'
+import { SeriesTypeSelect } from './SeriesTypeField'
 import { useDetailActions } from './useDetailActions'
 import AlternativeTitles from './AlternativeTitles'
 
@@ -80,6 +82,7 @@ export default function SeriesDetail() {
               onChange={(profileId) => assignProfile.mutate(profileId)}
               disabled={assignProfile.isPending}
             />
+            <SeriesTypeSelect series={s} />
             {admin ? (
               <MoreMenu items={more} />
             ) : (
@@ -101,6 +104,7 @@ export default function SeriesDetail() {
           season={season}
           episodes={episodes.filter((e) => e.seasonNumber === season.seasonNumber)}
           defaultOpen={season.seasonNumber === Math.max(...seasons.map((x) => x.seasonNumber))}
+          anime={s.seriesType === 'anime'}
         />
       ))}
 
@@ -126,12 +130,14 @@ function SeasonPanel({
   season,
   episodes,
   defaultOpen,
+  anime = false,
 }: {
   seriesId: number
   seriesTitle: string
   season: Season
   episodes: Episode[]
   defaultOpen: boolean
+  anime?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const [manualEpisode, setManualEpisode] = useState<Episode | null>(null)
@@ -182,6 +188,7 @@ function SeasonPanel({
             <thead>
               <tr>
                 <th className={styles.epNumber}>#</th>
+                <AbsHeader show={anime} />
                 <th>Title</th>
                 <th className={styles.epDate}>Aired</th>
                 <th className={styles.epStatus}>Status</th>
@@ -192,8 +199,10 @@ function SeasonPanel({
               {episodes.map((e) => (
                 <tr key={e.id} className={e.monitored ? undefined : styles.unmonitored}>
                   <td className={styles.epNumber}>{String(e.episodeNumber).padStart(2, '0')}</td>
+                  <AbsCell episode={e} show={anime} />
                   <td>
                     <span className={styles.epTitle}>{e.title}</span>
+                    <SceneTag episode={e} />
                     {e.file && <span className={styles.epFile}>{e.file.relativePath}</span>}
                   </td>
                   <td className={styles.epDate}>{formatDate(e.airDate)}</td>

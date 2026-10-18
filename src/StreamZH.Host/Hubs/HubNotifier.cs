@@ -20,23 +20,23 @@ public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub) : 
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _subscriptions.Add(events.Subscribe<LibraryChanged>((e, ct) =>
+        Track(events.Subscribe<LibraryChanged>((e, ct) =>
             new ValueTask(hub.Clients.All.SendAsync("libraryChanged", new { mediaType = e.MediaType.ToString(), id = e.Id }, ct))));
 
-        _subscriptions.Add(events.Subscribe<JobsChanged>((e, ct) =>
+        Track(events.Subscribe<JobsChanged>((e, ct) =>
             new ValueTask(hub.Clients.All.SendAsync("jobs", e.Status, ct))));
 
-        _subscriptions.Add(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("releaseGrabbed", e, ct))));
-        _subscriptions.Add(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("searchFinished", e, ct))));
-        _subscriptions.Add(events.Subscribe<IndexersChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("indexersChanged", ct))));
+        Track(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("releaseGrabbed", e, ct))));
+        Track(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("searchFinished", e, ct))));
+        Track(events.Subscribe<IndexersChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("indexersChanged", ct))));
 
         // Status window: re-read /api/v1/status/ongoing.
-        _subscriptions.Add(events.Subscribe<OngoingChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("ongoing", ct))));
+        Track(events.Subscribe<OngoingChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("ongoing", ct))));
 
         // Downloads: state changes (UI refetches) and throttled progress for live bars.
-        _subscriptions.Add(events.Subscribe<DownloadChanged>((e, ct) =>
+        Track(events.Subscribe<DownloadChanged>((e, ct) =>
             new ValueTask(hub.Clients.All.SendAsync("downloadChanged", new { downloadId = e.DownloadId }, ct))));
-        _subscriptions.Add(events.Subscribe<DownloadProgress>((e, ct) => new ValueTask(hub.Clients.All.SendAsync(
+        Track(events.Subscribe<DownloadProgress>((e, ct) => new ValueTask(hub.Clients.All.SendAsync(
             "downloadProgress",
             new
             {
@@ -58,7 +58,28 @@ public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub) : 
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _subscriptions.ForEach(s => s.Dispose());
+        // Start and stop can overlap when the host shuts down while it is still starting: take the subscriptions out
+        // under the lock, dispose them outside it.
+        IDisposable[] subscriptions;
+        lock (_subscriptions)
+        {
+            subscriptions = [.. _subscriptions];
+            _subscriptions.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
+        }
+
         return Task.CompletedTask;
+    }
+
+    private void Track(IDisposable subscription)
+    {
+        lock (_subscriptions)
+        {
+            _subscriptions.Add(subscription);
+        }
     }
 }

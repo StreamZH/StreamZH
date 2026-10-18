@@ -34,12 +34,12 @@ public sealed class MetadataEventHandler(IEventBus events, JobQueue jobs, Metada
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _subscriptions.Add(events.Subscribe<MediaImported>((e, _) =>
+        Track(events.Subscribe<MediaImported>((e, _) =>
         {
             Queue(e.MediaType, e.MovieId, e.SeriesId, e.Title);
             return ValueTask.CompletedTask;
         }));
-        _subscriptions.Add(events.Subscribe<MediaRenamed>((e, _) =>
+        Track(events.Subscribe<MediaRenamed>((e, _) =>
         {
             Queue(e.MediaType, e.MovieId, e.SeriesId, null);
             return ValueTask.CompletedTask;
@@ -49,13 +49,29 @@ public sealed class MetadataEventHandler(IEventBus events, JobQueue jobs, Metada
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        foreach (var subscription in _subscriptions)
+        // Start and stop can overlap when a host shuts down while it is still starting (seen in the test suite):
+        // take the subscriptions out under the lock, dispose them outside it.
+        IDisposable[] subscriptions;
+        lock (_subscriptions)
+        {
+            subscriptions = [.. _subscriptions];
+            _subscriptions.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
         {
             subscription.Dispose();
         }
 
-        _subscriptions.Clear();
         return Task.CompletedTask;
+    }
+
+    private void Track(IDisposable subscription)
+    {
+        lock (_subscriptions)
+        {
+            _subscriptions.Add(subscription);
+        }
     }
 
     private void Queue(MediaType type, int? movieId, int? seriesId, string? title)

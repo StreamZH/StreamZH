@@ -1,0 +1,45 @@
+/* Page head like CloudZH (.phead): serif title, a short line below, actions on the right. */
+.head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  margin: 6px 0 22px;
+}
+
+.text {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(26px, 3.2vw, 34px);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--fg);
+}
+
+.lead {
+  color: var(--fg-2);
+  margin-top: 6px;
+  max-width: 68ch;
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}

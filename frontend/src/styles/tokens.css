@@ -1,26 +1,141 @@
-/* CloudZH family design tokens (see StreamZH design canvas, 17.10.2026). */
+/* StreamZH design tokens: the CloudZH palette (web/public/app.css in CloudZH), so StreamZH looks like a CloudZH app.
+   Warm paper + red accent in light mode, warm graphite in dark mode. Follows the system unless the user picks a theme
+   (data-theme="light" | "dark" on <html>, set by lib/theme.ts).
+   CloudZH names (--fg, --fg-2, --muted, --side, --sunk, --line-strong, --accent-soft …) are the source; the older StreamZH
+   names (--text, --text-muted, --text-faint, --bg-sidebar, --surface-hover …) are kept as aliases so every module follows. */
 :root {
-  --bg: #131312;
-  --bg-sidebar: #161614;
-  --surface: #1c1b19;
-  --surface-hover: #24231f;
-  --line: #2e2d29;
-  --text: #f2f0ea;
-  --text-muted: #a9a59b;
-  --text-faint: #8a867d;
+  color-scheme: light;
+  --bg: #faf9f5;
+  --side: #f2f0e8;
+  --surface: #ffffff;
+  --sunk: #f4f2ec;
+  --line: #e6e3d8;
+  --line-strong: #d6d2c4;
+  --fg: #1f1e1c;
+  --fg-2: #56544e;
+  --muted: #6f6c64;
   --accent: #c0202a;
-  --ok: #6fbf73;
-  --warn: #d9b25a;
+  --accent-hover: #a11820;
+  --accent-soft: #f8e3e1;
+  --on-accent: #ffffff;
+  --ok: #3f7d4f;
+  --ok-soft: #e3efe4;
+  --warn: #94650f;
+  --warn-soft: #f6ecd6;
+  --err: #8f1d1d;
+  --err-soft: #f1dad5;
+  --on-err: #ffffff;
+  --orange: #c2561a;
+  --orange-soft: #f8e6da;
+  --info: #1d6fd6;
+  --info-soft: #dde9f8;
+  --shadow: 0 1px 2px rgba(40, 30, 20, 0.05), 0 10px 30px rgba(40, 30, 20, 0.07);
+  --shadow-sm: 0 1px 2px rgba(40, 30, 20, 0.06);
+  --scrim: rgba(25, 22, 18, 0.38);
+  --code-bg: #f3f1ea;
+  --poster-bg: #e9e6dc;
 
-  --movies: #e58b6d;
-  --series: #7aa7db;
-  --music: #d9b25a;
-  --books: #9cc2a0;
+  /* the logo keeps the brand red in both themes (like CloudZH) */
+  --logo-red: #c0202a;
 
-  --font-ui: 'Geist Sans', 'Geist', system-ui, sans-serif;
-  --font-title: 'Instrument Serif', Georgia, serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --movies: #c2561a;
+  --series: #1d6fd6;
+  --music: #94650f;
+  --books: #3f7d4f;
 
-  --radius: 10px;
-  --radius-small: 8px;
+  --font-body: 'Geist Sans', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --r: 14px;
+  --r-sm: 9px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --side-w: 256px;
+
+  /* StreamZH aliases */
+  --bg-sidebar: var(--side);
+  --surface-hover: var(--sunk);
+  --text: var(--fg);
+  --text-muted: var(--fg-2);
+  --text-faint: var(--muted);
+  --font-ui: var(--font-body);
+  --font-title: var(--font-display);
+  --radius: 12px;
+  --radius-small: var(--r-sm);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #262624;
+    --side: #1f1e1d;
+    --surface: #30302e;
+    --sunk: #2a2a28;
+    --line: #3b3a37;
+    --line-strong: #4a4945;
+    --fg: #f4f2ec;
+    --fg-2: #c3c0b6;
+    --muted: #9a978d;
+    --accent: #f0625a;
+    --accent-hover: #f57e77;
+    --accent-soft: #42211f;
+    --on-accent: #1f1e1d;
+    --ok: #7db58a;
+    --ok-soft: #24352a;
+    --warn: #e0b45e;
+    --warn-soft: #3a3121;
+    --err: #f4a493;
+    --err-soft: #3b2420;
+    --on-err: #1f1e1d;
+    --orange: #f0904f;
+    --orange-soft: #3d2a1e;
+    --info: #7fb2f0;
+    --info-soft: #1f2c3d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.28);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --code-bg: #1e1e1c;
+    --poster-bg: #2c2b29;
+    --movies: #f0904f;
+    --series: #7fb2f0;
+    --music: #e0b45e;
+    --books: #7db58a;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #262624;
+  --side: #1f1e1d;
+  --surface: #30302e;
+  --sunk: #2a2a28;
+  --line: #3b3a37;
+  --line-strong: #4a4945;
+  --fg: #f4f2ec;
+  --fg-2: #c3c0b6;
+  --muted: #9a978d;
+  --accent: #f0625a;
+  --accent-hover: #f57e77;
+  --accent-soft: #42211f;
+  --on-accent: #1f1e1d;
+  --ok: #7db58a;
+  --ok-soft: #24352a;
+  --warn: #e0b45e;
+  --warn-soft: #3a3121;
+  --err: #f4a493;
+  --err-soft: #3b2420;
+  --on-err: #1f1e1d;
+  --orange: #f0904f;
+  --orange-soft: #3d2a1e;
+  --info: #7fb2f0;
+  --info-soft: #1f2c3d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --code-bg: #1e1e1c;
+  --poster-bg: #2c2b29;
+  --movies: #f0904f;
+  --series: #7fb2f0;
+  --music: #e0b45e;
+  --books: #7db58a;
 }

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, type ReactNode } from 'react'
 import { api, unauthorizedEvent } from '../api/client'
+import { splashDone } from '../lib/splash'
 import { AuthContext, authQueryKey } from './auth'
 import LoginPage from './LoginPage'
 import SetupPage from './SetupPage'
@@ -22,6 +23,11 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       document.title = state.data.instanceName
     }
   }, [state.data])
+
+  // The splash screen (index.html) stays until StreamZH knows whether to show setup, sign-in or the app.
+  useEffect(() => {
+    if (!state.isPending) splashDone()
+  }, [state.isPending])
 
   if (state.isPending) {
     return <div className={styles.loading} aria-busy="true" />

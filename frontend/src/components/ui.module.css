@@ -1,106 +1,255 @@
+/* Shared building blocks in the CloudZH style (web/public/app.css: .btn, .input, .pill, .seg, .panel, .switch …). */
+
+/* ---- Buttons ---- */
 .button,
 .primary,
-.danger {
+.danger,
+.ghost {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  height: 36px;
+  padding: 0 14px;
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   line-height: 1;
-  border-radius: var(--radius-small);
-  padding: 9px 14px;
+  border-radius: 10px;
   cursor: pointer;
   white-space: nowrap;
   text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.button:active:not(:disabled),
+.primary:active:not(:disabled),
+.danger:active:not(:disabled),
+.ghost:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .button {
-  color: var(--text);
-  background: transparent;
-  border: 1px solid var(--line);
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
 }
 
 .button:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--sunk);
 }
 
 .primary {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border: 1px solid var(--accent);
 }
 
 .primary:hover:not(:disabled) {
-  background: #d02631;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .danger {
-  color: #fff;
-  background: #8f1820;
-  border: 1px solid #8f1820;
+  color: var(--err);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--err) 40%, var(--line));
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--err-soft);
+}
+
+.dangerSolid {
+  composes: button;
+  color: var(--on-err);
+  background: var(--err);
+  border-color: var(--err);
+}
+
+.dangerSolid:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--err) 88%, var(--fg));
+}
+
+.ghost {
+  color: var(--fg-2);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.ghost:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--sunk);
+}
+
+/* size and shape modifiers: <button className={`${ui.button} ${ui.sm}`}> */
+.sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+.icon {
+  width: 36px;
+  padding: 0;
+}
+
+.icon.sm {
+  width: 30px;
+}
+
+.block {
+  width: 100%;
+  height: 42px;
 }
 
 .button:disabled,
 .primary:disabled,
-.danger:disabled {
+.danger:disabled,
+.ghost:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
 }
 
+/* ---- Fields ---- */
 .input,
 .select {
+  height: 38px;
   font: inherit;
   font-size: 14px;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  padding: 9px 12px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0 12px;
   min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+textarea.input {
+  height: auto;
+  padding: 10px 12px;
+  line-height: 1.55;
+}
+
+.select {
+  padding-right: 8px;
+  cursor: pointer;
+}
+
+.input::placeholder {
+  color: var(--muted);
 }
 
 .input:focus,
 .select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.input:disabled,
+.select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-2);
 }
 
 .field small {
-  color: var(--text-faint);
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .check {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--fg-2);
   cursor: pointer;
 }
 
 .check input {
   accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
 }
 
-.badge {
+/* ---- Switch (CloudZH .switch): <label className={ui.switch}><input type="checkbox" /><span /></label> ---- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex: none;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  background: var(--line-strong);
+  transition: background 0.2s;
+}
+
+.switch span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s var(--ease);
+}
+
+.switch input:checked + span {
+  background: var(--accent);
+}
+
+.switch input:checked + span::after {
+  transform: translateX(16px);
+}
+
+.switch input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Pills and tags ---- */
+.badge,
+.pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 24px;
+  padding: 0 9px;
   font-size: 12px;
   font-weight: 500;
-  padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  color: var(--text-muted);
+  background: var(--sunk);
+  color: var(--fg-2);
   white-space: nowrap;
 }
 
@@ -112,16 +261,176 @@
   background: currentColor;
 }
 
+.badge.ok,
+.pillOk {
+  background: var(--ok-soft);
+  color: var(--ok);
+  border-color: transparent;
+}
+
+.badge.missing,
+.pillErr {
+  background: var(--err-soft);
+  color: var(--err);
+  border-color: transparent;
+}
+
+.badge.waiting,
+.pillWarn {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: transparent;
+}
+
+.pillBusy {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+.badge.idle {
+  color: var(--muted);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  background: var(--sunk);
+  color: var(--fg-2);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+/* ---- Segmented control (CloudZH .seg) ---- */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.seg > button,
+.seg > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg > button:hover,
+.seg > a:hover {
+  color: var(--fg);
+}
+
+.seg > .segOn,
+.seg > [aria-selected='true'],
+.seg > [aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---- Panel (CloudZH .panel) ---- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  min-width: 0;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.panelHead h2,
+.panelHead h3 {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panelHead > :last-child:not(:first-child) {
+  margin-left: auto;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ---- Empty state ---- */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+  color: var(--fg);
+}
+
+/* ---- Notes ---- */
+.infoBox,
+.errBox {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.infoBox {
+  color: var(--fg-2);
+  background: var(--sunk);
+  border: 1px solid var(--line);
+}
+
+.errBox {
+  color: var(--err);
+  background: var(--err-soft);
+}
+
+/* ---- Text colours ---- */
 .ok {
   color: var(--ok);
 }
 
 .missing {
-  color: #ef6b6b;
+  color: var(--err);
 }
 
 .idle {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .waiting {
@@ -129,16 +438,88 @@
 }
 
 .error {
-  color: #ef6b6b;
+  color: var(--err);
   font-size: 13px;
   margin: 0;
 }
 
 .muted {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .mono {
   font-family: var(--font-mono);
   font-size: 12.5px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Status dots ---- */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--muted);
+}
+
+.dotOk {
+  composes: dot;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+
+.dotWarn {
+  composes: dot;
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-soft);
+}
+
+.dotErr {
+  composes: dot;
+  background: var(--err);
+  box-shadow: 0 0 0 3px var(--err-soft);
+}
+
+.dotBusy {
+  composes: dot;
+  background: var(--accent);
+  animation: pulse 1s infinite;
+}
+
+/* ---- Table (CloudZH .tbl) ---- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr {
+  transition: background 0.12s;
+}
+
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }

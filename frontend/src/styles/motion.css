@@ -1,0 +1,112 @@
+/* Motion like CloudZH (app.css «Loading animations»):
+   - Splash (#splash, markup in index.html): the H grows from bottom and top, the Z draws itself in red, the wordmark
+     «StreamZH» slides open and «ZH» pops, then a progress bar and calm breathing until the app is ready.
+   - Page change: thin red bar at the very top (#topbar), the new page fades in from top to bottom (.v-in).
+   - Waiting: .ld (monogram whose Z draws itself and dissolves again), .sk (shimmering placeholder rows).
+   - prefers-reduced-motion: everything off, final state visible. */
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { transform: scale(0.97); opacity: 0; } }
+@keyframes slideIn { from { transform: translateX(30px); opacity: 0; } }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes livepulse { 0% { transform: scale(0.6); opacity: 0.55; } 80%, 100% { transform: scale(1.4); opacity: 0; } }
+@keyframes skShim { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes vIn { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------- Splash ---------- */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  transition: opacity 0.5s ease, visibility 0s linear 0.5s;
+}
+.splash.out { opacity: 0; visibility: hidden; pointer-events: none; }
+.sp-in { display: grid; justify-items: center; gap: 30px; padding: 24px; transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1); }
+.splash.out .sp-in { transform: translateY(-6px) scale(1.04); }
+.sp-brand { display: flex; align-items: center; animation: spBreath 2.8s ease-in-out 2.6s infinite; }
+.sp-mark { width: 64px; height: 64px; flex: none; color: var(--fg); }
+.sp-mark svg, .sp-word svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.sp-hl, .sp-hr { fill: currentColor; transform-box: fill-box; }
+.sp-hl { transform-origin: 50% 100%; animation: spGrow 0.55s cubic-bezier(0.2, 0.75, 0.2, 1) 0.05s backwards; }
+.sp-hr { transform-origin: 50% 0; animation: spGrow 0.55s cubic-bezier(0.2, 0.75, 0.2, 1) 0.2s backwards; }
+.sp-z { fill: var(--logo-red); }
+.sp-zs, .ld-s { fill: none; stroke: #fff; stroke-width: 26; stroke-linejoin: round; stroke-dasharray: 1 1.02; }
+.sp-zs { animation: spDraw 0.7s cubic-bezier(0.65, 0, 0.25, 1) 0.5s backwards; }
+/* wordmark box: 0.742 × monogram high, viewBox 647.4 × 106 */
+.sp-word {
+  width: 290.1px;
+  height: 47.5px;
+  margin-left: 15.4px;
+  transform: translateY(-2.8%);
+  overflow: hidden;
+  flex: none;
+  color: var(--fg);
+  animation: spWord 0.85s cubic-bezier(0.7, 0, 0.2, 1) 1.25s backwards;
+}
+.sp-word svg { animation: spWordIn 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) 1.4s backwards; }
+.sp-wc { fill: currentColor; }
+.sp-wz { fill: var(--logo-red); transform-box: fill-box; transform-origin: 50% 60%; animation: spPop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 1.9s backwards; }
+.sp-bar { width: 160px; height: 2px; border-radius: 2px; background: var(--line); overflow: hidden; animation: fade 0.45s ease 2.15s backwards; }
+.sp-bar > i { display: block; width: 36%; height: 100%; border-radius: 2px; background: var(--accent); animation: spSlide 1.3s cubic-bezier(0.45, 0, 0.25, 1) 2.15s infinite; }
+.sp-hint { margin: -12px 0 0; max-width: 280px; text-align: center; font-size: 12.5px; color: var(--muted); animation: fade 0.5s ease 7s backwards; }
+@media (max-width: 420px) {
+  .sp-mark { width: 48px; height: 48px; }
+  .sp-word { width: 217.6px; height: 35.6px; margin-left: 11.5px; }
+}
+@keyframes spGrow { from { transform: scaleY(0); } }
+@keyframes spDraw { from { stroke-dashoffset: 1; } }
+@keyframes spWord { from { width: 0; margin-left: 0; } }
+@keyframes spWordIn { from { transform: translateX(-22px); opacity: 0; } }
+@keyframes spPop { from { transform: scale(0.6); opacity: 0; } }
+@keyframes spBreath { 50% { opacity: 0.8; } }
+@keyframes spSlide { from { transform: translateX(-105%); } to { transform: translateX(280%); } }
+
+/* ---------- Page change: bar at the top ---------- */
+.topbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 95; pointer-events: none; }
+.topbar > i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+}
+.topbar.run > i { width: 84%; opacity: 1; transition: width 7s cubic-bezier(0.06, 0.75, 0.14, 1), opacity 0.12s; }
+.topbar.end > i { width: 100%; opacity: 0; transition: width 0.22s ease, opacity 0.32s ease 0.2s; }
+
+/* ---------- New page: children fade in from top to bottom ---------- */
+.v-in > * { animation: vIn 0.44s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+.v-in > :nth-child(2) { animation-delay: 0.05s; }
+.v-in > :nth-child(3) { animation-delay: 0.1s; }
+.v-in > :nth-child(4) { animation-delay: 0.14s; }
+.v-in > :nth-child(n + 5) { animation-delay: 0.18s; }
+
+/* ---------- Loader: the monogram, Z draws itself and dissolves ---------- */
+.ld { display: grid; justify-items: center; align-content: center; gap: 12px; padding: 32px 12px; color: var(--muted); font-size: 13px; }
+.ld.row { display: inline-flex; gap: 8px; padding: 0; align-items: center; }
+.ld-m { width: 34px; height: 34px; color: var(--fg); opacity: 0.9; }
+.ld.row .ld-m { width: 18px; height: 18px; }
+.ld.lg .ld-m { width: 56px; height: 56px; }
+.ld-h { fill: currentColor; opacity: 0.85; }
+.ld-z { fill: var(--logo-red); }
+.ld-s { animation: ldDraw 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+@keyframes ldDraw { 0% { stroke-dashoffset: 1; } 45%, 55% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -1.02; } }
+
+/* ---------- Skeleton ---------- */
+.sk {
+  display: block;
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(100deg, var(--sunk) 20%, color-mix(in srgb, var(--line) 85%, var(--surface)) 45%, var(--sunk) 70%) 0 0 / 300% 100% var(--sunk);
+  animation: skShim 1.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

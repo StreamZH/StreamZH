@@ -88,7 +88,7 @@ export default function SeriesDetail() {
                 Remove
               </button>
             ) : (
-              <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+              <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} item={{ mediaType: 'Series', tmdbId: s.tmdbId, title: s.title, year: s.year }} />
             )}
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
@@ -116,6 +116,7 @@ export default function SeriesDetail() {
           items={[{ id: s.id, title: s.title, folder: s.folderPath, size: s.sizeOnDisk }]}
           onClose={() => setRemoving(false)}
           onRemoved={() => void navigate('/library/series')}
+          listItem={{ mediaType: 'Series', tmdbId: s.tmdbId, title: s.title, year: s.year }}
         />
       )}
       <HistoryPanel seriesId={s.id} />

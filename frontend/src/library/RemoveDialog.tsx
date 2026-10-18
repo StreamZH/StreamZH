@@ -4,6 +4,7 @@ import { queryKeys, type MediaType } from '../api/library'
 import { organizeApi, type DeleteResult } from '../api/organize'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
+import { useExclusionOnRemove, type ListItemRef } from '../importLists/useExclusionOnRemove'
 import { formatBytes } from '../lib/format'
 import styles from './MassEdit.module.css'
 import { useOrganizeStatus } from './useOrganizeStatus'
@@ -24,12 +25,16 @@ export default function RemoveDialog({
   items,
   onClose,
   onRemoved,
+  listItem,
 }: {
   type: MediaType
   items: RemoveTarget[]
   onClose: () => void
   onRemoved: (result: DeleteResult) => void
+  /** Single item: when an import list added it, offer to add it to the list exclusions. */
+  listItem?: ListItemRef
 }) {
+  const exclusion = useExclusionOnRemove(listItem)
   const queryClient = useQueryClient()
   const status = useOrganizeStatus()
   const [deleteFiles, setDeleteFiles] = useState(false)
@@ -39,7 +44,10 @@ export default function RemoveDialog({
   const noun = type === 'Movie' ? (items.length === 1 ? 'movie' : 'movies') : 'series'
 
   const remove = useMutation({
-    mutationFn: () => organizeApi.remove(type, items.map((i) => i.id), deleteFiles),
+    mutationFn: async () => {
+      await exclusion.apply()
+      return organizeApi.remove(type, items.map((i) => i.id), deleteFiles)
+    },
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: type === 'Movie' ? queryKeys.movies : queryKeys.series })
       await queryClient.invalidateQueries({ queryKey: queryKeys.stats })
@@ -65,6 +73,7 @@ export default function RemoveDialog({
           ? `Deleted folders go to the recycle bin ${recycleBin} and are cleaned up as set in Media Management.`
           : 'No recycle bin is set in Media Management: deleted files are gone for good.'}
       </p>
+      {exclusion.prompt}
       <p className={deleteFiles ? styles.summaryDanger : styles.text}>{summary}</p>
       {!single && deleteFiles && (
         <ul className={styles.removeList}>

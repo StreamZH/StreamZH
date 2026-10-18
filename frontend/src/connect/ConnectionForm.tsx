@@ -22,7 +22,7 @@ import styles from './Connect.module.css'
 
 const topFields = ['name', 'enable']
 
-function Field({
+export function Field({
   id,
   label,
   advanced = false,
@@ -56,7 +56,7 @@ function Field({
   )
 }
 
-function Switch({ checked, onChange, on = 'On', off = 'Off', label }: { checked: boolean; onChange: (checked: boolean) => void; on?: string; off?: string; label?: string }) {
+export function Switch({ checked, onChange, on = 'On', off = 'Off', label }: { checked: boolean; onChange: (checked: boolean) => void; on?: string; off?: string; label?: string }) {
   return (
     <label className={form.switch}>
       <input type="checkbox" role="switch" checked={checked} aria-label={label} onChange={(e) => onChange(e.target.checked)} />
@@ -265,7 +265,7 @@ export default function ConnectionForm({
 }
 
 /** One type-specific setting, drawn from its field definition. */
-function SettingField({
+export function SettingField({
   id,
   field: f,
   value,

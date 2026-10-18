@@ -156,4 +156,8 @@ public static class ConfigKeys
     public const string UiShowRelativeDates = "UiShowRelativeDates";
     // Calendar (0.7)
     public const string UiFirstDayOfWeek = "UiFirstDayOfWeek";
+
+    // Import lists (0.7)
+    public const string ImportListSyncInterval = "ImportListSyncInterval";
+    public const string ImportListCleanLibraryLevel = "ImportListCleanLibraryLevel";
 }

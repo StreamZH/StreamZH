@@ -89,7 +89,7 @@ export default function MovieDetail() {
                 Remove
               </button>
             ) : (
-              <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+              <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} item={{ mediaType: 'Movie', tmdbId: m.tmdbId, title: m.title, year: m.year }} />
             )}
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
@@ -134,6 +134,7 @@ export default function MovieDetail() {
           items={[{ id: m.id, title: m.year > 0 ? `${m.title} (${m.year})` : m.title, folder: m.folderPath, size: m.file?.size ?? 0 }]}
           onClose={() => setRemoving(false)}
           onRemoved={() => void navigate('/library/movies')}
+          listItem={{ mediaType: 'Movie', tmdbId: m.tmdbId, title: m.title, year: m.year }}
         />
       )}
       <HistoryPanel movieId={m.id} />

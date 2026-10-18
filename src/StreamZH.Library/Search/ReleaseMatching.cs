@@ -18,24 +18,86 @@ namespace StreamZH.Library.Search;
 /// </summary>
 public static class ReleaseMatching
 {
-    public static ReleaseMatch MatchMovie(ParsedRelease parsed, Movie movie, ReleaseInfo? info = null)
+    /// <param name="alternativeTitles">The movie's other names (TMDB, translations, yours), like Radarr's alternative titles.</param>
+    public static ReleaseMatch MatchMovie(
+        ParsedRelease parsed, Movie movie, ReleaseInfo? info = null, IReadOnlyList<AlternativeTitle>? alternativeTitles = null)
     {
         if (info is not null && MovieIdsMatch(info, movie))
         {
             return ReleaseMatch.Match;
         }
 
-        return ReleaseMatcher.Match(parsed, isSeries: false, [movie.Title, movie.OriginalTitle], movie.Year, movie.ImdbId, movie.TmdbId);
+        return ReleaseMatcher.Match(parsed, isSeries: false, MovieTitles(movie, alternativeTitles), movie.Year, movie.ImdbId, movie.TmdbId);
     }
 
-    public static ReleaseMatch MatchSeries(ParsedRelease parsed, Series series, ReleaseInfo? info = null)
+    /// <param name="alternativeTitles">
+    /// The series' other names (TMDB, translations, scene names, yours), like Sonarr's scene mappings; a name for one season
+    /// only counts for releases of that season.
+    /// </param>
+    public static ReleaseMatch MatchSeries(
+        ParsedRelease parsed, Series series, ReleaseInfo? info = null, IReadOnlyList<AlternativeTitle>? alternativeTitles = null)
     {
         if (info is not null && SeriesIdsMatch(info, series))
         {
             return ReleaseMatch.Match;
         }
 
-        return ReleaseMatcher.Match(parsed, isSeries: true, [series.Title, series.OriginalTitle], series.Year);
+        return ReleaseMatcher.Match(parsed, isSeries: true, SeriesTitles(series, parsed.SeasonNumber, alternativeTitles), series.Year);
+    }
+
+    /// <summary>Title, original title and the alternative titles of a movie.</summary>
+    public static IEnumerable<string> MovieTitles(Movie movie, IReadOnlyList<AlternativeTitle>? alternativeTitles = null)
+    {
+        ArgumentNullException.ThrowIfNull(movie);
+        return [movie.Title, movie.OriginalTitle, .. (alternativeTitles ?? []).Select(t => t.Title)];
+    }
+
+    /// <summary>
+    /// Title, original title and the alternative titles of a series that apply to <paramref name="seasonNumber"/>
+    /// (null: the season is unknown, every title counts).
+    /// </summary>
+    public static IEnumerable<string> SeriesTitles(Series series, int? seasonNumber, IReadOnlyList<AlternativeTitle>? alternativeTitles = null)
+    {
+        ArgumentNullException.ThrowIfNull(series);
+        return [series.Title, series.OriginalTitle, .. (alternativeTitles ?? []).Where(t => AppliesToSeason(t, seasonNumber)).Select(t => t.Title)];
+    }
+
+    /// <summary>
+    /// Sonarr's scene mapping rule: a name for one scene season (TheXEM) only matches releases numbered with that season;
+    /// otherwise a name limited to one season only matches that season. Unrestricted names and an unknown season always match.
+    /// </summary>
+    public static bool AppliesToSeason(AlternativeTitle title, int? seasonNumber)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+        if (seasonNumber is not { } season)
+        {
+            return true;
+        }
+
+        return title.SceneSeasonNumber is { } scene ? scene == season
+            : title.SeasonNumber is not { } only || only == season;
+    }
+
+    /// <summary>
+    /// Which of <paramref name="titles"/> the release name stands for (the first one whose clean title matches), or null.
+    /// For messages like "matched by its German title".
+    /// </summary>
+    public static string? MatchedTitle(ParsedRelease parsed, IEnumerable<string> titles, int year, bool isSeries)
+    {
+        ArgumentNullException.ThrowIfNull(parsed);
+        ArgumentNullException.ThrowIfNull(titles);
+        foreach (var title in titles.Where(t => !string.IsNullOrWhiteSpace(t)))
+        {
+            foreach (var clean in TitleNormalizer.CleanVariants(title))
+            {
+                if (clean == parsed.CleanTitle || (isSeries && year > 0 && clean + year.ToString(CultureInfo.InvariantCulture) == parsed.CleanTitle))
+                {
+                    return title;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>A readable <see cref="RejectionCodes.WrongMedia"/> rejection, or null for a match.</summary>

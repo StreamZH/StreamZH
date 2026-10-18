@@ -21,6 +21,7 @@ import RemoveButton from './RemoveButton'
 import RemoveDialog from './RemoveDialog'
 import SearchButtons from './SearchButtons'
 import { useDetailActions } from './useDetailActions'
+import AlternativeTitles from './AlternativeTitles'
 
 export default function MovieDetail() {
   const id = Number(useParams().id)
@@ -137,6 +138,7 @@ export default function MovieDetail() {
       </section>
 
       {m.file && <MediaInfoPanel movieId={m.id} />}
+      <AlternativeTitles type="Movie" id={m.id} />
       <HistoryPanel movieId={m.id} />
 
       {organizing && <OrganizeDialog type="Movie" ids={[m.id]} onClose={() => setOrganizing(false)} />}

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { alternativeTitlesApi } from '../../api/alternativeTitles'
 import { libraryApi, queryKeys } from '../../api/library'
 import { tmdbImage } from '../../lib/format'
 import { toggleTheme } from '../../lib/theme'
@@ -45,10 +46,15 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   const list = useRef<HTMLDivElement>(null)
   const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies })
   const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series })
+  const titles = useQuery({ queryKey: ['library-titles'], queryFn: alternativeTitlesApi.all, staleTime: 60_000 })
 
   useEffect(() => input.current?.focus(), [])
 
   const entries: Entry[] = useMemo(() => {
+    // Alternative titles ("Die Simpsons", "Haus des Geldes") find the item too.
+    const known = new Map<string, string>()
+    for (const t of titles.data ?? []) known.set(`${t.mediaType}:${t.id}`, `${known.get(`${t.mediaType}:${t.id}`) ?? ''} ${t.title}`)
+    const aka = (type: string, id: number) => known.get(`${type}:${id}`) ?? ''
     const go = (to: string) => () => {
       onClose()
       void navigate(to)
@@ -70,7 +76,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
         group: 'Library',
         poster: s.posterPath,
         run: go(`/library/series/${s.id}`),
-        words: `${s.title} ${s.year} series`.toLowerCase(),
+        words: `${s.title} ${s.year} series ${aka('series', s.id)}`.toLowerCase(),
       })),
       ...(movies.data ?? []).map((m) => ({
         key: `movie:${m.id}`,
@@ -79,7 +85,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
         group: 'Library',
         poster: m.posterPath,
         run: go(`/library/movies/${m.id}`),
-        words: `${m.title} ${m.originalTitle} ${m.year} movie film`.toLowerCase(),
+        words: `${m.title} ${m.originalTitle} ${m.year} movie film ${aka('movie', m.id)}`.toLowerCase(),
       })),
       {
         key: 'act:theme',
@@ -94,7 +100,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
         words: 'theme dark light appearance colour color',
       },
     ]
-  }, [movies.data, series.data, navigate, onClose])
+  }, [movies.data, series.data, titles.data, navigate, onClose])
 
   const results = useMemo(() => {
     const words = text.trim().toLowerCase().split(/\s+/).filter(Boolean)

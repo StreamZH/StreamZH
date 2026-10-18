@@ -43,7 +43,8 @@ public sealed class MassEditService(
     LibraryRunTracker tracker,
     IEventBus events,
     ILogger<MassEditService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    AlternativeTitleRepository? alternativeTitles = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -249,6 +250,7 @@ public sealed class MassEditService(
                 series.Delete(id);
             }
 
+            alternativeTitles?.DeleteForItem(mediaType, id);
             removed.Add(new RemovedItem(id, title, folder, deleteFiles, recycled));
             logger.LogInformation(
                 deleteFiles ? "Removed '{Title}' from the library and deleted {Folder}" : "Removed '{Title}' from the library (files kept in {Folder})", title, folder);

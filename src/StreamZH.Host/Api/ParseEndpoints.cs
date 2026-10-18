@@ -7,7 +7,9 @@ using StreamZH.Core.Decisions;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
+using StreamZH.Library.Rss;
 using StreamZH.Library.Search;
+using StreamZH.Library.Titles;
 using StreamZH.Parsing.Releases;
 
 namespace StreamZH.Host.Api;
@@ -31,7 +33,8 @@ public static class ParseEndpoints
             DecisionTargetFactory targets,
             QualityDefinitionRepository definitions,
             IndexerOptions options,
-            StreamZH.Library.SceneNumbering.EpisodeMapper episodeMapper) =>
+            StreamZH.Library.SceneNumbering.EpisodeMapper episodeMapper,
+            AlternativeTitleRepository alternativeTitles) =>
         {
             var parsed = ReleaseParser.Parse(title.Trim());
             if (parsed is null)
@@ -49,7 +52,7 @@ public static class ParseEndpoints
             {
                 var name = $"{movie.Title} ({movie.Year})";
                 var target = targets.ForMovie(movie) with { Monitored = true };
-                var mismatch = ReleaseMatching.MismatchRejection(ReleaseMatching.MatchMovie(parsed, movie), parsed, name);
+                var mismatch = ReleaseMatching.MismatchRejection(ReleaseMatching.MatchMovie(parsed, movie, null, alternativeTitles.For(MediaType.Movie, movie.Id)), parsed, name);
                 decision = Decide(parsed, size, indexer, target, name, mismatch, definitions, rules);
                 decided = target;
             }
@@ -64,7 +67,7 @@ public static class ParseEndpoints
                     : parsed.FullSeason && parsed.SeasonNumber is { } season ? Math.Max(1, library.Count(e => e.SeasonNumber == season))
                     : Math.Max(1, parsed.EpisodeNumbers.Count);
                 var target = targets.ForEpisodes(show, covered, count) with { Monitored = true };
-                var mismatch = ReleaseMatching.MismatchRejection(ReleaseMatching.MatchSeries(parsed, show), parsed, name);
+                var mismatch = ReleaseMatching.MismatchRejection(ReleaseMatching.MatchSeries(parsed, show, null, alternativeTitles.For(MediaType.Series, show.Id)), parsed, name);
                 decision = Decide(parsed, size, indexer, target, name, mismatch, definitions, rules);
                 decided = target;
             }
@@ -94,6 +97,7 @@ public static class ParseEndpoints
                 ReleaseProfiles = [.. explained.Select(m => ReleaseProfileMatchResource.From(m, original.GetValueOrDefault(m.Profile.Id) ?? m.Profile))],
                 PreferredScore = explained.Sum(m => m.Score),
                 HardcodedSubs = HardcodedSubs.Find(parsed.ReleaseTitle),
+                Library = LibraryMatchResource.Find(parsed, movies, series, alternativeTitles),
             });
         }).RequireAuthorization().WithTags("Parse");
 
@@ -140,6 +144,52 @@ public sealed record ParseResult(ParsedReleaseResource? Parsed, DecisionResult? 
     public int PreferredScore { get; init; }
 
     public string? HardcodedSubs { get; init; }
+
+    /// <summary>The library movie or series the name belongs to (by any of its titles), or null.</summary>
+    public LibraryMatchResource? Library { get; init; }
+}
+
+/// <summary>
+/// The library item a release name belongs to and the title that matched it (<see cref="Source"/>: "title",
+/// "originalTitle" or an alternative title source such as "translation"; <see cref="Language"/> for alternative titles).
+/// </summary>
+public sealed record LibraryMatchResource(string MediaType, int Id, string Title, int Year, string MatchedTitle, string Source, string? Language)
+{
+    public static LibraryMatchResource? Find(ParsedRelease parsed, MovieRepository movies, SeriesRepository series, AlternativeTitleRepository alternativeTitles)
+    {
+        var lookup = new AlternativeTitleLookup([.. alternativeTitles.All(Core.Media.MediaType.Movie), .. alternativeTitles.All(Core.Media.MediaType.Series)]);
+        var index = new LibraryIndex(parsed.IsEpisode ? [] : movies.All(), parsed.IsEpisode ? series.All() : [], lookup);
+        if (parsed.IsEpisode)
+        {
+            return index.FindSeries(parsed) is { } show
+                ? Describe("series", show.Id, show.Title, show.OriginalTitle, show.Year, true, lookup.For(Core.Media.MediaType.Series, show.Id), parsed)
+                : null;
+        }
+
+        return index.FindMovie(parsed) is { } movie
+            ? Describe("movie", movie.Id, movie.Title, movie.OriginalTitle, movie.Year, false, lookup.For(Core.Media.MediaType.Movie, movie.Id), parsed)
+            : null;
+    }
+
+    private static LibraryMatchResource Describe(
+        string type, int id, string title, string originalTitle, int year, bool isSeries, IReadOnlyList<AlternativeTitle> alternatives, ParsedRelease parsed)
+    {
+        if (ReleaseMatching.MatchedTitle(parsed, [title], year, isSeries) is not null)
+        {
+            return new(type, id, title, year, title, "title", null);
+        }
+
+        if (ReleaseMatching.MatchedTitle(parsed, [originalTitle], year, isSeries) is not null)
+        {
+            return new(type, id, title, year, originalTitle, "originalTitle", null);
+        }
+
+        var usable = isSeries ? alternatives.Where(t => ReleaseMatching.AppliesToSeason(t, parsed.SeasonNumber)) : alternatives;
+        var matched = usable.FirstOrDefault(t => ReleaseMatching.MatchedTitle(parsed, [t.Title], year, isSeries) is not null);
+        return matched is null
+            ? new(type, id, title, year, title, "id", null)
+            : new(type, id, title, year, matched.Title, matched.Source, matched.LanguageId is { } l ? Core.Quality.Language.FindById(l).Name : null);
+    }
 }
 
 public sealed record DecisionResult(string Target, string Profile, bool Accepted, IReadOnlyList<RejectionResource> Rejections)

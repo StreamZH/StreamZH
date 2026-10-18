@@ -180,4 +180,7 @@ public static class ConfigKeys
     public const string FfprobePath = "FfprobePath";
     public const string MediaInfoAnalyze = "MediaInfoAnalyze";
     public const string MediaInfoRefreshIntervalDays = "MediaInfoRefreshIntervalDays";
+
+    // Alternative titles (0.8.1)
+    public const string IndexerSearchAlternativeTitles = "IndexerSearchAlternativeTitles";
 }

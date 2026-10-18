@@ -23,7 +23,7 @@ public enum ReleaseMatch
 
 /// <summary>
 /// Does a release belong to a movie or series? Ids in the name (IMDb, TMDB) decide first; otherwise the clean title
-/// must match the title or the original title, and a year in the name must be within one year
+/// must match one of the item's titles (title, original title, alternative titles; umlauts also without "e"), and a year in the name must be within one year
 /// (Radarr does the same: German and US releases often carry different years).
 /// </summary>
 public static class ReleaseMatcher
@@ -60,7 +60,7 @@ public static class ReleaseMatcher
         var clean = release.CleanTitle;
         var titleMatches = titles
             .Where(t => !string.IsNullOrWhiteSpace(t))
-            .Select(TitleNormalizer.Clean)
+            .SelectMany(TitleNormalizer.CleanVariants)
             .Any(t => t.Length > 0 && (t == clean || (isSeries && year > 0 && t + year == clean)));
 
         if (!titleMatches)

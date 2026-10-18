@@ -60,6 +60,30 @@ public static partial class TitleNormalizer
         return RemoveDiacritics(ReplaceSpecialLetters(title.ToLowerInvariant()));
     }
 
+    /// <summary>
+    /// The clean title and, for a title with German umlauts, also the spelling without the "e" that some release names
+    /// use ("Die Schöne und das Biest" → "dieschoeneunddasbiest" and "dieschoneunddasbiest"). Library titles go through this;
+    /// release names are cleaned with <see cref="Clean"/> only.
+    /// </summary>
+    public static IEnumerable<string> CleanVariants(string title)
+    {
+        var clean = Clean(title);
+        if (clean.Length == 0)
+        {
+            yield break;
+        }
+
+        yield return clean;
+        if (title.AsSpan().IndexOfAny("äöüÄÖÜ") >= 0)
+        {
+            var folded = Clean(title.Replace('ä', 'a').Replace('ö', 'o').Replace('ü', 'u').Replace('Ä', 'A').Replace('Ö', 'O').Replace('Ü', 'U'));
+            if (folded.Length > 0 && folded != clean)
+            {
+                yield return folded;
+            }
+        }
+    }
+
     /// <summary>Removes accents: "Amélie" → "Amelie". Letters without a decomposition (ß, ø, ð …) are left alone.</summary>
     internal static string RemoveDiacritics(string text)
     {

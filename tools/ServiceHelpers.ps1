@@ -106,6 +106,69 @@ function Wait-StreamZhReady([int]$timeoutSeconds = 90) {
     return $null
 }
 
+# The data folder from the service command line (--data "D:\StreamZH"), or '' for the default.
+function Get-StreamZhServiceDataDir {
+    $info = Get-CimInstance -ClassName Win32_Service -Filter "Name='$StreamZhServiceName'" -ErrorAction SilentlyContinue
+    if ($info -and $info.PathName -match '--data\s+"([^"]+)"') { return $Matches[1] }
+    if ($info -and $info.PathName -match '--data\s+(\S+)') { return $Matches[1] }
+    return ''
+}
+
+# Tray icon (StreamZH.Tray.exe next to StreamZH.exe): "Start with Windows" for the current user, like the menu item.
+$StreamZhRunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+$StreamZhTrayRunValue = 'StreamZH Tray'
+
+function Stop-StreamZhTray {
+    $tray = @(Get-Process -Name 'StreamZH.Tray' -ErrorAction SilentlyContinue)
+    if ($tray.Count -eq 0) { return $false }
+    # Only the own ones without administrator rights; that is enough to replace the file for this user.
+    $tray | Stop-Process -Force -ErrorAction SilentlyContinue
+    $tray | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+    return $true
+}
+
+function Register-StreamZhTray([string]$installDir, [string]$dataDir) {
+    $exe = Join-Path $installDir 'StreamZH.Tray.exe'
+    if (-not (Test-Path $exe)) { return $false }
+    $command = "`"$exe`""
+    # Without a trailing backslash, which would escape the closing quote.
+    if ($dataDir) { $command = "$command --data `"$($dataDir.TrimEnd('\'))`"" }
+    if (-not (Test-Path $StreamZhRunKey)) { New-Item -Path $StreamZhRunKey | Out-Null }
+    Set-ItemProperty -Path $StreamZhRunKey -Name $StreamZhTrayRunValue -Value $command
+    return $true
+}
+
+function Unregister-StreamZhTray {
+    if ((Get-ItemProperty -Path $StreamZhRunKey -ErrorAction SilentlyContinue).$StreamZhTrayRunValue) {
+        Remove-ItemProperty -Path $StreamZhRunKey -Name $StreamZhTrayRunValue
+        return $true
+    }
+    return $false
+}
+
+function Start-StreamZhTray([string]$installDir, [string]$dataDir) {
+    $exe = Join-Path $installDir 'StreamZH.Tray.exe'
+    if (-not (Test-Path $exe)) { return $false }
+    if ((Test-Administrator) -and -not $dataDir) {
+        # From an administrator PowerShell explorer.exe starts it as the signed-in user, without administrator rights.
+        Start-Process -FilePath 'explorer.exe' -ArgumentList "`"$exe`""
+    }
+    else {
+        $start = @{ FilePath = $exe; WorkingDirectory = $installDir }
+        if ($dataDir) { $start.ArgumentList = @('--data', "`"$($dataDir.TrimEnd('\'))`"") }
+        Start-Process @start
+    }
+    return $true
+}
+
+# The tray reads <data>\tray.token and tray.json; a new owner (service account or console user) writes them anew.
+function Remove-StreamZhTrayFiles([string]$dataDir) {
+    if (-not $dataDir) { $dataDir = Join-Path $env:ProgramData 'StreamZH' }
+    foreach ($name in @('tray.token', 'tray.json')) {
+        Remove-Item -LiteralPath (Join-Path $dataDir $name) -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Write-StreamZhTroubleshooting {
     $logs = Join-Path $env:ProgramData 'StreamZH\logs'
     Write-Host "Log-Dateien: $logs" -ForegroundColor Yellow

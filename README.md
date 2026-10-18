@@ -93,6 +93,7 @@ administrator rights for that (the install script allows your user to start and 
 | `-Account .\johndoe` | Runs the service as this user (asks for the password; Microsoft account: its password, not the PIN) instead of LocalSystem. Needed for a NAS that wants a login. `-Account LocalSystem` switches back |
 | `-DataDir D:\StreamZH` | Another data folder (passed as `--data`) |
 | `-NoStart` | Creates or updates the service without starting it |
+| `-NoTray` | No tray icon (removes its "Start with Windows" entry) |
 
 Things that work differently for a service:
 
@@ -106,6 +107,19 @@ Things that work differently for a service:
 
 Back to the console window: `C:\Repos\StreamZH\tools\Uninstall-Service.ps1` (as administrator;
 program and data stay).
+
+#### Tray icon
+
+A service has no window, so `StreamZH.Tray.exe` (next to `StreamZH.exe`) shows StreamZH in the
+notification area, bottom right: a dot shows the state (green running, orange paused or warnings,
+red stopped or not answering), the tooltip the downloads (`Running · 2 downloads · 47.3 % · 12 min 05 s`).
+Double-click opens the dashboard; the right-click menu pauses and resumes downloads, restarts, stops
+and starts StreamZH, opens the logs and the data folder, and switches "Start with Windows" and the
+notifications when a download finishes or fails. `Update-Local.ps1` and `Install-Service.ps1` build it,
+let it start with Windows for your user and start it (`-NoTray` leaves it out); it works for the
+service and for the console window. It needs the .NET 10 Windows Desktop Runtime, which the .NET SDK
+includes. The tray talks to StreamZH on this computer only, with a token StreamZH writes to
+`C:\ProgramData\StreamZH\tray.token` at every start (readable by administrators and signed-in users).
 
 ### Linux: systemd service
 
@@ -165,6 +179,7 @@ The OpenAPI description is at `/api/v1/openapi.json`. `/health` needs no login.
 | `src/StreamZH.Indexers` | Newznab client, search, RSS |
 | `src/StreamZH.Usenet` | Download engine: NZB, NNTP, yEnc, par2, unpack |
 | `src/StreamZH.Library` | Import, rename, disk scan, media server notifications |
+| `src/StreamZH.Tray`, `src/StreamZH.Tray.Core` | Windows tray icon (WinForms) and its logic without UI |
 | `frontend/` | React + TypeScript web UI |
 | `tests/` | xUnit tests |
 | `docs/` | Architecture, roadmap, decisions |

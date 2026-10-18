@@ -4,6 +4,8 @@
 
 .DESCRIPTION
     Stops and deletes the service, its firewall rule (from Install-Service.ps1 -Firewall) and its event log source.
+    Closes the tray icon and removes its "Start with Windows" entry for your user (Update-Local.ps1 sets it up again
+    for StreamZH in a console window).
     The program files in C:\Tools\StreamZH and your data in C:\ProgramData\StreamZH stay, so StreamZH can be started
     in a console window again (C:\Repos\StreamZH\tools\Update-Local.ps1 does that) or installed as a service again
     (C:\Repos\StreamZH\tools\Install-Service.ps1).
@@ -27,6 +29,14 @@ function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 Assert-Administrator $PSCommandPath (Format-StreamZhArguments $PSBoundParameters)
 
 $service = Get-StreamZhService
+$dataDir = Get-StreamZhServiceDataDir
+
+Step 'Tray icon'
+if (Stop-StreamZhTray) { Write-Host 'closed' } else { Write-Host 'not running' }
+if (Unregister-StreamZhTray) { Write-Host 'start with Windows: removed' }
+# Written by the service account; StreamZH in a console window writes its own.
+Remove-StreamZhTrayFiles $dataDir
+
 if (-not $service) {
     Write-Host 'Der Dienst StreamZH ist nicht installiert.' -ForegroundColor Yellow
 }

@@ -10,6 +10,10 @@
     It also lets your Windows user start and stop the service without administrator rights, so
     C:\Repos\StreamZH\tools\Update-Local.ps1 can update it from a normal PowerShell.
 
+    Tray icon: a service has no window, so StreamZH.Tray.exe (next to StreamZH.exe) shows StreamZH in the notification
+    area with a menu (open the dashboard, pause downloads, restart, stop, start). The script registers it to start with
+    Windows for your user (HKCU ... Run, "StreamZH Tray") and starts it; -NoTray leaves it out.
+
     The service runs as LocalSystem by default (no password needed). Two things work differently for a service:
     - Controlled folder access (Windows Security -> Ransomware protection) blocks unknown programs in protected folders
       such as Videos and Documents, also for a service. -AllowControlledFolderAccess allows StreamZH.exe.
@@ -40,7 +44,10 @@
     Adds StreamZH.exe to the allowed apps of Controlled folder access.
 
 .PARAMETER NoStart
-    Creates or updates the service but does not start it.
+    Creates or updates the service but does not start it (nor the tray icon).
+
+.PARAMETER NoTray
+    No tray icon: removes its "Start with Windows" entry and closes it.
 
 .EXAMPLE
     C:\Repos\StreamZH\tools\Install-Service.ps1
@@ -60,7 +67,8 @@ param(
     [ValidateRange(1, 65535)]
     [int]$Port = 9797,
     [switch]$AllowControlledFolderAccess,
-    [switch]$NoStart
+    [switch]$NoStart,
+    [switch]$NoTray
 )
 
 $ErrorActionPreference = 'Stop'
@@ -246,6 +254,8 @@ if (Grant-ServiceControl $me.User.Value) { Write-Host "$($me.Name): may start an
 else { Write-Host "$($me.Name): may start and stop the service (already set)" }
 
 New-Item -ItemType Directory -Path $data -Force | Out-Null
+# The service writes a new tray token for its account when it starts.
+Remove-StreamZhTrayFiles $data
 Grant-DataFolder $data $me.User.Value
 Write-Host "$($me.Name): may change $data"
 if ($credential) {
@@ -308,6 +318,20 @@ if ($mapped.Count -gt 0) {
     }
 }
 
+Step 'Tray icon'
+if ($NoTray) {
+    if (Unregister-StreamZhTray) { Write-Host 'start with Windows: removed' }
+    if (Stop-StreamZhTray) { Write-Host 'tray icon closed' }
+    Write-Host 'not used (-NoTray)'
+}
+elseif (Register-StreamZhTray $InstallDir $DataDir) {
+    Write-Host "start with Windows: on (for $($me.Name))"
+}
+else {
+    Hint "StreamZH.Tray.exe fehlt in $InstallDir. Mit Update-Local.ps1 bauen, dann dieses Skript nochmals ausführen:"
+    Hint "    & '$(Join-Path $PSScriptRoot 'Update-Local.ps1')'"
+}
+
 if ($NoStart) {
     Write-Host "`nDienst eingerichtet, nicht gestartet. Starten mit: Start-Service StreamZH" -ForegroundColor Green
     exit 0
@@ -327,6 +351,7 @@ catch {
 $url = Wait-StreamZhReady
 if (-not $url) { exit 1 }
 Write-Host $url
+if (-not $NoTray -and (Start-StreamZhTray $InstallDir $DataDir)) { Write-Host 'tray icon started (notification area, bottom right)' }
 Write-Host "`nFertig: StreamZH läuft als Windows-Dienst, auch ohne Anmeldung." -ForegroundColor Green
 Write-Host "Updates wie bisher mit: & '$(Join-Path $PSScriptRoot 'Update-Local.ps1')'"
 Write-Host "Zurück zum Start im Konsolenfenster: & '$(Join-Path $PSScriptRoot 'Uninstall-Service.ps1')'"

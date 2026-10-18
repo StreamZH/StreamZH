@@ -75,6 +75,8 @@ installs pinned official releases (SHA-256 checked) into `<data>/tools` itself
 | `StreamZH.Usenet` | Download engine: NZB parser, NNTP connection pool, yEnc decoder, file assembly, par2, unpack |
 | `StreamZH.Library` | Root folders, disk scan, import, rename, media server notifications (Plex first) |
 | `StreamZH.Host` | API, authentication, background scheduler, SignalR, static frontend |
+| `StreamZH.Tray` | Windows only: `StreamZH.Tray.exe`, the notification area icon (WinForms); talks to the host through `/api/v1/tray` with the token from `<data>/tray.token` |
+| `StreamZH.Tray.Core` | The tray's logic without UI (status text, state, notifications, files, HTTP client), tested on every OS |
 
 ## The pipeline
 

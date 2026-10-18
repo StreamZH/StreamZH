@@ -5,6 +5,7 @@
 using StreamZH.Core.Quality;
 using StreamZH.Host.Auth;
 using StreamZH.Library;
+using StreamZH.Library.CustomFormats;
 
 namespace StreamZH.Host.Api;
 
@@ -20,18 +21,25 @@ public static class ProfileEndpoints
             .WithTags("Languages");
 
         var profiles = api.MapGroup("/qualityprofiles").WithTags("Quality profiles");
-        profiles.MapGet("/", (QualityProfileService service) => service.All().Select(QualityProfileResource.From));
-        profiles.MapGet("/schema", () => QualityProfileResource.From(QualityProfileService.Schema()));
-        profiles.MapGet("/{id:int}", (int id, QualityProfileService service) =>
-            service.Find(id) is { } p ? Results.Ok(QualityProfileResource.From(p)) : Results.NotFound());
-        profiles.MapPost("/", (QualityProfileRequest request, QualityProfileService service) =>
+        profiles.MapGet("/", (QualityProfileService service, CustomFormatService formats) =>
+        {
+            var all = formats.All();
+            return service.All().Select(p => QualityProfileResource.From(p, all));
+        });
+        profiles.MapGet("/schema", (CustomFormatService formats) => QualityProfileResource.From(QualityProfileService.Schema(), formats.All()));
+        profiles.MapGet("/{id:int}", (int id, QualityProfileService service, CustomFormatService formats) =>
+            service.Find(id) is { } p ? Results.Ok(QualityProfileResource.From(p, formats.All())) : Results.NotFound());
+        profiles.MapPost("/", (QualityProfileRequest request, QualityProfileService service, CustomFormatService formats) =>
         {
             var created = service.Create(request.ToProfile());
-            return Results.Created($"/api/v1/qualityprofiles/{created.Id}", QualityProfileResource.From(created));
+            return Results.Created($"/api/v1/qualityprofiles/{created.Id}", QualityProfileResource.From(created, formats.All()));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
-        profiles.MapPut("/{id:int}", (int id, QualityProfileRequest request, QualityProfileService service) =>
-            QualityProfileResource.From(service.Update(id, request.ToProfile())))
-            .RequireAuthorization(AuthSchemes.AdminPolicy);
+        profiles.MapPut("/{id:int}", (int id, QualityProfileRequest request, QualityProfileService service, CustomFormatService formats) =>
+        {
+            var existing = service.Find(id) ?? throw new LibraryException("Quality profile not found.", LibraryError.NotFound);
+            var saved = service.Update(id, request.ToProfile(existing, service.ExistingFormatItems(existing)));
+            return QualityProfileResource.From(saved, formats.All());
+        }).RequireAuthorization(AuthSchemes.AdminPolicy);
         profiles.MapDelete("/{id:int}", (int id, QualityProfileService service) =>
         {
             service.Delete(id);

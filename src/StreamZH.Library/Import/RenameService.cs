@@ -6,6 +6,8 @@
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Events;
 using StreamZH.Core.Media;
+using StreamZH.Core.Quality;
+using StreamZH.Library.CustomFormats;
 using StreamZH.Data;
 using StreamZH.Parsing.Releases;
 
@@ -29,7 +31,8 @@ public sealed class RenameService(
     ImportFileSystem files,
     IEventBus events,
     ILogger<RenameService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    CustomFormatRepository? customFormats = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -43,7 +46,9 @@ public sealed class RenameService(
         }
 
         var full = Path.Combine(movie.FolderPath, file.RelativePath);
-        var name = new FileNameBuilder(options).MovieFileName(movie, Info(full, movie.FolderPath));
+        var info = Info(full, movie.FolderPath).WithCustomFormats(
+            Formats(MediaType.Movie), MediaType.Movie, Language.FindById(movie.OriginalLanguageId), movie.Year, Path.GetFileName(file.RelativePath), file.Size);
+        var name = new FileNameBuilder(options).MovieFileName(movie, info);
         var target = name + Path.GetExtension(file.RelativePath).ToLowerInvariant();
         return name.Length == 0 || SamePath(file.RelativePath, target) ? [] : [new RenamePreview([], null, file.RelativePath, target)];
     }
@@ -58,6 +63,8 @@ public sealed class RenameService(
         }
 
         var builder = new FileNameBuilder(options);
+        var formats = Formats(MediaType.Series);
+        var original = Language.FindById(show.OriginalLanguageId);
         var result = new List<RenamePreview>();
         var episodes = series.Episodes(seriesId).Where(e => e.File is not null && (seasonNumber is null || e.SeasonNumber == seasonNumber));
         foreach (var group in episodes.GroupBy(e => e.File!.RelativePath).OrderBy(g => g.Min(e => e.SeasonNumber)).ThenBy(g => g.Min(e => e.EpisodeNumber)))
@@ -71,7 +78,9 @@ public sealed class RenameService(
             var list = group.OrderBy(e => e.EpisodeNumber).ToList();
             var full = Path.Combine(show.FolderPath, relative);
             var daily = ReleaseParser.ParseEpisode(Path.GetFileName(relative))?.AirDate is not null;
-            var name = builder.EpisodeFileName(show, list, Info(full, show.FolderPath), FileNameBuilder.FormatFor(show, daily));
+            var info = Info(full, show.FolderPath).WithCustomFormats(
+                formats, MediaType.Series, original, show.Year, Path.GetFileName(relative), list[0].File!.Size, CustomFormatNaming.EpisodeFileType(list.Count));
+            var name = builder.EpisodeFileName(show, list, info, FileNameBuilder.FormatFor(show, daily));
             if (name.Length == 0)
             {
                 continue;
@@ -194,6 +203,8 @@ public sealed class RenameService(
 
         return item.NewPath;
     }
+
+    private IReadOnlyList<Core.CustomFormats.CustomFormat> Formats(MediaType mediaType) => customFormats?.ForMediaType(mediaType) ?? [];
 
     private NamingFileInfo Info(string fullPath, string itemFolder)
     {

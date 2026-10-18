@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using Microsoft.Extensions.Logging;
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Decisions;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
+using StreamZH.Data;
 using StreamZH.Parsing;
 using StreamZH.Parsing.Releases;
 
@@ -15,7 +18,11 @@ namespace StreamZH.Library.Search;
 public sealed record FreeSearchRequest(string? Query, TextSearchType Type, IReadOnlyList<int> Categories, IReadOnlyList<int> IndexerIds);
 
 /// <summary>One result of a free search, with quality and languages read from the name (display only, nothing is decided).</summary>
-public sealed record FreeSearchRelease(ReleaseInfo Release, Quality Quality, IReadOnlyList<Language> Languages);
+public sealed record FreeSearchRelease(ReleaseInfo Release, Quality Quality, IReadOnlyList<Language> Languages)
+{
+    /// <summary>Custom formats of the media type the name looks like (episode → series formats, else movie formats).</summary>
+    public IReadOnlyList<CustomFormat> CustomFormats { get; init; } = [];
+}
 
 /// <summary>Results newest first, how many indexers were asked and which of them failed.</summary>
 public sealed record FreeSearchResult(IReadOnlyList<FreeSearchRelease> Releases, int IndexerCount, IReadOnlyList<IndexerSearchFailure> Failures);
@@ -30,7 +37,8 @@ public sealed class FreeSearchService(
     IIndexerClient client,
     ReleaseCache cache,
     GrabService grab,
-    ILogger<FreeSearchService> logger)
+    ILogger<FreeSearchService> logger,
+    CustomFormatRepository? customFormats = null)
 {
     /// <summary>The longest query passed on to the indexers.</summary>
     public const int MaxQueryLength = 200;
@@ -80,12 +88,16 @@ public sealed class FreeSearchService(
         var subject = new SearchSubject(null, null, null, query.Length > 0 ? $"search \"{query}\"" : "search (newest releases)");
         var results = new List<FreeSearchRelease>(releases.Count);
         var decisions = new List<ReleaseDecision>(releases.Count);
+        var formats = new Dictionary<MediaType, IReadOnlyList<CustomFormat>>();
         foreach (var info in releases)
         {
             var parsed = Parse(info, request.Type);
             var quality = parsed?.Quality.Quality ?? QualityParser.ParseQuality(info.Title).Quality;
             var languages = parsed?.Languages ?? LanguageParser.ParseLanguages(info.Title);
-            results.Add(new FreeSearchRelease(info, quality, [.. languages.Where(l => l != Language.Unknown)]));
+            results.Add(new FreeSearchRelease(info, quality, [.. languages.Where(l => l != Language.Unknown)])
+            {
+                CustomFormats = FormatsOf(info, parsed, formats),
+            });
 
             var candidate = new ReleaseCandidate(
                 parsed ?? new ParsedRelease { ReleaseTitle = info.Title, Title = info.Title, CleanTitle = string.Empty },
@@ -106,6 +118,24 @@ public sealed class FreeSearchService(
     {
         using var source = IndexerCallContext.Begin(IndexerCallSource.Search);
         return await grab.GrabAsync(indexerId, guid, categoryName, cancellationToken);
+    }
+
+    private IReadOnlyList<CustomFormat> FormatsOf(ReleaseInfo info, ParsedRelease? parsed, Dictionary<MediaType, IReadOnlyList<CustomFormat>> cache)
+    {
+        if (customFormats is null || parsed is null)
+        {
+            return [];
+        }
+
+        var type = parsed.IsEpisode ? MediaType.Series : MediaType.Movie;
+        if (!cache.TryGetValue(type, out var all))
+        {
+            all = customFormats.ForMediaType(type);
+            cache[type] = all;
+        }
+
+        // No library item: the original language is unknown, so "Original" conditions only match a tagged original track.
+        return all.Count == 0 ? [] : CustomFormatCalculator.Matching(all, CustomFormatInput.ForRelease(parsed, info.Size, type, Language.Unknown));
     }
 
     /// <summary>TV categories or a TV search read the name as an episode first, everything else as a movie first.</summary>

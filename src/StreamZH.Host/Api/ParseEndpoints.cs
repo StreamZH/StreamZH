@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Decisions;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
@@ -74,8 +75,21 @@ public static class ParseEndpoints
                     indexer, 0, parsed.ReleaseTitle)
                 : ReleaseProfileRules.Explain(rules, indexer, decided.Profile.Id, parsed.ReleaseTitle);
             var original = rules.ReleaseProfiles.ToDictionary(p => p.Id);
+
+            // The formats of the item's media type and its profile's score; without an item the type the name looks like, no score.
+            var formats = decided is not null
+                ? new DecisionContext(decided, new Dictionary<int, StreamZH.Core.Profiles.QualityDefinition>(), DateTimeOffset.UtcNow)
+                    .CustomFormatsFor(new ReleaseCandidate(parsed, size, "Manual test", 25, default, string.Empty, parsed.ReleaseTitle) { IndexerId = indexer })
+                : CustomFormatResult.None with
+                {
+                    Formats = CustomFormatCalculator.Matching(
+                        targets.Formats(parsed.IsEpisode ? MediaType.Series : MediaType.Movie),
+                        CustomFormatInput.ForRelease(parsed, size, parsed.IsEpisode ? MediaType.Series : MediaType.Movie, Language.Unknown)),
+                };
             return Results.Ok(new ParseResult(ParsedReleaseResource.From(parsed), decision)
             {
+                CustomFormats = CustomFormatRefResource.From(formats.Formats),
+                CustomFormatScore = formats.Score,
                 ReleaseProfiles = [.. explained.Select(m => ReleaseProfileMatchResource.From(m, original.GetValueOrDefault(m.Profile.Id) ?? m.Profile))],
                 PreferredScore = explained.Sum(m => m.Score),
                 HardcodedSubs = HardcodedSubs.Find(parsed.ReleaseTitle),
@@ -102,6 +116,8 @@ public static class ParseEndpoints
         return new DecisionResult(targetName, target.Profile.Name, result.Accepted, [.. result.Rejections.Select(r => new RejectionResource(r.Code, r.Message))])
         {
             PreferredScore = result.PreferredScore,
+            CustomFormats = CustomFormatRefResource.From(result.CustomFormats),
+            CustomFormatScore = result.CustomFormatScore,
         };
     }
 }
@@ -114,6 +130,12 @@ public sealed record ParseResult(ParsedReleaseResource? Parsed, DecisionResult? 
 {
     public IReadOnlyList<ReleaseProfileMatchResource> ReleaseProfiles { get; init; } = [];
 
+    /// <summary>Custom formats the name matches (of the item's media type, else of the type the name looks like).</summary>
+    public IReadOnlyList<CustomFormatRefResource> CustomFormats { get; init; } = [];
+
+    /// <summary>Their score in the item's quality profile; 0 without an item.</summary>
+    public int CustomFormatScore { get; init; }
+
     public int PreferredScore { get; init; }
 
     public string? HardcodedSubs { get; init; }
@@ -122,6 +144,10 @@ public sealed record ParseResult(ParsedReleaseResource? Parsed, DecisionResult? 
 public sealed record DecisionResult(string Target, string Profile, bool Accepted, IReadOnlyList<RejectionResource> Rejections)
 {
     public int PreferredScore { get; init; }
+
+    public IReadOnlyList<CustomFormatRefResource> CustomFormats { get; init; } = [];
+
+    public int CustomFormatScore { get; init; }
 }
 
 /// <summary>What one release profile says about a name. <see cref="Limited"/>: it only applies to some indexers or quality profiles.</summary>

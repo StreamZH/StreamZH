@@ -105,7 +105,10 @@ public sealed record FreeSearchResource(int Indexers, IReadOnlyList<IndexerFailu
         [.. result.Releases.Select(r => FreeReleaseResource.From(r, now))]);
 }
 
-/// <summary>One free search result. Quality and languages are read from the name, for display only.</summary>
+/// <summary>
+/// One free search result. Quality, languages and custom formats (of the media type the name looks like) are read from the
+/// name, for display only; without a library item there is no profile, so <see cref="CustomFormatScore"/> is 0.
+/// </summary>
 public sealed record FreeReleaseResource(
     string Guid,
     int IndexerId,
@@ -120,6 +123,10 @@ public sealed record FreeReleaseResource(
     string Quality,
     IReadOnlyList<string> Languages)
 {
+    public IReadOnlyList<CustomFormatRefResource> CustomFormats { get; init; } = [];
+
+    public int CustomFormatScore { get; init; }
+
     public static FreeReleaseResource From(FreeSearchRelease r, DateTimeOffset now) => new(
         r.Release.Guid,
         r.Release.IndexerId,
@@ -132,5 +139,8 @@ public sealed record FreeReleaseResource(
         r.Release.Categories,
         r.Release.InfoUrl,
         r.Quality.Name,
-        [.. r.Languages.Select(l => l.Name)]);
+        [.. r.Languages.Select(l => l.Name)])
+    {
+        CustomFormats = CustomFormatRefResource.From(r.CustomFormats),
+    };
 }

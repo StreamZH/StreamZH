@@ -13,6 +13,7 @@ using StreamZH.Core.Media;
 using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
+using StreamZH.Library.CustomFormats;
 using StreamZH.Library.Downloads;
 using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
@@ -65,7 +66,8 @@ public sealed class DownloadImportService(
     IDownloadQueue? queue = null,
     DownloadEngine? engine = null,
     ITmdbClient? tmdb = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    CustomFormatRepository? customFormats = null)
 {
     /// <summary>Sonarr waits this long after the air date for a missing episode title.</summary>
     public static readonly TimeSpan EpisodeTitleWait = TimeSpan.FromHours(48);
@@ -230,7 +232,8 @@ public sealed class DownloadImportService(
             source = videos.MaxBy(f => f.Length) ?? throw new ImportException(NoVideoMessage(folder));
         }
 
-        var info = Describe(item.Title, source.FullName);
+        var info = Describe(item.Title, source.FullName).WithCustomFormats(
+            customFormats?.ForMediaType(MediaType.Movie) ?? [], MediaType.Movie, Language.FindById(movie.OriginalLanguageId), movie.Year, source.Name, source.Length);
         var existingPath = movie.File is { } current && !IsDisc(current) ? Path.Combine(movie.FolderPath, current.RelativePath) : null;
         if (existingPath is not null && !File.Exists(existingPath))
         {
@@ -381,9 +384,12 @@ public sealed class DownloadImportService(
 
         // 3. Checks per file: better than what is on disk, enough space for all of them.
         var accepted = new List<(FileInfo File, IReadOnlyList<Episode> Episodes, bool Daily, NamingFileInfo Info, IReadOnlyList<string> Existing)>();
+        var seriesFormats = customFormats?.ForMediaType(MediaType.Series) ?? [];
         foreach (var (file, episodes, daily) in planned)
         {
-            var info = Describe(item.Title, file.FullName);
+            var info = Describe(item.Title, file.FullName).WithCustomFormats(
+                seriesFormats, MediaType.Series, Language.FindById(show.OriginalLanguageId), show.Year, file.Name, file.Length,
+                CustomFormatNaming.EpisodeFileType(episodes.Count));
             var existing = episodes
                 .Where(e => e.File is not null)
                 .Select(e => Path.Combine(show.FolderPath, e.File!.RelativePath))

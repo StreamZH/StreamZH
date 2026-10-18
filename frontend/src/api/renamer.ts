@@ -223,7 +223,8 @@ export interface RenamerRun {
 
 export interface RenamerRunItem {
   order: number
-  kind: 'rename' | 'createFolder'
+  /** removeFolder: a folder the run left empty and removed (oldPath); undo creates it again. */
+  kind: 'rename' | 'createFolder' | 'removeFolder'
   oldPath: string
   newPath: string
   isFolder: boolean

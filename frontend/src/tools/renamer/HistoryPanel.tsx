@@ -93,6 +93,10 @@ function RunItems({ id, folder, live }: { id: number; folder: string; live: bool
             <span>
               Created folder <code>{relative(item.newPath)}</code>
             </span>
+          ) : item.kind === 'removeFolder' ? (
+            <span>
+              Removed empty folder <code>{relative(item.oldPath)}</code>
+            </span>
           ) : (
             <span className={styles.runPaths}>
               <code>{relative(item.oldPath)}</code>

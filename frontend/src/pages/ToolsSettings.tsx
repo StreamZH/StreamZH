@@ -64,13 +64,30 @@ function toolsOf(data: ToolSettings): Tool[] {
       installedVersion: data.sevenZipInstalledVersion,
       installVersion: data.sevenZipInstallVersion,
     },
+    {
+      name: 'ffprobe',
+      label: 'ffprobe',
+      purpose: 'Reads codecs, resolution, HDR and audio languages of video files (media info).',
+      path: data.ffprobePath,
+      found: data.ffprobeFound,
+      version: data.ffprobeVersion,
+      resolved: data.ffprobeResolvedPath,
+      source: data.ffprobeSource,
+      problem: data.ffprobeProblem,
+      installable: data.ffprobeInstallable,
+      installing: data.ffprobeInstalling,
+      progress: data.ffprobeInstallProgress,
+      error: data.ffprobeInstallError,
+      installedVersion: data.ffprobeInstalledVersion,
+      installVersion: data.ffprobeInstallVersion,
+    },
   ]
 }
 
-const anyInstalling = (data: ToolSettings | undefined) => !!data && (data.par2Installing || data.sevenZipInstalling)
+const anyInstalling = (data: ToolSettings | undefined) => !!data && (data.par2Installing || data.sevenZipInstalling || data.ffprobeInstalling)
 
 /**
- * Settings → Downloads → Tools: par2 and 7-Zip. StreamZH installs them by itself when they are missing; the simple view
+ * Settings → Downloads → Tools: par2, 7-Zip and ffprobe. StreamZH installs them by itself when they are missing; the simple view
  * shows whether they are there and an Install button, the advanced view custom paths and the automatic installation.
  */
 export function ToolsSection() {
@@ -78,6 +95,7 @@ export function ToolsSection() {
   const advanced = useAdvanced()
   const [par2Path, setPar2Path] = useState<string | null>(null)
   const [sevenZipPath, setSevenZipPath] = useState<string | null>(null)
+  const [ffprobePath, setFfprobePath] = useState<string | null>(null)
   const [autoInstall, setAutoInstall] = useState<boolean | null>(null)
 
   const install = useMutation({
@@ -109,6 +127,7 @@ export function ToolsSection() {
       queryClient.setQueryData(toolKeys.settings, data)
       setPar2Path(null)
       setSevenZipPath(null)
+      setFfprobePath(null)
       setAutoInstall(null)
     },
   })
@@ -118,8 +137,9 @@ export function ToolsSection() {
   const tools = toolsOf(data)
   const par2 = par2Path ?? data.par2Path
   const sevenZip = sevenZipPath ?? data.sevenZipPath
+  const ffprobe = ffprobePath ?? data.ffprobePath
   const auto = autoInstall ?? data.autoInstall
-  const dirty = par2.trim() !== data.par2Path || sevenZip.trim() !== data.sevenZipPath || auto !== data.autoInstall
+  const dirty = par2.trim() !== data.par2Path || sevenZip.trim() !== data.sevenZipPath || ffprobe.trim() !== data.ffprobePath || auto !== data.autoInstall
   const fieldErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
   const manual = tools.filter((t) => !t.found && !t.installable)
 
@@ -129,8 +149,8 @@ export function ToolsSection() {
     <Section
       id="tools"
       title="Tools"
-      description={`Finished downloads are repaired with par2 and unpacked with 7-Zip.${tools.some((t) => t.installable) ? ' StreamZH installs both by itself when they are missing.' : ''}`}
-      hiddenCount={advanced ? 0 : 3}
+      description={`Finished downloads are repaired with par2 and unpacked with 7-Zip; ffprobe reads the media info of video files.${tools.some((t) => t.installable) ? ' StreamZH installs them by itself when they are missing.' : ''}`}
+      hiddenCount={advanced ? 0 : 4}
       footer={
         advanced && (
           <SaveBar
@@ -138,10 +158,11 @@ export function ToolsSection() {
             saving={save.isPending}
             saved={save.isSuccess && !dirty}
             error={save.error && Object.keys(fieldErrors).length === 0 ? save.error.message : null}
-            onSave={() => save.mutate({ par2Path: par2.trim(), sevenZipPath: sevenZip.trim(), autoInstall: auto })}
+            onSave={() => save.mutate({ par2Path: par2.trim(), sevenZipPath: sevenZip.trim(), ffprobePath: ffprobe.trim(), autoInstall: auto })}
             onReset={() => {
               setPar2Path(null)
               setSevenZipPath(null)
+              setFfprobePath(null)
               setAutoInstall(null)
               save.reset()
             }}
@@ -180,6 +201,16 @@ export function ToolsSection() {
           value={sevenZip}
           placeholder={data.os === 'Windows' ? 'C:\\Program Files\\7-Zip\\7z.exe' : '/usr/bin/7zz'}
           onChange={(e) => setSevenZipPath(e.target.value)}
+          spellCheck={false}
+        />
+      </Row>
+      <Row label="ffprobe path" htmlFor="tool-ffprobe" advanced help="Empty: use the copy StreamZH installs or finds." error={fieldError('ffprobePath')}>
+        <input
+          id="tool-ffprobe"
+          className={`${ui.input} ${ui.mono}`}
+          value={ffprobe}
+          placeholder={data.os === 'Windows' ? 'C:\\ffmpeg\\bin\\ffprobe.exe' : '/usr/bin/ffprobe'}
+          onChange={(e) => setFfprobePath(e.target.value)}
           spellCheck={false}
         />
       </Row>
@@ -271,7 +302,7 @@ function where(tool: Tool, installing: boolean, autoInstall: boolean): ReactNode
 
 /** Only for systems where StreamZH cannot install a tool by itself (e.g. 32-bit or FreeBSD). */
 function ManualHint({ settings, tools }: { settings: ToolSettings; tools: Tool[] }) {
-  const names = tools.map((t) => t.label).join(' and ')
+  const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(tools.map((t) => t.label))
   if (settings.os === 'Windows') {
     return (
       <p className={styles.text}>
@@ -291,17 +322,31 @@ function ManualHint({ settings, tools }: { settings: ToolSettings; tools: Tool[]
             <a href="https://github.com/animetosho/par2cmdline-turbo/releases" target="_blank" rel="noreferrer">
               par2cmdline-turbo releases
             </a>{' '}
-            (put <code>par2.exe</code> into <code>{settings.bundledFolder}</code>).
+            (put <code>par2.exe</code> into <code>{settings.bundledFolder}</code>){tools.some((t) => t.name === 'ffprobe') ? ', ' : '.'}
+          </>
+        )}
+        {tools.some((t) => t.name === 'ffprobe') && (
+          <>
+            ffprobe from an FFmpeg build linked on{' '}
+            <a href="https://ffmpeg.org/download.html" target="_blank" rel="noreferrer">
+              ffmpeg.org
+            </a>{' '}
+            (put <code>ffprobe.exe</code> into <code>{settings.bundledFolder}</code>).
           </>
         )}
       </p>
     )
   }
 
+  const packages = (os: 'macOS' | 'Linux') =>
+    tools
+      .map((t) => (t.name === 'par2' ? 'par2' : t.name === 'sevenZip' ? (os === 'macOS' ? 'sevenzip' : '7zip') : 'ffmpeg'))
+      .join(' ')
   return (
     <p className={styles.text}>
       Install {names} yourself, for example with{' '}
-      <code>{settings.os === 'macOS' ? 'brew install par2 sevenzip' : 'sudo apt install par2 7zip'}</code>.
+      <code>{settings.os === 'macOS' ? `brew install ${packages('macOS')}` : `sudo apt install ${packages('Linux')}`}</code>
+      {tools.some((t) => t.name === 'ffprobe') && ' (ffprobe comes with ffmpeg)'}.
     </p>
   )
 }

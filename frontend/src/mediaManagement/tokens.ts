@@ -46,14 +46,24 @@ const quality: TokenGroup = {
   ],
 }
 
+// What ffprobe found in the file (falls back to the release name when it was not analysed), like Radarr and Sonarr.
 const mediaInfo: TokenGroup = {
-  name: 'Media info (from the release name)',
+  name: 'Media info',
   tokens: [
-    { token: '{MediaInfo VideoCodec}', example: 'x264' },
-    { token: '{MediaInfo AudioCodec}', example: 'DTS' },
     { token: '{MediaInfo Simple}', example: 'x264 DTS' },
+    { token: '{MediaInfo Full}', example: 'x264 DTS [DE+EN] [DE]' },
+    { token: '{MediaInfo VideoCodec}', example: 'x264' },
+    { token: '{MediaInfo VideoBitDepth}', example: '10' },
     { token: '{MediaInfo VideoDynamicRange}', example: 'HDR' },
-    { token: '{MediaInfo AudioLanguages}', example: 'DE+EN' },
+    { token: '{MediaInfo VideoDynamicRangeType}', example: 'DV HDR10' },
+    { token: '{MediaInfo AudioCodec}', example: 'DTS' },
+    { token: '{MediaInfo AudioChannels}', example: '5.1' },
+    { token: '{MediaInfo AudioLanguages}', example: '[DE+EN]' },
+    { token: '{MediaInfo AudioLanguages:DE}', example: '[DE]' },
+    { token: '{MediaInfo AudioLanguages:-EN}', example: '[DE]' },
+    { token: '{MediaInfo AudioLanguagesAll}', example: '[EN]' },
+    { token: '{MediaInfo SubtitleLanguages}', example: '[DE]' },
+    { token: '{MediaInfo 3D}', example: '3D' },
   ],
 }
 
@@ -64,6 +74,7 @@ const release = (edition: boolean): TokenGroup => ({
       ? [
           { token: '{Edition Tags}', example: 'IMAX' },
           { token: '{edition-{Edition Tags}}', example: '{edition-IMAX}' },
+          { token: '{{Edition Tags}}', example: '{IMAX}' },
         ]
       : []),
     // Custom formats marked "Include in file names" (Settings → Custom formats), like Radarr and Sonarr.
@@ -85,6 +96,7 @@ const series: TokenGroup = {
     { token: '{Series TitleThe}', example: "Series Title's!, The" },
     { token: '{Series TitleFirstCharacter}', example: 'S' },
     { token: '{Series Year}', example: '2010' },
+    { token: '{Series CleanTitleWithoutYear}', example: 'The Series Titles' },
   ],
 }
 
@@ -105,6 +117,8 @@ const episode: TokenGroup = {
     { token: '{season}x{episode:00}', example: '1x01' },
     { token: '{Episode Title}', example: 'Episode Title (1)' },
     { token: '{Episode CleanTitle}', example: 'Episode Title 1' },
+    // A length cuts long titles like Sonarr ("..." where it was cut).
+    { token: '{Episode CleanTitle:30}', example: 'Episode Title 1' },
     { token: '{Air-Date}', example: '2013-10-30' },
     { token: '{Air Date}', example: '2013 10 30' },
     // Anime: the absolute episode number (counted over all seasons), like Sonarr.

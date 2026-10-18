@@ -125,6 +125,9 @@ public sealed class PostProcessToolsTests
     [InlineData("7-Zip (z) 24.08 (x64) : Copyright (c) 1999-2024 Igor Pavlov", "7-Zip 24.08")]
     [InlineData("par2cmdline version 0.8.1\nCopyright (C) 2003-2019 Peter Brian Clements.", "par2cmdline 0.8.1")]
     [InlineData("par2cmdline-turbo version 1.1.1", "par2cmdline-turbo 1.1.1")]
+    [InlineData("ffprobe version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers", "ffprobe 9.0.2")]
+    [InlineData("ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers", "ffprobe 6.1.1")]
+    [InlineData("ffprobe version n7.1 Copyright (c) 2007-2024 the FFmpeg developers", "ffprobe 7.1")]
     [InlineData("something else", null)]
     public void Parses_tool_versions(string output, string? expected)
     {

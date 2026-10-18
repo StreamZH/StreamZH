@@ -1,6 +1,6 @@
 import { request } from './client'
 
-/** par2 (repair) and 7-Zip (extraction), called as external programs by post-processing. */
+/** par2 (repair), 7-Zip (extraction) and ffprobe (media info), called as external programs. */
 export interface ToolSettings {
   /** Configured path; '' = search automatically. */
   par2Path: string
@@ -41,11 +41,24 @@ export interface ToolSettings {
   autoInstall: boolean
   /** Where StreamZH installs the tools (<data>/tools). */
   installFolder: string | null
+  /** ffprobe (media info of video files), with the same fields as par2 and 7-Zip. */
+  ffprobePath: string
+  ffprobeFound: boolean
+  ffprobeVersion: string | null
+  ffprobeResolvedPath: string | null
+  ffprobeSource: ToolSource
+  ffprobeProblem: string | null
+  ffprobeInstallable: boolean
+  ffprobeInstalling: boolean
+  ffprobeInstallProgress: number | null
+  ffprobeInstallError: string | null
+  ffprobeInstalledVersion: string | null
+  ffprobeInstallVersion: string | null
 }
 
 export type ToolSource = 'NotFound' | 'Configured' | 'Installed' | 'Bundled' | 'Path' | 'WindowsDefault'
 
-export type ToolName = 'par2' | 'sevenZip'
+export type ToolName = 'par2' | 'sevenZip' | 'ffprobe'
 
 export const toolKeys = {
   settings: ['settings-tools'] as const,
@@ -54,7 +67,8 @@ export const toolKeys = {
 export const toolsApi = {
   settings: () => request<ToolSettings>('GET', '/settings/tools'),
   /** '' switches a path back to the automatic search; a missing field leaves it unchanged. */
-  save: (changes: { par2Path?: string; sevenZipPath?: string; autoInstall?: boolean }) => request<ToolSettings>('PUT', '/settings/tools', changes),
+  save: (changes: { par2Path?: string; sevenZipPath?: string; ffprobePath?: string; autoInstall?: boolean }) =>
+    request<ToolSettings>('PUT', '/settings/tools', changes),
   /** Installs (or reinstalls) the tool; answers when the installation has finished. */
   install: (tool: ToolName) => request<ToolSettings>('POST', `/settings/tools/${tool}/install`),
 }

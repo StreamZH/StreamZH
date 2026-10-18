@@ -17,9 +17,10 @@ COPY --from=frontend /src/src/StreamZH.Host/wwwroot src/StreamZH.Host/wwwroot
 RUN dotnet publish src/StreamZH.Host -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
-# par2 for repair, 7-Zip for unpacking (RAR, 7z, ZIP). Found on PATH, so StreamZH does not install its own copy here.
+# par2 for repair, 7-Zip for unpacking (RAR, 7z, ZIP), ffmpeg for ffprobe (media info). Found on PATH, so StreamZH does
+# not install its own copies here.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends par2 7zip \
+    && apt-get install -y --no-install-recommends par2 7zip ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /config \
     && chown "$APP_UID:$APP_UID" /config

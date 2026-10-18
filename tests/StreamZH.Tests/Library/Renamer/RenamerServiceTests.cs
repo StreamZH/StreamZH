@@ -8,6 +8,7 @@ using StreamZH.Core.Jobs;
 using StreamZH.Core.Media;
 using StreamZH.Data;
 using StreamZH.Library;
+using StreamZH.Library.Import;
 using StreamZH.Library.Renamer;
 using StreamZH.Metadata.Tmdb;
 using StreamZH.Tests.Library.Import;
@@ -539,6 +540,59 @@ public sealed class RenamerServiceTests : IDisposable
         Assert.Equal(before, Names(source));
         Assert.Equal(RunState.Undone, service.Run(run.Id).Run.State);
         Assert.All(service.Run(run.Id).Items, i => Assert.Equal(RunItemState.Undone, i.State));
+    }
+
+    [Fact]
+    public async Task A_season_folder_left_with_only_system_junk_is_removed_and_undo_recreates_it()
+    {
+        Touch("Dark/Season 1/dark.s01e01.mkv");
+        Touch("Dark/Season 1/Thumbs.db");
+        Touch("Dark/Season 1/desktop.ini");
+        Touch("Dark/Season 1/.DS_Store");
+        Touch("Dark/Staffel 2/dark.s02e01.mkv");
+        Touch("Dark/Staffel 2/Thumbs.db");
+        Touch("Dark/Staffel 2/staffel-notizen.nfo");
+        var source = Path.Combine(Work, "Dark");
+        var service = Service();
+
+        var run = await ApplyAsync(service, SeasonFolders(source));
+
+        Assert.Equal(RunState.Completed, run.State);
+        Assert.Equal(
+            [
+                "Season 01",
+                "Season 01/Dark - S01E01 - Secrets.mkv",
+                "Season 02",
+                "Season 02/Dark - S02E01 - Beginnings and Endings.mkv",
+                "Staffel 2",
+                "Staffel 2/Thumbs.db",
+                "Staffel 2/staffel-notizen.nfo",
+            ],
+            Names(source));
+        Assert.Equal([Path.Combine(source, "Season 1")], service.Run(run.Id).Items.Where(i => i.Kind == RunItemKind.RemoveFolder).Select(i => i.OldPath));
+
+        // The undo brings the folder back (the junk files are not needed).
+        await service.UndoAsync(service.QueueUndo(run.Id));
+        Assert.Equal(
+            ["Season 1", "Season 1/dark.s01e01.mkv", "Staffel 2", "Staffel 2/Thumbs.db", "Staffel 2/dark.s02e01.mkv", "Staffel 2/staffel-notizen.nfo"],
+            Names(source));
+        Assert.Equal(RunState.Undone, service.Run(run.Id).Run.State);
+    }
+
+    [Fact]
+    public void Only_operating_system_junk_counts_as_empty()
+    {
+        Touch("j/Thumbs.db");
+        Touch("j/ehthumbs.db");
+        Touch("j/.DS_Store");
+        Touch("k/Thumbs.db");
+        Touch("k/movie.nfo");
+        Directory.CreateDirectory(Path.Combine(Work, "l", "sub"));
+
+        Assert.True(ImportFileSystem.OnlyJunk(Path.Combine(Work, "j"), out var junk));
+        Assert.Equal(3, junk.Count);
+        Assert.False(ImportFileSystem.OnlyJunk(Path.Combine(Work, "k"), out _));
+        Assert.False(ImportFileSystem.OnlyJunk(Path.Combine(Work, "l"), out _));
     }
 
     [Fact]

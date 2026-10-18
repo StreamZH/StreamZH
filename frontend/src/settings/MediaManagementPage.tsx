@@ -16,6 +16,7 @@ import ui from '../components/ui.module.css'
 import { setAdvanced } from '../lib/advancedMode'
 import FormatField from '../mediaManagement/FormatField'
 import mm from '../mediaManagement/MediaManagement.module.css'
+import { MediaInfoSection } from './MediaInfoSection'
 import { RootFoldersSection } from './RootFoldersSection'
 import { NumberInput, Row, SaveBar, Section, Select, SettingsPage, Toggle } from './SettingsKit'
 import { useSettingsForm } from './useSettingsForm'
@@ -380,6 +381,8 @@ export default function MediaManagementPage() {
               </Row>
             )}
           </Section>
+
+          <MediaInfoSection />
 
           <Section id="folders" title="Folders" advanced>
             <Row label="Create empty folders" help="Create the movie or series folder when it is added, before there is a file.">

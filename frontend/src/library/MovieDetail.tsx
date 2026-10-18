@@ -13,6 +13,7 @@ import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
+import MediaInfoPanel from './MediaInfoPanel'
 import MoreMenu, { type MoreItem } from './MoreMenu'
 import OrganizeDialog from './OrganizeDialog'
 import PathRow from './PathRow'
@@ -135,6 +136,7 @@ export default function MovieDetail() {
         </dl>
       </section>
 
+      {m.file && <MediaInfoPanel movieId={m.id} />}
       <HistoryPanel movieId={m.id} />
 
       {organizing && <OrganizeDialog type="Movie" ids={[m.id]} onClose={() => setOrganizing(false)} />}

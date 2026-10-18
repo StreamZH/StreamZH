@@ -72,6 +72,55 @@ public sealed class ToolInstallerTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(ToolOs.Windows, Architecture.X64, true)]
+    [InlineData(ToolOs.Windows, Architecture.Arm64, false)]
+    [InlineData(ToolOs.Linux, Architecture.X64, false)]
+    [InlineData(ToolOs.MacOS, Architecture.Arm64, false)]
+    public void Ffprobe_is_installed_on_windows_x64_only(ToolOs os, Architecture architecture, bool installable)
+    {
+        var package = ToolPackages.For(PostProcessTool.FFprobe, new ToolPlatform(os, architecture));
+
+        Assert.Equal(installable, package is not null);
+        if (package is not null)
+        {
+            Assert.Equal("9.0.2", package.Version);
+            Assert.Equal(ToolInstallMethod.Zip, package.Method);
+            Assert.Equal(["ffprobe.exe"], package.Files);
+            Assert.Equal("https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip", package.Download.Url.AbsoluteUri);
+            Assert.Equal("60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba", package.Download.Sha256);
+            Assert.StartsWith("GPL", package.License, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Ffprobe_zip_unpacks_only_ffprobe_and_the_license_files()
+    {
+        const string root = "ffmpeg-9.0.2-essentials_build/";
+        var data = TestToolPackages.Zip(
+            (root + "bin/ffmpeg.exe", "ffmpeg"),
+            (root + "bin/ffplay.exe", "ffplay"),
+            (root + "bin/ffprobe.exe", "ffprobe"),
+            (root + "doc/ffprobe.html", "<html>"),
+            (root + "presets/libvpx-720p.ffpreset", "preset"),
+            (root + "LICENSE", "GPL v3"),
+            (root + "README.txt", "Source Code: https://github.com/FFmpeg/FFmpeg/commit/946fcce07b"));
+        var download = TestToolPackages.Download("ffmpeg-9.0.2-essentials_build.zip", data);
+        _downloads.Add(download, data);
+        var package = new ToolPackage(PostProcessTool.FFprobe, ToolPackages.FfprobeName, "9.0.2", ToolPackages.FfprobeLicense, ToolInstallMethod.Zip, download, ["ffprobe.exe"]);
+        var installer = Installer(WindowsX64, new ToolCatalog((tool, _) => tool == PostProcessTool.FFprobe ? package : null), NoProcesses());
+
+        var result = await installer.InstallAsync(PostProcessTool.FFprobe, CancellationToken.None);
+
+        Assert.True(result.Success, result.Error);
+        var folder = Path.Combine(ToolsFolder, "ffprobe");
+        Assert.Equal(
+            ["LICENSE", "README.txt", "ffprobe.exe", ToolInstaller.VersionFileName],
+            Directory.GetFiles(folder).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal("9.0.2", installer.Installed(PostProcessTool.FFprobe)!.Version);
+        Assert.False(Directory.Exists(Path.Combine(ToolsFolder, ToolInstaller.DownloadFolderName)));
+    }
+
     [Fact]
     public void Windows_7zip_uses_the_msi_with_the_installer_exe_as_fallback()
     {

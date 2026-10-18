@@ -240,6 +240,21 @@ public sealed record NamingPreview(
             new Core.CustomFormats.CustomFormat { Id = -1, Name = "Surround Sound", MediaType = MediaType.Movie, IncludeInRename = true },
             new Core.CustomFormats.CustomFormat { Id = -2, Name = "x264", MediaType = MediaType.Movie, IncludeInRename = true },
         ],
+
+        // Sample media info like Radarr's: x264 8-bit 1080p, DTS 5.1 in German and English, German subtitles.
+        MediaInfo = SampleMediaInfo,
+    };
+
+    private static MediaInfo SampleMediaInfo => new()
+    {
+        Container = "Matroska",
+        Video = new MediaVideoInfo("h264", "x264", "High", 8, 1920, 1080, 1080, 23.976, "Progressive", MediaHdrType.None, "bt709", "bt709", null, false),
+        AudioTracks =
+        [
+            new MediaAudioTrack("dts", "DTS", "DTS", 5.1m, "5.1(side)", "ger", Language.German.Id, null, true, false, null),
+            new MediaAudioTrack("dts", "DTS", "DTS", 5.1m, "5.1(side)", "eng", Language.English.Id, null, false, false, null),
+        ],
+        Subtitles = [new MediaSubtitleTrack("subrip", "SRT", "ger", Language.German.Id, null, false, false, false)],
     };
 
     private static readonly NamingFileInfo EpisodeFileInfo = MovieFileInfo with

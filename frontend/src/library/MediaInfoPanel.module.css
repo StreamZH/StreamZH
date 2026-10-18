@@ -1,0 +1,173 @@
+/* Media info of a file: the movie panel and the episode popover. */
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.title svg {
+  color: var(--muted);
+}
+
+.headTools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.updated {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.spin {
+  animation: global(spin) 0.9s linear infinite;
+}
+
+.body {
+  display: grid;
+  gap: 16px;
+}
+
+.video {
+  display: grid;
+  gap: 4px;
+}
+
+.videoLine {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  line-height: 1.25;
+}
+
+.facts {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.group {
+  display: grid;
+  gap: 8px;
+}
+
+.tracks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--sunk);
+  animation: global(rise) 0.3s var(--ease) both;
+}
+
+.language {
+  font-weight: 600;
+  color: var(--fg);
+  min-width: 90px;
+}
+
+.codec {
+  color: var(--fg-2);
+}
+
+.flag {
+  font-size: 11px;
+}
+
+.trackTitle {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.chipMeta {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ---- Episode popover ---- */
+
+.popoverAnchor {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.infoButton {
+  color: var(--muted);
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: min(380px, calc(100vw - 32px));
+  padding: 14px 16px 16px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 400;
+  animation: global(pop) 0.18s var(--ease);
+}
+
+.popoverHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.compact .videoLine {
+  font-size: 16px;
+}
+
+.compact .track {
+  padding: 6px 10px;
+}
+
+.compact .language {
+  min-width: 70px;
+}

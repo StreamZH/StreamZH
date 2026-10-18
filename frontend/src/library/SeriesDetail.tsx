@@ -14,6 +14,7 @@ import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import { AbsCell, AbsHeader, SceneTag } from './EpisodeNumbering'
 import HistoryPanel from './HistoryPanel'
+import { EpisodeMediaInfo } from './MediaInfoPanel'
 import MoreMenu, { type MoreItem } from './MoreMenu'
 import OrganizeDialog from './OrganizeDialog'
 import PathRow from './PathRow'
@@ -206,6 +207,7 @@ function SeasonPanel({
                   <td className={styles.epDate}>{formatDate(e.airDate)}</td>
                   <td className={styles.epStatus}>
                     <EpisodeStatus episode={e} />
+                    {e.file && <EpisodeMediaInfo seriesId={seriesId} episodeId={e.id} label={code(e)} />}
                   </td>
                   <td className={styles.epSearch}>
                     <button

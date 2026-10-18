@@ -327,7 +327,10 @@ function TemplatePicker({
   onChange: (id: string | null) => void
 }) {
   // Opens on the group of the chosen template, so a preselected one is in view.
-  const [group, setGroup] = useState(() => list?.find((p) => p.trashId === value)?.group ?? 'all')
+  // A German browser starts on the German templates.
+  const [group, setGroup] = useState(
+    () => list?.find((p) => p.trashId === value)?.group ?? (navigator.language?.toLowerCase().startsWith('de') && list?.some((p) => p.group === 'German') ? 'German' : 'all'),
+  )
   const [search, setSearch] = useState('')
   const groups = useMemo(() => {
     const names = [...new Set((list ?? []).map((p) => p.group))]

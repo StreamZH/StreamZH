@@ -68,6 +68,7 @@ public sealed class OngoingService(
         AddToolInstalls(running);
         AddDownloads(running, active.Where(d => d.Status is not (DownloadStatus.Queued or DownloadStatus.Paused)));
         AddJob(running);
+        RenamerStatus.Add(running, services);
         AddDownloads(running, active.Where(d => d.Status is DownloadStatus.Queued or DownloadStatus.Paused));
 
         AddToolNotices(notices);

@@ -77,6 +77,7 @@ builder.Services.AddSingleton<MovieRepository>();
 builder.Services.AddSingleton<SeriesRepository>();
 builder.Services.AddSingleton<QualityProfileRepository>();
 builder.Services.AddSingleton<CustomFormatRepository>();
+builder.Services.AddSingleton<AlternativeTitleRepository>();
 builder.Services.AddSingleton<QualityDefinitionRepository>();
 builder.Services.AddSingleton<QualityProfileService>();
 builder.Services.AddSingleton<QualityDefinitionService>();

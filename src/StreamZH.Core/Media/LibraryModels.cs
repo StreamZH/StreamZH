@@ -76,6 +76,17 @@ public sealed class Series
     public string FolderPath { get; set; } = string.Empty;
     public DateTime Added { get; set; }
     public DateTime? LastRefreshed { get; set; }
+
+    /// <summary>Standard (S01E02), Daily (air date) or Anime (absolute numbers), like Sonarr.</summary>
+    public SeriesType SeriesType { get; set; } = SeriesType.Standard;
+}
+
+/// <summary>How episodes of a series are named and searched (Sonarr's series type).</summary>
+public enum SeriesType
+{
+    Standard = 0,
+    Daily = 1,
+    Anime = 2,
 }
 
 public sealed class Episode

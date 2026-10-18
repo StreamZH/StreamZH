@@ -17,6 +17,7 @@ SABnzbd and the indexer setup on the CloudZH home server.
 | 0.5 ✅ | Download Engine | NZB parser, NNTP pool with backup servers, yEnc, assembly, par2 verify/repair, unpack | A real NZB downloads, repairs and unpacks |
 | 0.6 ✅ | Import & Settings | Import + rename, blocklist + retry, Plex/Jellyfin/Emby/Kodi and notifications, NFO and artwork; settings areas like Radarr/Sonarr/SABnzbd (Media Management, Indexers with release profiles and RSS sync, Downloads with categories/switches/schedule, Connect, Metadata, General with host/security/proxy/backups, UI) and System pages | Grab → playable file in Plex without manual steps |
 | 0.7 ✅ | Automation | Wanted (missing, cutoff unmet) and calendar with iCal feed, library mass editor and Organize (rename folders and files) with undo, bulk file renamer (rules, filters, regex, TMDB episode titles), import lists (TMDB, Trakt, Plex watchlist, RSS, StreamZH), Activity paging and filters, Windows service and systemd service | Runs unattended for two weeks |
+| 0.7.1 ✅ | Design | The CloudZH look: palette (light and dark), fonts, icons, sidebar with groups, search or jump to (Ctrl K), top bar with downloads (percent and time left), splash screen with the animated logo, page transitions; every page restyled; simple file renamer | StreamZH visibly belongs to the CloudZH family |
 | 0.8 | Migration | Import settings and libraries from existing Sonarr/Radarr/Prowlarr/SABnzbd via their APIs | Home server switched over to StreamZH |
 
 ### How the test runs on the home server

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { indexerOptionsApi, indexerOptionsKeys } from '../api/indexerOptions'
 import { libraryApi, queryKeys, type LookupResult, type MediaType } from '../api/library'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import Modal from '../components/Modal'
 import Poster from '../components/Poster'
 import ProfileSelect from '../components/ProfileSelect'
@@ -30,46 +32,67 @@ export default function AddDialog({ type, onClose }: { type: MediaType; onClose:
 
   return (
     <Modal title={type === 'Movie' ? 'Add movie' : 'Add series'} onClose={onClose}>
-      <input
-        className={ui.input}
-        type="search"
-        autoFocus
-        placeholder={type === 'Movie' ? 'Search TMDB, e.g. Dune' : 'Search TMDB, e.g. Breaking Bad'}
-        value={term}
-        onChange={(e) => {
-          setTerm(e.target.value)
-          setSelected(null)
-        }}
-      />
+      <label className={styles.search}>
+        <Icon name="search" size={16} />
+        <input
+          className={ui.input}
+          type="search"
+          autoFocus
+          aria-label="Search TMDB"
+          placeholder={type === 'Movie' ? 'Search TMDB, e.g. Dune' : 'Search TMDB, e.g. Breaking Bad'}
+          value={term}
+          onChange={(e) => {
+            setTerm(e.target.value)
+            setSelected(null)
+          }}
+        />
+      </label>
 
-      {results.isFetching && <p className={ui.muted}>Searching…</p>}
+      {results.isFetching && !results.data && <Skeleton rows={3} />}
       {results.isError && <p className={ui.error}>{results.error.message}</p>}
       {results.data && results.data.length === 0 && <p className={ui.muted}>No results on TMDB.</p>}
 
-      <ul className={styles.results}>
-        {(results.data ?? []).map((r) => (
-          <li key={r.tmdbId} className={selected?.tmdbId === r.tmdbId ? styles.selectedRow : undefined}>
-            <button type="button" className={styles.result} onClick={() => setSelected(r)} disabled={r.libraryId !== null}>
-              <span className={styles.thumb}>
-                <Poster path={r.posterPath} title={r.title} size="w92" />
-              </span>
-              <span className={styles.text}>
-                <span className={styles.title}>
-                  {r.title} {r.year > 0 && <span className={ui.muted}>({r.year})</span>}
-                </span>
-                {r.originalTitle !== r.title && <span className={styles.original}>{r.originalTitle}</span>}
-                <span className={styles.overview}>{r.overview ?? 'No description.'}</span>
-              </span>
-            </button>
-            {r.libraryId !== null && (
-              <Link className={styles.inLibrary} to={`/library/${path}/${r.libraryId}`} onClick={onClose}>
-                In library →
-              </Link>
-            )}
-            {selected?.tmdbId === r.tmdbId && <AddOptions type={type} item={r} onDone={onClose} />}
-          </li>
-        ))}
-      </ul>
+      {(results.data ?? []).length > 0 && (
+        <ul className={`${styles.results} ${results.isFetching ? styles.stale : ''}`}>
+          {(results.data ?? []).map((r) => {
+            const isSelected = selected?.tmdbId === r.tmdbId
+            const inLibrary = r.libraryId !== null
+            return (
+              <li key={r.tmdbId} className={`${styles.item} ${isSelected ? styles.selectedRow : ''} ${inLibrary ? styles.owned : ''}`}>
+                <div className={styles.resultRow}>
+                  <button
+                    type="button"
+                    className={styles.result}
+                    onClick={() => setSelected(isSelected ? null : r)}
+                    disabled={inLibrary}
+                    aria-expanded={inLibrary ? undefined : isSelected}
+                  >
+                    <span className={styles.thumb}>
+                      <Poster path={r.posterPath} title={r.title} size="w92" />
+                    </span>
+                    <span className={styles.text}>
+                      <span className={styles.title}>
+                        {r.title} {r.year > 0 && <span className={styles.year}>{r.year}</span>}
+                      </span>
+                      {r.originalTitle !== r.title && <span className={styles.original}>{r.originalTitle}</span>}
+                      <span className={styles.overview}>{r.overview ?? 'No description.'}</span>
+                    </span>
+                  </button>
+                  {inLibrary ? (
+                    <Link className={`${ui.pill} ${ui.pillOk} ${styles.inLibrary}`} to={`/library/${path}/${r.libraryId}`} onClick={onClose}>
+                      <Icon name="check" size={12} />
+                      In library
+                    </Link>
+                  ) : (
+                    <Icon name={isSelected ? 'down' : 'right'} size={16} className={styles.chevron} />
+                  )}
+                </div>
+                {isSelected && <AddOptions type={type} item={r} onDone={onClose} />}
+              </li>
+            )
+          })}
+        </ul>
+      )}
       <p className={styles.attribution}>Search results from The Movie Database (TMDB).</p>
     </Modal>
   )
@@ -100,30 +123,39 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
 
   return (
     <div className={styles.options}>
-      <label className={ui.field}>
-        <span>Root folder</span>
-        <select className={ui.select} value={effectiveRoot ?? ''} onChange={(e) => setRootFolderId(Number(e.target.value))}>
-          {folders.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.path}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={ui.field}>
-        <span>Quality profile</span>
-        <ProfileSelect value={qualityProfileId} onChange={setQualityProfileId} />
-      </label>
-      <label className={ui.check}>
-        <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />
+      <div className={styles.fields}>
+        <label className={ui.field}>
+          <span>Root folder</span>
+          <select className={ui.select} value={effectiveRoot ?? ''} onChange={(e) => setRootFolderId(Number(e.target.value))}>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.path}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={ui.field}>
+          <span>Quality profile</span>
+          <ProfileSelect value={qualityProfileId} onChange={setQualityProfileId} />
+        </label>
+      </div>
+      <label className={styles.switchRow}>
+        <span className={ui.switch}>
+          <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />
+          <span />
+        </span>
         <span>Monitored{type === 'Series' ? ' (all regular seasons)' : ''}</span>
       </label>
-      <label className={ui.check}>
-        <input type="checkbox" checked={searchForMissing} disabled={!monitored} onChange={(e) => setSearch(e.target.checked)} />
+      <label className={styles.switchRow}>
+        <span className={ui.switch}>
+          <input type="checkbox" checked={searchForMissing} disabled={!monitored} onChange={(e) => setSearch(e.target.checked)} />
+          <span />
+        </span>
         <span>Start search for missing {type === 'Movie' ? 'movie' : 'episodes'}</span>
       </label>
       <div className={styles.optionActions}>
         <button className={ui.primary} type="button" disabled={!effectiveRoot || add.isPending} onClick={() => add.mutate()}>
+          <Icon name="plus" size={15} />
           {add.isPending ? 'Adding…' : `Add ${item.title}`}
         </button>
         {add.error && <span className={ui.error}>{add.error.message}</span>}

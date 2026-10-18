@@ -1,8 +1,19 @@
+/* Import existing folders: root folder pick, summary toolbar and a CloudZH table (cards on phones). */
+
 .back {
-  display: inline-block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--fg);
 }
 
 .toolbar {
@@ -10,63 +21,85 @@
   gap: 8px;
 }
 
-.toolbar select {
-  min-width: min(100%, 420px);
+.rootPick {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(100%, 480px);
+  color: var(--muted);
+}
+
+.rootPick > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+
+.rootPick select {
+  width: 100%;
+  padding-left: 34px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.compact {
+  height: 34px;
+  font-size: 13px;
 }
 
 .summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  color: var(--text-muted);
+  gap: 10px 14px;
+  padding: 10px 10px 10px 16px;
+  color: var(--fg-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
 }
 
-.summary span:first-child {
-  flex: 1;
+.count {
+  flex: 1 1 220px;
+  font-size: 13.5px;
+}
+
+.count strong {
+  color: var(--fg);
+}
+
+.matching {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 4px;
+}
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
 }
 
 .tableWrap {
   overflow-x: auto;
+  padding: 6px 8px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
   background: var(--surface);
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-
 .table th {
-  text-align: left;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-faint);
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.table td {
-  padding: 8px 12px;
-  border-top: 1px solid var(--line);
-  vertical-align: middle;
-}
-
-.table tr:first-child td {
-  border-top: none;
+  padding-top: 8px;
 }
 
 .table input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
   accent-color: var(--accent);
-}
-
-.table select {
-  width: 100%;
-  max-width: 380px;
-  padding: 6px 10px;
-  font-size: 13px;
+  vertical-align: middle;
 }
 
 .folder {
@@ -78,11 +111,12 @@
 .right {
   text-align: right;
   white-space: nowrap;
-  color: var(--text-muted);
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
 }
 
-.skipped td {
-  opacity: 0.55;
+.skipped td:not(:first-child) {
+  opacity: 0.5;
 }
 
 .table th:first-child,
@@ -99,31 +133,107 @@
 .searchRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .matchRow select {
   flex: 1;
+  width: 100%;
+  max-width: 400px;
+  min-width: 0;
 }
 
 .searchRow input {
   flex: 1;
   max-width: 320px;
-  padding: 6px 10px;
-  font-size: 13px;
 }
 
-.searchRow button {
-  padding: 6px 10px;
+/* Import running / done */
+.done {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
 }
 
-.linkButton {
-  font: inherit;
-  font-size: 12.5px;
-  color: var(--accent);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  white-space: nowrap;
+.done > :first-child {
+  margin-bottom: 0;
+}
+
+.doneTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.track {
+  width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.track > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.6s var(--ease);
+}
+
+@media (max-width: 760px) {
+  .summary {
+    padding: 12px;
+  }
+
+  .summary > button {
+    width: 100%;
+  }
+
+  .tableWrap {
+    padding: 0 12px;
+  }
+
+  /* Each folder as a card: checkbox and folder name on top, the match below, the files on the right. */
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    gap: 8px 8px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table td {
+    padding: 0;
+    border: 0;
+    width: auto !important;
+  }
+
+  .table tbody tr:hover td {
+    background: none;
+  }
+
+  .match {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+
+  .files {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 12.5px;
+  }
+
+  .matchRow select {
+    max-width: none;
+  }
 }

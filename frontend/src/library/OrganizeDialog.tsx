@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import type { MediaType } from '../api/library'
 import { organizeApi, organizeKeys, type OrganizeFileKind, type OrganizeItem } from '../api/organize'
+import Icon from '../components/Icon'
+import Loader, { Skeleton } from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import styles from './MassEdit.module.css'
@@ -52,7 +54,7 @@ export default function OrganizeDialog({ type, ids, onClose }: { type: MediaType
     return (
       <Modal title={finished ? 'Organize finished' : 'Organizing…'} onClose={onClose}>
         {run && <RunProgress run={run} />}
-        {!run && !finished && <p className={styles.text}>Starting…</p>}
+        {!run && !finished && <Loader text="Starting…" />}
         {finished && <RunResult result={finished} />}
         {finished && finished.runId != null && (
           <p className={styles.text}>Not what you wanted? Undo renames everything back, for the next 24 hours.</p>
@@ -70,7 +72,12 @@ export default function OrganizeDialog({ type, ids, onClose }: { type: MediaType
 
   return (
     <Modal title={`Organize ${ids.length} ${noun(ids.length)}`} onClose={onClose}>
-      {preview.isPending && <p className={styles.text}>Working out the new names…</p>}
+      {preview.isPending && (
+        <>
+          <p className={styles.text}>Working out the new names…</p>
+          <Skeleton rows={4} />
+        </>
+      )}
       {preview.isError && <p className={ui.error}>{preview.error.message}</p>}
       {preview.isSuccess && (
         <>
@@ -82,8 +89,8 @@ export default function OrganizeDialog({ type, ids, onClose }: { type: MediaType
             . Subtitles, NFO and artwork next to a video get the new name too.
           </p>
           <div className={styles.summary}>
-            <span className={`${ui.badge} ${ui.ok}`}>{ready.length} ready</span>
-            {conflicts.length > 0 && <span className={`${ui.badge} ${ui.missing}`}>{conflicts.length} with a conflict</span>}
+            <span className={`${ui.badge} ${ui.ok} ${ui.num}`}>{ready.length} ready</span>
+            {conflicts.length > 0 && <span className={`${ui.badge} ${ui.missing} ${ui.num}`}>{conflicts.length} with a conflict</span>}
             {unchanged > 0 && (
               <label className={ui.check}>
                 <input type="checkbox" checked={showUnchanged} onChange={(e) => setShowUnchanged(e.target.checked)} />
@@ -92,7 +99,10 @@ export default function OrganizeDialog({ type, ids, onClose }: { type: MediaType
             )}
           </div>
           {changing.length === 0 && !showUnchanged && (
-            <p className={styles.text}>Everything already follows the naming scheme. Nothing to rename.</p>
+            <div className={ui.empty}>
+              <Icon name="check" size={22} />
+              <span>Everything already follows the naming scheme. Nothing to rename.</span>
+            </div>
           )}
           {shown.length > 0 && (
             <ul className={styles.previewList}>
@@ -125,6 +135,7 @@ export default function OrganizeDialog({ type, ids, onClose }: { type: MediaType
           Cancel
         </button>
         <button type="button" className={ui.primary} disabled={chosen.length === 0 || apply.isPending || !!run} onClick={() => apply.mutate()}>
+          <Icon name="rename" size={15} />
           {run ? 'Another run is busy…' : `Organize ${chosen.length} ${noun(chosen.length)}`}
         </button>
       </div>
@@ -177,6 +188,7 @@ function PreviewItem({ item, checked, onToggle }: { item: OrganizeItem; checked:
         ))}
         {item.conflicts.map((c) => (
           <span key={c} className={styles.conflictText}>
+            <Icon name="alert" size={14} />
             {c}
           </span>
         ))}

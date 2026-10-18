@@ -1,49 +1,98 @@
+/* Add movie / series: a TMDB search with compact result rows (CloudZH .results/.result), options below the chosen one. */
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.search > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+
+.search input {
+  width: 100%;
+  padding-left: 36px;
+}
+
 .results {
   list-style: none;
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 56vh;
+  padding: 0 4px 0 0;
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 520px);
   overflow: auto;
+  transition: opacity 0.15s;
 }
 
-.results li {
-  border-radius: var(--radius-small);
-  border: 1px solid transparent;
+.stale {
+  opacity: 0.6;
+}
+
+.item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color 0.15s, background 0.15s;
+  animation: rise 0.25s var(--ease) both;
+}
+
+.item:hover:not(.owned) {
+  border-color: var(--line-strong);
 }
 
 .selectedRow {
-  border-color: var(--line) !important;
-  background: var(--bg);
+  border-color: var(--accent) !important;
+}
+
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
 }
 
 .result {
-  width: 100%;
-  display: flex;
-  gap: 14px;
-  padding: 10px;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
   font: inherit;
   text-align: left;
   color: inherit;
   background: none;
   border: none;
-  border-radius: var(--radius-small);
+  border-radius: 12px;
   cursor: pointer;
 }
 
-.result:hover:not(:disabled) {
-  background: var(--surface-hover);
+.result:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .result:disabled {
   cursor: default;
-  opacity: 0.55;
 }
 
-.thumb {
-  flex: 0 0 54px;
+.owned .result {
+  opacity: 0.7;
+}
+
+.thumb > * {
+  border-radius: 8px;
+}
+
+.thumb > div {
+  font-size: 11px;
+  padding: 4px;
 }
 
 .text {
@@ -55,34 +104,74 @@
 
 .title {
   font-weight: 600;
+  font-size: 14px;
+}
+
+.year {
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .original {
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .overview {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  color: var(--muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
+.chevron {
+  flex: none;
+  color: var(--muted);
+}
+
 .inLibrary {
-  display: inline-block;
-  margin: 0 0 10px 78px;
-  font-size: 13px;
-  color: var(--accent);
+  flex: none;
+  height: 22px;
+  font-size: 11.5px;
+  text-decoration: none;
+}
+
+.inLibrary:hover {
+  text-decoration: underline;
 }
 
 .options {
   display: grid;
-  grid-template-columns: 1fr;
   gap: 12px;
-  padding: 4px 12px 14px 78px;
+  margin: 0 8px 8px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  animation: rise 0.2s var(--ease);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fields select {
+  width: 100%;
+  min-width: 0;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--fg-2);
+  cursor: pointer;
 }
 
 .optionActions {
@@ -90,24 +179,26 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  padding-top: 2px;
 }
 
 .attribution {
   margin: 0;
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 @media (max-width: 600px) {
-  .options,
-  .inLibrary {
-    padding-left: 12px;
-    margin-left: 10px;
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
 
-.options label,
-.options select {
-  min-width: 0;
-  width: 100%;
+  .result {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .optionActions > button {
+    width: 100%;
+  }
 }

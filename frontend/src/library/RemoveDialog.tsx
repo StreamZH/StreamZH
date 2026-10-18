@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { queryKeys, type MediaType } from '../api/library'
 import { organizeApi, type DeleteResult } from '../api/organize'
+import Icon from '../components/Icon'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import { useExclusionOnRemove, type ListItemRef } from '../importLists/useExclusionOnRemove'
@@ -64,17 +65,22 @@ export default function RemoveDialog({
 
   return (
     <Modal title={`Remove ${what}`} onClose={onClose}>
-      <label className={`${ui.check} ${styles.deleteCheck}`}>
+      <label className={styles.choice}>
         <input type="checkbox" checked={deleteFiles} onChange={(e) => setDeleteFiles(e.target.checked)} />
-        Delete files and folder
+        <span>
+          Delete files and folder
+          <small>
+            {recycleBin
+              ? `Deleted folders go to the recycle bin ${recycleBin} and are cleaned up as set in Media Management.`
+              : 'No recycle bin is set in Media Management: deleted files are gone for good.'}
+          </small>
+        </span>
       </label>
-      <p className={styles.hint}>
-        {recycleBin
-          ? `Deleted folders go to the recycle bin ${recycleBin} and are cleaned up as set in Media Management.`
-          : 'No recycle bin is set in Media Management: deleted files are gone for good.'}
-      </p>
       {exclusion.prompt}
-      <p className={deleteFiles ? styles.summaryDanger : styles.text}>{summary}</p>
+      <p className={deleteFiles ? styles.summaryDanger : styles.text}>
+        {deleteFiles && <Icon name="alert" size={16} />}
+        <span>{summary}</span>
+      </p>
       {!single && deleteFiles && (
         <ul className={styles.removeList}>
           {items.slice(0, 8).map((i) => (
@@ -104,7 +110,8 @@ export default function RemoveDialog({
           {remove.data ? 'Close' : 'Cancel'}
         </button>
         {!remove.data && (
-          <button type="button" className={ui.danger} disabled={remove.isPending || items.length === 0} onClick={() => remove.mutate()}>
+          <button type="button" className={deleteFiles ? ui.dangerSolid : ui.danger} disabled={remove.isPending || items.length === 0} onClick={() => remove.mutate()}>
+            <Icon name="trash" size={15} />
             {remove.isPending ? 'Removing…' : deleteFiles ? 'Remove and delete files' : 'Remove'}
           </button>
         )}

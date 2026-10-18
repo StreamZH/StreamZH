@@ -1,39 +1,46 @@
-.back {
-  font-size: 13px;
-  color: var(--text-faint);
-  align-self: flex-start;
-}
+/* Movie and series pages in the CloudZH .detail look: backdrop head, panels, tables, path rows. */
 
-.back:hover {
-  color: var(--text);
-}
-
+/* ---- Head ---- */
 .hero {
   position: relative;
-  border-radius: 14px;
-  overflow: hidden;
+  border-radius: var(--r);
   border: 1px solid var(--line);
   background: var(--surface);
 }
 
+/* The backdrop fades into the surface towards the text, so both themes stay readable. (Clipped by its own radius, so
+   the «…» menu can hang out of the head.) */
 .backdrop {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
   background-size: cover;
-  background-position: center 20%;
-  opacity: 0.22;
-  mask-image: linear-gradient(90deg, transparent 0%, #000 45%);
+  background-position: center 22%;
+  opacity: 0.3;
+  mask-image: linear-gradient(90deg, transparent 18%, #000 75%);
+  animation: fade 0.5s ease;
+}
+
+.backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, var(--surface) 0%, transparent 55%);
 }
 
 .heroInner {
   position: relative;
-  display: flex;
-  gap: 28px;
-  padding: 28px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 26px;
+  padding: 24px;
 }
 
 .poster {
-  flex: 0 0 200px;
+  align-self: start;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
 }
 
 .info {
@@ -43,15 +50,36 @@
   min-width: 0;
 }
 
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.back:hover {
+  color: var(--fg);
+}
+
 .title {
-  font-family: var(--font-title);
-  font-size: 44px;
-  line-height: 1.05;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(28px, 3.4vw, 40px);
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  color: var(--fg);
 }
 
 .facts {
   margin: 0;
-  color: var(--text-muted);
+  font-size: 13.5px;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .badges {
@@ -61,51 +89,193 @@
 }
 
 .overview {
-  margin: 4px 0 0;
-  max-width: 70ch;
-  color: var(--text-muted);
+  margin: 2px 0 0;
+  max-width: 72ch;
+  font-size: 14px;
+  color: var(--fg-2);
   line-height: 1.6;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   margin-top: auto;
   padding-top: 8px;
 }
 
-.facts2 {
+.profile {
+  height: 36px;
+  max-width: 220px;
+  font-size: 13px;
+}
+
+.divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--line-strong);
+}
+
+/* ---- «…» menu ---- */
+.more {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 190px;
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 8px 20px;
-  margin: 0;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  animation: pop 0.15s var(--ease);
+  transform-origin: top right;
 }
 
-.facts2 dt {
-  color: var(--text-faint);
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.facts2 dd {
+.menu button svg {
+  color: var(--muted);
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  background: var(--sunk);
+  outline: none;
+}
+
+.menu .menuDanger,
+.menu .menuDanger svg {
+  color: var(--err);
+}
+
+.menu .menuDanger:hover {
+  background: var(--err-soft);
+}
+
+/* ---- Panels ---- */
+.panelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.panelTitle svg {
+  color: var(--muted);
+}
+
+.panelCount {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.paths {
+  display: grid;
+  gap: 8px;
+}
+
+/* CloudZH .pathrow: label above a mono path, a copy button on the right. */
+.pathrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--sunk);
+}
+
+.pathrow small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.pathrow code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.pathrow .none {
+  font-family: var(--font-body);
+  color: var(--muted);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 18px;
+  margin: 14px 0 0;
+  font-size: 13.5px;
+}
+
+.kv dt {
+  color: var(--muted);
+}
+
+.kv dd {
   margin: 0;
   overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 .links {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
 }
 
 .links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--accent);
+  text-decoration: none;
+}
+
+.links a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Seasons ---- */
+.season {
+  padding: 0;
+  overflow: hidden;
 }
 
 .seasonHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px 12px;
   flex-wrap: wrap;
+  padding: 12px 14px 12px 12px;
 }
 
 .seasonToggle {
@@ -113,114 +283,268 @@
   align-items: center;
   gap: 10px;
   font: inherit;
-  color: var(--text);
+  color: var(--fg);
   background: none;
   border: none;
-  padding: 0;
+  padding: 4px 6px;
+  margin: -4px 0;
+  border-radius: 8px;
   cursor: pointer;
 }
 
+.seasonToggle:hover {
+  background: var(--sunk);
+}
+
 .chevron {
-  width: 14px;
-  color: var(--text-faint);
+  color: var(--muted);
+  transition: transform 0.2s var(--ease);
+}
+
+.open .chevron {
+  transform: rotate(90deg);
 }
 
 .seasonTitle {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 
-.episodes {
-  width: 100%;
-  margin-top: 12px;
-  border-collapse: collapse;
-  font-size: 13.5px;
+.seasonTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
 }
 
-.episodes td {
-  padding: 9px 8px;
+.monitorSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+
+.seasonBody {
   border-top: 1px solid var(--line);
-  vertical-align: top;
+  padding: 4px 6px 6px;
+  animation: fade 0.2s ease;
+}
+
+.seasonBody th {
+  padding-top: 10px;
 }
 
 .epNumber {
-  width: 36px;
+  width: 48px;
   font-family: var(--font-mono);
-  color: var(--text-faint);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .epTitle {
   display: block;
+  font-weight: 500;
 }
 
 .epFile {
   display: block;
+  margin-top: 2px;
   font-family: var(--font-mono);
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .epDate {
   width: 120px;
-  color: var(--text-muted);
+  color: var(--fg-2);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .epStatus {
   width: 110px;
+}
+
+.epStatus > span {
+  height: 22px;
+  font-size: 11.5px;
+}
+
+.epSearch {
+  width: 44px;
   text-align: right;
 }
 
-.unmonitored {
+.epSearch button {
+  margin: -6px -6px -6px 0;
+}
+
+.unmonitored td {
   opacity: 0.55;
+}
+
+/* ---- History ---- */
+.historyTable td {
+  vertical-align: top;
+}
+
+.historyDate {
+  width: 110px;
+  color: var(--fg-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.historyRelease {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.historyNum {
+  white-space: nowrap;
+  text-align: right;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.historyMuted {
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.eventPill {
+  height: 22px;
+  font-size: 11.5px;
 }
 
 @media (max-width: 760px) {
   .heroInner {
-    flex-direction: column;
-    padding: 18px;
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 14px 16px;
+    padding: 16px;
+  }
+
+  .backdrop {
+    mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+    opacity: 0.22;
+  }
+
+  .info {
+    display: contents;
+  }
+
+  .back {
+    grid-column: 1 / -1;
+    grid-row: 1;
   }
 
   .poster {
-    flex: none;
-    width: 140px;
+    grid-column: 1;
+    grid-row: 2 / span 3;
   }
 
   .title {
-    font-size: 34px;
+    grid-column: 2;
+    font-size: 26px;
+  }
+
+  .facts,
+  .badges {
+    grid-column: 2;
+  }
+
+  .overview,
+  .actions {
+    grid-column: 1 / -1;
+  }
+
+  .overview {
+    font-size: 13.5px;
+  }
+
+  .profile {
+    max-width: none;
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .seasonBody td,
+  .seasonBody th {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
   .epDate {
     display: none;
   }
-}
 
-.actions button {
-  background: rgb(28 27 25 / 0.85);
-  backdrop-filter: blur(6px);
-}
+  /* The season's buttons and its switch fit one row; the switch keeps its name for screen readers. */
+  .switchText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
-.profile {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
+  .monitorSwitch {
+    margin-left: auto;
+  }
 
-.profile select {
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: rgb(28 27 25 / 0.85);
-  backdrop-filter: blur(6px);
-}
+  .seasonTools {
+    flex: 1 1 100%;
+    gap: 6px;
+  }
 
-.profile select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  .epNumber {
+    width: 34px;
+  }
+
+  .epStatus {
+    width: auto;
+  }
+
+  /* History as cards: date and event on top, the release below, the facts after it. */
+  .historyTable thead {
+    display: none;
+  }
+
+  .historyTable tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .historyTable tr:last-child {
+    border-bottom: 0;
+  }
+
+  .historyTable td {
+    padding: 0;
+    border: 0;
+  }
+
+  .historyTable .historyRelease {
+    grid-column: 1 / -1;
+  }
+
+  .historyTable .historyNum {
+    text-align: left;
+  }
+
+  .historyDate {
+    width: auto;
+  }
 }

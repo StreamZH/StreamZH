@@ -1,0 +1,73 @@
+/* Restart overlay like CloudZH's restart screen (#srvDown: scrim, .modal-c with .empty and the large loader). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+  animation: fade 0.2s ease;
+}
+
+.card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(420px, 100%);
+  padding: 30px 26px 28px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  animation: pop 0.2s var(--ease);
+}
+
+.card h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.card p {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  border-radius: 14px;
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.stopped {
+  color: var(--muted);
+  background: var(--sunk);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+
+.link {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.card > :global(.ld) {
+  padding: 2px 0 10px;
+}

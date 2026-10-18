@@ -12,15 +12,15 @@ import {
   type WantedSortKey,
   type WantedType,
 } from '../api/wanted'
-import { Empty } from '../activity/QueueTab'
 import { useToasts } from '../activity/hooks'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import Modal from '../components/Modal'
+import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
-import { formatDate, formatDateTime, relativeTime, useUiFormats } from '../lib/format'
-import page from '../pages/Page.module.css'
+import { formatDate, formatDateTime, relativeTime, tmdbImage, useUiFormats } from '../lib/format'
 import { useIsAdmin } from '../status/useOngoing'
-import Glyph from './Glyph'
 import styles from './Wanted.module.css'
 
 const pageSizes = [25, 50, 100]
@@ -36,11 +36,13 @@ const texts = {
     title: 'Missing',
     lead: 'Monitored movies and episodes without a file that are released, like Wanted → Missing in Radarr and Sonarr.',
     searchAll: 'Search all missing',
+    searchShort: 'Search all',
   },
   cutoff: {
     title: 'Cutoff unmet',
     lead: 'Files below the quality cutoff or in the wrong language of their profile. A search grabs an upgrade when one is found.',
     searchAll: 'Search all cutoff unmet',
+    searchShort: 'Search all',
   },
 } as const
 
@@ -183,211 +185,242 @@ export default function WantedPage() {
   }
 
   return (
-    <div className={`${page.page} ${styles.wanted}`}>
-      <header>
-        <p className={styles.eyebrow}>Wanted</p>
-        <h1 className={page.title}>{text.title}</h1>
-        <p className={page.lead}>{text.lead}</p>
-      </header>
+    <div className={styles.wanted}>
+      <PageHeader title={text.title} lead={text.lead} />
 
-      <div className={styles.toolbar}>
-        <div className={styles.segmented} role="group" aria-label="Movies or episodes">
-          {(['movies', 'episodes'] as const).map((type) => (
-            <button key={type} type="button" aria-pressed={filter.type === type} onClick={() => update({ type: type === 'movies' ? undefined : type })}>
-              {type === 'movies' ? 'Movies' : 'Episodes'}
-              {counts && <span className={styles.count}>{type === 'movies' ? counts.movies : counts.episodes}</span>}
-            </button>
-          ))}
-        </div>
-        <div className={styles.filters}>
-          <label className={ui.check}>
-            <input type="checkbox" checked={!filter.monitored} onChange={(e) => update({ unmonitored: e.target.checked ? '1' : undefined })} />
-            Show unmonitored
-          </label>
-          {kind === 'missing' && (
-            <label className={ui.check}>
-              <input type="checkbox" checked={!filter.available} onChange={(e) => update({ unreleased: e.target.checked ? '1' : undefined })} />
-              {filter.type === 'movies' ? 'Show not yet available' : 'Show unaired'}
-            </label>
-          )}
-        </div>
-        {admin && (
-          <div className={styles.actions}>
-            {selected.size > 0 && (
-              <>
-                <button type="button" className={ui.primary} onClick={() => search.mutate([...selected])} disabled={search.isPending}>
-                  <Glyph name="search" size={14} /> Search {selected.size} selected
-                </button>
-                <button type="button" className={ui.button} onClick={() => unmonitor.mutate([...selected])} disabled={unmonitor.isPending}>
-                  <Glyph name="eyeOff" size={14} /> Unmonitor
-                </button>
-              </>
-            )}
-            {selected.size === 0 && (
-              <button type="button" className={ui.button} onClick={() => setConfirmAll(true)} disabled={total === 0 || searchAll.isPending}>
-                <Glyph name="search" size={14} /> {text.searchAll}
+      <div className={styles.body}>
+        <div className={styles.toolbar}>
+          <div className={ui.seg} role="group" aria-label="Movies or episodes">
+            {(['movies', 'episodes'] as const).map((type) => (
+              <button key={type} type="button" aria-pressed={filter.type === type} onClick={() => update({ type: type === 'movies' ? undefined : type })}>
+                <Icon name={type === 'movies' ? 'film' : 'tv'} size={14} />
+                {type === 'movies' ? 'Movies' : 'Episodes'}
+                {counts && <span className={styles.count}>{type === 'movies' ? counts.movies : counts.episodes}</span>}
               </button>
+            ))}
+          </div>
+          <div className={styles.filters}>
+            <label className={ui.check}>
+              <input type="checkbox" checked={!filter.monitored} onChange={(e) => update({ unmonitored: e.target.checked ? '1' : undefined })} />
+              Show unmonitored
+            </label>
+            {kind === 'missing' && (
+              <label className={ui.check}>
+                <input type="checkbox" checked={!filter.available} onChange={(e) => update({ unreleased: e.target.checked ? '1' : undefined })} />
+                {filter.type === 'movies' ? 'Show not yet available' : 'Show unaired'}
+              </label>
             )}
           </div>
-        )}
-      </div>
-
-      {list.isError ? (
-        <Empty icon="error" title="The list could not be loaded">
-          <p>{list.error.message}</p>
-        </Empty>
-      ) : !data ? (
-        <div className={styles.loading} role="status">
-          <span className={styles.spinner} aria-hidden="true" />
-          Loading…
-        </div>
-      ) : records.length === 0 ? (
-        <Empty icon="check" title={kind === 'missing' ? `No missing ${filter.type}` : `Every ${filter.type === 'movies' ? 'movie' : 'episode'} meets its profile`}>
-          <p>
-            {kind === 'missing'
-              ? filter.type === 'movies'
-                ? 'Every monitored movie that is released has a file. Movies count as released by the minimum availability of Settings → Indexers.'
-                : 'Every monitored episode that has aired has a file.'
-              : 'No file is below the cutoff of its quality profile or in the wrong language.'}
-          </p>
-          {kind === 'missing' && filter.type === 'movies' && (
-            <div className={styles.emptyActions}>
-              <Link className={ui.button} to="/settings/indexers">
-                Minimum availability
-              </Link>
+          {admin && (
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={ui.primary}
+                onClick={() => setConfirmAll(true)}
+                disabled={total === 0 || searchAll.isPending}
+                title={text.searchAll}
+              >
+                <Icon name="search" size={15} /> {text.searchShort}
+              </button>
             </div>
           )}
-        </Empty>
-      ) : (
-        <>
-          <div className={`${styles.tableWrap} ${list.isPlaceholderData ? styles.stale : ''}`}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  {admin && (
-                    <th className={styles.selectCell}>
-                      <input
-                        type="checkbox"
-                        aria-label="Select all on this page"
-                        checked={allOnPage}
-                        onChange={() => setSelected(allOnPage ? new Set() : new Set(records.map((r) => r.id)))}
-                      />
-                    </th>
-                  )}
-                  {sortHeader('title', filter.type === 'movies' ? 'Movie' : 'Series')}
-                  {filter.type === 'episodes' && <th>Episode</th>}
-                  {sortHeader('date', filter.type === 'movies' ? 'In cinemas' : 'Aired')}
-                  {filter.type === 'movies' && kind === 'missing' && <th className={styles.wide}>Home release</th>}
-                  {kind === 'cutoff' && sortHeader('quality', 'Quality')}
-                  {kind === 'cutoff' && <th>Cutoff</th>}
-                  {sortHeader('profile', 'Profile', styles.wide)}
-                  {sortHeader('status', 'Status')}
-                  {sortHeader('lastSearched', 'Last searched', styles.wide)}
-                  {admin && <th className={styles.actionCell}><span className={styles.srOnly}>Actions</span></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((r) => {
-                  const home = homeRelease(r)
-                  return (
-                    <tr key={r.id} className={`${selected.has(r.id) ? styles.selected : ''} ${r.monitored ? '' : styles.unmonitored}`}>
-                      {admin && (
-                        <td className={styles.selectCell}>
-                          <input type="checkbox" aria-label={`Select ${r.title}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
-                        </td>
-                      )}
-                      <td className={styles.titleCell}>
-                        <span className={styles.tone} data-type={r.type} aria-hidden="true" />
-                        <Link to={detailLink(r)} className={styles.titleLink}>
-                          {r.title}
-                        </Link>
-                        {r.type === 'movie' && r.year > 0 && <span className={`${styles.faint} ${styles.nowrap}`}> ({r.year})</span>}
-                        {!r.monitored && <span className={styles.flag}>Unmonitored</span>}
-                      </td>
-                      {filter.type === 'episodes' && (
-                        <td className={styles.episodeCell} data-label="Episode">
-                          <span className={styles.mono}>{episodeNumber(r)}</span> <span className={styles.episodeTitle}>{r.episodeTitle}</span>
-                        </td>
-                      )}
-                      <td className={styles.nowrap} data-label={filter.type === 'movies' ? 'In cinemas' : 'Aired'} title={r.date ?? undefined}>
-                        {r.date ? formatDate(r.date) : <span className={styles.faint}>Unknown</span>}
-                      </td>
-                      {filter.type === 'movies' && kind === 'missing' && (
-                        <td className={`${styles.wide} ${styles.nowrap}`} data-label="Home release" title={[r.digitalRelease && `Digital ${r.digitalRelease}`, r.physicalRelease && `Physical ${r.physicalRelease}`].filter(Boolean).join(', ') || undefined}>
-                          {home ? (
-                            <>
-                              {formatDate(home.date)} <span className={styles.faint}>{home.label}</span>
-                            </>
-                          ) : (
-                            <span className={styles.faint}>–</span>
-                          )}
-                        </td>
-                      )}
-                      {kind === 'cutoff' && (
-                        <td className={styles.nowrap} data-label="Quality">
-                          <span className={styles.quality}>{r.quality ?? 'Unknown'}</span>
-                          {r.languages.length > 0 && <span className={styles.faint}> {r.languages.join(', ')}</span>}
-                        </td>
-                      )}
-                      {kind === 'cutoff' && (
-                        <td className={styles.nowrap} data-label="Cutoff">
-                          {r.cutoff}
-                          {r.wantedLanguage && <span className={styles.faint}> {r.wantedLanguage}</span>}
-                        </td>
-                      )}
-                      <td className={`${styles.wide} ${styles.nowrap}`} data-label="Profile">
-                        {r.profile}
-                      </td>
-                      <td data-label="Status">
-                        <Status record={r} />
-                      </td>
-                      <td className={`${styles.wide} ${styles.nowrap}`} data-label="Last searched" title={r.lastSearched ? formatDateTime(r.lastSearched) : undefined}>
-                        {r.lastSearched ? relativeTime(r.lastSearched) : <span className={styles.faint}>Never</span>}
-                      </td>
-                      {admin && (
-                        <td className={styles.actionCell}>
-                          <button
-                            type="button"
-                            className={styles.iconAction}
-                            onClick={() => search.mutate([r.id])}
-                            disabled={search.isPending}
-                            title={searchedIds.has(r.id) ? 'Search queued' : 'Search'}
-                            aria-label={`Search ${r.type === 'movie' ? r.title : `${r.title} ${episodeNumber(r)}`}`}
-                          >
-                            <Glyph name="search" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        </div>
 
-          <nav className={styles.pager} aria-label="Pages">
-            <button className={ui.button} type="button" disabled={data.page <= 1} onClick={() => update({ page: data.page > 2 ? String(data.page - 1) : undefined })}>
-              Previous
+        {admin && selected.size > 0 && (
+          <div className={styles.bulkbar} role="region" aria-label="Selection">
+            <b>{`${selected.size} selected`}</b>
+            <button type="button" className={`${ui.button} ${ui.sm}`} onClick={() => search.mutate([...selected])} disabled={search.isPending}>
+              <Icon name="search" size={14} /> Search
             </button>
-            <span className={styles.pagerText}>
-              Page <strong>{data.page}</strong> of {pages} · {new Intl.NumberFormat().format(total)} {noun(filter.type, total)}
-            </span>
-            <button className={ui.button} type="button" disabled={data.page >= pages} onClick={() => update({ page: String(data.page + 1) })}>
-              Next
+            <button type="button" className={`${ui.button} ${ui.sm}`} onClick={() => unmonitor.mutate([...selected])} disabled={unmonitor.isPending}>
+              <Icon name="eyeoff" size={14} /> Unmonitor
             </button>
-            <label className={styles.pageSize}>
-              <span className={styles.srOnly}>Rows per page</span>
-              <select className={ui.select} value={filter.pageSize} onChange={(e) => update({ pageSize: e.target.value === '25' ? undefined : e.target.value })}>
-                {pageSizes.map((size) => (
-                  <option key={size} value={size}>
-                    {size} per page
-                  </option>
-                ))}
-              </select>
-            </label>
-          </nav>
-        </>
-      )}
+            <button type="button" className={`${ui.ghost} ${ui.sm} ${styles.bulkClear}`} onClick={() => setSelected(new Set())}>
+              Clear
+            </button>
+          </div>
+        )}
+
+        {list.isError ? (
+          <div className={`${ui.panel} ${ui.empty}`}>
+            <Icon name="alert" size={26} className={styles.emptyErr} />
+            <h3>The list could not be loaded</h3>
+            <p>{list.error.message}</p>
+          </div>
+        ) : !data ? (
+          <div className={`${ui.panel} ${styles.wait}`}>
+            <Skeleton rows={5} />
+          </div>
+        ) : records.length === 0 ? (
+          <div className={`${ui.panel} ${ui.empty}`}>
+            <Icon name="check" size={26} className={styles.emptyOk} />
+            <h3>{kind === 'missing' ? `No missing ${filter.type}` : `Every ${filter.type === 'movies' ? 'movie' : 'episode'} meets its profile`}</h3>
+            <p>
+              {kind === 'missing'
+                ? filter.type === 'movies'
+                  ? 'Every monitored movie that is released has a file. Movies count as released by the minimum availability of Settings → Indexers.'
+                  : 'Every monitored episode that has aired has a file.'
+                : 'No file is below the cutoff of its quality profile or in the wrong language.'}
+            </p>
+            {kind === 'missing' && filter.type === 'movies' && (
+              <div className={styles.emptyActions}>
+                <Link className={ui.button} to="/settings/indexers">
+                  Minimum availability
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className={`${styles.tableWrap} ${list.isPlaceholderData ? styles.stale : ''}`}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    {admin && (
+                      <th className={styles.selectCell}>
+                        <input
+                          type="checkbox"
+                          aria-label="Select all on this page"
+                          checked={allOnPage}
+                          onChange={() => setSelected(allOnPage ? new Set() : new Set(records.map((r) => r.id)))}
+                        />
+                      </th>
+                    )}
+                    {sortHeader('title', filter.type === 'movies' ? 'Movie' : 'Series')}
+                    {filter.type === 'episodes' && <th>Episode</th>}
+                    {sortHeader('date', filter.type === 'movies' ? 'In cinemas' : 'Aired')}
+                    {filter.type === 'movies' && kind === 'missing' && <th className={styles.wide}>Home release</th>}
+                    {kind === 'cutoff' && sortHeader('quality', 'Quality')}
+                    {kind === 'cutoff' && <th>Cutoff</th>}
+                    {sortHeader('profile', 'Profile', styles.wide)}
+                    {sortHeader('status', 'Status')}
+                    {sortHeader('lastSearched', 'Last searched', styles.wide)}
+                    {admin && <th className={styles.actionCell}><span className={styles.srOnly}>Actions</span></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((r) => {
+                    const home = homeRelease(r)
+                    return (
+                      <tr key={r.id} className={`${selected.has(r.id) ? styles.selected : ''} ${r.monitored ? '' : styles.unmonitored}`}>
+                        {admin && (
+                          <td className={styles.selectCell}>
+                            <input type="checkbox" aria-label={`Select ${r.title}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
+                          </td>
+                        )}
+                        <td className={styles.titleCell}>
+                          <div className={styles.titleBox}>
+                            <Thumb record={r} />
+                            <div className={styles.titleText}>
+                              <Link to={detailLink(r)} className={styles.titleLink}>
+                                {r.title}
+                              </Link>
+                              {r.type === 'movie' && r.year > 0 && <span className={`${styles.faint} ${styles.nowrap}`}> ({r.year})</span>}
+                              {!r.monitored && <span className={styles.flag}>Unmonitored</span>}
+                            </div>
+                          </div>
+                        </td>
+                        {filter.type === 'episodes' && (
+                          <td className={styles.episodeCell} data-label="Episode">
+                            <span className={styles.mono}>{episodeNumber(r)}</span> <span className={styles.episodeTitle}>{r.episodeTitle}</span>
+                          </td>
+                        )}
+                        <td className={styles.nowrap} data-label={filter.type === 'movies' ? 'In cinemas' : 'Aired'} title={r.date ?? undefined}>
+                          {r.date ? formatDate(r.date) : <span className={styles.faint}>Unknown</span>}
+                        </td>
+                        {filter.type === 'movies' && kind === 'missing' && (
+                          <td className={`${styles.wide} ${styles.nowrap}`} data-label="Home release" title={[r.digitalRelease && `Digital ${r.digitalRelease}`, r.physicalRelease && `Physical ${r.physicalRelease}`].filter(Boolean).join(', ') || undefined}>
+                            {home ? (
+                              <>
+                                {formatDate(home.date)} <span className={styles.faint}>{home.label}</span>
+                              </>
+                            ) : (
+                              <span className={styles.faint}>–</span>
+                            )}
+                          </td>
+                        )}
+                        {kind === 'cutoff' && (
+                          <td className={styles.nowrap} data-label="Quality">
+                            <span className={styles.quality}>{r.quality ?? 'Unknown'}</span>
+                            {r.languages.length > 0 && <span className={styles.faint}> {r.languages.join(', ')}</span>}
+                          </td>
+                        )}
+                        {kind === 'cutoff' && (
+                          <td className={styles.nowrap} data-label="Cutoff">
+                            {r.cutoff}
+                            {r.wantedLanguage && <span className={styles.faint}> {r.wantedLanguage}</span>}
+                          </td>
+                        )}
+                        <td className={`${styles.wide} ${styles.nowrap}`} data-label="Profile">
+                          {r.profile}
+                        </td>
+                        <td data-label="Status">
+                          <Status record={r} />
+                        </td>
+                        <td className={`${styles.wide} ${styles.nowrap}`} data-label="Last searched" title={r.lastSearched ? formatDateTime(r.lastSearched) : undefined}>
+                          {r.lastSearched ? relativeTime(r.lastSearched) : <span className={styles.faint}>Never</span>}
+                        </td>
+                        {admin && (
+                          <td className={styles.actionCell}>
+                            <button
+                              type="button"
+                              className={styles.iconAction}
+                              onClick={() => search.mutate([r.id])}
+                              disabled={search.isPending}
+                              title={searchedIds.has(r.id) ? 'Search queued' : 'Search'}
+                              aria-label={`Search ${r.type === 'movie' ? r.title : `${r.title} ${episodeNumber(r)}`}`}
+                            >
+                              <Icon name={searchedIds.has(r.id) ? 'check' : 'search'} size={15} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <nav className={styles.pager} aria-label="Pages">
+              <span className={styles.pagerText}>
+                Page <strong>{data.page}</strong> of {pages} · {new Intl.NumberFormat().format(total)} {noun(filter.type, total)}
+              </span>
+              <div className={styles.pagerControls}>
+                <label className={styles.pageSize}>
+                  <span className={styles.srOnly}>Rows per page</span>
+                  <select className={ui.select} value={filter.pageSize} onChange={(e) => update({ pageSize: e.target.value === '25' ? undefined : e.target.value })}>
+                    {pageSizes.map((size) => (
+                      <option key={size} value={size}>
+                        {size} per page
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className={`${ui.button} ${ui.icon}`}
+                  type="button"
+                  disabled={data.page <= 1}
+                  onClick={() => update({ page: data.page > 2 ? String(data.page - 1) : undefined })}
+                  aria-label="Previous page"
+                  title="Previous page"
+                >
+                  <Icon name="left" size={16} />
+                </button>
+                <button
+                  className={`${ui.button} ${ui.icon}`}
+                  type="button"
+                  disabled={data.page >= pages}
+                  onClick={() => update({ page: String(data.page + 1) })}
+                  aria-label="Next page"
+                  title="Next page"
+                >
+                  <Icon name="right" size={16} />
+                </button>
+              </div>
+            </nav>
+          </>
+        )}
+      </div>
 
       {confirmAll && (
         <Modal title={text.searchAll} onClose={() => setConfirmAll(false)}>
@@ -409,6 +442,17 @@ export default function WantedPage() {
       )}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
+  )
+}
+
+/** Small poster in the first column; a tinted box with an icon when there is none. */
+function Thumb({ record: r }: { record: WantedRecord }) {
+  const [failed, setFailed] = useState(false)
+  const url = tmdbImage(r.posterPath, 'w92')
+  return (
+    <span className={styles.thumb} data-type={r.type} aria-hidden="true">
+      {url && !failed ? <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} /> : <Icon name={r.type === 'movie' ? 'film' : 'tv'} size={14} />}
+    </span>
   )
 }
 

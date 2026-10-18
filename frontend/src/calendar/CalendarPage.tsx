@@ -3,11 +3,12 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { generalApi, generalKeys } from '../api/general'
 import { calendarApi, calendarKeys, type CalendarEntry, type CalendarFilter } from '../api/wanted'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
+import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
 import { formatDate, formatDayMonth, formatLongDate, useUiFormats } from '../lib/format'
-import page from '../pages/Page.module.css'
 import { useIsAdmin } from '../status/useOngoing'
-import Glyph from '../wanted/Glyph'
 import { addDays, dayKey, daysBetween, parseDay, step, viewRange, weekdayNames, type CalendarView } from './dates'
 import IcalDialog from './IcalDialog'
 import styles from './Calendar.module.css'
@@ -15,7 +16,7 @@ import styles from './Calendar.module.css'
 const views: { key: CalendarView; label: string }[] = [
   { key: 'month', label: 'Month' },
   { key: 'week', label: 'Week' },
-  { key: 'agenda', label: 'Agenda' },
+  { key: 'agenda', label: 'List' },
 ]
 
 const releaseLabels = { inCinemas: 'In cinemas', digital: 'Digital release', physical: 'Physical release', airDate: 'Airs' } as const
@@ -134,88 +135,91 @@ export default function CalendarPage() {
   const inRange = todayKey >= dayKey(start) && todayKey <= dayKey(end)
 
   return (
-    <div className={`${page.page} ${styles.calendar}`}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={page.title}>Calendar</h1>
-          <p className={page.lead}>Movie releases and episode air dates of your library, and what is already on disk.</p>
-        </div>
-        {admin && (
-          <button type="button" className={ui.button} onClick={() => setIcal(true)}>
-            <Glyph name="link" size={14} /> iCal link
-          </button>
-        )}
-      </header>
-
-      <div className={styles.toolbar}>
-        <div className={styles.nav}>
-          <button type="button" className={ui.button} onClick={() => go({ date: null })} disabled={inRange && !url.get('date')}>
-            Today
-          </button>
-          <button type="button" className={styles.arrow} onClick={() => go({ date: step(view, anchor, -1) })} aria-label="Previous">
-            <Glyph name="left" size={16} />
-          </button>
-          <button type="button" className={styles.arrow} onClick={() => go({ date: step(view, anchor, 1) })} aria-label="Next">
-            <Glyph name="right" size={16} />
-          </button>
-          <h2 className={styles.period} aria-live="polite">
-            {title}
-          </h2>
-        </div>
-        <div className={styles.segmented} role="group" aria-label="View">
-          {views.map((v) => (
-            <button
-              key={v.key}
-              type="button"
-              aria-pressed={view === v.key}
-              onClick={() => {
-                remember({ view: v.key })
-                go({ view: v.key })
-              }}
-            >
-              {v.label}
+    <div className={styles.calendar}>
+      <PageHeader
+        title="Calendar"
+        lead="Movie releases and episode air dates of your library, and what is already on disk."
+        actions={
+          admin && (
+            <button type="button" className={ui.button} onClick={() => setIcal(true)}>
+              <Icon name="link" size={15} /> iCal link
             </button>
-          ))}
+          )
+        }
+      />
+
+      <div className={styles.body}>
+        <div className={styles.toolbar}>
+          <div className={styles.nav}>
+            <button type="button" className={`${ui.button} ${ui.icon}`} onClick={() => go({ date: step(view, anchor, -1) })} aria-label="Previous" title="Previous">
+              <Icon name="left" size={16} />
+            </button>
+            <button type="button" className={ui.button} onClick={() => go({ date: null })} disabled={inRange && !url.get('date')}>
+              Today
+            </button>
+            <button type="button" className={`${ui.button} ${ui.icon}`} onClick={() => go({ date: step(view, anchor, 1) })} aria-label="Next" title="Next">
+              <Icon name="right" size={16} />
+            </button>
+            <h2 className={styles.period} aria-live="polite">
+              {title}
+            </h2>
+          </div>
+          <div className={ui.seg} role="group" aria-label="View">
+            {views.map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                aria-pressed={view === v.key}
+                onClick={() => {
+                  remember({ view: v.key })
+                  go({ view: v.key })
+                }}
+              >
+                <Icon name={v.key === 'month' ? 'grid' : v.key === 'week' ? 'calendar' : 'list'} size={14} />
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className={styles.filters}>
-        <button type="button" className={styles.chip} data-tone="movies" aria-pressed={showMovies} onClick={() => remember({ movies: !showMovies })}>
-          Movies
-        </button>
-        <button type="button" className={styles.chip} data-tone="series" aria-pressed={showSeries} onClick={() => remember({ series: !showSeries })}>
-          Series
-        </button>
-        <label className={ui.check}>
-          <input type="checkbox" checked={filter.unmonitored} onChange={(e) => remember({ unmonitored: e.target.checked })} />
-          Show unmonitored
-        </label>
-        <ul className={styles.legend} aria-label="Legend">
-          <li data-status="downloaded">Downloaded</li>
-          <li data-status="downloading">Downloading</li>
-          <li data-status="missing">Missing</li>
-          <li data-status="unaired">Not released yet</li>
-        </ul>
-      </div>
+        <div className={styles.filters}>
+          <button type="button" className={styles.chip} data-tone="movies" aria-pressed={showMovies} onClick={() => remember({ movies: !showMovies })}>
+            Movies
+          </button>
+          <button type="button" className={styles.chip} data-tone="series" aria-pressed={showSeries} onClick={() => remember({ series: !showSeries })}>
+            Series
+          </button>
+          <label className={ui.check}>
+            <input type="checkbox" checked={filter.unmonitored} onChange={(e) => remember({ unmonitored: e.target.checked })} />
+            Show unmonitored
+          </label>
+          <ul className={styles.legend} aria-label="Legend">
+            <li data-status="downloaded">Downloaded</li>
+            <li data-status="downloading">Downloading</li>
+            <li data-status="missing">Missing</li>
+            <li data-status="unaired">Not released yet</li>
+          </ul>
+        </div>
 
-      {entries.isError && <p className={ui.error}>{entries.error.message}</p>}
-      {nothingShown && <p className={styles.note}>Pick movies, series or both to fill the calendar.</p>}
+        {entries.isError && <p className={ui.errBox}>{entries.error.message}</p>}
+        {nothingShown && <p className={ui.infoBox}>Pick movies, series or both to fill the calendar.</p>}
 
-      <div className={entries.isPlaceholderData ? styles.stale : undefined}>
-        {view === 'month' && (
-          <MonthView
-            anchor={anchor}
-            start={start}
-            end={end}
-            firstDay={firstDay}
-            todayKey={todayKey}
-            byDay={byDay}
-            selectedDay={selectedDay ?? (inRange ? todayKey : null)}
-            onSelect={setSelectedDay}
-          />
-        )}
-        {view === 'week' && <WeekView start={start} firstDay={firstDay} todayKey={todayKey} byDay={byDay} />}
-        {view === 'agenda' && <AgendaView start={start} end={end} todayKey={todayKey} byDay={byDay} loading={!entries.data && !nothingShown} />}
+        <div key={view} className={`${styles.view} ${entries.isPlaceholderData ? styles.stale : ''}`}>
+          {view === 'month' && (
+            <MonthView
+              anchor={anchor}
+              start={start}
+              end={end}
+              firstDay={firstDay}
+              todayKey={todayKey}
+              byDay={byDay}
+              selectedDay={selectedDay ?? (inRange ? todayKey : null)}
+              onSelect={setSelectedDay}
+            />
+          )}
+          {view === 'week' && <WeekView start={start} firstDay={firstDay} todayKey={todayKey} byDay={byDay} />}
+          {view === 'agenda' && <AgendaView start={start} end={end} todayKey={todayKey} byDay={byDay} loading={!entries.data && !nothingShown} />}
+        </div>
       </div>
 
       {ical && <IcalDialog onClose={() => setIcal(false)} />}
@@ -357,12 +361,19 @@ function AgendaView(props: { start: Date; end: Date; todayKey: string; byDay: Ma
   const days = daysBetween(props.start, props.end)
     .map(dayKey)
     .filter((key) => props.byDay.has(key))
-  if (props.loading) return <p className={styles.note}>Loading…</p>
+  if (props.loading) {
+    return (
+      <div className={`${ui.panel} ${styles.agendaWait}`}>
+        <Skeleton rows={4} />
+      </div>
+    )
+  }
   if (days.length === 0) {
     return (
-      <div className={styles.emptyAgenda}>
-        <p className={styles.emptyTitle}>Nothing in these {daysBetween(props.start, props.end).length} days</p>
-        <p className={styles.note}>Movies show on their cinema, digital and physical release, episodes on their air date.</p>
+      <div className={`${ui.panel} ${ui.empty}`}>
+        <Icon name="calendar" size={26} className={styles.emptyIcon} />
+        <h3>Nothing in these {daysBetween(props.start, props.end).length} days</h3>
+        <p>Movies show on their cinema, digital and physical release, episodes on their air date.</p>
       </div>
     )
   }

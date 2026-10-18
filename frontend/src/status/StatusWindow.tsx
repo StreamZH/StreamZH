@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import type { OngoingNotice, OngoingRunning } from '../api/status'
-import { formatElapsed, formatSpeed, percent } from './format'
+import { formatElapsed, formatEta, formatSpeed } from './format'
 import StatusIcon from './icons'
 import { loadDismissed, loadOpen, saveDismissed, saveOpen } from './storage'
 import { useOngoing } from './useOngoing'
@@ -9,6 +9,20 @@ import styles from './StatusWindow.module.css'
 
 /** A download row that is waiting (queued or paused) rather than working. */
 const isIdle = (row: OngoingRunning) => row.kind === 'download' && row.speedBps == null
+
+/** "42.8 %": one decimal, rounded down so 100 % only shows when it is really done. */
+function precise(value: number): string {
+  return `${(Math.floor(Math.min(1, Math.max(0, value)) * 1000) / 10).toFixed(1)} %`
+}
+
+/** The row's second line without the whole-number percent (shown precisely next to the title), with the time left. */
+function details(row: { sub: string | null; progress?: number | null; speedBps?: number | null; etaSeconds?: number | null }): string | null {
+  let parts = (row.sub ?? '').split(' · ').filter(Boolean)
+  if (row.progress != null) parts = parts.filter((part) => !/^\d+ %$/.test(part))
+  const eta = row.speedBps && row.speedBps > 0 ? formatEta(row.etaSeconds) : ''
+  if (eta && !parts.some((part) => part.endsWith(' left'))) parts.push(eta)
+  return parts.length ? parts.join(' · ') : null
+}
 
 /**
  * The status window at the bottom right, as in CloudZH: collapsed one row with the essentials (spinner, title, percent and
@@ -89,12 +103,11 @@ export default function StatusWindow() {
     } else {
       tone = 'run'
       icon = <span className={styles.spinner} />
+      const eta = lead.speedBps ? formatEta(lead.etaSeconds) : ''
       meta =
-        lead.speedBps != null && lead.progress != null
-          ? `${percent(lead.progress)} · ${formatSpeed(lead.speedBps)}`
-          : lead.progress != null
-            ? percent(lead.progress)
-            : formatElapsed(now - (lead.seenAt ?? now))
+        lead.progress != null
+          ? [precise(lead.progress), eta || (lead.speedBps != null ? formatSpeed(lead.speedBps) : '')].filter(Boolean).join(' · ')
+          : formatElapsed(now - (lead.seenAt ?? now))
     }
   } else {
     const first = notices[0]
@@ -127,7 +140,15 @@ export default function StatusWindow() {
           {running.length > 0 && (
             <div className={styles.list}>
               {running.map((row) => (
-                <Row key={row.key} title={row.title} sub={row.sub} link={row.link} tone={isIdle(row) ? 'idle' : 'run'} progress={row.progress} onNavigate={collapseSoon} />
+                <Row
+                  key={row.key}
+                  title={row.title}
+                  sub={details(row)}
+                  link={row.link}
+                  tone={isIdle(row) ? 'idle' : 'run'}
+                  progress={row.progress}
+                  onNavigate={collapseSoon}
+                />
               ))}
             </div>
           )}
@@ -200,15 +221,24 @@ function Row({
   onNavigate: () => void
   children?: ReactNode
 }) {
+  const pct = tone === 'run' || tone === 'idle' ? (progress ?? null) : null
   const content = (
     <>
       <span className={styles.st}>
         {tone === 'run' ? <span className={styles.spinner} /> : tone === 'idle' ? <StatusIcon name="pause" size={14} /> : <StatusIcon name={tone} />}
       </span>
       <span className={styles.ctx}>
-        <span className={styles.ct} title={title}>
-          {title}
+        <span className={styles.ctop}>
+          <span className={styles.ct} title={title}>
+            {title}
+          </span>
+          {pct != null && <span className={styles.cp}>{precise(pct)}</span>}
         </span>
+        {pct != null && (
+          <span className={styles.cbar} aria-hidden="true">
+            <i style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }} />
+          </span>
+        )}
         {sub && <span className={styles.cs}>{sub}</span>}
       </span>
     </>
@@ -223,9 +253,6 @@ function Row({
         <div className={`${styles.cb} ${styles.static}`}>{content}</div>
       )}
       {children}
-      {(tone === 'run' || tone === 'idle') && progress != null && (
-        <i className={styles.cbar} style={{ width: `calc((100% - 20px) * ${Math.min(1, Math.max(0, progress))})` }} />
-      )}
     </div>
   )
 }

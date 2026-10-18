@@ -2,8 +2,11 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useLocation } from 'react-router'
 import { generalApi, generalKeys, type GeneralSettings } from '../api/general'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { urlBase } from '../lib/urlBase'
+import overlay from './Restart.module.css'
 import styles from './System.module.css'
 
 // Restart and shutdown. The overlay lives outside the pages (see RestartOverlay in main.tsx): the banner with the
@@ -151,27 +154,29 @@ export function RestartOverlay() {
   const address = target ? `${target.origin}${target.base}/` : ''
 
   return (
-    <div className={styles.overlay} role="alertdialog" aria-live="assertive" aria-label="StreamZH restart">
-      <div className={styles.overlayCard}>
+    <div className={overlay.overlay} role="alertdialog" aria-live="assertive" aria-label="StreamZH restart">
+      <div className={overlay.card}>
         {phase === 'restarting' && (
           <>
-            <div className={styles.overlayTitle}>
-              <span className={styles.spinner} /> Restarting StreamZH…
-            </div>
+            <Loader size="lg" />
+            <h3>Restarting StreamZH</h3>
             <p>The page reloads when StreamZH is back, usually after a few seconds.</p>
             {address !== `${window.location.origin}${urlBase}/` && (
               <p>
-                New address: <span className={styles.mono}>{address}</span>
+                New address: <span className={overlay.mono}>{address}</span>
               </p>
             )}
           </>
         )}
         {phase === 'timeout' && (
           <>
-            <div className={styles.overlayTitle}>StreamZH did not come back</div>
+            <div className={overlay.icon}>
+              <Icon name="alert" size={24} />
+            </div>
+            <h3>StreamZH did not come back</h3>
             <p>
               It may listen on another address now, or it could not start. Try{' '}
-              <a className={styles.link} href={address}>
+              <a className={overlay.link} href={address}>
                 {address}
               </a>
               , or look at the log file in the data folder.
@@ -180,7 +185,10 @@ export function RestartOverlay() {
         )}
         {phase === 'stopped' && (
           <>
-            <div className={styles.overlayTitle}>StreamZH has stopped</div>
+            <div className={`${overlay.icon} ${overlay.stopped}`}>
+              <Icon name="power" size={24} />
+            </div>
+            <h3>StreamZH has stopped</h3>
             <p>Start it again where it runs: the Windows service, the terminal, or Docker (a container with a restart policy starts again by itself).</p>
           </>
         )}

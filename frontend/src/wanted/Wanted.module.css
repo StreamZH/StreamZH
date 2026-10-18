@@ -1,18 +1,13 @@
+/* Wanted (Missing, Cutoff unmet) in the CloudZH style: toolbar with .seg, filters and the primary «Search all»,
+   a selection bar like .bulkbar, the table like .tbl/.utable (poster thumbnails, row hover, selection) and a pager. */
 .wanted {
-  --err: #ef6b6b;
-  --sunk: #171614;
-  --info: #7aa7db;
-  max-width: 1200px;
-  gap: 20px;
+  max-width: 1280px;
 }
 
-.eyebrow {
-  margin: 0 0 4px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--accent);
+.body {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
 }
 
 .srOnly {
@@ -30,56 +25,26 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 20px;
-}
-
-.segmented {
-  display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--sunk);
-}
-
-.segmented button {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  font-size: 13px;
-  color: var(--text-muted);
-  border-radius: 7px;
-  cursor: pointer;
-}
-
-.segmented button[aria-pressed='true'] {
-  background: var(--surface-hover);
-  color: var(--text);
-  font-weight: 500;
-}
-
-.segmented button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  gap: 10px 18px;
 }
 
 .count {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  display: inline-grid;
+  place-items: center;
   min-width: 20px;
-  padding: 1px 6px;
-  text-align: center;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--text-muted);
+  background: var(--sunk);
+  color: var(--muted);
 }
 
-.segmented button[aria-pressed='true'] .count {
-  color: var(--text);
+[aria-pressed='true'] > .count {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
 }
 
 .filters {
@@ -95,11 +60,35 @@
   margin-left: auto;
 }
 
+.bulkbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13.5px;
+  animation: pop 0.15s ease-out;
+}
+
+.bulkbar b {
+  font-weight: 600;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bulkClear {
+  margin-left: auto;
+  color: inherit;
+}
+
 /* ---- Table ---- */
 
 .tableWrap {
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
   background: var(--surface);
   overflow-x: auto;
   transition: opacity 0.15s;
@@ -112,12 +101,12 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .table th,
 .table td {
-  padding: 9px 12px;
+  padding: 10px 12px;
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--line);
@@ -128,22 +117,32 @@
 }
 
 .table th {
+  padding-top: 12px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-faint);
+  color: var(--muted);
   white-space: nowrap;
-  background: var(--sunk);
 }
 
-.table tbody tr:hover {
-  background: var(--surface-hover);
+.table tbody tr {
+  transition: background 0.12s;
+  animation: fade 0.25s ease backwards;
+}
+
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+.table tbody tr.selected td {
+  background: var(--accent-soft);
 }
 
 .table input[type='checkbox'] {
   accent-color: var(--accent);
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   margin: 0;
+  vertical-align: middle;
   cursor: pointer;
 }
 
@@ -154,11 +153,12 @@
   gap: 4px;
   cursor: pointer;
   color: inherit;
+  transition: color 0.12s;
 }
 
 .sort:hover,
 .sortActive {
-  color: var(--text);
+  color: var(--fg);
 }
 
 .sort:focus-visible {
@@ -170,11 +170,11 @@
 .sortArrow {
   display: inline-block;
   width: 10px;
-  font-family: var(--font-mono);
+  color: var(--accent);
 }
 
 .selectCell {
-  width: 36px;
+  width: 34px;
   padding-right: 0 !important;
 }
 
@@ -184,39 +184,70 @@
 }
 
 .selected {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: var(--accent-soft);
 }
 
 .unmonitored .titleLink,
-.unmonitored .episodeTitle {
-  color: var(--text-muted);
+.unmonitored .episodeTitle,
+.unmonitored .thumb {
+  opacity: 0.6;
 }
 
 .titleCell {
-  min-width: 180px;
+  min-width: 200px;
 }
 
-.tone {
-  display: inline-block;
-  width: 3px;
-  height: 14px;
-  margin-right: 9px;
-  vertical-align: -2px;
-  border-radius: 2px;
-  background: var(--movies);
+.titleBox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.tone[data-type='episode'] {
-  background: var(--series);
+.titleText {
+  min-width: 0;
+}
+
+.thumb {
+  --tone: var(--movies);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 45px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--tone) 14%, var(--poster-bg));
+  color: var(--tone);
+  transition: transform 0.15s var(--ease), box-shadow 0.15s;
+}
+
+.thumb[data-type='episode'] {
+  --tone: var(--series);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  animation: fade 0.3s ease;
+}
+
+.table tbody tr:hover .thumb {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .titleLink {
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
 }
 
 .titleLink:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--accent);
 }
 
 .episodeCell {
@@ -224,11 +255,11 @@
 }
 
 .episodeTitle {
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .faint {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .nowrap {
@@ -236,25 +267,29 @@
 }
 
 .mono {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .quality {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 1px 6px;
-  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  border-radius: 6px;
   border: 1px solid var(--line);
   background: var(--sunk);
+  color: var(--fg-2);
   white-space: nowrap;
 }
 
 .flag {
+  display: inline-block;
   margin-left: 8px;
   font-size: 11px;
-  color: var(--text-faint);
-  border: 1px dashed var(--line);
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
   border-radius: 999px;
   padding: 0 7px;
   white-space: nowrap;
@@ -268,24 +303,32 @@
 
 .queued {
   color: var(--info);
+  background: var(--info-soft);
+  border-color: transparent;
 }
 
 .iconAction {
-  all: unset;
-  box-sizing: border-box;
   display: inline-grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: var(--radius-small);
-  border: 1px solid var(--line);
-  color: var(--text-muted);
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.table tbody tr:hover .iconAction {
+  border-color: var(--line);
 }
 
 .iconAction:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--surface);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent !important;
 }
 
 .iconAction:focus-visible {
@@ -304,49 +347,42 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 10px 14px;
   font-size: 13px;
 }
 
 .pagerText {
-  color: var(--text-muted);
-  text-align: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .pagerText strong {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.pagerControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .pageSize select {
+  height: 36px;
   font-size: 13px;
-  padding: 7px 10px;
 }
 
-.loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 48px 16px;
-  color: var(--text-muted);
+.wait {
+  padding: 22px;
 }
 
-.spinner {
-  width: 26px;
-  height: 26px;
-  border: 2px solid var(--line);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.emptyOk {
+  color: var(--ok);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.emptyErr {
+  color: var(--err);
 }
 
 .emptyActions {
@@ -358,14 +394,13 @@
 
 .dialogText {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .dialogActions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 18px;
 }
 
 /* ---- Phone: every row becomes a small card ---- */
@@ -416,8 +451,18 @@
     margin-bottom: 8px;
     padding: 12px;
     border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border-radius: var(--r);
     background: var(--surface);
+  }
+
+  .table tbody tr:hover td,
+  .table tbody tr.selected td {
+    background: none;
+  }
+
+  .table tbody tr.selected {
+    background: var(--accent-soft);
+    border-color: transparent;
   }
 
   .table td {
@@ -431,7 +476,7 @@
 
   .table td[data-label]::before {
     content: attr(data-label) ': ';
-    color: var(--text-faint);
+    color: var(--muted);
   }
 
   .table td.selectCell {
@@ -444,9 +489,14 @@
     grid-row: 1 / span 6;
   }
 
+  .iconAction {
+    border-color: var(--line);
+  }
+
   .table td.titleCell {
     font-size: 14px;
     min-width: 0;
+    margin-bottom: 4px;
   }
 
   .table td.episodeCell::before {
@@ -455,5 +505,9 @@
 
   .wide:not(th) {
     display: none !important;
+  }
+
+  .pager {
+    justify-content: center;
   }
 }

@@ -154,4 +154,6 @@ public static class ConfigKeys
     public const string UiLongDateFormat = "UiLongDateFormat";
     public const string UiTimeFormat = "UiTimeFormat";
     public const string UiShowRelativeDates = "UiShowRelativeDates";
+    // Calendar (0.7)
+    public const string UiFirstDayOfWeek = "UiFirstDayOfWeek";
 }

@@ -27,6 +27,7 @@ export default function UiPage() {
         longDateFormat: draft.longDateFormat,
         timeFormat: draft.timeFormat,
         showRelativeDates: draft.showRelativeDates,
+        firstDayOfWeek: draft.firstDayOfWeek,
       })
       setUiFormats(saved)
       queryClient.setQueryData(generalKeys.ui, saved)
@@ -75,6 +76,14 @@ export default function UiPage() {
             </Row>
             <Row label="Relative dates" help="“3 min ago” instead of the date and time for recent events. Off: always the date and time.">
               <Toggle checked={v.showRelativeDates} onChange={(showRelativeDates) => form.set({ showRelativeDates })} />
+            </Row>
+            <Row label="First day of week" htmlFor="firstDayOfWeek" error={form.error('firstDayOfWeek')} help="Where the weeks of the calendar start.">
+              <Select
+                id="firstDayOfWeek"
+                value={v.firstDayOfWeek}
+                onChange={(firstDayOfWeek) => form.set({ firstDayOfWeek: firstDayOfWeek as UiSettings['firstDayOfWeek'] })}
+                options={v.firstDaysOfWeek.map((d) => ({ value: d, label: d === 'monday' ? 'Monday' : 'Sunday' }))}
+              />
             </Row>
             <Row label="Preview">
               <dl className={styles.preview}>

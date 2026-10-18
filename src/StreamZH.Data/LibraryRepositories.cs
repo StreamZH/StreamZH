@@ -48,7 +48,7 @@ public sealed class MovieRepository(Database database)
 {
     private const string Columns = """
         Id, TmdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Runtime, Status, Genres, PosterPath, BackdropPath,
-        Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified, InCinemas
+        Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified, InCinemas, DigitalRelease, PhysicalRelease
         """;
 
     public IReadOnlyList<Movie> All()
@@ -87,9 +87,9 @@ public sealed class MovieRepository(Database database)
         movie.Id = connection.ExecuteScalar<int>(
             """
             INSERT INTO Movies (TmdbId, ImdbId, Title, OriginalTitle, SortTitle, Year, Overview, Runtime, Status, Genres, PosterPath, BackdropPath,
-                Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified, InCinemas)
+                Monitored, QualityProfileId, OriginalLanguageId, RootFolderId, FolderPath, Added, LastRefreshed, FileRelativePath, FileSize, FileModified, InCinemas, DigitalRelease, PhysicalRelease)
             VALUES (@TmdbId, @ImdbId, @Title, @OriginalTitle, @SortTitle, @Year, @Overview, @Runtime, @Status, @Genres, @PosterPath, @BackdropPath,
-                @Monitored, @QualityProfileId, @OriginalLanguageId, @RootFolderId, @FolderPath, @Added, @LastRefreshed, @FileRelativePath, @FileSize, @FileModified, @InCinemas);
+                @Monitored, @QualityProfileId, @OriginalLanguageId, @RootFolderId, @FolderPath, @Added, @LastRefreshed, @FileRelativePath, @FileSize, @FileModified, @InCinemas, @DigitalRelease, @PhysicalRelease);
             SELECT last_insert_rowid();
             """,
             MovieRow.From(movie));
@@ -104,7 +104,8 @@ public sealed class MovieRepository(Database database)
             UPDATE Movies SET ImdbId = @ImdbId, Title = @Title, OriginalTitle = @OriginalTitle, SortTitle = @SortTitle, Year = @Year,
                 Overview = @Overview, Runtime = @Runtime, Status = @Status, Genres = @Genres, PosterPath = @PosterPath, BackdropPath = @BackdropPath,
                 Monitored = @Monitored, QualityProfileId = @QualityProfileId, OriginalLanguageId = @OriginalLanguageId, FolderPath = @FolderPath, LastRefreshed = @LastRefreshed,
-                FileRelativePath = @FileRelativePath, FileSize = @FileSize, FileModified = @FileModified, InCinemas = @InCinemas
+                FileRelativePath = @FileRelativePath, FileSize = @FileSize, FileModified = @FileModified, InCinemas = @InCinemas,
+                DigitalRelease = @DigitalRelease, PhysicalRelease = @PhysicalRelease
             WHERE Id = @Id
             """,
             MovieRow.From(movie));
@@ -142,6 +143,8 @@ public sealed class MovieRepository(Database database)
         public long? FileSize { get; init; }
         public DateTime? FileModified { get; init; }
         public string? InCinemas { get; init; }
+        public string? DigitalRelease { get; init; }
+        public string? PhysicalRelease { get; init; }
 
         public static MovieRow From(Movie m) => new()
         {
@@ -169,6 +172,8 @@ public sealed class MovieRepository(Database database)
             FileSize = m.File?.Size,
             FileModified = m.File?.Modified,
             InCinemas = m.InCinemas,
+            DigitalRelease = m.DigitalRelease,
+            PhysicalRelease = m.PhysicalRelease,
         };
 
         public Movie ToMovie() => new()
@@ -195,6 +200,8 @@ public sealed class MovieRepository(Database database)
             LastRefreshed = LastRefreshed is { } r ? Utc(r) : null,
             File = FileRelativePath is null ? null : new MediaFile(FileRelativePath, FileSize ?? 0, Utc(FileModified ?? DateTime.MinValue)),
             InCinemas = InCinemas,
+            DigitalRelease = DigitalRelease,
+            PhysicalRelease = PhysicalRelease,
         };
     }
 

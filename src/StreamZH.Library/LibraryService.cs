@@ -360,6 +360,8 @@ public sealed class LibraryService(
         movie.BackdropPath = d.BackdropPath;
         movie.OriginalLanguageId = StreamZH.Core.Quality.Language.FromIsoCode(d.OriginalLanguage).Id;
         movie.InCinemas = d.ReleaseDate ?? movie.InCinemas;
+        movie.DigitalRelease = d.DigitalRelease ?? movie.DigitalRelease;
+        movie.PhysicalRelease = d.PhysicalRelease ?? movie.PhysicalRelease;
     }
 
     private static void Apply(Series item, TmdbSeries d)

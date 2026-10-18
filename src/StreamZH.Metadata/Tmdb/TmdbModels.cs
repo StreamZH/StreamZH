@@ -37,7 +37,9 @@ public sealed record TmdbMovie(
     string? PosterPath,
     string? BackdropPath,
     string? OriginalLanguage = null,
-    string? ReleaseDate = null);
+    string? ReleaseDate = null,
+    string? DigitalRelease = null,
+    string? PhysicalRelease = null);
 
 public sealed record TmdbSeries(
     int TmdbId,
@@ -82,6 +84,7 @@ internal sealed class MovieDto
     public List<NamedDto>? Genres { get; set; }
     public string? PosterPath { get; set; }
     public string? BackdropPath { get; set; }
+    public ReleaseDatesDto? ReleaseDates { get; set; }
 }
 
 internal sealed class TvDto

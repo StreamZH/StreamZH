@@ -23,7 +23,7 @@ public enum MinimumAvailability
     [JsonStringEnumMemberName("inCinemas")]
     InCinemas,
 
-    /// <summary>From the home release: cinema release + 90 days (Radarr's estimate when no digital or physical date is known).</summary>
+    /// <summary>From the home release: the digital or physical release, else cinema release + 90 days (Radarr's estimate).</summary>
     [JsonStringEnumMemberName("released")]
     Released,
 }
@@ -132,8 +132,9 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
 
     /// <summary>
     /// From when a movie counts as available, like Radarr's Movie.IsAvailable: Announced = always; In cinemas = the TMDB
-    /// release date; Released = that date + 90 days; plus the availability delay (days, may be negative). Without a
-    /// release date the TMDB status decides (Released, or a year before this one), as before 0.6.
+    /// release date; Released = the earlier of the digital and physical release, else the cinema release + 90 days; plus
+    /// the availability delay (days, may be negative). Without a release date the TMDB status decides (Released, or a
+    /// year before this one), as before 0.6.
     /// Null = available now; <see cref="DateTimeOffset.MaxValue"/> = not available and no date known.
     /// </summary>
     public static DateTimeOffset? AvailableFrom(Movie movie, MinimumAvailability minimum, int delayDays, DateTimeOffset now)
@@ -142,6 +143,13 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         if (minimum == MinimumAvailability.Announced)
         {
             return null;
+        }
+
+        // Released: the digital or physical release when TMDB knows one (Radarr), else the cinema release + 90 days.
+        if (minimum == MinimumAvailability.Released && HomeRelease(movie) is { } home)
+        {
+            var homeFrom = new DateTimeOffset(home.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).AddDays(delayDays);
+            return now >= homeFrom ? null : homeFrom;
         }
 
         if (DateOnly.TryParseExact(movie.InCinemas, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var cinema))
@@ -153,6 +161,22 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
 
         var released = movie.Status is "" or "Released" || (movie.Year > 0 && movie.Year < now.Year);
         return released ? null : DateTimeOffset.MaxValue;
+    }
+
+    /// <summary>The earlier of the digital and the physical release; null when neither is known.</summary>
+    public static DateOnly? HomeRelease(Movie movie)
+    {
+        ArgumentNullException.ThrowIfNull(movie);
+        DateOnly? earliest = null;
+        foreach (var value in new[] { movie.DigitalRelease, movie.PhysicalRelease })
+        {
+            if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) && (earliest is null || date < earliest))
+            {
+                earliest = date;
+            }
+        }
+
+        return earliest;
     }
 
     /// <summary>Availability with the current settings.</summary>

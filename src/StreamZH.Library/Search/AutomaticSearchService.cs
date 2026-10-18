@@ -31,7 +31,8 @@ public sealed class AutomaticSearchService(
     IDownloadQueue? queue = null,
     TimeProvider? timeProvider = null,
     IndexerOptions? options = null,
-    PendingImports? pendingImports = null)
+    PendingImports? pendingImports = null,
+    LastSearchRepository? lastSearches = null)
 {
     /// <summary>
     /// With the blackhole folder StreamZH cannot see whether a grab is still downloading: items grabbed this recently are
@@ -218,6 +219,8 @@ public sealed class AutomaticSearchService(
             return false;
         }
 
+        lastSearches?.MarkMovies([movieId], _time.GetUtcNow().UtcDateTime);
+
         var accepted = result.Decisions.Where(d => d.Accepted).ToList();
         if (accepted.Count == 0)
         {
@@ -257,6 +260,8 @@ public sealed class AutomaticSearchService(
             logger.LogWarning("Search for season {Season} of series {Id} skipped: {Message}", seasonNumber, seriesId, ex.Message);
             return 0;
         }
+
+        lastSearches?.MarkEpisodes(open, _time.GetUtcNow().UtcDateTime);
 
         // Best first; a release only counts if it brings a wanted episode and touches none already taken.
         var taken = new HashSet<int>(done);

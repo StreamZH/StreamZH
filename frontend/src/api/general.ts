@@ -64,6 +64,9 @@ export interface UiSettings {
   shortDateFormats: string[]
   longDateFormats: string[]
   timeFormats: string[]
+  /** Calendar: "monday" (default) or "sunday". */
+  firstDayOfWeek: 'monday' | 'sunday'
+  firstDaysOfWeek: ('monday' | 'sunday')[]
 }
 
 export interface UpdateCheck {
@@ -174,7 +177,7 @@ export const generalApi = {
   regenerateApiKey: () => request<{ apiKey: string }>('POST', '/settings/apikey'),
 
   ui: () => request<UiSettings>('GET', '/settings/ui'),
-  saveUi: (change: Partial<Pick<UiSettings, 'shortDateFormat' | 'longDateFormat' | 'timeFormat' | 'showRelativeDates'>>) =>
+  saveUi: (change: Partial<Pick<UiSettings, 'shortDateFormat' | 'longDateFormat' | 'timeFormat' | 'showRelativeDates' | 'firstDayOfWeek'>>) =>
     request<UiSettings>('PUT', '/settings/ui', change),
 
   restart: () => request<void>('POST', '/system/restart'),

@@ -1,0 +1,39 @@
+/* Series type select on the series page and the episode numbering cells (absolute number, scene numbering). */
+
+.select {
+  height: 36px;
+  max-width: 140px;
+  font-size: 13px;
+}
+
+.abs {
+  width: 64px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.scene {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--info);
+  background: var(--info-soft);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .select {
+    max-width: none;
+    flex: 1 1 140px;
+  }
+
+  .abs {
+    width: 44px;
+  }
+}

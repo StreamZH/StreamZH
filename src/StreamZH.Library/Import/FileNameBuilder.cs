@@ -171,7 +171,7 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
     /// <summary>Every token of any format, to tell <c>{{Edition Tags}}</c> (the value in braces) from literal text in double braces.</summary>
     private static readonly IReadOnlySet<string> AllTokens = Allowed.Values.SelectMany(t => t).ToHashSet();
 
-    private static string[] EpisodeTokens() => ["series year", "season", "episode", "episode title", "episode cleantitle", "air date"];
+    private static string[] EpisodeTokens() => ["series year", "season", "episode", "episode title", "episode cleantitle", "air date", "absolute"];
 
     private static HashSet<string> Set(params IEnumerable<string>[] groups) => [.. groups.SelectMany(g => g)];
 
@@ -198,6 +198,14 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
         ArgumentNullException.ThrowIfNull(series);
         ArgumentNullException.ThrowIfNull(episodes);
         var ordered = episodes.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
+
+        // Like Sonarr: the daily format needs an air date, the anime format absolute numbers (specials have none).
+        if ((format == EpisodeFormat.Daily && ordered.FirstOrDefault()?.AirDate is null)
+            || (format == EpisodeFormat.Anime && (ordered.Count == 0 || ordered.Any(e => e.AbsoluteEpisodeNumber is null))))
+        {
+            format = EpisodeFormat.Standard;
+        }
+
         var pattern = format switch
         {
             EpisodeFormat.Daily => settings.DailyEpisodeFormat,
@@ -233,18 +241,19 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
         return name.Length == 0 ? null : name;
     }
 
-    /// <summary>Daily when the file or release was named by air date; anime for Japanese animation (StreamZH has no series type yet).</summary>
+    /// <summary>
+    /// The format of the series type (Sonarr): Daily and Anime series use their formats; a Standard series uses the daily
+    /// format only for a file or release named by air date.
+    /// </summary>
     public static EpisodeFormat FormatFor(Series series, bool namedByAirDate)
     {
         ArgumentNullException.ThrowIfNull(series);
-        if (namedByAirDate)
+        return series.SeriesType switch
         {
-            return EpisodeFormat.Daily;
-        }
-
-        return series.OriginalLanguageId == Language.Japanese.Id && series.Genres.Any(g => g.Equals("Animation", StringComparison.OrdinalIgnoreCase))
-            ? EpisodeFormat.Anime
-            : EpisodeFormat.Standard;
+            SeriesType.Daily => EpisodeFormat.Daily,
+            SeriesType.Anime => EpisodeFormat.Anime,
+            _ => namedByAirDate ? EpisodeFormat.Daily : EpisodeFormat.Standard,
+        };
     }
 
     // ------------------------------------------------------------------ validation
@@ -312,8 +321,10 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
         {
             NamingFormatKind.MovieFile when !Has(MovieTitleTokens) && !original => "Add the movie title, e.g. {Movie Title}.",
             NamingFormatKind.MovieFolder when !Has(MovieTitleTokens) => "Add the movie title, e.g. {Movie Title}.",
-            NamingFormatKind.StandardEpisode or NamingFormatKind.AnimeEpisode when !(Has("season") && Has("episode")) && !original =>
+            NamingFormatKind.StandardEpisode when !(Has("season") && Has("episode")) && !original =>
                 "Add the season and episode numbers, e.g. S{season:00}E{episode:00}.",
+            NamingFormatKind.AnimeEpisode when !(Has("season") && Has("episode")) && !Has("absolute") && !original =>
+                "Add the season and episode numbers or the absolute number, e.g. S{season:00}E{episode:00} or {absolute:000}.",
             NamingFormatKind.DailyEpisode when !Has("air date") && !(Has("season") && Has("episode")) && !original =>
                 "Add the air date, e.g. {Air-Date}.",
             NamingFormatKind.SeriesFolder when !Has(SeriesTitleTokens) => "Add the series title, e.g. {Series Title}.",
@@ -464,6 +475,7 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             "episode title" => EpisodeTitle(c.Episodes),
             "episode cleantitle" => EpisodeTitle(c.Episodes) is { } title ? CleanTitle(title) : null,
             "air date" => c.Episodes.FirstOrDefault()?.AirDate?.Replace('-', ' '),
+            "absolute" => AbsoluteValue(c.Episodes, numberFormat),
             "quality full" => file is null || file.Quality.Quality == Core.Quality.Quality.Unknown ? null : QualityFull(file.Quality),
             "quality title" => file is null || file.Quality.Quality == Core.Quality.Quality.Unknown ? null : file.Quality.Quality.Name,
             "quality proper" => file is { Quality.Revision.Version: > 1 } ? (file.Quality.Revision.IsRepack ? "Repack" : "Proper") : null,
@@ -485,6 +497,20 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             "tvdb id" or "tvdbid" => series?.TvdbId is > 0 and var tvdb ? tvdb.ToString(CultureInfo.InvariantCulture) : null,
             _ => null,
         };
+    }
+
+    /// <summary>{absolute:000}: "012", several episodes as a range "012-014"; nothing when an episode has no absolute number.</summary>
+    private static string? AbsoluteValue(IReadOnlyList<Episode> episodes, string numberFormat)
+    {
+        if (episodes.Count == 0 || episodes.Any(e => e.AbsoluteEpisodeNumber is null))
+        {
+            return null;
+        }
+
+        var numbers = episodes.Select(e => e.AbsoluteEpisodeNumber!.Value).Distinct().Order().ToList();
+        return numbers.Count == 1
+            ? Number(numbers[0], numberFormat)
+            : $"{Number(numbers[0], numberFormat)}-{Number(numbers[^1], numberFormat)}";
     }
 
     /// <summary>

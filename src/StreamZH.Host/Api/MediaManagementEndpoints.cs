@@ -218,9 +218,9 @@ public sealed record NamingPreview(
         Title = "The Series Title's!", OriginalTitle = "The Series Title's!", Year = 2010, ImdbId = "tt12345", TmdbId = 9999, TvdbId = 12345,
     };
 
-    private static readonly Episode First = new() { SeasonNumber = 1, EpisodeNumber = 1, Title = "Episode Title (1)", AirDate = "2013-10-30" };
-    private static readonly Episode Second = new() { SeasonNumber = 1, EpisodeNumber = 2, Title = "Episode Title (2)", AirDate = "2013-11-06" };
-    private static readonly Episode Third = new() { SeasonNumber = 1, EpisodeNumber = 3, Title = "Episode Title (3)", AirDate = "2013-11-13" };
+    private static readonly Episode First = new() { SeasonNumber = 1, EpisodeNumber = 1, Title = "Episode Title (1)", AirDate = "2013-10-30", AbsoluteEpisodeNumber = 1 };
+    private static readonly Episode Second = new() { SeasonNumber = 1, EpisodeNumber = 2, Title = "Episode Title (2)", AirDate = "2013-11-06", AbsoluteEpisodeNumber = 2 };
+    private static readonly Episode Third = new() { SeasonNumber = 1, EpisodeNumber = 3, Title = "Episode Title (3)", AirDate = "2013-11-13", AbsoluteEpisodeNumber = 3 };
 
     private static readonly NamingFileInfo MovieFileInfo = new()
     {

@@ -9,7 +9,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Data;
 using StreamZH.Library.PostProcessing;
+using StreamZH.Library.SceneNumbering;
 using StreamZH.Metadata.Tmdb;
+using StreamZH.Tests.Library.SceneNumbering;
 using StreamZH.Tests.PostProcessing;
 
 namespace StreamZH.Tests.Host;
@@ -27,6 +29,9 @@ public sealed class StreamZhFactory(ITmdbClient? tmdb = null) : WebApplicationFa
     /// <summary>Answers the tool downloads (par2, 7-Zip); unknown URLs get 404, so tests never reach GitHub.</summary>
     public FakeToolDownloads ToolDownloads { get; } = new();
 
+    /// <summary>Answers TheXEM requests (no mappings unless a test adds some), so tests never reach thexem.info.</summary>
+    public FakeXem Xem { get; } = new();
+
     /// <summary>The packages the tool installer uses; null = the official ones.</summary>
     public ToolCatalog? ToolCatalog { get; set; }
 
@@ -43,6 +48,7 @@ public sealed class StreamZhFactory(ITmdbClient? tmdb = null) : WebApplicationFa
             // No automatic installation at startup; downloads go to the fake.
             services.Replace(ServiceDescriptor.Singleton(new ToolAutoInstallOptions(TimeSpan.Zero, Enabled: false)));
             services.AddHttpClient(ToolInstaller.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => ToolDownloads);
+            services.AddHttpClient(XemClient.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Xem);
             if (ToolCatalog is not null)
             {
                 services.Replace(ServiceDescriptor.Singleton(ToolCatalog));

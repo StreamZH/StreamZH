@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { SeriesType } from './seriesType'
 
 export type MediaType = 'Movie' | 'Series'
 
@@ -55,6 +56,7 @@ export interface Series {
   airedCount: number
   fileCount: number
   sizeOnDisk: number
+  seriesType: SeriesType
 }
 
 export interface Episode {
@@ -67,6 +69,11 @@ export interface Episode {
   monitored: boolean
   hasFile: boolean
   file: MediaFile | null
+  /** Counted over the regular seasons; scene numbers come from TheXEM (null without a mapping). */
+  absoluteEpisodeNumber?: number | null
+  sceneSeasonNumber?: number | null
+  sceneEpisodeNumber?: number | null
+  sceneAbsoluteEpisodeNumber?: number | null
 }
 
 export interface Season {
@@ -90,6 +97,8 @@ export interface LookupResult {
   overview: string | null
   posterPath: string | null
   libraryId: number | null
+  /** Series only: what the series looks like (Japanese animation → anime, talk/news → daily). */
+  suggestedSeriesType?: SeriesType | null
 }
 
 export interface RootFolder {
@@ -159,8 +168,15 @@ export const libraryApi = {
   lookup: (type: MediaType, term: string, year?: number | null) =>
     request<LookupResult[]>('GET', `/lookup/${path(type)}?term=${encodeURIComponent(term)}${year ? `&year=${year}` : ''}`),
   /** `searchForMissing` null: the default from Settings → Indexers. */
-  add: (type: MediaType, tmdbId: number, rootFolderId: number, monitored: boolean, qualityProfileId: number | null, searchForMissing: boolean | null = null) =>
-    request<Movie | Series>('POST', `/${path(type)}`, { tmdbId, rootFolderId, monitored, qualityProfileId, searchForMissing }),
+  add: (
+    type: MediaType,
+    tmdbId: number,
+    rootFolderId: number,
+    monitored: boolean,
+    qualityProfileId: number | null,
+    searchForMissing: boolean | null = null,
+    seriesType: SeriesType | null = null,
+  ) => request<Movie | Series>('POST', `/${path(type)}`, { tmdbId, rootFolderId, monitored, qualityProfileId, searchForMissing, seriesType }),
   setMonitored: (type: MediaType, id: number, monitored: boolean) =>
     request<void>('PUT', `/${path(type)}/${id}/monitor`, { monitored }),
   setSeasonMonitored: (id: number, season: number, monitored: boolean) =>

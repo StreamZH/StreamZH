@@ -69,6 +69,7 @@ public sealed class DownloadImportService(
     ITmdbClient? tmdb = null,
     TimeProvider? timeProvider = null,
     CustomFormatRepository? customFormats = null,
+    SceneNumbering.EpisodeMapper? episodeMapper = null,
     MediaInfoService? mediaInfo = null)
 {
     /// <summary>Sonarr waits this long after the air date for a missing episode title.</summary>
@@ -181,14 +182,15 @@ public sealed class DownloadImportService(
             throw new LibraryException("The download folder no longer exists.", LibraryError.NotFound);
         }
 
-        var library = seriesId is { } id ? series.Episodes(id) : [];
+        var show = seriesId is { } id ? series.Find(id) : null;
+        var library = show is not null ? series.Episodes(show.Id) : [];
         return [.. VideoFiles(folder).OrderBy(f => f.FullName, StringComparer.OrdinalIgnoreCase).Select(file =>
         {
             var info = Describe(item.Title, file.FullName);
             var parsed = ParseEpisodeFile(file.FullName, item.Title, single: false);
             IReadOnlyList<int> ids = [];
             string? problem = null;
-            if (seriesId is not null)
+            if (show is not null)
             {
                 if (parsed is null)
                 {
@@ -196,7 +198,7 @@ public sealed class DownloadImportService(
                 }
                 else
                 {
-                    var (episodes, rejection) = ReleaseMatching.MapEpisodes(parsed, library);
+                    var (episodes, rejection) = episodeMapper.MapEpisodes(parsed, show, library);
                     ids = [.. episodes.Select(e => e.Id)];
                     problem = rejection?.Message;
                 }
@@ -341,7 +343,7 @@ public sealed class DownloadImportService(
                 }
                 else
                 {
-                    var (mapped, rejection) = ReleaseMatching.MapEpisodes(parsed, library);
+                    var (mapped, rejection) = episodeMapper.MapEpisodes(parsed, show, library);
                     if (rejection is not null)
                     {
                         results.Add(new ImportedFile(file.FullName, null, [], rejection.Message, false));
@@ -880,7 +882,12 @@ public sealed class DownloadImportService(
             return null;
         }
 
-        var format = FileNameBuilder.FormatFor(show, false) == EpisodeFormat.Anime ? options.AnimeEpisodeFormat : options.StandardEpisodeFormat;
+        var format = FileNameBuilder.FormatFor(show, false) switch
+        {
+            EpisodeFormat.Anime => options.AnimeEpisodeFormat,
+            EpisodeFormat.Daily => options.DailyEpisodeFormat,
+            _ => options.StandardEpisodeFormat,
+        };
         if (!format.Contains("episode", StringComparison.OrdinalIgnoreCase)
             || !(format.Contains("Title}", StringComparison.OrdinalIgnoreCase) || format.Contains("CleanTitle", StringComparison.OrdinalIgnoreCase)))
         {

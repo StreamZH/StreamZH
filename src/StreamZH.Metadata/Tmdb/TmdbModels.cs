@@ -22,7 +22,10 @@ public sealed record TmdbSearchResult(
     string OriginalTitle,
     int Year,
     string? Overview,
-    string? PosterPath);
+    string? PosterPath,
+    IReadOnlyList<int>? GenreIds = null,
+    IReadOnlyList<string>? OriginCountries = null,
+    string? OriginalLanguage = null);
 
 public sealed record TmdbMovie(
     int TmdbId,
@@ -55,7 +58,9 @@ public sealed record TmdbSeries(
     string? PosterPath,
     string? BackdropPath,
     IReadOnlyList<int> SeasonNumbers,
-    string? OriginalLanguage = null);
+    string? OriginalLanguage = null,
+    IReadOnlyList<int>? GenreIds = null,
+    IReadOnlyList<string>? OriginCountries = null);
 
 public sealed record TmdbEpisode(int SeasonNumber, int EpisodeNumber, string Title, string? AirDate, string? Overview);
 
@@ -102,6 +107,12 @@ internal sealed class TvDto
     public string? BackdropPath { get; set; }
     public List<SeasonSummaryDto>? Seasons { get; set; }
     public ExternalIdsDto? ExternalIds { get; set; }
+
+    /// <summary>Search results carry genre ids only; details carry <see cref="Genres"/>.</summary>
+    public List<int>? GenreIds { get; set; }
+
+    /// <summary>ISO 3166-1 countries, e.g. "JP".</summary>
+    public List<string>? OriginCountry { get; set; }
 }
 
 internal sealed class SeasonSummaryDto
@@ -131,6 +142,8 @@ internal sealed class ExternalIdsDto
 
 internal sealed class NamedDto
 {
+    public int Id { get; set; }
+
     public string? Name { get; set; }
 }
 

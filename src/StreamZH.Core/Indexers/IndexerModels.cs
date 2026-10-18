@@ -152,7 +152,10 @@ public sealed record EpisodeSearchCriteria : SearchCriteria
     /// <summary>yyyy-MM-dd for daily shows.</summary>
     public string? AirDate { get; init; }
 
-    public bool IsSeasonSearch => EpisodeNumbers.Count == 0 && AirDate is null;
+    /// <summary>Anime: the absolute numbers of the episodes (scene numbering), searched as "Title 12" too (Sonarr).</summary>
+    public IReadOnlyList<int> AbsoluteEpisodeNumbers { get; init; } = [];
+
+    public bool IsSeasonSearch => EpisodeNumbers.Count == 0 && AirDate is null && AbsoluteEpisodeNumbers.Count == 0;
 }
 
 /// <summary>Which Newznab function a free text search uses.</summary>

@@ -191,7 +191,7 @@ public sealed class MediaInfoServiceTests : IDisposable
 
     private DownloadImportService Import(CustomFormatRepository? formats = null) => new(
         _bed.Settings, _bed.Bed.Downloads, _bed.Bed.Movies, _bed.Bed.Series, _bed.EpisodeFiles, _bed.Details, _bed.Imports, _bed.Bed.History, _bed.Bed.Profiles,
-        _bed.Files, _bed.Bed.Events, NullLogger<DownloadImportService>.Instance, _bed.Queue, null, null, _bed.Bed.Time, formats, Service);
+        _bed.Files, _bed.Bed.Events, NullLogger<DownloadImportService>.Instance, _bed.Queue, null, null, _bed.Bed.Time, formats, mediaInfo: Service);
 
     [Fact]
     public async Task Import_stores_the_media_info_and_takes_languages_and_resolution_from_it()

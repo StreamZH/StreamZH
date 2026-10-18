@@ -203,7 +203,7 @@ export default function MediaManagementPage() {
               htmlFor="mm-daily-format"
               advanced
               error={err('dailyEpisodeFormat')}
-              help="For releases named by air date (talk shows, news)."
+              help="For series of type Daily (talk shows, news) and files named by air date."
             >
               <FormatField
                 id="mm-daily-format"
@@ -218,7 +218,7 @@ export default function MediaManagementPage() {
               htmlFor="mm-anime-format"
               advanced
               error={err('animeEpisodeFormat')}
-              help="For Japanese animation (TMDB genre Animation, original language Japanese)."
+              help="For series of type Anime. {absolute:000} gives the absolute episode number."
             >
               <FormatField
                 id="mm-anime-format"

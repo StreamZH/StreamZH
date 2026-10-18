@@ -103,7 +103,20 @@ public sealed class Episode
     public string? Overview { get; set; }
     public bool Monitored { get; set; } = true;
     public MediaFile? File { get; set; }
+
+    /// <summary>Running number over all regular seasons (TMDB has none: counted on refresh, specials excluded).</summary>
+    public int? AbsoluteEpisodeNumber { get; set; }
+
+    /// <summary>Scene numbering from TheXEM when releases are numbered differently than TMDB; null without a mapping.</summary>
+    public int? SceneSeasonNumber { get; set; }
+
+    public int? SceneEpisodeNumber { get; set; }
+
+    public int? SceneAbsoluteEpisodeNumber { get; set; }
 }
+
+/// <summary>Scene season, episode and absolute number of one episode (TheXEM).</summary>
+public sealed record SceneNumber(int? SeasonNumber, int? EpisodeNumber, int? AbsoluteEpisodeNumber);
 
 /// <summary>Episode counters per series, used for the library list.</summary>
 public sealed record SeriesCounts(int SeriesId, int EpisodeCount, int AiredCount, int FileCount, long SizeOnDisk);

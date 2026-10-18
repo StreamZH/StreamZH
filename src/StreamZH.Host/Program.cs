@@ -13,6 +13,7 @@ using StreamZH.Host.General;
 using StreamZH.Host.Hubs;
 using StreamZH.Host.Jobs;
 using StreamZH.Host.Logging;
+using StreamZH.Host.Service;
 using StreamZH.Host.Settings;
 using StreamZH.Host.Status;
 using StreamZH.Indexers;
@@ -22,6 +23,9 @@ using StreamZH.Library.Rss;
 using StreamZH.Library.Import;
 using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
+
+// Windows service: connects to the service control manager once; restarts below keep that connection.
+var service = ServiceSession.Connect();
 
 // Restart (Settings → General, System → Status) runs everything from here again in this process; see AppLifecycle.
 RestartState? restart = null;
@@ -48,6 +52,7 @@ var config = new ConfigRepository(database);
 config.GetOrCreate(ConfigKeys.ApiKey, GeneralSettingsEndpoints.NewApiKey);
 var fileLogger = builder.AddStreamZhLogging(paths, config);
 var runningHost = builder.UseStreamZhHost(config, restart);
+builder.UseStreamZhService(service);
 
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(database);
@@ -150,10 +155,12 @@ if (restored.Outcome is { } restoreOutcome)
 }
 
 restart = await app.RunUntilStoppedAsync(runningHost, fileLogger);
-if (restart is not null)
+if (restart is not null && service?.StopRequested != true)
 {
     goto start;
 }
+
+service?.Finish();
 
 public sealed record StartupInfo(DateTimeOffset StartedAt);
 

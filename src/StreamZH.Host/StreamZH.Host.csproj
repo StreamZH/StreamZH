@@ -20,5 +20,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <!-- Windows service: ServiceBase, IsWindowsService and the event log (only used on Windows). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
+  </ItemGroup>
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+    <!-- Linux packages carry the installer: unpack, then sudo bash install-linux.sh. -->
+    <None Include="../../tools/install-linux.sh" Link="install-linux.sh" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="Never" />
   </ItemGroup>
 </Project>

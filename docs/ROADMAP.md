@@ -46,9 +46,9 @@ par2 and 7-Zip are bundled with the native packages so post-processing works out
 
 | Platform | Delivery | Runs as | Data dir | Available from |
 |---|---|---|---|---|
-| Linux x64 / arm64 | `.tar.gz` + install script (systemd unit) | systemd service | `/var/lib/streamzh` | 0.1 (CI build), script 0.7 |
+| Linux x64 / arm64 | `.tar.gz` + install script (systemd unit, `tools/install-linux.sh`) | systemd service | `/var/lib/streamzh` | 0.1 (CI build), script 0.7 |
 | Docker | Image on GHCR (amd64, arm64) | Container | `/config` | 0.1 |
-| Windows x64 | Installer (Inno Setup) + portable `.zip` | Windows service or tray app | `C:\ProgramData\StreamZH` | 0.1 (CI build), installer 0.7 |
+| Windows x64 | Installer (Inno Setup) + portable `.zip` | Windows service or tray app | `C:\ProgramData\StreamZH` | 0.1 (CI build), service scripts 0.7 (`tools/Install-Service.ps1`), installer later |
 | macOS (Apple Silicon, Intel) | `.app` in `.zip` | Login item | `~/Library/Application Support/StreamZH` | 1.0 |
 | NAS (Synology, QNAP, Unraid, TrueNAS) | Docker image + Unraid template, Synology package later | Container / package | `/config` | 1.0 |
 | CloudZH | App Store entry, preconfigured | Container | managed by CloudZH | 1.0 |

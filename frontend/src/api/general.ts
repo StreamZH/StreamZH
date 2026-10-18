@@ -100,7 +100,7 @@ export interface SystemInfo {
   runtime: string
   operatingSystem: string
   architecture: string
-  runtimeMode: 'docker' | 'windowsService' | 'console'
+  runtimeMode: 'docker' | 'windowsService' | 'systemd' | 'console'
   dataDirectory: string
   databaseFile: string
   databaseSize: number

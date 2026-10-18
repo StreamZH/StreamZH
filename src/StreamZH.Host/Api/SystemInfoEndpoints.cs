@@ -8,6 +8,7 @@ using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Host.Backups;
 using StreamZH.Host.General;
+using StreamZH.Host.Service;
 using StreamZH.Host.Status;
 using StreamZH.Library.Search;
 
@@ -26,16 +27,8 @@ public static class SystemInfoEndpoints
         return app;
     }
 
-    /// <summary>"docker", "windowsService" or "console".</summary>
-    public static string RuntimeMode()
-    {
-        if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
-        {
-            return "docker";
-        }
-
-        return OperatingSystem.IsWindows() && !Environment.UserInteractive ? "windowsService" : "console";
-    }
+    /// <summary>"docker", "windowsService", "systemd" or "console" (see <see cref="RunningAs"/>).</summary>
+    public static string RuntimeMode() => RunningAs.Mode;
 
     private static SystemInfo Build(IServiceProvider services)
     {
@@ -129,7 +122,7 @@ public static class SystemInfoEndpoints
 /// <param name="Drive">The drive or mount point the folder is on.</param>
 public sealed record DiskSpaceEntry(string Label, string Path, string? Drive, long? FreeBytes, long? TotalBytes, string? Problem);
 
-/// <param name="RuntimeMode">"docker", "windowsService" or "console".</param>
+/// <param name="RuntimeMode">"docker", "windowsService", "systemd" or "console".</param>
 public sealed record SystemInfo(
     string AppName,
     string Version,

@@ -11,6 +11,7 @@ import { SystemPage } from './SystemPage'
 const modes: Record<SystemInfo['runtimeMode'], string> = {
   docker: 'Docker container',
   windowsService: 'Windows service',
+  systemd: 'systemd service',
   console: 'Program (console)',
 }
 

@@ -48,7 +48,19 @@ Without a TMDB key you can point StreamZH at a TMDB stand-in for development:
 For UI work run `npm run dev` in `frontend/` (http://localhost:5173). It proxies
 `/api` and `/hub` to the backend on port 9797.
 
-### Windows: build and install locally
+### CI
+
+Every push builds and tests (about 3 minutes). The Docker image and the packages for
+Windows, Linux and macOS are built only when started by hand (Actions → CI → Run workflow)
+or for a version tag such as `v0.3.0`.
+
+## Install
+
+StreamZH runs unattended as a Windows service, a systemd service on Linux or a Docker
+container. Your data stays in the data folder in all cases (`C:\ProgramData\StreamZH`,
+`/var/lib/streamzh`, `/config`); updating only replaces the program files.
+
+### Windows: build, install, run as a service
 
 One command pulls the latest code, builds `StreamZH.exe`, stops the running instance,
 installs it to `C:\Tools\StreamZH` and starts it again. Data in `C:\ProgramData\StreamZH` is kept.
@@ -60,18 +72,75 @@ C:\Repos\StreamZH\tools\Update-Local.ps1
 Needs Git, the .NET 10 SDK and Node.js LTS (`winget install --id Microsoft.DotNet.SDK.10 -e`,
 `winget install --id OpenJS.NodeJS.LTS -e`).
 
-### CI
+Started like this, StreamZH runs in a console window and stops when you log off. To run it
+as the Windows service "StreamZH" instead, run once in a PowerShell **as administrator**:
 
-Every push builds and tests (about 3 minutes). The Docker image and the packages for
-Windows, Linux and macOS are built only when started by hand (Actions → CI → Run workflow)
-or for a version tag such as `v0.3.0`.
+```powershell
+C:\Repos\StreamZH\tools\Install-Service.ps1 -Firewall -AllowControlledFolderAccess
+```
+
+The service starts with Windows (delayed automatic start), keeps running without a login,
+and Windows restarts it after a crash (after 5 s, 10 s, then every 60 s). Restart and
+Shutdown in the web UI work as before; System → Status shows "Runs as: Windows service".
+Running the script again updates the service. From then on `Update-Local.ps1` stops the
+service, installs the new build, starts the service and waits until it answers; it needs no
+administrator rights for that (the install script allows your user to start and stop the service).
+
+| Option | Effect |
+|---|---|
+| `-Firewall` (`-Port 9797`) | Allows the port from private and domain networks |
+| `-AllowControlledFolderAccess` | Adds `StreamZH.exe` to the allowed apps of Controlled folder access (Windows Security → Ransomware protection). Without it the service cannot import into protected folders such as Videos |
+| `-Account .\johndoe` | Runs the service as this user (asks for the password; Microsoft account: its password, not the PIN) instead of LocalSystem. Needed for a NAS that wants a login. `-Account LocalSystem` switches back |
+| `-DataDir D:\StreamZH` | Another data folder (passed as `--data`) |
+| `-NoStart` | Creates or updates the service without starting it |
+
+Things that work differently for a service:
+
+- Mapped network drives (`Z:`) do not exist for services. Use UNC paths (`\\nas\movies`)
+  for root folders and download folders; the install script lists your mapped drives with their UNC paths.
+- LocalSystem logs on to other computers as the computer account. Use `-Account` when the NAS
+  needs a user and password.
+- The proxy of your Windows user does not apply to LocalSystem; set a proxy in Settings → General if you need one.
+- Logs stay in `C:\ProgramData\StreamZH\logs`. When StreamZH cannot start at all, the error is
+  also in the Windows event log (Application, source StreamZH).
+
+Back to the console window: `C:\Repos\StreamZH\tools\Uninstall-Service.ps1` (as administrator;
+program and data stay).
+
+### Linux: systemd service
+
+Download a Linux package (Actions → CI → artifact `StreamZH-linux-x64` or `StreamZH-linux-arm64`),
+unpack it and run the installer that comes with it:
+
+```bash
+unzip StreamZH-linux-x64.zip -d StreamZH && cd StreamZH
+sudo bash install-linux.sh
+```
+
+It creates the system user `streamzh`, installs the program to `/opt/streamzh`, the data to
+`/var/lib/streamzh`, writes `/etc/systemd/system/streamzh.service` (sample:
+[docs/streamzh.service](docs/streamzh.service)), enables and starts it. Running it again with a
+newer package updates StreamZH (`sudo bash install-linux.sh --from StreamZH-linux-x64.zip` also
+takes a `.zip` or `.tar.gz` directly). `--uninstall` removes service and program, `--purge` also
+the data. `bash install-linux.sh --help` lists all options.
+
+The service user needs read and write access to your media and download folders, for example
+`sudo setfacl -R -m u:streamzh:rwX -m d:u:streamzh:rwX /srv/media`. Logs: `journalctl -u streamzh -f`.
+StreamZH needs ICU (`sudo apt install libicu-dev`) and installs par2 and 7-Zip itself (needs `tar` and `xz`).
 
 ### Docker
 
 ```bash
 docker build -f docker/Dockerfile -t streamzh:dev .
-docker run -d --name streamzh -p 9797:9797 -v /opt/streamzh:/config streamzh:dev
+docker run -d --name streamzh --restart unless-stopped -p 9797:9797 \
+  -e PUID=1000 -e PGID=1000 -e UMASK=002 \
+  -v /opt/streamzh:/config -v /srv/media:/media streamzh:dev
 ```
+
+Like the linuxserver.io images, `PUID`/`PGID` set the user StreamZH runs as (default: the
+image's `app` user, 1654) and `/config` is given to that user; `--user` works as well. The
+image has a health check on `/health` (port 9797 inside the container; publish another port
+with `-p`, do not change it in Settings).
 
 ## API
 

@@ -6,6 +6,13 @@
     git pull -> build web UI -> publish single-file StreamZH.exe -> stop running StreamZH
     -> copy to the install folder -> start it again. Your data in C:\ProgramData\StreamZH stays untouched.
 
+    Windows service: when the service StreamZH exists (C:\Repos\StreamZH\tools\Install-Service.ps1), the script stops
+    the service, installs the new StreamZH.exe, starts the service again and waits until it answers. Without the service
+    StreamZH starts in a console window as before and stops when you log off. To switch to the service, once, in a
+    PowerShell as administrator:
+        C:\Repos\StreamZH\tools\Install-Service.ps1
+    Back to the console window: C:\Repos\StreamZH\tools\Uninstall-Service.ps1
+
     Needs once: Git, .NET 10 SDK and Node.js (LTS). The script tells you how to install what is missing.
 
     par2 and 7-Zip are not handled here: StreamZH installs them itself (par2cmdline-turbo and 7-Zip, pinned
@@ -26,6 +33,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ServiceHelpers.ps1')
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 $env:NPM_CONFIG_UPDATE_NOTIFIER = 'false'
@@ -80,12 +88,25 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 
     Step 'Stop running StreamZH'
+    $service = Get-StreamZhService
+    if ($service) {
+        try {
+            if (Stop-StreamZhService) { Write-Host 'service stopped' } else { Write-Host 'service not running' }
+        }
+        catch {
+            Write-Host "Der Dienst StreamZH lässt sich nicht stoppen: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host 'Einmal als Administrator ausführen, danach geht es ohne Administratorrechte:' -ForegroundColor Yellow
+            Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'" -ForegroundColor Yellow
+            throw 'stopping the StreamZH service failed'
+        }
+    }
+    # A StreamZH in a console window (also next to the service) would lock StreamZH.exe.
     $running = Get-Process -Name 'StreamZH' -ErrorAction SilentlyContinue
     if ($running) {
         $running | Stop-Process -Force
         $running | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
         Write-Host 'stopped'
-    } else {
+    } elseif (-not $service) {
         Write-Host 'not running'
     }
 
@@ -96,10 +117,21 @@ try {
     robocopy $out $InstallDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 
-    if (-not $NoStart) {
+    if ($service -and $NoStart) {
+        Write-Host "`nDer Dienst StreamZH bleibt gestoppt. Starten mit: Start-Service StreamZH" -ForegroundColor Yellow
+    } elseif ($service) {
+        Step 'Start StreamZH service'
+        Start-Service -Name $StreamZhServiceName
+        $url = Wait-StreamZhReady
+        if (-not $url) { throw 'the StreamZH service did not start' }
+        Write-Host $url
+    } elseif (-not $NoStart) {
         Step 'Start StreamZH'
         Start-Process -FilePath (Join-Path $InstallDir 'StreamZH.exe') -WorkingDirectory $InstallDir
         Write-Host 'http://localhost:9797'
+        Write-Host "`nStreamZH läuft im Konsolenfenster und stoppt bei der Abmeldung. Als Windows-Dienst läuft es"
+        Write-Host 'auch ohne Anmeldung weiter. Einmalig in einer PowerShell als Administrator:'
+        Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'"
     }
 
     $version = (Get-Item (Join-Path $InstallDir 'StreamZH.exe')).VersionInfo.ProductVersion

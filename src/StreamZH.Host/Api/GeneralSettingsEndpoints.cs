@@ -448,7 +448,8 @@ public sealed record UpdateInfo(string Version, string Mechanism, string Instruc
         var (mechanism, instructions) = mode switch
         {
             "docker" => ("docker", "Pull the new image and recreate the container. Your data in /config stays."),
-            "windowsService" => ("manual", "Built-in updates are not available yet. Install the new version over this one; your data stays in the data folder."),
+            "windowsService" => ("manual", "Built-in updates are not available yet. Stop the StreamZH service, replace the program files with the new release and start the service again (tools\\Update-Local.ps1 does all three); your data stays in the data folder."),
+            "systemd" => ("manual", "Built-in updates are not available yet. Run install-linux.sh of the new release; it stops the service, replaces the program files and starts it again. Your data stays in the data folder."),
             _ => ("manual", "Built-in updates are not available yet. Replace the program files with the new release and restart; your data stays in the data folder."),
         };
         return new UpdateInfo(AppInfo.Version, mechanism, instructions, last);

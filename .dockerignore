@@ -1,0 +1,12 @@
+# Keep the build context small and free of host build output (docker/Dockerfile builds everything itself).
+.git
+.github
+.devdata
+**/bin
+**/obj
+**/node_modules
+frontend/dist
+src/StreamZH.Host/wwwroot
+tests
+docs
+tools

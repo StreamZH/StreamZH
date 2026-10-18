@@ -1,0 +1,30 @@
+# StreamZH systemd service (sample). tools/install-linux.sh writes this file to /etc/systemd/system/streamzh.service
+# with the folders and user of its options; by hand:
+#   sudo useradd --system --user-group --home-dir /var/lib/streamzh --shell /usr/sbin/nologin streamzh
+#   sudo install -d -o streamzh -g streamzh -m 0750 /var/lib/streamzh
+#   sudo cp -R <unpacked package>/. /opt/streamzh/ && sudo chmod 0755 /opt/streamzh/StreamZH
+#   sudo cp docs/streamzh.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now streamzh
+[Unit]
+Description=StreamZH - one app for your whole media pipeline
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=streamzh
+Group=streamzh
+Environment=STREAMZH_DATA=/var/lib/streamzh
+WorkingDirectory=/opt/streamzh
+ExecStart=/opt/streamzh/StreamZH
+# Restart after a crash; "Shutdown" in the web UI stops it for good.
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+# New files: group may read and write (media folders shared with Plex/Jellyfin).
+UMask=0002
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

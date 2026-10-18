@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { downloadKeys, downloadsApi, withLive, type DownloadItem } from '../api/downloads'
+import { mediaManagementApi, mediaManagementKeys } from '../api/mediaManagement'
 import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
 import { formatBytes } from '../lib/format'
@@ -11,11 +12,41 @@ import StatusIcon, { type StatusIconName } from '../status/icons'
 import { useIsAdmin, useLiveProgress, useOngoing } from '../status/useOngoing'
 import DownloadCard, { type DownloadActions } from './DownloadCard'
 import { RemoveDialog, UploadDialog } from './Dialogs'
+import { downloadTypeOptions, matchesSearch, matchesType, pick, useCustomCategories } from './filterOptions'
+import { FilterBar, FilterSelect, NoMatches, SearchBox } from './Filters'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
 import { PendingImports } from './imports'
+import { useClampPage, useListParams } from './listParams'
+import Pager from './Pager'
+import { usePageSize } from './paging'
 import styles from './Activity.module.css'
 
 const lowSpace = 10 * 1024 ** 3
+
+const filterKeys = ['q', 'status', 'type'] as const
+
+const statusOptions = [
+  { value: '', label: 'All statuses' },
+  { value: 'downloading', label: 'Downloading' },
+  { value: 'queued', label: 'Queued' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'processing', label: 'Verifying, repairing, extracting' },
+  { value: 'import', label: 'Waiting for import' },
+]
+
+/** True when the download is in the status filter ('import' only matches the "Waiting for import" section). */
+function matchesStatus(item: DownloadItem, status: string): boolean {
+  switch (status) {
+    case '':
+      return true
+    case 'processing':
+      return item.status === 'verifying' || item.status === 'repairing' || item.status === 'extracting'
+    case 'import':
+      return false
+    default:
+      return item.status === status
+  }
+}
 
 /** Active downloads with live progress, the queue totals, and the actions. */
 export default function QueueTab() {
@@ -35,6 +66,21 @@ export default function QueueTab() {
 
   const items = (queue.data?.items ?? []).map((i) => withLive(i, live, queue.dataUpdatedAt))
   const media = useMediaLinks(items)
+
+  // Filters and paging (client-side: the queue is loaded as a whole).
+  const { page, get, setFilters, setSearch, setPage, clear, active } = useListParams(filterKeys)
+  const [pageSize, setPageSize] = usePageSize('activity-queue')
+  const categories = useCustomCategories()
+  const status = pick(get('status'), statusOptions)
+  const search = get('q')
+  const type = get('type')
+  const matches = (item: DownloadItem) => matchesSearch(item.title, search) && matchesType(item, type)
+  const filtered = items.filter((i) => matches(i) && matchesStatus(i, status))
+  const shownPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)))
+  const pageItems = filtered.slice((shownPage - 1) * pageSize, shownPage * pageSize)
+  const pending = useQuery({ queryKey: mediaManagementKeys.pending, queryFn: mediaManagementApi.pending, enabled: false })
+  const pendingMatches = status === '' || status === 'import' ? (pending.data ?? []).filter((p) => matches(p.download)).length : 0
+  useClampPage(page, queue.data ? filtered.length : undefined, pageSize, setPage)
   const fail = (title: string) => (message: string) => push('error', title, message)
 
   const pause = useDownloadAction(downloadsApi.pause, fail('Could not pause'))
@@ -145,7 +191,7 @@ export default function QueueTab() {
         Loading the queue…
       </div>
     )
-  } else if (items.length === 0) {
+  } else if (items.length === 0 && !active) {
     body = noServer ? (
       <Empty icon="server" title="Add your Usenet server first">
         <p>StreamZH downloads releases itself. It needs the address and login of your Usenet provider before anything can start.</p>
@@ -184,11 +230,20 @@ export default function QueueTab() {
             </span>
           </p>
         )}
-        <div className={styles.cards}>
-          {items.map((item) => (
-            <DownloadCard key={item.id} item={item} media={media(item)} actions={actions} busy={busyIds.has(item.id)} />
-          ))}
-        </div>
+        <FilterBar label="Filter the queue" active={active} matches={filtered.length + pendingMatches} noun="downloads" onClear={clear}>
+          <SearchBox value={search} onChange={setSearch} placeholder="Search titles" label="Search the queue" />
+          <FilterSelect label="Status" value={status} onChange={(v) => setFilters({ status: v })} options={statusOptions} />
+          <FilterSelect label="Type" value={type} onChange={(v) => setFilters({ type: v })} options={downloadTypeOptions} groups={[{ label: 'Categories', options: categories }]} />
+        </FilterBar>
+        {active && filtered.length + pendingMatches === 0 && <NoMatches noun="downloads" onClear={clear} />}
+        {pageItems.length > 0 && (
+          <div className={styles.cards}>
+            {pageItems.map((item) => (
+              <DownloadCard key={item.id} item={item} media={media(item)} actions={actions} busy={busyIds.has(item.id)} />
+            ))}
+          </div>
+        )}
+        {status !== 'import' && <Pager page={page} pageSize={pageSize} total={filtered.length} noun="downloads" onPage={setPage} onPageSize={setPageSize} />}
       </>
     )
   }
@@ -197,7 +252,7 @@ export default function QueueTab() {
     <>
       {!blackhole && header}
       {body}
-      {!blackhole && <PendingImports admin={admin} onToast={push} />}
+      {!blackhole && (status === '' || status === 'import') && <PendingImports admin={admin} onToast={push} match={active ? matches : undefined} />}
       {removing && (
         <RemoveDialog
           item={removing}

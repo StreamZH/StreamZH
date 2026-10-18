@@ -1,0 +1,153 @@
+.pager {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.summary {
+  margin: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary strong {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.pages {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.numbers {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step,
+.number {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-small);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.step {
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.step:hover:not(:disabled),
+.number:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.number[aria-current='page'] {
+  background: var(--surface-hover);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--accent);
+  cursor: default;
+}
+
+.step:focus-visible,
+.number:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.gap {
+  min-width: 20px;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.compact {
+  display: none;
+  min-width: 52px;
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.size {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  padding: 6px 8px;
+}
+
+.select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+@media (max-width: 760px) {
+  .pager {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+  }
+
+  .summary {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    text-align: center;
+  }
+
+  .pages {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .numbers {
+    display: none;
+  }
+
+  .compact {
+    display: inline-block;
+  }
+
+  .size {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}

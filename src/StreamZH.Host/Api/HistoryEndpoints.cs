@@ -14,16 +14,56 @@ public static class HistoryEndpoints
 
     public static IEndpointRouteBuilder MapHistoryEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/v1/history", (int? page, int? pageSize, int? movieId, int? seriesId, HistoryRepository history) =>
+        // Filters: eventType (comma list of event names), mediaType (movie, series), search (words in the release title), indexer.
+        app.MapGet("/api/v1/history", (int? page, int? pageSize, int? movieId, int? seriesId, string? eventType, string? mediaType, string? search, string? indexer, HistoryRepository history) =>
         {
+            var errors = new Dictionary<string, string[]>();
+            var eventTypes = new List<HistoryEventType>();
+            foreach (var name in (eventType ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (Enum.TryParse<HistoryEventType>(name, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed) && !int.TryParse(name, out _))
+                {
+                    eventTypes.Add(parsed);
+                }
+                else
+                {
+                    errors["eventType"] = [$"Unknown event \"{name}\". Use {string.Join(", ", Enum.GetNames<HistoryEventType>())}."];
+                }
+            }
+
+            var media = ParseMediaType(mediaType);
+            if (media is null && !string.IsNullOrWhiteSpace(mediaType) && !IsAll(mediaType))
+            {
+                errors["mediaType"] = ["Use movie or series."];
+            }
+
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors);
+            }
+
             var p = Math.Max(1, page ?? 1);
             var size = Math.Clamp(pageSize ?? 20, 1, MaxPageSize);
-            var (records, total) = history.Page(p, size, movieId, seriesId);
-            return new HistoryPage(p, size, total, [.. records.Select(HistoryResource.From)]);
+            var (records, total) = history.Page(p, size, movieId, seriesId, new HistoryFilter(eventTypes, media, search, indexer));
+            return Results.Ok(new HistoryPage(p, size, total, [.. records.Select(HistoryResource.From)]));
         }).RequireAuthorization().WithTags("History");
+
+        // The indexers that occur in the history, for the filter.
+        app.MapGet("/api/v1/history/indexers", (HistoryRepository history) => history.Indexers())
+            .RequireAuthorization().WithTags("History");
 
         return app;
     }
+
+    /// <summary>"movie"/"movies" or "series"/"tv" (case-insensitive); null for anything else.</summary>
+    public static MediaType? ParseMediaType(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "movie" or "movies" => MediaType.Movie,
+        "series" or "tv" => MediaType.Series,
+        _ => null,
+    };
+
+    private static bool IsAll(string value) => string.Equals(value.Trim(), "all", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record HistoryPage(int Page, int PageSize, int TotalRecords, IReadOnlyList<HistoryResource> Records);

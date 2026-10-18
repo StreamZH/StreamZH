@@ -201,12 +201,25 @@ public sealed class BlocklistRepository(Database database)
     }
 
     /// <summary>Newest first. <paramref name="page"/> starts at 1.</summary>
-    public (IReadOnlyList<BlocklistItem> Records, int Total) Page(int page, int pageSize)
+    /// <param name="search">Words that must all appear in the release title (case-insensitive).</param>
+    /// <param name="mediaType">Movie or Series; null for all.</param>
+    public (IReadOnlyList<BlocklistItem> Records, int Total) Page(int page, int pageSize, string? search = null, MediaType? mediaType = null)
     {
+        var conditions = new List<string> { "1 = 1" };
+        var parameters = new DynamicParameters(new { take = pageSize, skip = (page - 1) * pageSize });
+        if (mediaType is { } type)
+        {
+            conditions.Add("MediaType = @mediaType");
+            parameters.Add("mediaType", (int)type);
+        }
+
+        TextSearch.Where("SourceTitle", search, conditions, parameters);
+
+        var where = string.Join(" AND ", conditions);
         using var connection = database.Open();
-        var total = connection.ExecuteScalar<int>("SELECT COUNT(*) FROM Blocklist");
+        var total = connection.ExecuteScalar<int>($"SELECT COUNT(*) FROM Blocklist WHERE {where}", parameters);
         var rows = connection.Query<Row>(
-            $"SELECT {Columns} FROM Blocklist ORDER BY Date DESC, Id DESC LIMIT @take OFFSET @skip", new { take = pageSize, skip = (page - 1) * pageSize });
+            $"SELECT {Columns} FROM Blocklist WHERE {where} ORDER BY Date DESC, Id DESC LIMIT @take OFFSET @skip", parameters);
         return ([.. rows.Select(r => r.ToItem())], total);
     }
 

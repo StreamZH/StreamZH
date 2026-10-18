@@ -32,19 +32,28 @@ export interface HistoryFilter {
   pageSize?: number
   movieId?: number
   seriesId?: number
+  /** Comma list of event types. */
+  eventType?: string
+  mediaType?: 'movie' | 'series'
+  /** Words that must all appear in the release title. */
+  search?: string
+  indexer?: string
 }
 
 export const historyKeys = {
   all: ['history'] as const,
   list: (filter: HistoryFilter) => ['history', filter] as const,
+  indexers: ['history', 'indexers'] as const,
 }
 
 export const historyApi = {
   page: (filter: HistoryFilter = {}) => {
     const params = new URLSearchParams()
     for (const [key, value] of Object.entries(filter)) {
-      if (value != null) params.set(key, String(value))
+      if (value != null && value !== '') params.set(key, String(value))
     }
     return request<HistoryPage>('GET', `/history?${params}`)
   },
+  /** Indexer names that occur in the history (for the filter). */
+  indexers: () => request<string[]>('GET', '/history/indexers'),
 }

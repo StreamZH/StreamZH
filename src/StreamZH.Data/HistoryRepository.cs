@@ -57,6 +57,17 @@ public sealed record HistoryItem
     public IReadOnlyDictionary<string, string?> Data { get; init; } = new Dictionary<string, string?>();
 }
 
+/// <summary>Filters of the history list; null or empty fields do not filter.</summary>
+/// <param name="EventTypes">Any of these events.</param>
+/// <param name="MediaType">Movie or Series.</param>
+/// <param name="Search">Words that must all appear in the release title (case-insensitive).</param>
+/// <param name="Indexer">The indexer name (case-insensitive).</param>
+public sealed record HistoryFilter(
+    IReadOnlyList<HistoryEventType>? EventTypes = null,
+    MediaType? MediaType = null,
+    string? Search = null,
+    string? Indexer = null);
+
 public sealed class HistoryRepository(Database database)
 {
     private const string Columns = """
@@ -92,15 +103,45 @@ public sealed class HistoryRepository(Database database)
     }
 
     /// <summary>Newest first. <paramref name="page"/> starts at 1.</summary>
-    public (IReadOnlyList<HistoryItem> Records, int Total) Page(int page, int pageSize, int? movieId = null, int? seriesId = null)
+    public (IReadOnlyList<HistoryItem> Records, int Total) Page(int page, int pageSize, int? movieId = null, int? seriesId = null, HistoryFilter? filter = null)
     {
-        const string Filter = "(@movieId IS NULL OR MovieId = @movieId) AND (@seriesId IS NULL OR SeriesId = @seriesId)";
+        var conditions = new List<string> { "(@movieId IS NULL OR MovieId = @movieId)", "(@seriesId IS NULL OR SeriesId = @seriesId)" };
+        var parameters = new DynamicParameters(new { movieId, seriesId, take = pageSize, skip = (page - 1) * pageSize });
+
+        if (filter?.EventTypes is { Count: > 0 } eventTypes)
+        {
+            conditions.Add("EventType IN @eventTypes");
+            parameters.Add("eventTypes", eventTypes.Select(e => (int)e).Distinct().ToList());
+        }
+
+        if (filter?.MediaType is { } mediaType)
+        {
+            conditions.Add("MediaType = @mediaType");
+            parameters.Add("mediaType", (int)mediaType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter?.Indexer))
+        {
+            conditions.Add("Indexer = @indexer COLLATE NOCASE");
+            parameters.Add("indexer", filter.Indexer.Trim());
+        }
+
+        TextSearch.Where("SourceTitle", filter?.Search, conditions, parameters);
+
+        var where = string.Join(" AND ", conditions);
         using var connection = database.Open();
-        var parameters = new { movieId, seriesId, take = pageSize, skip = (page - 1) * pageSize };
-        var total = connection.ExecuteScalar<int>($"SELECT COUNT(*) FROM History WHERE {Filter}", parameters);
+        var total = connection.ExecuteScalar<int>($"SELECT COUNT(*) FROM History WHERE {where}", parameters);
         var rows = connection.Query<HistoryRow>(
-            $"SELECT {Columns} FROM History WHERE {Filter} ORDER BY Date DESC, Id DESC LIMIT @take OFFSET @skip", parameters);
+            $"SELECT {Columns} FROM History WHERE {where} ORDER BY Date DESC, Id DESC LIMIT @take OFFSET @skip", parameters);
         return ([.. rows.Select(r => r.ToItem())], total);
+    }
+
+    /// <summary>The indexer names that occur in the history (for the filter), sorted.</summary>
+    public IReadOnlyList<string> Indexers()
+    {
+        using var connection = database.Open();
+        return [.. connection.Query<string>(
+            "SELECT Indexer FROM History WHERE Indexer IS NOT NULL AND TRIM(Indexer) <> '' GROUP BY Indexer COLLATE NOCASE ORDER BY Indexer COLLATE NOCASE")];
     }
 
     /// <summary>True when the movie has an event of this type at or after <paramref name="since"/>.</summary>

@@ -45,6 +45,33 @@ public sealed record DownloadRecord
     public bool Duplicate { get; init; }
 }
 
+/// <summary>Which finished downloads by their import (see <see cref="DownloadRepository.History"/>).</summary>
+public enum DownloadImportFilter
+{
+    /// <summary>Completed, and at least one file went into the library.</summary>
+    Imported,
+
+    /// <summary>Completed, but not (yet) imported: no import, or one that is queued, running or waiting.</summary>
+    NotImported,
+
+    /// <summary>Completed, and the import failed.</summary>
+    ImportFailed,
+}
+
+/// <summary>Filters of the download history; null fields do not filter.</summary>
+/// <param name="Status">Completed or Failed (other values are ignored).</param>
+/// <param name="Kind">Movie, series or other (the kind of the category).</param>
+/// <param name="CategoryName">A download category by name (case-insensitive).</param>
+/// <param name="Search">Words that must all appear in the title (case-insensitive).</param>
+/// <param name="Since">Finished (or added, when there is no finish time) at or after this time.</param>
+public sealed record DownloadHistoryFilter(
+    DownloadStatus? Status = null,
+    DownloadImportFilter? Import = null,
+    DownloadCategory? Kind = null,
+    string? CategoryName = null,
+    string? Search = null,
+    DateTime? Since = null);
+
 /// <summary>What duplicate detection and the history cleanup need of a download.</summary>
 public sealed record DownloadSummary(int Id, string Title, string? NzbHash, DownloadStatus Status, DateTime Added, DateTime? Completed);
 
@@ -185,20 +212,66 @@ public sealed class DownloadRepository(Database database)
     }
 
     /// <summary>Completed and failed downloads, newest first. <paramref name="page"/> starts at 1.</summary>
-    public (IReadOnlyList<DownloadRecord> Records, int Total) History(int page, int pageSize)
+    public (IReadOnlyList<DownloadRecord> Records, int Total) History(int page, int pageSize, DownloadHistoryFilter? filter = null)
     {
-        const string Filter = "Status IN (@completed, @failed)";
-        using var connection = database.Open();
-        var parameters = new
+        var conditions = new List<string>();
+        var parameters = new DynamicParameters(new
         {
             completed = (int)DownloadStatus.Completed,
             failed = (int)DownloadStatus.Failed,
+            imported = (int)ImportState.Imported,
+            importFailed = (int)ImportState.Failed,
             take = pageSize,
             skip = (page - 1) * pageSize,
-        };
-        var total = connection.ExecuteScalar<int>($"SELECT COUNT(*) FROM Downloads WHERE {Filter}", parameters);
+        });
+
+        conditions.Add(filter?.Status switch
+        {
+            DownloadStatus.Completed => "Status = @completed",
+            DownloadStatus.Failed => "Status = @failed",
+            _ => "Status IN (@completed, @failed)",
+        });
+
+        // Only completed downloads are imported. One without an import row (never tried, or not linked) is "not imported";
+        // queued, running and waiting imports count as not imported yet.
+        switch (filter?.Import)
+        {
+            case DownloadImportFilter.Imported:
+                conditions.Add("Status = @completed AND Id IN (SELECT DownloadId FROM DownloadImports WHERE State = @imported)");
+                break;
+            case DownloadImportFilter.ImportFailed:
+                conditions.Add("Status = @completed AND Id IN (SELECT DownloadId FROM DownloadImports WHERE State = @importFailed)");
+                break;
+            case DownloadImportFilter.NotImported:
+                conditions.Add("Status = @completed AND Id NOT IN (SELECT DownloadId FROM DownloadImports WHERE State IN (@imported, @importFailed))");
+                break;
+        }
+
+        if (filter?.Kind is { } kind)
+        {
+            conditions.Add("Category = @kind");
+            parameters.Add("kind", (int)kind);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter?.CategoryName))
+        {
+            conditions.Add("CategoryName = @categoryName COLLATE NOCASE");
+            parameters.Add("categoryName", filter.CategoryName.Trim());
+        }
+
+        if (filter?.Since is { } since)
+        {
+            conditions.Add("IFNULL(Completed, Added) >= @since");
+            parameters.Add("since", since.ToUniversalTime());
+        }
+
+        TextSearch.Where("Title", filter?.Search, conditions, parameters);
+
+        var where = string.Join(" AND ", conditions.Select(c => $"({c})"));
+        using var connection = database.Open();
+        var total = connection.ExecuteScalar<int>($"SELECT COUNT(*) FROM Downloads WHERE {where}", parameters);
         var rows = connection.Query<DownloadRow>(
-            $"SELECT {Columns} FROM Downloads WHERE {Filter} ORDER BY IFNULL(Completed, Added) DESC, Id DESC LIMIT @take OFFSET @skip", parameters);
+            $"SELECT {Columns} FROM Downloads WHERE {where} ORDER BY IFNULL(Completed, Added) DESC, Id DESC LIMIT @take OFFSET @skip", parameters);
         return ([.. rows.Select(r => r.ToRecord())], total);
     }
 

@@ -123,6 +123,12 @@ export interface BlocklistItem {
   message: string | null
 }
 
+/** Filters of the blocklist; empty fields do not filter. */
+export interface BlocklistFilter {
+  search?: string
+  mediaType?: 'movie' | 'series'
+}
+
 export interface BlocklistPage {
   page: number
   pageSize: number
@@ -145,7 +151,7 @@ export const mediaManagementKeys = {
   pending: ['imports', 'pending'] as const,
   allImports: ['imports'] as const,
   files: (downloadId: number, seriesId: number | null) => ['imports', 'files', downloadId, seriesId] as const,
-  blocklist: (page: number, pageSize: number) => ['blocklist', page, pageSize] as const,
+  blocklist: (page: number, pageSize: number, filter: BlocklistFilter = {}) => ['blocklist', page, pageSize, filter] as const,
   allBlocklist: ['blocklist'] as const,
   rename: (type: MediaType, id: number, season?: number) => ['rename', type, id, season ?? null] as const,
 }
@@ -163,7 +169,11 @@ export const mediaManagementApi = {
   manualImport: (downloadId: number, body: ManualImportRequest) => request<unknown>('POST', `/import/downloads/${downloadId}/manual`, body),
   dismiss: (downloadId: number) => request<void>('POST', `/import/downloads/${downloadId}/dismiss`),
 
-  blocklist: (page: number, pageSize: number) => request<BlocklistPage>('GET', `/blocklist?page=${page}&pageSize=${pageSize}`),
+  blocklist: (page: number, pageSize: number, filter: BlocklistFilter = {}) => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value)
+    return request<BlocklistPage>('GET', `/blocklist?${params}`)
+  },
   unblock: (id: number) => request<void>('DELETE', `/blocklist/${id}`),
   clearBlocklist: () => request<{ removed: number }>('DELETE', '/blocklist'),
 

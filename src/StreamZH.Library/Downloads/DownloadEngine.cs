@@ -142,10 +142,10 @@ public sealed class DownloadEngine(
         return repository.Find(id) is { } record ? ToItem(record) : null;
     }
 
-    /// <summary>Completed and failed downloads, newest first.</summary>
-    public (IReadOnlyList<DownloadItem> Items, int Total) History(int page, int pageSize)
+    /// <summary>Completed and failed downloads, newest first; <paramref name="filter"/> narrows them (status, import, category, search, date).</summary>
+    public (IReadOnlyList<DownloadItem> Items, int Total) History(int page, int pageSize, DownloadHistoryFilter? filter = null)
     {
-        var (records, total) = repository.History(page, pageSize);
+        var (records, total) = repository.History(page, pageSize, filter);
         return ([.. records.Select(ToItem)], total);
     }
 

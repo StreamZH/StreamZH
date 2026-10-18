@@ -4,6 +4,7 @@
 
 using System.Text.Json;
 using Dapper;
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
 
@@ -18,11 +19,18 @@ public static class QualityProfileItemsJson
 
     public static IReadOnlyList<QualityProfileItem> Deserialize(string json) =>
         JsonSerializer.Deserialize<List<QualityProfileItem>>(json, Options) ?? [];
+
+    public static string SerializeFormats(IReadOnlyList<ProfileFormatItem> items) => JsonSerializer.Serialize(items, Options);
+
+    public static IReadOnlyList<ProfileFormatItem> DeserializeFormats(string json) =>
+        JsonSerializer.Deserialize<List<ProfileFormatItem>>(json, Options) ?? [];
 }
 
 public sealed class QualityProfileRepository(Database database)
 {
-    private const string Columns = "Id, Name, Items, CutoffQualityId, UpgradeAllowed, LanguageId, PreferDualLanguage";
+    private const string Columns =
+        "Id, Name, Items, CutoffQualityId, UpgradeAllowed, LanguageId, PreferDualLanguage, FormatItems, MinFormatScore, CutoffFormatScore, " +
+        "MinUpgradeFormatScore, TrashMovieTemplate, TrashSeriesTemplate";
 
     public IReadOnlyList<QualityProfile> All()
     {
@@ -67,8 +75,10 @@ public sealed class QualityProfileRepository(Database database)
         using var connection = database.Open();
         return connection.ExecuteScalar<int>(
             """
-            INSERT INTO QualityProfiles (Name, Items, CutoffQualityId, UpgradeAllowed, LanguageId, PreferDualLanguage)
-            VALUES (@Name, @Items, @CutoffQualityId, @UpgradeAllowed, @LanguageId, @PreferDualLanguage);
+            INSERT INTO QualityProfiles (Name, Items, CutoffQualityId, UpgradeAllowed, LanguageId, PreferDualLanguage, FormatItems,
+                MinFormatScore, CutoffFormatScore, MinUpgradeFormatScore, TrashMovieTemplate, TrashSeriesTemplate)
+            VALUES (@Name, @Items, @CutoffQualityId, @UpgradeAllowed, @LanguageId, @PreferDualLanguage, @FormatItems,
+                @MinFormatScore, @CutoffFormatScore, @MinUpgradeFormatScore, @TrashMovieTemplate, @TrashSeriesTemplate);
             SELECT last_insert_rowid();
             """,
             ProfileRow.From(profile));
@@ -80,7 +90,9 @@ public sealed class QualityProfileRepository(Database database)
         connection.Execute(
             """
             UPDATE QualityProfiles SET Name = @Name, Items = @Items, CutoffQualityId = @CutoffQualityId, UpgradeAllowed = @UpgradeAllowed,
-                LanguageId = @LanguageId, PreferDualLanguage = @PreferDualLanguage
+                LanguageId = @LanguageId, PreferDualLanguage = @PreferDualLanguage, FormatItems = @FormatItems,
+                MinFormatScore = @MinFormatScore, CutoffFormatScore = @CutoffFormatScore, MinUpgradeFormatScore = @MinUpgradeFormatScore,
+                TrashMovieTemplate = @TrashMovieTemplate, TrashSeriesTemplate = @TrashSeriesTemplate
             WHERE Id = @Id
             """,
             ProfileRow.From(profile));
@@ -110,6 +122,12 @@ public sealed class QualityProfileRepository(Database database)
         public bool UpgradeAllowed { get; init; }
         public long LanguageId { get; init; }
         public bool PreferDualLanguage { get; init; }
+        public string FormatItems { get; init; } = "[]";
+        public long MinFormatScore { get; init; }
+        public long CutoffFormatScore { get; init; }
+        public long MinUpgradeFormatScore { get; init; } = 1;
+        public string? TrashMovieTemplate { get; init; }
+        public string? TrashSeriesTemplate { get; init; }
 
         public static ProfileRow From(QualityProfile p) => new()
         {
@@ -120,6 +138,12 @@ public sealed class QualityProfileRepository(Database database)
             UpgradeAllowed = p.UpgradeAllowed,
             LanguageId = p.LanguageId,
             PreferDualLanguage = p.PreferDualLanguage,
+            FormatItems = QualityProfileItemsJson.SerializeFormats(p.FormatItems),
+            MinFormatScore = p.MinFormatScore,
+            CutoffFormatScore = p.CutoffFormatScore,
+            MinUpgradeFormatScore = p.MinUpgradeFormatScore,
+            TrashMovieTemplate = p.TrashMovieTemplate,
+            TrashSeriesTemplate = p.TrashSeriesTemplate,
         };
 
         public QualityProfile ToProfile() => new()
@@ -131,6 +155,12 @@ public sealed class QualityProfileRepository(Database database)
             UpgradeAllowed = UpgradeAllowed,
             LanguageId = (int)LanguageId,
             PreferDualLanguage = PreferDualLanguage,
+            FormatItems = QualityProfileItemsJson.DeserializeFormats(FormatItems),
+            MinFormatScore = (int)MinFormatScore,
+            CutoffFormatScore = (int)CutoffFormatScore,
+            MinUpgradeFormatScore = (int)MinUpgradeFormatScore,
+            TrashMovieTemplate = TrashMovieTemplate,
+            TrashSeriesTemplate = TrashSeriesTemplate,
         };
     }
 }

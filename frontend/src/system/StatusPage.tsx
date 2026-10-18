@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { generalApi, generalKeys, type DiskSpaceEntry, type SystemInfo } from '../api/general'
+import Icon, { type IconName } from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDateTime, formatDuration } from '../lib/format'
-import { Section } from '../settings/SettingsKit'
 import { RestartControls } from './Restart'
 import styles from './System.module.css'
 import { SystemPage } from './SystemPage'
@@ -15,40 +16,134 @@ const modes: Record<SystemInfo['runtimeMode'], string> = {
   console: 'Program (console)',
 }
 
-/** System → Status (like Radarr): health, about, disk space, licence. */
+const modeIcons: Record<SystemInfo['runtimeMode'], IconName> = {
+  docker: 'box',
+  windowsService: 'server',
+  systemd: 'server',
+  console: 'terminal',
+}
+
+/** System → Status (like CloudZH's System Health): metrics on top, health checks, disk space, about, licence. */
 export default function StatusPage() {
   const info = useQuery({ queryKey: generalKeys.info, queryFn: generalApi.info, refetchInterval: 30_000 })
   const data = info.data
+  const errors = data?.health.filter((n) => n.level === 'error').length ?? 0
+  const warnings = data?.health.filter((n) => n.level === 'warn').length ?? 0
 
   return (
     <SystemPage title="Status" lead="Version, health, disk space and runtime." actions={<RestartControls />}>
       {info.isError && <p className={ui.error}>{info.error.message}</p>}
+      {info.isPending && (
+        <div className={`${ui.panel} ${styles.loading}`}>
+          <Skeleton rows={5} />
+        </div>
+      )}
       {data && (
         <>
-          <Section id="health" title="Health" description="The same notices as the status window, in one list.">
-            {data.health.length === 0 ? (
-              <p className={styles.ok}>No problems found.</p>
-            ) : (
-              <ul className={styles.health}>
-                {data.health.map((notice) => (
-                  <li key={notice.key} className={styles.notice}>
-                    <span className={`${styles.dot} ${notice.level === 'error' ? styles.dotError : notice.level === 'warn' ? styles.dotWarn : ''}`} />
-                    <span className={styles.noticeText}>
-                      <span>{notice.title}</span>
-                      {notice.sub && <span className={styles.noticeSub}>{notice.sub}</span>}
-                    </span>
-                    {notice.link && (
-                      <Link className={styles.noticeLink} to={notice.link}>
-                        Open →
-                      </Link>
-                    )}
-                  </li>
+          <div className={styles.metrics}>
+            <div className={`${ui.panel} ${styles.metric}`}>
+              <span className={styles.metricTop}>
+                <span className={ui.eyebrow}>Version</span>
+                <Icon name="sparkle" size={16} className={styles.metricIcon} />
+              </span>
+              <span className={styles.metricValue}>{data.version}</span>
+              <span className={styles.metricSub}>
+                {data.appName} · {data.runtime}
+              </span>
+            </div>
+            <div className={`${ui.panel} ${styles.metric}`}>
+              <span className={styles.metricTop}>
+                <span className={ui.eyebrow}>Uptime</span>
+                <Icon name="clock" size={16} className={styles.metricIcon} />
+              </span>
+              <span className={styles.metricValue}>{formatDuration(data.uptimeSeconds)}</span>
+              <span className={styles.metricSub} title={formatDateTime(data.startedAt)}>
+                Since {formatDateTime(data.startedAt)}
+              </span>
+            </div>
+            <div className={`${ui.panel} ${styles.metric}`}>
+              <span className={styles.metricTop}>
+                <span className={ui.eyebrow}>Runs as</span>
+                <Icon name={modeIcons[data.runtimeMode]} size={16} className={styles.metricIcon} />
+              </span>
+              <span className={`${styles.metricValue} ${styles.metricText}`}>{modes[data.runtimeMode]}</span>
+              <span className={styles.metricSub}>
+                {data.operatingSystem} ({data.architecture})
+              </span>
+            </div>
+            <div className={`${ui.panel} ${styles.metric}`}>
+              <span className={styles.metricTop}>
+                <span className={ui.eyebrow}>Health</span>
+                <Icon name="heart" size={16} className={styles.metricIcon} />
+              </span>
+              <span className={`${styles.metricValue} ${errors ? styles.errorText : warnings ? styles.warnText : styles.ok}`}>
+                {errors + warnings === 0 ? 'All good' : errors + warnings}
+                {errors + warnings > 0 && <small>{errors ? (errors === 1 ? 'error' : 'errors') : warnings === 1 ? 'warning' : 'warnings'}</small>}
+              </span>
+              <span className={styles.metricSub}>
+                {errors && warnings ? `and ${warnings} warning${warnings === 1 ? '' : 's'}` : errors + warnings === 0 ? 'No problems found' : 'See the checks below'}
+              </span>
+            </div>
+          </div>
+
+          <div className={styles.split}>
+            <section id="health" className={ui.panel}>
+              <div className={styles.phead}>
+                <Icon name="heart" size={17} className={styles.panelIcon} />
+                <h2>Health</h2>
+                <span className={styles.pheadAside}>Same as the status window</span>
+              </div>
+              {data.health.length === 0 ? (
+                <div className={styles.allGood}>
+                  <Icon name="check" size={16} />
+                  <span>
+                    <b>No problems found.</b> Indexers, download servers, folders and tools all respond.
+                  </span>
+                </div>
+              ) : (
+                <ul className={styles.health}>
+                  {data.health.map((notice) => (
+                    <li
+                      key={notice.key}
+                      className={`${styles.check} ${notice.level === 'error' ? styles.checkErr : notice.level === 'warn' ? styles.checkWarn : styles.checkInfo}`}
+                    >
+                      <span className={styles.checkIcon} aria-hidden="true">
+                        <Icon name={notice.level === 'error' ? 'x' : notice.level === 'warn' ? 'alert' : 'info'} size={15} />
+                      </span>
+                      <span className={styles.noticeText}>
+                        <b>{notice.title}</b>
+                        {notice.sub && <small>{notice.sub}</small>}
+                      </span>
+                      {notice.link && (
+                        <Link className={`${ui.ghost} ${ui.sm}`} to={notice.link}>
+                          Open
+                          <Icon name="right" size={14} />
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section id="disk-space" className={ui.panel}>
+              <div className={styles.phead}>
+                <Icon name="hdd" size={17} className={styles.panelIcon} />
+                <h2>Disk space</h2>
+              </div>
+              <ul className={styles.disks} aria-label="Disk space">
+                {data.diskSpace.map((d) => (
+                  <DiskRow key={d.path} entry={d} />
                 ))}
               </ul>
-            )}
-          </Section>
+            </section>
+          </div>
 
-          <Section id="about" title="About">
+          <section id="about" className={ui.panel}>
+            <div className={styles.phead}>
+              <Icon name="info" size={17} className={styles.panelIcon} />
+              <h2>About</h2>
+            </div>
             <dl className={styles.facts}>
               <dt>Version</dt>
               <dd>
@@ -89,28 +184,13 @@ export default function StatusPage() {
                 </>
               )}
             </dl>
-          </Section>
+          </section>
 
-          <Section id="disk-space" title="Disk space">
-            <div className={`${styles.table} ${styles.disk}`} role="table" aria-label="Disk space">
-              <div className={styles.head} role="row">
-                <span role="columnheader">Location</span>
-                <span role="columnheader">Folder</span>
-                <span role="columnheader" className={styles.right}>
-                  Free
-                </span>
-                <span role="columnheader" className={styles.right}>
-                  Total
-                </span>
-                <span role="columnheader">Used</span>
-              </div>
-              {data.diskSpace.map((d) => (
-                <DiskRow key={d.path} entry={d} />
-              ))}
+          <section id="more" className={ui.panel}>
+            <div className={styles.phead}>
+              <Icon name="filetext" size={17} className={styles.panelIcon} />
+              <h2>More info</h2>
             </div>
-          </Section>
-
-          <Section id="more" title="More info">
             <dl className={styles.facts}>
               <dt>Licence</dt>
               <dd>GNU General Public License v3.0 only ({data.license})</dd>
@@ -119,7 +199,7 @@ export default function StatusPage() {
               <dt>Privacy</dt>
               <dd>StreamZH sends no usage data or analytics.</dd>
             </dl>
-          </Section>
+          </section>
         </>
       )}
     </SystemPage>
@@ -129,31 +209,34 @@ export default function StatusPage() {
 function DiskRow({ entry: d }: { entry: DiskSpaceEntry }) {
   const used = d.totalBytes && d.freeBytes != null ? 1 - d.freeBytes / d.totalBytes : null
   const low = d.freeBytes != null && d.freeBytes < 10 * 1024 ** 3
+  const percent = used != null ? Math.round(used * 100) : null
   return (
-    <div className={styles.row} role="row">
-      <span role="cell" className={`${styles.cell} ${styles.name}`}>
-        {d.label}
-      </span>
-      <span role="cell" className={`${styles.cell} ${styles.mono}`} title={d.drive ?? undefined}>
-        {d.path}
-      </span>
-      <span role="cell" className={`${styles.cell} ${styles.right} ${low ? styles.warnText : ''}`}>
-        <span className={styles.cellLabel}>Free</span>
-        {d.freeBytes != null ? formatBytes(d.freeBytes) : '–'}
-      </span>
-      <span role="cell" className={`${styles.cell} ${styles.right}`}>
-        <span className={styles.cellLabel}>Total</span>
-        {d.totalBytes != null ? formatBytes(d.totalBytes) : '–'}
-      </span>
-      <span role="cell" className={styles.cell}>
-        {d.problem ? (
-          <span className={styles.errorText}>{d.problem}</span>
-        ) : used != null ? (
-          <div className={styles.bar} title={`${Math.round(used * 100)} % used`}>
-            <div className={`${styles.barFill} ${used > 0.95 ? styles.barError : used > 0.85 ? styles.barWarn : ''}`} style={{ width: `${Math.round(used * 100)}%` }} />
+    <li className={styles.disk}>
+      <div className={styles.diskTop}>
+        <span className={styles.name}>{d.label}</span>
+        <span className={`${styles.diskFree} ${low ? styles.warnText : ''}`}>
+          {d.freeBytes != null ? `${formatBytes(d.freeBytes)} free` : '–'}
+          {d.totalBytes != null && <span className={styles.muted}> of {formatBytes(d.totalBytes)}</span>}
+        </span>
+      </div>
+      {d.problem ? (
+        <span className={styles.errorText}>{d.problem}</span>
+      ) : (
+        percent != null && (
+          <div className={styles.bar} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label={`${d.label}: ${percent} % used`}>
+            <div
+              className={`${styles.barFill} ${used! > 0.95 ? styles.barError : used! > 0.85 ? styles.barWarn : ''}`}
+              style={{ width: `${percent}%` }}
+            />
           </div>
-        ) : null}
-      </span>
-    </div>
+        )
+      )}
+      <div className={styles.diskBottom}>
+        <span className={styles.diskPath} title={d.drive ?? undefined}>
+          {d.path}
+        </span>
+        {percent != null && <span className={styles.muted}>{percent} % used</span>}
+      </div>
+    </li>
   )
 }

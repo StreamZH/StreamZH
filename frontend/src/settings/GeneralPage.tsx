@@ -14,6 +14,7 @@ import {
 } from '../api/general'
 import { authQueryKey, useAuth } from '../auth/auth'
 import FolderPicker from '../components/FolderPicker'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import { formatDateTime } from '../lib/format'
 import { useAdvanced } from '../lib/advancedMode'
@@ -42,10 +43,10 @@ export default function GeneralPage() {
       </Section>
       {settings.data && (
         <Section id="storage" title="Storage">
-          <Row label="Data folder" help="Database, settings, logs and keys. Set with --data or STREAMZH_DATA.">
+          <Row label="Data folder" wide help="Database, settings, logs and keys. Set with --data or STREAMZH_DATA.">
             <code className={styles.path}>{settings.data.dataDirectory}</code>
           </Row>
-          <Row label="Log folder">
+          <Row label="Log folder" wide>
             <code className={styles.path}>{settings.data.logDirectory}</code>
           </Row>
         </Section>
@@ -374,13 +375,15 @@ function ApiKeySection({ apiKey }: { apiKey: string }) {
         </>
       }
     >
-      <Row label="API key">
+      <Row label="API key" wide>
         <div className={styles.keyRow}>
           <code className={styles.key}>{visible ? apiKey : '•'.repeat(32)}</code>
           <button className={ui.button} type="button" onClick={() => setVisible((v) => !v)}>
+            <Icon name={visible ? 'eyeoff' : 'eye'} size={15} />
             {visible ? 'Hide' : 'Show'}
           </button>
           <button className={ui.button} type="button" onClick={() => void copy()}>
+            <Icon name={copied ? 'check' : 'copy'} size={15} />
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
@@ -397,7 +400,8 @@ function ApiKeySection({ apiKey }: { apiKey: string }) {
                 </button>
               </>
             ) : (
-              <button className={ui.button} type="button" onClick={() => setConfirming(true)}>
+              <button className={ui.ghost} type="button" onClick={() => setConfirming(true)}>
+                <Icon name="restart" size={15} />
                 Create new key
               </button>
             )}
@@ -589,7 +593,7 @@ function BackupSection() {
       hiddenCount={advanced ? 0 : 1}
       footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
     >
-      <Row label="Folder" htmlFor="backupFolder" advanced error={form.error('backupFolder')} help="Another drive is safer. Scheduled backups go to “scheduled”, manual ones to “manual”.">
+      <Row label="Folder" htmlFor="backupFolder" wide advanced error={form.error('backupFolder')} help="Another drive is safer. Scheduled backups go to “scheduled”, manual ones to “manual”.">
         <div className={styles.folderRow}>
           <TextInput id="backupFolder" value={v.backupFolder} onChange={(backupFolder) => form.set({ backupFolder })} mono />
           <button className={ui.button} type="button" onClick={() => setPicking(true)}>

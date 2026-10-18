@@ -1,144 +1,191 @@
+/* Settings like CloudZH (app.css .set-sec / .set-row / .switch): panels with a 14 px title, rows split by hairlines,
+   label and help on the left, the control on the right; a save bar that rises in at the bottom while dirty. */
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   max-width: 1100px;
+  min-width: 0;
 }
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px 24px;
+.pageWide {
+  max-width: none;
 }
 
-.eyebrow {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
+/* The PageHeader brings its own bottom margin; the page gap is enough. */
+.page > header:first-child {
+  margin-bottom: 6px;
 }
 
-.title {
-  font-family: var(--font-title);
-  font-size: 40px;
-  line-height: 1.1;
-}
-
-.lead {
-  margin: 6px 0 0;
-  max-width: 760px;
-  color: var(--text-muted);
-}
-
-.headerActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
+/* ---- Section (panel) ---- */
 .section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  scroll-margin-top: 16px;
+  scroll-margin-top: 72px;
 }
 
 .sectionHead {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sectionTitle {
-  font-size: 16px;
-  font-weight: 600;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+  margin-bottom: 6px;
 }
 
 .sectionText {
-  margin: 0;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.sectionTitle {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.sectionDesc {
+  margin: 3px 0 0;
   font-size: 13px;
-  color: var(--text-muted);
-  max-width: 760px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 76ch;
+}
+
+.sectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 .rows {
   display: flex;
   flex-direction: column;
-}
-
-/* Label on the left, control with help below on the right (like Radarr). */
-.row {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 6px 24px;
-  padding: 12px 0;
-  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
-}
-
-.row:first-child {
-  border-top: none;
-}
-
-@media (max-width: 720px) {
-  .row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.label {
-  padding-top: 9px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.control {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   min-width: 0;
 }
 
-.control > input:not([type='checkbox']),
-.control > select,
-.control > textarea {
-  max-width: 520px;
+/* ---- Row (CloudZH .set-row) ---- */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.rowText {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
 }
 
 .help {
+  display: block;
   font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--text-faint);
-  max-width: 640px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 68ch;
 }
 
 .help code {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--fg-2);
+}
+
+.control {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+/* Text fields get a comfortable width; everything stays within the row. */
+.control > input:not([type='checkbox']):not([type='number']),
+.control > textarea {
+  width: 380px;
+  max-width: 100%;
+}
+
+.control > select {
+  max-width: 100%;
+}
+
+.control > * {
+  max-width: 100%;
+}
+
+/* Wide rows: the control goes below the label and takes the whole width. */
+.rowWide .control,
+.row:has(.control > textarea) .control {
+  flex-basis: 100%;
+  align-items: stretch;
+  margin-left: 0;
+}
+
+.rowWide .control > input:not([type='checkbox']),
+.rowWide .control > textarea,
+.row:has(.control > textarea) .control > textarea {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .control {
+    flex-basis: 100%;
+    align-items: stretch;
+    margin-left: 0;
+  }
+
+  .control > input:not([type='checkbox']):not([type='number']),
+  .control > textarea,
+  .control > select {
+    width: 100%;
+  }
+
+  /* A lone switch stays on the right. */
+  .row:has(.control > .toggle:only-child) .control {
+    flex-basis: auto;
+    margin-left: auto;
+  }
 }
 
 .error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12.5px;
-  color: #ef6b6b;
+  color: var(--err);
 }
 
 .invalid input:not([type='checkbox']),
 .invalid select,
 .invalid textarea {
-  border-color: #ef6b6b;
+  border-color: var(--err);
 }
 
 .select {
-  max-width: 320px;
+  width: 300px;
+  max-width: 100%;
 }
 
 .withUnit {
@@ -148,135 +195,199 @@
 }
 
 .number {
-  width: 140px;
+  width: 120px;
 }
 
 .numberWide {
-  width: 200px;
+  width: 180px;
 }
 
 .unit {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
-.switch {
-  position: relative;
+/* ---- Toggle (CloudZH .switch) with an optional state text ---- */
+.toggle {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding-top: 6px;
+  cursor: pointer;
+}
+
+.toggleOff {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.toggleText {
   font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-  align-self: flex-start;
+  color: var(--fg-2);
 }
 
-.switch input {
-  position: absolute;
-  opacity: 0;
-  width: 36px;
-  height: 20px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.track {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--line);
-  transition: background 0.15s;
-}
-
-.track::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform 0.15s, background 0.15s;
-}
-
-.switch input:checked + .track {
-  background: var(--accent);
-}
-
-.switch input:checked + .track::after {
-  transform: translateX(16px);
-  background: #fff;
-}
-
-.switch input:focus-visible + .track {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.switch input:disabled + .track {
-  opacity: 0.5;
-}
-
+/* ---- Footer and save bar ---- */
 .footer {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.footer:empty {
+  display: none;
+}
+
+.saveSlot {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+}
+
+.saveSlotOn {
+  margin-top: 6px;
 }
 
 .saveBar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  gap: 10px 20px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 8px 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  animation: rise 0.28s var(--ease) backwards;
+}
+
+/* "Saved": stays for a moment, then fades out (the hook clears it after 2.5 s). */
+.saveBarDone {
+  animation:
+    rise 0.28s var(--ease) backwards,
+    saveFade 0.5s ease 1.9s forwards;
+}
+
+@keyframes saveFade {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .saveState {
-  margin-right: auto;
-  font-size: 13px;
-  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg-2);
+}
+
+.saveError {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--err);
+  overflow-wrap: anywhere;
+}
+
+.saveDone {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ok);
+}
+
+.saveDone svg {
+  animation: pop 0.3s var(--ease) backwards;
+}
+
+.saveActions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .coming {
   padding: 14px 16px;
   font-size: 13px;
-  color: var(--text-muted);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-small);
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
 }
 
-/* Overview cards on /settings. */
+/* ---- Overview on /settings: area cards ---- */
 .areas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
 }
 
 .area {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 14px;
+  align-items: flex-start;
   padding: 16px 18px;
-  color: var(--text);
+  color: var(--fg);
   text-decoration: none;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  transition: border-color 0.15s, background 0.15s;
+  border-radius: var(--r);
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s;
 }
 
 .area:hover {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
-  background: var(--surface-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+}
+
+.area:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.areaIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+  transition: background 0.2s, color 0.2s;
+}
+
+.area:hover .areaIcon {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.areaBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 
 .areaTitle {
+  font-size: 14.5px;
   font-weight: 600;
 }
 
 .areaText {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.areaGroup {
+  margin: 10px 0 -4px;
 }

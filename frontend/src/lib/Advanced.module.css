@@ -1,32 +1,37 @@
-/* Compact switch "Advanced" for page and dialog headers. */
+/* The "Advanced" switch for page and dialog headers: a 36 px chip with a small CloudZH switch inside. */
 .toggle {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
+  gap: 9px;
+  height: 36px;
+  padding: 0 12px 0 10px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--text-muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  color: var(--fg-2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .toggle:hover {
-  color: var(--text);
-  background: var(--surface-hover);
+  color: var(--fg);
+  background: var(--sunk);
 }
 
 .on {
   color: var(--warn);
-  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
 }
 
 .on:hover {
   color: var(--warn);
+  background: var(--warn-soft);
 }
 
 .toggle input {
@@ -41,23 +46,22 @@
   position: relative;
   width: 28px;
   height: 16px;
-  border-radius: 999px;
-  background: var(--line);
-  transition: background 0.15s;
+  border-radius: 99px;
+  background: var(--line-strong);
+  transition: background 0.2s;
 }
 
 .track::after {
-  content: "";
+  content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 10px;
-  height: 10px;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--text-muted);
-  transition:
-    transform 0.15s,
-    background 0.15s;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s var(--ease);
 }
 
 .toggle input:checked + .track {
@@ -66,7 +70,6 @@
 
 .toggle input:checked + .track::after {
   transform: translateX(12px);
-  background: #1c1b19;
 }
 
 .toggle input:focus-visible + .track {
@@ -74,28 +77,50 @@
   outline-offset: 2px;
 }
 
-/* Label of an expert setting. */
-.label {
-  color: var(--warn) !important;
+/* Label of an expert setting: normal text with a small «Advanced» tag after it. */
+.label::after {
+  content: 'Advanced';
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  white-space: nowrap;
 }
 
 .hint {
-  margin: 4px 0 0;
+  margin: 10px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
   font-size: 12.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .hintButton {
   font: inherit;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--accent);
   background: none;
   border: none;
   padding: 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
   cursor: pointer;
 }
 
 .hintButton:hover {
-  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.hintButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
 }

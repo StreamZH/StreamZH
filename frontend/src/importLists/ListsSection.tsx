@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { importListApi, importListKeys, newImportList, type ImportList, type ImportListSchema, type ImportListType } from '../api/importLists'
 import { libraryApi, queryKeys } from '../api/library'
 import { useAuth } from '../auth/auth'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import connect from '../connect/Connect.module.css'
 import { Pill } from '../indexers/Chips'
@@ -48,7 +49,8 @@ export function ListsSection() {
       {lists.isError && <p className={ui.error}>{lists.error.message}</p>}
       {canEdit && all.length > 0 && (
         <div className={styles.sectionActions}>
-          <button className={ui.button} type="button" onClick={() => syncAll.mutate()} disabled={syncAll.isPending || enabled === 0}>
+          <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => syncAll.mutate()} disabled={syncAll.isPending || enabled === 0}>
+            <Icon name="restart" size={14} />
             {syncAll.isPending ? 'Starting…' : 'Sync all lists'}
           </button>
           {syncAll.isSuccess && (
@@ -68,7 +70,7 @@ export function ListsSection() {
           <li>
             <button className={connect.addCard} type="button" onClick={() => setView({ kind: 'pick' })} disabled={!schema.isSuccess}>
               <span className={connect.plus} aria-hidden="true">
-                +
+                <Icon name="plus" size={16} />
               </span>
               Add list
             </button>
@@ -110,11 +112,16 @@ function ListCard({ list: l, canEdit, onEdit }: { list: ImportList; canEdit: boo
     <li>
       <button type="button" className={`${connect.card} ${state}`} onClick={onEdit} disabled={!canEdit}>
         <span className={connect.cardHead}>
-          <span className={connect.cardName}>{l.name}</span>
+          <span className={connect.cardIcon} aria-hidden="true">
+            <Icon name={l.mediaType === 'Series' ? 'tv' : l.mediaType === 'Movie' ? 'film' : 'list'} size={16} />
+          </span>
+          <span className={connect.cardTitle}>
+            <span className={connect.cardName}>{l.name}</span>
+            <span className={connect.cardType}>
+              {l.implementationName} · {mediaLabel(l.mediaType)}
+            </span>
+          </span>
           {!l.enabled ? <Pill tone="off">Disabled</Pill> : failing ? <Pill tone="error">Failing</Pill> : !l.enableAuto ? <Pill tone="info">Manual</Pill> : null}
-        </span>
-        <span className={connect.cardType}>
-          {l.implementationName} · {mediaLabel(l.mediaType)}
         </span>
         {failing ? (
           <span className={connect.cardError}>

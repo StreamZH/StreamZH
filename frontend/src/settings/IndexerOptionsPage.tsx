@@ -14,6 +14,7 @@ import {
 } from '../api/indexerOptions'
 import { indexerKeys, indexersApi } from '../api/indexers'
 import { profileKeys, profilesApi } from '../api/profiles'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import styles from './IndexerOptions.module.css'
 import ReleaseProfileDialog from './ReleaseProfileDialog'
@@ -198,6 +199,7 @@ function AutomationSection() {
         <div className={styles.picks}>
           <NumberInput id="io-rss" value={v.rssSyncInterval} onChange={(rssSyncInterval) => form.set({ rssSyncInterval })} unit="minutes" min={0} max={120} step={5} />
           <button className={ui.button} type="button" onClick={() => run.mutate()} disabled={run.isPending || !!rss?.running || !!rss?.queued}>
+            <Icon name="restart" size={15} />
             Sync now
           </button>
         </div>
@@ -252,7 +254,7 @@ function ReleaseProfilesSection() {
           <button key={p.id} type="button" className={`${styles.profile} ${p.enabled ? '' : styles.profileOff}`} onClick={() => setEditing(p)}>
             <span className={styles.profileHead}>
               <span>{p.name}</span>
-              {!p.enabled && <span className={`${ui.badge} ${ui.idle}`}>Off</span>}
+              {!p.enabled && <span className={ui.pill}>Off</span>}
             </span>
             <TermLine label="Must contain" terms={p.required} />
             <TermLine label="Must not contain" terms={p.ignored} />
@@ -262,7 +264,8 @@ function ReleaseProfilesSection() {
           </button>
         ))}
         <button type="button" className={styles.addProfile} onClick={() => setEditing(emptyReleaseProfile)}>
-          + Add release profile
+          <Icon name="plus" size={16} />
+          Add release profile
         </button>
       </div>
       {editing && <ReleaseProfileDialog profile={editing} onClose={() => setEditing(null)} />}

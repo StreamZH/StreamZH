@@ -92,7 +92,7 @@ export function MetadataSection() {
             value={v.tmdbToken}
             onChange={(e) => form.set({ tmdbToken: e.target.value })}
           />
-          {v.tmdbConfigured ? <span className={`${ui.badge} ${ui.ok}`}>Saved {v.tmdbTokenHint}</span> : <span className={`${ui.badge} ${ui.missing}`}>Not set</span>}
+          {v.tmdbConfigured ? <span className={`${ui.pill} ${ui.pillOk}`}>Saved {v.tmdbTokenHint}</span> : <span className={`${ui.pill} ${ui.pillErr}`}>Not set</span>}
         </div>
         <div className={styles.actions}>
           <button className={ui.button} type="button" onClick={() => test.mutate()} disabled={test.isPending || (!v.tmdbToken.trim() && !v.tmdbConfigured)}>

@@ -132,11 +132,7 @@ export default function MediaManagementPage() {
   const err = (field: string) => form.error(field) ?? preview.data?.errors[field]?.[0]
 
   const set = form.set
-  const save = (
-    <div className={`${mm.saveDock} ${form.dirty || form.saving || form.formError ? '' : mm.saveDockIdle}`}>
-      <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />
-    </div>
-  )
+  const save = <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />
 
   return (
     <SettingsPage title="Media Management" lead="Where your movies and series live, how files are named and how finished downloads are imported.">

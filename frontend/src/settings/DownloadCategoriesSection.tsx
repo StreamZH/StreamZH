@@ -9,6 +9,7 @@ import {
   type DownloadCategoryInput,
   type PostProcessLevel,
 } from '../api/downloadSettings'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import styles from './DownloadsPage.module.css'
 import { Section } from './SettingsKit'
@@ -124,15 +125,17 @@ export function DownloadCategoriesSection() {
       id="categories"
       title="Categories"
       description="Each download has a category: it decides the folder, the priority and how much post-processing it gets. Grabs use movies and series; Add NZB and the Search page can pick any."
-      footer={
+      actions={
         editing === null && (
-          <button className={ui.button} type="button" onClick={() => open(null)}>
+          <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => open(null)}>
+            <Icon name="plus" size={14} />
             Add category
           </button>
         )
       }
     >
       {categories.data && (
+        <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -148,7 +151,7 @@ export function DownloadCategoriesSection() {
               <tr key={category.id}>
                 <td className={styles.name}>
                   {category.name}
-                  {category.paused && <span className={styles.badge}>paused</span>}
+                  {category.paused && <span className={`${ui.pill} ${ui.pillWarn} ${styles.badge}`}>paused</span>}
                 </td>
                 <td className={`${styles.path} ${styles.cellWide}`} title={category.path}>
                   {category.path}
@@ -157,19 +160,22 @@ export function DownloadCategoriesSection() {
                 <td>{label(postProcessLevels, category.postProcessing)}</td>
                 <td>
                   <div className={styles.actions}>
-                    <button className={`${ui.button} ${styles.small}`} type="button" onClick={() => open(category)}>
+                    <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={() => open(category)}>
+                      <Icon name="edit" size={14} />
                       Edit
                     </button>
                     {!category.isDefault && (
                       <button
-                        className={`${ui.button} ${styles.small}`}
+                        className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
+                        aria-label={`Delete ${category.name}`}
+                        title="Delete"
                         type="button"
                         disabled={remove.isPending}
                         onClick={() => {
                           if (window.confirm(`Delete the category ${category.name}? Downloads in it keep their folder.`)) remove.mutate(category.id)
                         }}
                       >
-                        Delete
+                        <Icon name="trash" size={14} />
                       </button>
                     )}
                   </div>
@@ -178,6 +184,7 @@ export function DownloadCategoriesSection() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       {remove.error && <span className={styles.error}>{remove.error.message}</span>}
       {editing !== null && editor}

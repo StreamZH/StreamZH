@@ -1,10 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { renamerApi, renamerKeys, type RenamerRun, type RunState } from '../../api/renamer'
+import Icon from '../../components/Icon'
+import Loader from '../../components/Loader'
 import ui from '../../components/ui.module.css'
 import { formatDateTime } from '../../lib/format'
 import styles from './Renamer.module.css'
 import { activeStates } from './rules'
+
+const statePill: Record<RunState, string> = {
+  queued: ui.pillBusy,
+  running: ui.pillBusy,
+  completed: ui.pillOk,
+  partial: ui.pillWarn,
+  failed: ui.pillErr,
+  undoing: ui.pillBusy,
+  undone: '',
+}
 
 const stateLabel: Record<RunState, string> = {
   queued: 'Queued',
@@ -39,10 +51,14 @@ export default function HistoryPanel({ runs }: { runs: RenamerRun[] }) {
         return (
           <li key={run.id} className={styles.historyItem}>
             <div className={styles.historyHead}>
+              <div className={styles.historyMain}>
+              <span className={styles.historyIcon} aria-hidden="true">
+                <Icon name={run.state === 'undone' ? 'undo' : 'rename'} size={16} />
+              </span>
               <div className={styles.historyText}>
                 <span className={styles.historyTitle}>
                   {run.state === 'undone' ? `${run.total} renamed, then put back` : `${run.done} of ${run.total} renamed`}
-                  <span className={`${styles.runState} ${styles[`run_${run.state}`] ?? ''}`}>{stateLabel[run.state]}</span>
+                  <span className={`${ui.pill} ${statePill[run.state]} ${styles.runState}`}>{stateLabel[run.state]}</span>
                 </span>
                 <span className={styles.historyMeta}>
                   {formatDateTime(run.started)} · <span className={ui.mono}>{run.folder}</span>
@@ -50,22 +66,24 @@ export default function HistoryPanel({ runs }: { runs: RenamerRun[] }) {
                 <span className={styles.historyMeta}>{run.summary}</span>
                 {run.error && <span className={ui.error}>{run.error}</span>}
               </div>
+              </div>
               <div className={styles.historyActions}>
-                <button type="button" className={ui.button} onClick={() => setOpenId(openId === run.id ? null : run.id)} aria-expanded={openId === run.id}>
+                <button type="button" className={`${ui.ghost} ${ui.sm}`} onClick={() => setOpenId(openId === run.id ? null : run.id)} aria-expanded={openId === run.id}>
                   {openId === run.id ? 'Hide' : 'Details'}
                 </button>
                 {canUndo &&
                   (confirm === run.id ? (
                     <>
-                      <button type="button" className={ui.danger} disabled={undo.isPending} onClick={() => undo.mutate(run.id)}>
+                      <button type="button" className={`${ui.danger} ${ui.sm}`} disabled={undo.isPending} onClick={() => undo.mutate(run.id)}>
                         {undo.isPending ? 'Undoing…' : `Undo ${run.done}`}
                       </button>
-                      <button type="button" className={ui.button} onClick={() => setConfirm(null)}>
+                      <button type="button" className={`${ui.ghost} ${ui.sm}`} onClick={() => setConfirm(null)}>
                         Keep
                       </button>
                     </>
                   ) : (
-                    <button type="button" className={ui.button} onClick={() => setConfirm(run.id)} disabled={busy}>
+                    <button type="button" className={`${ui.button} ${ui.sm}`} onClick={() => setConfirm(run.id)} disabled={busy}>
+                      <Icon name="undo" size={14} />
                       Undo
                     </button>
                   ))}
@@ -82,7 +100,7 @@ export default function HistoryPanel({ runs }: { runs: RenamerRun[] }) {
 
 function RunItems({ id, folder, live }: { id: number; folder: string; live: boolean }) {
   const detail = useQuery({ queryKey: renamerKeys.run(id), queryFn: () => renamerApi.run(id), refetchInterval: live ? 1000 : false })
-  if (detail.isPending) return <p className={styles.emptyRows}>Loading…</p>
+  if (detail.isPending) return <Loader text="Loading…" />
   if (detail.isError) return <p className={ui.error}>{detail.error.message}</p>
   const relative = (path: string) => (path.startsWith(folder) ? path.slice(folder.length).replace(/^[/\\]/, '') : path)
   return (

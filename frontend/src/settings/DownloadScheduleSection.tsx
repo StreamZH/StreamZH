@@ -11,6 +11,7 @@ import {
   type ScheduleAction,
 } from '../api/downloadSettings'
 import { usenetApi, usenetKeys } from '../api/usenet'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import styles from './DownloadsPage.module.css'
 import { Section, Toggle } from './SettingsKit'
@@ -138,13 +139,12 @@ export function DownloadScheduleSection() {
       </label>
       {argumentField()}
       <div className={styles.editorWide}>
-        <div className={styles.days} role="group" aria-label="Days">
+        <div className={`${ui.seg} ${styles.days}`} role="group" aria-label="Days">
           {days.map((d) => (
             <button
               key={d.value}
               type="button"
               aria-pressed={draft.days.includes(d.value)}
-              className={`${styles.day} ${draft.days.includes(d.value) ? styles.dayOn : ''}`}
               onClick={() => toggleDay(d.value)}
             >
               {d.label}
@@ -182,9 +182,10 @@ export function DownloadScheduleSection() {
       id="scheduling"
       title="Scheduling"
       description="Rules run at the set time (server time). After a restart the latest rule of each kind is applied again."
-      footer={
+      actions={
         editing === null && (
-          <button className={ui.button} type="button" onClick={() => open(null)}>
+          <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => open(null)}>
+            <Icon name="plus" size={14} />
             Add rule
           </button>
         )
@@ -192,6 +193,7 @@ export function DownloadScheduleSection() {
     >
       {rules.data && rules.data.length === 0 && editing === null && <p className={styles.empty}>No rules. Downloads run whenever something is in the queue.</p>}
       {rules.data && rules.data.length > 0 && (
+        <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -206,18 +208,26 @@ export function DownloadScheduleSection() {
             {rules.data.map((rule) => (
               <tr key={rule.id} className={rule.enabled ? undefined : styles.muted}>
                 <td>
-                  <Toggle checked={rule.enabled} on="" off="" disabled={toggle.isPending} onChange={() => toggle.mutate(rule)} />
+                  <Toggle checked={rule.enabled} label={`Rule at ${rule.time} on`} disabled={toggle.isPending} onChange={() => toggle.mutate(rule)} />
                 </td>
                 <td className={styles.name}>{rule.time}</td>
                 <td>{daysText(rule)}</td>
                 <td className={styles.cellWide}>{what(rule)}</td>
                 <td>
                   <div className={styles.actions}>
-                    <button className={`${ui.button} ${styles.small}`} type="button" onClick={() => open(rule)}>
+                    <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={() => open(rule)}>
+                      <Icon name="edit" size={14} />
                       Edit
                     </button>
-                    <button className={`${ui.button} ${styles.small}`} type="button" disabled={remove.isPending} onClick={() => remove.mutate(rule.id)}>
-                      Delete
+                    <button
+                      className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
+                      type="button"
+                      aria-label={`Delete the rule at ${rule.time}`}
+                      title="Delete"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate(rule.id)}
+                    >
+                      <Icon name="trash" size={14} />
                     </button>
                   </div>
                 </td>
@@ -225,6 +235,7 @@ export function DownloadScheduleSection() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       {editing !== null && editor}
     </Section>

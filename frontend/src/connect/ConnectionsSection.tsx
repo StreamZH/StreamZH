@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { connectApi, connectKeys, newConnection, triggerKeys, type Connection, type ConnectKind, type ConnectType } from '../api/connect'
 import { useAuth } from '../auth/auth'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import { Pill } from '../indexers/Chips'
 import { Section } from '../settings/SettingsKit'
@@ -54,7 +55,7 @@ export function ConnectionsSection() {
                 <li>
                   <button className={styles.addCard} type="button" onClick={() => setView({ kind: 'pick', filter: kind })} disabled={!schema.isSuccess}>
                     <span className={styles.plus} aria-hidden="true">
-                      +
+                      <Icon name="plus" size={16} />
                     </span>
                     {kind === 'mediaServer' ? 'Add media server' : 'Add notification'}
                   </button>
@@ -114,10 +115,15 @@ function ConnectionCard({
     <li>
       <button type="button" className={`${styles.card} ${state}`} onClick={onEdit} disabled={!canEdit || !type}>
         <span className={styles.cardHead}>
-          <span className={styles.cardName}>{c.name}</span>
+          <span className={styles.cardIcon} aria-hidden="true">
+            <Icon name={c.kind === 'mediaServer' ? 'tv' : 'bell'} size={16} />
+          </span>
+          <span className={styles.cardTitle}>
+            <span className={styles.cardName}>{c.name}</span>
+            <span className={styles.cardType}>{c.implementationName}</span>
+          </span>
           {!c.enable ? <Pill tone="off">Disabled</Pill> : failing ? <Pill tone="error">Failing</Pill> : null}
         </span>
-        <span className={styles.cardType}>{c.implementationName}</span>
         <span className={styles.triggers}>
           {triggers.length === 0 ? (
             <span className={ui.muted}>No triggers</span>

@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { formatScore } from '../api/indexerOptions'
 import { indexerKeys, indexersApi } from '../api/indexers'
 import { libraryApi, queryKeys } from '../api/library'
 import { parseRelease, type ParsedRelease, type ParseResult } from '../api/parse'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { SettingsPage } from '../settings/SettingsKit'
-import page from './Page.module.css'
 import styles from './ParseTest.module.css'
 
 const examples = [
@@ -17,7 +18,7 @@ const examples = [
   'Breaking.Bad.S01E02.German.DL.720p.WEB.h264-GRP',
 ]
 
-/** Shows how StreamZH reads a release name and whether it would grab it. */
+/** Tools → Release test: how StreamZH reads a release name and whether it would grab it (CloudZH key/value panels). */
 export default function ParseTest() {
   const [title, setTitle] = useState('')
   const [target, setTarget] = useState('')
@@ -40,17 +41,37 @@ export default function ParseTest() {
     if (title.trim()) setSubmitted({ title: title.trim(), target, size: Number(sizeMb) || null, indexerId: Number(indexerId) || null })
   }
 
-  return (
-    <SettingsPage title="Release test" lead="Paste a release name to see how StreamZH reads it and whether it would grab it.">
+  const decision = result.data?.decision
 
-      <form className={page.panel} onSubmit={submit}>
-        <label className={ui.field}>
-          <span>Release name</span>
-          <input className={`${ui.input} ${ui.mono}`} value={title} onChange={(e) => setTitle(e.target.value)} spellCheck={false} autoFocus />
+  return (
+    <SettingsPage eyebrow="Tools" advancedToggle={false} title="Release test" lead="Paste a release name to see how StreamZH reads it and whether it would grab it.">
+      <form className={ui.panel} onSubmit={submit}>
+        <div className={styles.head}>
+          <Icon name="sparkle" size={17} className={styles.headIcon} />
+          <h2>Release</h2>
+        </div>
+        <label className={styles.titleLabel} htmlFor="parse-title">
+          Release name
         </label>
+        <div className={styles.titleRow}>
+          <input
+            id="parse-title"
+            className={`${ui.input} ${ui.mono}`}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Some.Movie.2024.German.DL.1080p.WEB.h264-GROUP"
+            spellCheck={false}
+            autoFocus
+          />
+          <button className={ui.primary} type="submit" disabled={!title.trim()}>
+            <Icon name="zap" size={15} />
+            Test
+          </button>
+        </div>
         <div className={styles.examples}>
+          <span className={styles.examplesLabel}>Examples</span>
           {examples.map((e) => (
-            <button key={e} type="button" className={styles.example} onClick={() => setTitle(e)}>
+            <button key={e} type="button" className={styles.example} onClick={() => setTitle(e)} aria-pressed={title === e}>
               {e}
             </button>
           ))}
@@ -93,36 +114,68 @@ export default function ParseTest() {
           </label>
           <label className={ui.field}>
             <span>Size in MB (optional)</span>
-            <input className={ui.input} inputMode="decimal" value={sizeMb} onChange={(e) => setSizeMb(e.target.value)} placeholder="e.g. 8500" />
+            <input className={`${ui.input} ${ui.num}`} inputMode="decimal" value={sizeMb} onChange={(e) => setSizeMb(e.target.value)} placeholder="e.g. 8500" />
           </label>
-          <button className={ui.primary} type="submit" disabled={!title.trim()}>
-            Test
-          </button>
         </div>
       </form>
 
-      {result.isError && <p className={ui.error}>{result.error.message}</p>}
-      {result.data && !result.data.parsed && <p className={ui.muted}>StreamZH could not read this name.</p>}
-      {result.data?.decision && (
-        <section className={`${page.panel} ${result.data.decision.accepted ? styles.accepted : styles.rejected}`}>
-          <h2 className={page.panelTitle}>
-            {result.data.decision.accepted ? 'Would be grabbed' : 'Would be rejected'} for {result.data.decision.target}
-          </h2>
-          <p className={ui.muted}>
-            Profile: {result.data.decision.profile}
-            {result.data.releaseProfiles.length > 0 && <> · Preferred score {formatScore(result.data.decision.preferredScore)}</>}
-          </p>
-          {result.data.decision.rejections.length > 0 && (
+      {result.isFetching && !result.data && (
+        <div className={ui.panel}>
+          <Loader text="Reading the name…" />
+        </div>
+      )}
+      {result.isError && <p className={ui.errBox}>{result.error.message}</p>}
+      {result.data && !result.data.parsed && (
+        <div className={`${ui.panel} ${styles.unreadable}`}>
+          <span className={`${styles.verdictIcon} ${styles.verdictBad}`} aria-hidden="true">
+            <Icon name="alert" size={18} />
+          </span>
+          <span>StreamZH could not read this name.</span>
+        </div>
+      )}
+
+      {decision && (
+        <section className={`${ui.panel} ${styles.verdict} ${decision.accepted ? styles.accepted : styles.rejected}`} aria-live="polite">
+          <div className={styles.verdictHead}>
+            <span className={`${styles.verdictIcon} ${decision.accepted ? styles.verdictOk : styles.verdictBad}`} aria-hidden="true">
+              <Icon name={decision.accepted ? 'check' : 'x'} size={18} />
+            </span>
+            <div className={styles.verdictText}>
+              <h2>
+                {decision.accepted ? 'Would be grabbed' : 'Would be rejected'} for {decision.target}
+              </h2>
+              <div className={styles.pills}>
+                <span className={ui.pill}>
+                  <Icon name="star" size={12} />
+                  {decision.profile}
+                </span>
+                {result.data!.releaseProfiles.length > 0 && (
+                  <span className={`${ui.pill} ${decision.preferredScore > 0 ? ui.pillOk : decision.preferredScore < 0 ? ui.pillErr : ''}`}>
+                    Preferred score {formatScore(decision.preferredScore)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          {decision.rejections.length > 0 && (
             <ul className={styles.reasons}>
-              {result.data.decision.rejections.map((r) => (
-                <li key={r.code}>{r.message}</li>
+              {decision.rejections.map((r) => (
+                <li key={r.code}>
+                  <Icon name="ban" size={14} />
+                  {r.message}
+                </li>
               ))}
             </ul>
           )}
         </section>
       )}
-      {result.data?.parsed && <ReleaseProfiles result={result.data} />}
-      {result.data?.parsed && <ParsedTable parsed={result.data.parsed} hardcodedSubs={result.data.hardcodedSubs} />}
+
+      {result.data?.parsed && (
+        <div className={styles.results}>
+          <ParsedTable parsed={result.data.parsed} hardcodedSubs={result.data.hardcodedSubs} />
+          <ReleaseProfiles result={result.data} />
+        </div>
+      )}
     </SettingsPage>
   )
 }
@@ -131,37 +184,57 @@ export default function ParseTest() {
 function ReleaseProfiles({ result }: { result: ParseResult }) {
   const matches = result.releaseProfiles
   return (
-    <section className={page.panel}>
-      <h2 className={page.panelTitle}>
-        Release profiles
-        {matches.length > 0 && <span className={styles.score}>Preferred score {formatScore(result.preferredScore)}</span>}
-      </h2>
+    <section className={ui.panel}>
+      <div className={styles.head}>
+        <Icon name="filter" size={17} className={styles.headIcon} />
+        <h2>Release profiles</h2>
+        {matches.length > 0 && (
+          <span className={`${ui.pill} ${result.preferredScore > 0 ? ui.pillOk : result.preferredScore < 0 ? ui.pillErr : ''} ${styles.headAside}`}>
+            Score {formatScore(result.preferredScore)}
+          </span>
+        )}
+      </div>
       {matches.length === 0 ? (
-        <p className={ui.muted}>
+        <p className={styles.note}>
           No release profile matches this name. Release profiles are set up under <Link to="/settings/indexers#release-profiles">Settings → Indexers</Link>.
         </p>
       ) : (
         <ul className={styles.profiles}>
           {matches.map((m) => (
             <li key={m.id} className={m.rejects ? styles.profileRejects : undefined}>
-              <strong>{m.name}</strong>
-              {m.limited && <span className={ui.muted}> (only some indexers or quality profiles)</span>}
-              <ul className={styles.terms}>
-                {m.missingRequired && <li className={styles.bad}>Contains none of {m.required.map((t) => `'${t}'`).join(', ')}</li>}
-                {m.requiredMatched.length > 0 && <li>Contains {m.requiredMatched.map((t) => `'${t}'`).join(', ')}</li>}
-                {m.ignoredMatched.length > 0 && <li className={styles.bad}>Contains {m.ignoredMatched.map((t) => `'${t}'`).join(', ')} (must not)</li>}
-                {m.preferredMatched.map((p) => (
-                  <li key={p.term}>
-                    Preferred '{p.term}' <span className={p.score > 0 ? styles.plus : styles.bad}>{formatScore(p.score)}</span>
-                  </li>
+              <div className={styles.profileHead}>
+                <strong>{m.name}</strong>
+                {m.rejects && <span className={`${ui.pill} ${ui.pillErr}`}>Rejects</span>}
+              </div>
+              {m.limited && <span className={styles.note}>Only some indexers or quality profiles</span>}
+              <div className={styles.terms}>
+                {m.missingRequired && <Term tone="bad">Contains none of {m.required.map((t) => `'${t}'`).join(', ')}</Term>}
+                {m.requiredMatched.map((t) => (
+                  <Term key={`r-${t}`} tone="ok">
+                    Contains '{t}'
+                  </Term>
                 ))}
-              </ul>
+                {m.ignoredMatched.map((t) => (
+                  <Term key={`i-${t}`} tone="bad">
+                    Contains '{t}' (must not)
+                  </Term>
+                ))}
+                {m.preferredMatched.map((p) => (
+                  <Term key={`p-${p.term}`} tone={p.score > 0 ? 'ok' : 'bad'}>
+                    '{p.term}' {formatScore(p.score)}
+                  </Term>
+                ))}
+              </div>
             </li>
           ))}
         </ul>
       )}
     </section>
   )
+}
+
+function Term({ tone, children }: { tone: 'ok' | 'bad'; children: ReactNode }) {
+  return <span className={`${ui.pill} ${tone === 'ok' ? ui.pillOk : ui.pillErr} ${styles.term}`}>{children}</span>
 }
 
 function ParsedTable({ parsed: p, hardcodedSubs }: { parsed: ParsedRelease; hardcodedSubs: string | null }) {
@@ -176,31 +249,49 @@ function ParsedTable({ parsed: p, hardcodedSubs }: { parsed: ParsedRelease; hard
             : `S${pad(p.seasonNumber ?? 0)}` + p.episodeNumbers.map((e) => `E${pad(e)}`).join('')
       : null
 
-  const rows: [string, string | null][] = [
-    ['Type', p.kind],
-    ['Title', p.title],
+  const quality = p.version > 1 || p.real > 0 ? `${p.quality} (v${p.version}${p.real ? `, REAL ${p.real}` : ''}${p.isRepack ? ', repack' : ''})` : p.quality
+
+  const rows: [string, ReactNode][] = [
+    ['Type', <span key="v" className={ui.tag}>{p.kind}</span>],
+    ['Title', <b key="v" className={styles.strong}>{p.title}</b>],
     ['Year', p.year > 0 ? String(p.year) : null],
-    ['Episodes', episodes],
-    ['Quality', p.version > 1 || p.real > 0 ? `${p.quality} (v${p.version}${p.real ? `, REAL ${p.real}` : ''}${p.isRepack ? ', repack' : ''})` : p.quality],
-    ['Languages', p.languages.length > 0 ? p.languages.join(', ') : 'none named'],
-    ['Release group', p.releaseGroup],
+    ['Episodes', episodes && <span key="v" className={ui.mono}>{episodes}</span>],
+    ['Quality', <span key="v" className={`${ui.pill} ${ui.pillBusy}`}>{quality}</span>],
+    [
+      'Languages',
+      p.languages.length > 0 ? (
+        <span key="v" className={styles.pills}>
+          {p.languages.map((l) => (
+            <span key={l} className={ui.pill}>
+              {l}
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span key="v" className={ui.muted}>none named</span>
+      ),
+    ],
+    ['Release group', p.releaseGroup && <span key="v" className={ui.tag}>{p.releaseGroup}</span>],
     ['Edition', p.edition],
-    ['HDR', p.hdr !== 'None' ? p.hdr : null],
+    ['HDR', p.hdr !== 'None' ? <span key="v" className={`${ui.pill} ${ui.pillWarn}`}>{p.hdr}</span> : null],
     ['Video', p.videoCodec],
     ['Audio', p.audioCodec],
-    ['Hardcoded subs', hardcodedSubs],
+    ['Hardcoded subs', hardcodedSubs && <span key="v" className={`${ui.pill} ${ui.pillWarn}`}>{hardcodedSubs}</span>],
     ['IMDb / TMDB', [p.imdbId, p.tmdbId].filter(Boolean).join(' / ') || null],
-    ['Matching key', p.cleanTitle],
+    ['Matching key', p.cleanTitle && <span key="v" className={ui.mono}>{p.cleanTitle}</span>],
   ]
 
   return (
-    <section className={page.panel}>
-      <h2 className={page.panelTitle}>Parsed</h2>
-      <dl className={styles.facts}>
+    <section className={ui.panel}>
+      <div className={styles.head}>
+        <Icon name="list" size={17} className={styles.headIcon} />
+        <h2>Parsed</h2>
+      </div>
+      <dl className={styles.kv}>
         {rows
           .filter(([, value]) => value)
           .map(([label, value]) => (
-            <div key={label} className={styles.fact}>
+            <div key={label} className={styles.kvRow}>
               <dt>{label}</dt>
               <dd>{value}</dd>
             </div>

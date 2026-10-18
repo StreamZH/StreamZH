@@ -1,16 +1,17 @@
-/* Settings → Media Management, the rename dialog and the manual import dialog. */
+/* Settings → Media Management, the rename dialog and the manual import dialog (CloudZH look). */
 
 .format {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
+  width: 560px;
+  max-width: 100%;
   min-width: 0;
 }
 
 .formatInput {
   display: flex;
   gap: 8px;
-  max-width: 720px;
 }
 
 .formatInput input {
@@ -25,6 +26,7 @@
 .tokensOpen {
   border-color: var(--accent) !important;
   color: var(--accent) !important;
+  background: var(--accent-soft) !important;
 }
 
 .example {
@@ -33,18 +35,17 @@
   align-items: baseline;
   gap: 4px 8px;
   margin: 0;
-  font-size: 12.5px;
-  color: var(--text-faint);
-  max-width: 720px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .example code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
-  border-radius: 6px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
   padding: 3px 8px;
   overflow-wrap: anywhere;
 }
@@ -53,11 +54,12 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 720px;
   padding: 12px;
-  background: var(--bg);
+  background: var(--sunk);
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  border-radius: var(--r-sm);
+  animation: pop 0.18s var(--ease);
+  transform-origin: top;
 }
 
 .tokenGroup {
@@ -68,10 +70,10 @@
 
 .tokenGroupName {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .tokenList {
@@ -88,18 +90,20 @@
   padding: 6px 9px;
   font: inherit;
   text-align: left;
-  color: var(--text);
+  color: var(--fg);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   max-width: 100%;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .token:hover,
 .token:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
-  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: var(--accent-soft);
+  outline: none;
 }
 
 .token code {
@@ -109,7 +113,7 @@
 
 .token small {
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
@@ -117,36 +121,16 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .tokenHelp code {
   font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
-/* One save bar for the whole page, sticky at the bottom while there are changes. */
-.saveDock {
-  position: sticky;
-  bottom: 12px;
-  z-index: 5;
-  padding: 12px 16px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 0.25);
-}
-
-.saveDockIdle {
-  position: static;
-  box-shadow: none;
-  background: transparent;
-  border-style: dashed;
+  color: var(--fg-2);
 }
 
 .short {
-  width: 120px;
+  width: 120px !important;
 }
 
 .subRow {
@@ -157,18 +141,17 @@
 }
 
 .notice {
-  margin: 0;
+  margin: 4px 0;
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--warn) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
-  border-radius: var(--radius-small);
+  color: var(--fg-2);
+  background: var(--warn-soft);
+  border-radius: 10px;
 }
 
 .notice strong {
-  color: var(--text);
+  color: var(--fg);
 }
 
 /* Rename and manual import dialogs */
@@ -176,7 +159,7 @@
   margin: 0 0 12px;
   font-size: 13.5px;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .renameList {
@@ -185,19 +168,27 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   max-height: min(56vh, 520px);
   overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
 }
 
 .renameItem {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 10px;
+  gap: 4px 12px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
+  border-top: 1px solid var(--line);
+  animation: rise 0.25s var(--ease) backwards;
+}
+
+.renameItem:first-child {
+  border-top: 0;
+}
+
+.renameItem:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .renameItem input {
@@ -208,21 +199,19 @@
 .renamePaths {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   font-family: var(--font-mono);
   font-size: 12px;
 }
 
 .renameOld {
-  color: var(--text-faint);
-  text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--text-faint) 60%, transparent);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .renameNew {
-  color: var(--text);
+  color: var(--fg);
   overflow-wrap: anywhere;
 }
 
@@ -249,27 +238,38 @@
   gap: 12px;
 }
 
+/* Segmented choice (CloudZH .seg) */
 .segmented {
   display: inline-flex;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
   align-self: flex-start;
 }
 
 .segmented button {
   font: inherit;
   font-size: 13px;
-  padding: 8px 14px;
-  color: var(--text-muted);
+  font-weight: 500;
+  height: 30px;
+  padding: 0 12px;
+  color: var(--fg-2);
   background: transparent;
   border: none;
+  border-radius: 7px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.segmented button:hover {
+  color: var(--fg);
 }
 
 .segmented button[aria-pressed='true'] {
-  color: #fff;
-  background: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .pickList {
@@ -278,8 +278,8 @@
   max-height: 180px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
+  border-radius: var(--r-sm);
+  background: var(--surface);
 }
 
 .pickItem {
@@ -287,10 +287,10 @@
   font-size: 13.5px;
   text-align: left;
   padding: 8px 12px;
-  color: var(--text-muted);
+  color: var(--fg-2);
   background: transparent;
   border: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  border-bottom: 1px solid var(--line);
   cursor: pointer;
 }
 
@@ -299,22 +299,23 @@
 }
 
 .pickItem:hover {
-  color: var(--text);
-  background: var(--surface-hover);
+  color: var(--fg);
+  background: var(--sunk);
 }
 
 .pickItem[aria-selected='true'] {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--fg);
+  background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .fileTable {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   max-height: min(50vh, 460px);
   overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
 }
 
 .fileRow {
@@ -323,9 +324,15 @@
   align-items: center;
   gap: 6px 12px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.fileRow:first-child {
+  border-top: 0;
+}
+
+.fileRow:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .fileRow input[type='checkbox'] {
@@ -343,9 +350,9 @@
 }
 
 .fileName small {
-  font-family: var(--font-body, inherit);
+  font-family: var(--font-body);
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .fileProblem {

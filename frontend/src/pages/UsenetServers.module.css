@@ -2,12 +2,12 @@
   display: inline-block;
   margin-bottom: 8px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
   text-decoration: none;
 }
 
 .back:hover {
-  color: var(--text);
+  color: var(--fg);
 }
 
 /* Title on the left, "Advanced" switch on the right (below the title on phones). */
@@ -40,11 +40,11 @@
 .cardSummary {
   margin: 0;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .cardSummary strong {
-  color: var(--text);
+  color: var(--fg);
   font-weight: 600;
 }
 
@@ -65,7 +65,7 @@
 .summary {
   margin: 0;
   font-size: 12.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .empty {
@@ -75,7 +75,17 @@
   gap: 12px;
   max-width: 640px;
   padding: 8px 0 4px;
-  color: var(--text-muted);
+  color: var(--fg-2);
+}
+
+.emptyIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .empty p {
@@ -83,7 +93,7 @@
 }
 
 .empty strong {
-  color: var(--text);
+  color: var(--fg);
   font-weight: 600;
 }
 
@@ -103,9 +113,10 @@
 }
 
 .head {
-  padding: 8px 14px 8px 17px;
+  padding: 4px 14px 10px 17px;
   font-size: 12px;
-  color: var(--text-faint);
+  font-weight: 500;
+  color: var(--muted);
   border-bottom: 1px solid var(--line);
 }
 
@@ -114,6 +125,12 @@
   row-gap: 6px;
   padding: 12px 14px 12px 17px;
   border-bottom: 1px solid var(--line);
+  transition: background 0.12s;
+  animation: rise 0.25s var(--ease) backwards;
+}
+
+.row:last-child {
+  border-bottom: 0;
 }
 
 .row:has(button) {
@@ -121,7 +138,7 @@
 }
 
 .row:hover {
-  background: var(--surface-hover);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 /* Status bar on the left edge. */
@@ -141,11 +158,11 @@
 }
 
 .disabled {
-  --state: var(--text-faint);
+  --state: var(--muted);
 }
 
 .failing {
-  --state: #ef6b6b;
+  --state: var(--err);
 }
 
 .main {
@@ -167,7 +184,7 @@
   font: inherit;
   font-size: 14.5px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--fg);
   background: none;
   border: none;
   padding: 0;
@@ -193,7 +210,7 @@ button.name:focus-visible {
 }
 
 .disabled .name {
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .hostLine {
@@ -206,7 +223,7 @@ button.name:focus-visible {
 .host {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
@@ -228,7 +245,7 @@ button.name:focus-visible {
 .cell {
   min-width: 0;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .cellLabel {
@@ -238,13 +255,13 @@ button.name:focus-visible {
 .connections {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+  gap: 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .connections strong {
-  color: var(--text);
+  color: var(--fg);
   font-weight: 600;
 }
 
@@ -252,18 +269,19 @@ button.name:focus-visible {
   display: block;
   width: 100%;
   max-width: 140px;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--line);
+  height: 6px;
+  border-radius: 99px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
   overflow: hidden;
 }
 
 .meter span {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 99px;
   background: var(--ok);
-  transition: width 0.4s ease;
+  transition: width 0.6s var(--ease);
 }
 
 .actions {
@@ -275,12 +293,12 @@ button.name:focus-visible {
   grid-column: 1 / -1;
   margin: 2px 0 0;
   font-size: 12.5px;
-  color: var(--text-faint);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .failing .lastError {
-  color: #ef9a9a;
+  color: var(--err);
 }
 
 /* Test result, save error and hints on separate lines when they do not fit on one. */
@@ -309,11 +327,11 @@ button.name:focus-visible {
   gap: 6px 12px;
   margin-top: 8px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .usageFull {
-  color: #ef9a9a;
+  color: var(--err);
 }
 
 .notes {
@@ -326,7 +344,7 @@ button.name:focus-visible {
 /* Quota and notes in a server row, after the host. */
 .quota {
   font-size: 12.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 @media (max-width: 860px) {
@@ -360,7 +378,7 @@ button.name:focus-visible {
     flex: none;
     width: 86px;
     font-size: 12px;
-    color: var(--text-faint);
+    color: var(--muted);
   }
 
   .connections {

@@ -226,7 +226,7 @@ function ToolRow({ tool, advanced, autoInstall, busy, requestError, onInstall }:
         {error && <small className={styles.error}>{error}</small>}
       </div>
       {canInstall && (
-        <button type="button" className={tool.found ? styles.secondary : styles.primary} disabled={installing} onClick={onInstall}>
+        <button type="button" className={`${tool.found ? ui.button : ui.primary} ${ui.sm}`} disabled={installing} onClick={onInstall}>
           {installing ? 'Installing…' : tool.found ? 'Reinstall' : 'Install'}
         </button>
       )}

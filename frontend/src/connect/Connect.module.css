@@ -1,9 +1,10 @@
-/* Connection cards, like Radarr's Connect page: one card per media server or notification service. */
+/* Settings → Connect: one card per media server or notification service (CloudZH cards: hover lift), the type picker
+   and the connection form. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 12px;
-  margin: 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -11,6 +12,7 @@
 .grid > li {
   display: flex;
   min-width: 0;
+  animation: rise 0.25s var(--ease) backwards;
 }
 
 .card,
@@ -20,21 +22,28 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  min-height: 112px;
+  min-height: 116px;
   padding: 14px 16px;
   font: inherit;
   text-align: left;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--fg);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  border-radius: 12px;
   cursor: pointer;
   min-width: 0;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s,
+    background 0.15s,
+    color 0.15s;
 }
 
-.card:hover:not(:disabled),
-.addCard:hover:not(:disabled) {
-  background: var(--surface-hover);
+.card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
 }
 
 .card:focus-visible,
@@ -42,7 +51,7 @@
 .typeCard:focus-visible,
 .chip:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .card:disabled {
@@ -54,17 +63,26 @@
 }
 
 .card.failing {
-  border-color: color-mix(in srgb, #ef6b6b 55%, var(--line));
+  border-color: color-mix(in srgb, var(--err) 45%, var(--line));
+  background: color-mix(in srgb, var(--err-soft) 45%, var(--surface));
 }
 
 .addCard {
   align-items: center;
   justify-content: center;
   flex-direction: row;
-  gap: 10px;
-  color: var(--text-muted);
-  border-style: dashed;
-  font-size: 13px;
+  gap: 8px;
+  color: var(--fg-2);
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.addCard:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .addCard:disabled {
@@ -73,21 +91,44 @@
 }
 
 .plus {
-  font-size: 20px;
-  line-height: 1;
+  display: inline-flex;
   color: var(--accent);
 }
 
 .cardHead {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   min-width: 0;
+  margin-bottom: 2px;
+}
+
+.cardIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.disabled .cardIcon {
+  background: var(--sunk);
+  color: var(--muted);
+}
+
+.cardTitle {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
 }
 
 .cardName {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -96,8 +137,8 @@
 }
 
 .cardType {
-  font-size: 12.5px;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .triggers {
@@ -109,22 +150,26 @@
 }
 
 .trigger {
-  padding: 2px 7px;
-  border-radius: 999px;
-  color: var(--text-muted);
-  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--fg-2);
+  background: var(--sunk);
   border: 1px solid var(--line);
   white-space: nowrap;
 }
 
 .cardError {
   font-size: 12.5px;
-  color: #ef6b6b;
+  color: var(--err);
   overflow-wrap: anywhere;
 }
 
 .cardTime {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 /* Type picker */
@@ -139,37 +184,43 @@
 
 .typeGrid > li {
   display: flex;
+  animation: rise 0.25s var(--ease) backwards;
 }
 
 .typeCard {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   padding: 14px 16px;
   font: inherit;
   text-align: left;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--fg);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  border-radius: 12px;
   cursor: pointer;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s;
 }
 
 .typeCard:hover {
-  background: var(--surface-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
 .typeName {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
 .typeText {
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .spacer {
@@ -187,9 +238,22 @@
 .triggerCheck {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 9px;
+  padding: 8px 10px;
   font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.triggerCheck:hover {
+  background: var(--sunk);
+}
+
+.triggerCheck:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
 }
 
 .triggerCheck input {
@@ -206,7 +270,7 @@
 .triggerCheck small {
   font-size: 11.5px;
   line-height: 1.35;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .withUnit {
@@ -217,7 +281,7 @@
 
 .unit {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .chips {
@@ -227,23 +291,31 @@
 }
 
 .chip {
-  padding: 5px 10px;
+  height: 30px;
+  padding: 0 12px;
   font: inherit;
-  font-size: 12.5px;
-  color: var(--text-muted);
-  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-2);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 8px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.chip:hover {
+  color: var(--fg);
 }
 
 .chipOn {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
 }
 
 .textArea {
-  max-width: 460px;
+  width: 460px;
+  max-width: 100%;
   resize: vertical;
 }

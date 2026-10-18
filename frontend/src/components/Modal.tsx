@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import Icon from './Icon'
 import styles from './Modal.module.css'
 
 export default function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -24,7 +25,7 @@ export default function Modal({ title, onClose, children }: { title: string; onC
         <header className={styles.header}>
           <h2>{title}</h2>
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-            ×
+            <Icon name="x" size={18} />
           </button>
         </header>
         {children}

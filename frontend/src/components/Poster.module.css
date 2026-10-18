@@ -1,11 +1,17 @@
+/* Poster like CloudZH (.poster): 2:3, 12 px radius, hairline border; the card around it lifts on hover. */
 .poster,
 .fallback {
   display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
-  border-radius: var(--radius-small);
-  background: var(--surface-hover);
+  border-radius: 12px;
+  background: var(--poster-bg);
   object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.poster {
+  animation: fade 0.4s ease;
 }
 
 .fallback {
@@ -13,9 +19,8 @@
   place-items: center;
   padding: 12px;
   text-align: center;
-  font-family: var(--font-title);
+  font-family: var(--font-display);
   font-size: 18px;
   line-height: 1.2;
-  color: var(--text-muted);
-  border: 1px solid var(--line);
+  color: var(--fg-2);
 }

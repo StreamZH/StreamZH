@@ -1,15 +1,22 @@
+/* Dialog like CloudZH (.modal-c): surface card, 16 px radius, serif title, pops in over a warm scrim. */
 .dialog {
   width: min(760px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
+  max-height: calc(100vh - 48px);
   padding: 0;
-  color: var(--text);
+  color: var(--fg);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.dialog[open] {
+  animation: pop 0.18s var(--ease);
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 0.6);
+  background: var(--scrim);
+  animation: fade 0.15s;
 }
 
 .body {
@@ -23,23 +30,32 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .header h2 {
-  font-family: var(--font-title);
-  font-size: 28px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  min-width: 0;
 }
 
 .close {
-  font-size: 24px;
-  line-height: 1;
-  color: var(--text-faint);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: var(--muted);
   background: none;
-  border: none;
+  border: 0;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 4px 8px;
+  transition: background 0.15s, color 0.15s;
 }
 
 .close:hover {
-  color: var(--text);
+  color: var(--fg);
+  background: var(--sunk);
 }

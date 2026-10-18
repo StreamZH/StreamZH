@@ -9,7 +9,7 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .spinner {
@@ -37,7 +37,7 @@
   margin: 0;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  border-radius: var(--r-sm);
   background: var(--bg);
 }
 
@@ -70,14 +70,14 @@
 }
 
 .failed .icon {
-  color: #ef6b6b;
-  background: color-mix(in srgb, #ef6b6b 15%, transparent);
+  color: var(--err);
+  background: var(--err-soft);
 }
 
 .name {
   font: inherit;
   font-weight: 600;
-  color: var(--text);
+  color: var(--fg);
   background: none;
   border: none;
   padding: 0;
@@ -98,12 +98,12 @@
 }
 
 .message {
-  color: var(--text-muted);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 
 .failed .message {
-  color: #ef9a9a;
+  color: var(--err);
 }
 
 .spacer {

@@ -1,4 +1,6 @@
 import { useId } from 'react'
+import Icon from '../components/Icon'
+import ui from '../components/ui.module.css'
 import { pageList, pageSizes } from './paging'
 import styles from './Pager.module.css'
 
@@ -21,15 +23,17 @@ export interface PagerProps {
 const numberFormat = new Intl.NumberFormat()
 
 /**
- * Numbered pages with Previous/Next, "Page 2 of 5 · 237 downloads" and the page size. Shown whenever the list has
- * items, so the page size can always be changed. Compact (‹ 2/5 ›) at phone width.
+ * CloudZH-style pager: "1–50 of 214 downloads", small Previous/Next and page buttons, and the page size. Shown whenever
+ * the list has items, so the page size can always be changed. Compact (‹ 2/5 ›) at phone width.
  */
 export default function Pager({ page, pageSize, total, noun, one, onPage, onPageSize, sizes = pageSizes }: PagerProps) {
   const sizeId = useId()
   if (total <= 0) return null
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const current = Math.min(Math.max(1, page), pages)
-  const count = `${numberFormat.format(total)} ${total === 1 ? (one ?? noun.replace(/s$/, '')) : noun}`
+  const from = (current - 1) * pageSize + 1
+  const to = Math.min(total, current * pageSize)
+  const word = total === 1 ? (one ?? noun.replace(/s$/, '')) : noun
 
   const changeSize = (size: number) => {
     const first = (current - 1) * pageSize
@@ -42,17 +46,29 @@ export default function Pager({ page, pageSize, total, noun, one, onPage, onPage
       <p className={styles.summary} aria-live="polite">
         {pages > 1 ? (
           <>
-            Page <strong>{current}</strong> of {numberFormat.format(pages)} · {count}
+            <b>
+              {numberFormat.format(from)}–{numberFormat.format(to)}
+            </b>{' '}
+            of {numberFormat.format(total)} {word}
           </>
         ) : (
-          count
+          <>
+            <b>{numberFormat.format(total)}</b> {word}
+          </>
         )}
       </p>
 
       {pages > 1 && (
         <div className={styles.pages}>
-          <button type="button" className={styles.step} disabled={current <= 1} onClick={() => onPage(current - 1)} aria-label="Previous page" title="Previous page">
-            <Chevron left />
+          <button
+            type="button"
+            className={`${ui.button} ${ui.sm} ${ui.icon}`}
+            disabled={current <= 1}
+            onClick={() => onPage(current - 1)}
+            aria-label="Previous page"
+            title="Previous page"
+          >
+            <Icon name="left" size={15} />
           </button>
           <ol className={styles.numbers}>
             {pageList(current, pages).map((p, index) =>
@@ -78,15 +94,22 @@ export default function Pager({ page, pageSize, total, noun, one, onPage, onPage
           <span className={styles.compact} aria-hidden="true">
             {current}/{pages}
           </span>
-          <button type="button" className={styles.step} disabled={current >= pages} onClick={() => onPage(current + 1)} aria-label="Next page" title="Next page">
-            <Chevron />
+          <button
+            type="button"
+            className={`${ui.button} ${ui.sm} ${ui.icon}`}
+            disabled={current >= pages}
+            onClick={() => onPage(current + 1)}
+            aria-label="Next page"
+            title="Next page"
+          >
+            <Icon name="right" size={15} />
           </button>
         </div>
       )}
 
       <div className={styles.size}>
         <label htmlFor={sizeId}>Per page</label>
-        <select id={sizeId} className={styles.select} value={pageSize} onChange={(e) => changeSize(Number(e.target.value))}>
+        <select id={sizeId} className={`${ui.select} ${styles.select}`} value={pageSize} onChange={(e) => changeSize(Number(e.target.value))}>
           {sizes.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -95,13 +118,5 @@ export default function Pager({ page, pageSize, total, noun, one, onPage, onPage
         </select>
       </div>
     </nav>
-  )
-}
-
-function Chevron({ left }: { left?: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={left ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} />
-    </svg>
   )
 }

@@ -1,18 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
 import { downloadKeys, downloadsApi, type DownloadHistoryFilter, type DownloadItem } from '../api/downloads'
 import { historyApi, historyKeys, type HistoryFilter, type HistoryRecord } from '../api/history'
+import Icon, { type IconName } from '../components/Icon'
+import Loader from '../components/Loader'
 import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
 import { formatBytes } from '../lib/format'
 import { joinParts, relativeTime } from '../status/format'
-import StatusIcon, { type StatusIconName } from '../status/icons'
 import { useIsAdmin } from '../status/useOngoing'
 import { RemoveDialog } from './Dialogs'
 import { downloadTypeOptions, mediaTypeOptions, pick, useCustomCategories } from './filterOptions'
-import { FilterBar, FilterSelect, NoMatches, SearchBox } from './Filters'
+import { FilterBar, FilterSeg, FilterSelect, NoMatches, SearchBox, Toolbar } from './Filters'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
 import { useImportActions, useImportStates } from './importHooks'
 import { ImportLine } from './imports'
@@ -21,25 +22,25 @@ import ManualImportDialog from './ManualImportDialog'
 import { categoryLabels } from './labels'
 import Pager from './Pager'
 import { usePageSize } from './paging'
-import { Empty } from './QueueTab'
+import { Empty } from './Empty'
 import styles from './Activity.module.css'
 
 /** How each history event shows in the event list. */
-const eventLabels: Record<HistoryRecord['eventType'], { label: string; icon: StatusIconName; failed?: boolean; neutral?: boolean }> = {
+const eventLabels: Record<HistoryRecord['eventType'], { label: string; icon: IconName; failed?: boolean; neutral?: boolean }> = {
   Grabbed: { label: 'Grabbed', icon: 'download', neutral: true },
   DownloadCompleted: { label: 'Downloaded', icon: 'check' },
-  DownloadFailed: { label: 'Download failed', icon: 'error', failed: true },
+  DownloadFailed: { label: 'Download failed', icon: 'alert', failed: true },
   Imported: { label: 'Imported', icon: 'folder' },
-  Upgraded: { label: 'Upgraded', icon: 'up' },
-  ImportFailed: { label: 'Import failed', icon: 'error', failed: true },
-  Renamed: { label: 'Renamed', icon: 'retry', neutral: true },
+  Upgraded: { label: 'Upgraded', icon: 'arrowup' },
+  ImportFailed: { label: 'Import failed', icon: 'alert', failed: true },
+  Renamed: { label: 'Renamed', icon: 'rename', neutral: true },
 }
 
 const downloadFilterKeys = ['q', 'status', 'import', 'type', 'range'] as const
 const eventFilterKeys = ['q', 'event', 'type', 'indexer'] as const
 
 const statusOptions = [
-  { value: '', label: 'Completed and failed' },
+  { value: '', label: 'All' },
   { value: 'completed', label: 'Completed' },
   { value: 'failed', label: 'Failed' },
 ]
@@ -84,22 +85,20 @@ export default function HistoryTab() {
   // Switching the view starts on page 1 without filters (the two lists filter different things).
   const show = (next: 'downloads' | 'grabs') => setUrl(next === 'grabs' ? { tab: 'history', view: 'grabs' } : { tab: 'history' })
 
-  return (
-    <>
-      <div className={styles.segmented} role="group" aria-label="History">
-        <button type="button" aria-pressed={view === 'downloads'} onClick={() => show('downloads')}>
-          Downloads
-        </button>
-        <button type="button" aria-pressed={view === 'grabs'} onClick={() => show('grabs')}>
-          Events
-        </button>
-      </div>
-      {view === 'downloads' ? <DownloadHistory /> : <GrabHistory />}
-    </>
+  const views = (
+    <div className={ui.seg} role="group" aria-label="History">
+      <button type="button" aria-pressed={view === 'downloads'} onClick={() => show('downloads')}>
+        Downloads
+      </button>
+      <button type="button" aria-pressed={view === 'grabs'} onClick={() => show('grabs')}>
+        Events
+      </button>
+    </div>
   )
+  return view === 'downloads' ? <DownloadHistory views={views} /> : <GrabHistory views={views} />
 }
 
-function DownloadHistory() {
+function DownloadHistory({ views }: { views: ReactNode }) {
   const admin = useIsAdmin()
   const { page, get, setFilters, setSearch, setPage, clear, active } = useListParams(downloadFilterKeys)
   const [pageSize, setPageSize] = usePageSize('activity-downloads')
@@ -126,33 +125,44 @@ function DownloadHistory() {
   if (history.isError) {
     const missing = history.error instanceof ApiError && history.error.status === 404
     return (
-      <Empty icon="error" title={missing ? 'No download history yet' : 'The history could not be loaded'}>
-        <p>{missing ? 'This StreamZH build has no built-in downloader yet. The grab history shows what was sent.' : history.error.message}</p>
-        <div className={styles.emptyActions}>
-          <Link className={ui.button} to="/activity?tab=history&view=grabs">
-            Grab history
-          </Link>
-        </div>
-      </Empty>
+      <>
+        <Toolbar>{views}</Toolbar>
+        <Empty icon="error" title={missing ? 'No download history yet' : 'The history could not be loaded'}>
+          <p>{missing ? 'This StreamZH build has no built-in downloader yet. The grab history shows what was sent.' : history.error.message}</p>
+          <div className={styles.emptyActions}>
+            <Link className={`${ui.button} ${ui.sm}`} to="/activity?tab=history&view=grabs">
+              Grab history
+            </Link>
+          </div>
+        </Empty>
+      </>
     )
   }
 
-  if (!history.data) return <Loading />
+  if (!history.data) return <Loader text="Loading the history" />
 
   const total = history.data.totalRecords
   if (total === 0 && !active) {
     return (
-      <Empty icon="check" title="Nothing finished yet">
-        <p>Completed and failed downloads are listed here with their folder or the reason they failed.</p>
-      </Empty>
+      <>
+        <Toolbar>{views}</Toolbar>
+        <Empty icon="check" title="Nothing finished yet">
+          <p>Completed and failed downloads are listed here with their folder or the reason they failed.</p>
+        </Empty>
+      </>
     )
   }
 
   return (
     <>
       <FilterBar label="Filter downloads" active={active} matches={settled} noun="downloads" onClear={clear}>
-        <SearchBox value={get('q')} onChange={setSearch} placeholder="Search titles" label="Search downloads" />
-        <FilterSelect label="Status" value={status} onChange={(v) => setFilters({ status: v, import: v === 'failed' ? undefined : get('import') })} options={statusOptions} />
+        {views}
+        <FilterSeg
+          label="Status"
+          value={status}
+          onChange={(v) => setFilters({ status: v, import: v === 'failed' ? undefined : get('import') })}
+          options={statusOptions}
+        />
         <FilterSelect label="Import" value={importState} onChange={(v) => setFilters({ import: v })} options={importOptions} disabled={status === 'failed'} />
         <FilterSelect
           label="Type"
@@ -162,6 +172,7 @@ function DownloadHistory() {
           groups={[{ label: 'Categories', options: categories }]}
         />
         <FilterSelect label="Finished" value={range} onChange={(v) => setFilters({ range: v })} options={rangeOptions} />
+        <SearchBox value={get('q')} onChange={setSearch} placeholder="Search titles" label="Search downloads" />
       </FilterBar>
       {history.data.records.length === 0 ? (
         <NoMatches noun="downloads" onClear={clear} />
@@ -192,63 +203,109 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
 
   return (
     <>
-      <ul className={`${styles.historyList} ${stale ? styles.stale : ''}`} aria-label="Download history">
-        {records.map((item) => {
-          const link = media(item)
-          const failed = item.status === 'failed'
-          return (
-            <li key={item.id} className={`${styles.historyItem} ${failed ? styles.historyFailed : ''}`}>
-              <span className={styles.historyIcon} title={failed ? 'Failed' : 'Completed'}>
-                <StatusIcon name={failed ? 'error' : 'check'} size={16} />
-              </span>
-              <div className={styles.historyMain}>
-                <span className={styles.dlTitle}>{item.title}</span>
-                <span className={styles.meta}>
-                  <span className={`${styles.cat} ${styles[`cat_${item.category}`]}`}>{categoryLabels[item.category]}</span>
-                  {link && (
-                    <Link className={styles.mediaLink} to={link.to}>
-                      {link.label}
-                    </Link>
-                  )}
-                  <span>{joinParts(formatBytes(item.totalBytes), item.indexer, `${failed ? 'failed' : 'finished'} ${relativeTime(item.completed ?? item.added)}`)}</span>
-                </span>
-                {failed ? (
-                  <span className={styles.historyError}>{item.error ?? 'Failed'}</span>
-                ) : (
-                  <>
-                    {item.outputPath && imports(item.id)?.state !== 'imported' && (
-                      <span className={styles.historyPath} title={item.outputPath}>
-                        <StatusIcon name="folder" size={13} />
-                        {item.outputPath}
-                      </span>
-                    )}
-                    <ImportLine
-                      item={item}
-                      state={imports(item.id)}
-                      admin={admin}
-                      busy={importActions.importNow.isPending}
-                      onImport={() => importActions.importNow.mutate(item.id)}
-                      onManual={() => setManual(item)}
-                    />
-                  </>
-                )}
-              </div>
+      <div className={`${ui.panel} ${styles.tablePanel} ${stale ? styles.stale : ''}`}>
+        <table className={`${ui.table} ${styles.table}`} aria-label="Download history">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Release</th>
+              <th className={styles.hideSm}>Type</th>
+              <th className={`${styles.r} ${styles.hideSm}`}>Size</th>
+              <th className={styles.hideMd}>Indexer</th>
+              <th className={styles.hideSm}>Finished</th>
               {admin && (
-                <div className={styles.actions}>
-                  {failed && (
-                    <button type="button" className={styles.iconAction} onClick={() => retry.mutate(item.id)} disabled={retry.isPending} title="Retry" aria-label={`Retry ${item.title}`}>
-                      <StatusIcon name="retry" />
-                    </button>
-                  )}
-                  <button type="button" className={`${styles.iconAction} ${styles.iconDanger}`} onClick={() => setRemoving(item)} title="Remove" aria-label={`Remove ${item.title}`}>
-                    <StatusIcon name="trash" />
-                  </button>
-                </div>
+                <th>
+                  <span className={styles.srOnly}>Actions</span>
+                </th>
               )}
-            </li>
-          )
-        })}
-      </ul>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((item) => {
+              const link = media(item)
+              const failed = item.status === 'failed'
+              const when = relativeTime(item.completed ?? item.added)
+              const state = imports(item.id)
+              return (
+                <tr key={item.id}>
+                  <td className={styles.statusCell}>
+                    <span className={`${ui.pill} ${failed ? ui.pillErr : ui.pillOk} ${styles.statePill}`} title={failed ? 'Failed' : 'Completed'}>
+                      <Icon name={failed ? 'alert' : 'check'} size={13} />
+                      <span className={styles.pillText}>{failed ? 'Failed' : 'Completed'}</span>
+                    </span>
+                  </td>
+                  <td className={styles.release}>
+                    <span className={styles.relTitle} title={item.title}>
+                      {item.title}
+                    </span>
+                    <span className={styles.sub}>
+                      {link && (
+                        <Link className={styles.mediaLink} to={link.to}>
+                          {link.label}
+                        </Link>
+                      )}
+                      <span className={styles.showSm}>{joinParts(categoryLabels[item.category], formatBytes(item.totalBytes), when)}</span>
+                    </span>
+                    {failed ? (
+                      <span className={styles.historyError}>{item.error ?? 'Failed'}</span>
+                    ) : (
+                      <>
+                        {item.outputPath && state?.state !== 'imported' && (
+                          <span className={styles.historyPath} title={item.outputPath}>
+                            <Icon name="folder" size={13} />
+                            <span>{item.outputPath}</span>
+                          </span>
+                        )}
+                        <ImportLine
+                          item={item}
+                          state={state}
+                          admin={admin}
+                          busy={importActions.importNow.isPending}
+                          onImport={() => importActions.importNow.mutate(item.id)}
+                          onManual={() => setManual(item)}
+                        />
+                      </>
+                    )}
+                  </td>
+                  <td className={styles.hideSm}>
+                    <span className={`${ui.tag} ${styles.cat} ${styles[`cat_${item.category}`]}`}>{categoryLabels[item.category]}</span>
+                  </td>
+                  <td className={`${styles.r} ${ui.num} ${styles.hideSm} ${styles.nowrap}`}>{formatBytes(item.totalBytes)}</td>
+                  <td className={`${styles.hideMd} ${styles.dim}`}>{item.indexer ?? '–'}</td>
+                  <td className={`${styles.hideSm} ${styles.dim} ${styles.nowrap}`}>{when}</td>
+                  {admin && (
+                    <td className={styles.actionsCell}>
+                      <div className={styles.actions}>
+                        {failed && (
+                          <button
+                            type="button"
+                            className={`${ui.ghost} ${ui.icon} ${ui.sm}`}
+                            onClick={() => retry.mutate(item.id)}
+                            disabled={retry.isPending}
+                            title="Retry"
+                            aria-label={`Retry ${item.title}`}
+                          >
+                            <Icon name="restart" size={16} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={`${ui.ghost} ${ui.icon} ${ui.sm} ${styles.dangerIcon}`}
+                          onClick={() => setRemoving(item)}
+                          title="Remove"
+                          aria-label={`Remove ${item.title}`}
+                        >
+                          <Icon name="trash" size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
       {removing && (
         <RemoveDialog item={removing} busy={remove.isPending} onClose={() => setRemoving(null)} onConfirm={(deleteFiles) => remove.mutate({ id: removing.id, deleteFiles })} />
       )}
@@ -268,7 +325,7 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
   )
 }
 
-function GrabHistory() {
+function GrabHistory({ views }: { views: ReactNode }) {
   const { page, get, setFilters, setSearch, setPage, clear, active } = useListParams(eventFilterKeys)
   const [pageSize, setPageSize] = usePageSize('activity-events')
   const indexers = useQuery({ queryKey: historyKeys.indexers, queryFn: historyApi.indexers, staleTime: 60_000 })
@@ -293,19 +350,25 @@ function GrabHistory() {
 
   if (history.isError) {
     return (
-      <Empty icon="error" title="The grab history could not be loaded">
-        <p>{history.error.message}</p>
-      </Empty>
+      <>
+        <Toolbar>{views}</Toolbar>
+        <Empty icon="error" title="The grab history could not be loaded">
+          <p>{history.error.message}</p>
+        </Empty>
+      </>
     )
   }
-  if (!history.data) return <Loading />
+  if (!history.data) return <Loader text="Loading the history" />
 
   const total = history.data.totalRecords
   if (total === 0 && !active) {
     return (
-      <Empty icon="download" title="Nothing happened yet">
-        <p>Every grab, download, import and rename is recorded here.</p>
-      </Empty>
+      <>
+        <Toolbar>{views}</Toolbar>
+        <Empty icon="download" title="Nothing happened yet">
+          <p>Every grab, download, import and rename is recorded here.</p>
+        </Empty>
+      </>
     )
   }
 
@@ -313,60 +376,75 @@ function GrabHistory() {
   return (
     <>
       <FilterBar label="Filter events" active={active} matches={settled} noun="events" onClear={clear}>
-        <SearchBox value={get('q')} onChange={setSearch} placeholder="Search release titles" label="Search events" />
+        {views}
         <FilterSelect label="Event" value={event} onChange={(v) => setFilters({ event: v })} options={eventOptions} groups={eventGroups} />
         <FilterSelect label="Type" value={type} onChange={(v) => setFilters({ type: v })} options={mediaTypeOptions} />
         {(indexerOptions.length > 0 || get('indexer') !== '') && (
           <FilterSelect label="Indexer" value={get('indexer')} onChange={(v) => setFilters({ indexer: v })} options={[{ value: '', label: 'All indexers' }, ...indexerOptions]} />
         )}
+        <SearchBox value={get('q')} onChange={setSearch} placeholder="Search release titles" label="Search events" />
       </FilterBar>
       {records.length === 0 ? (
         <NoMatches noun="events" onClear={clear} />
       ) : (
-        <ul className={`${styles.historyList} ${history.isPlaceholderData ? styles.stale : ''}`} aria-label="Events">
-          {records.map((record: HistoryRecord) => {
-            const link = media(record)
-            const event = eventLabels[record.eventType] ?? eventLabels.Grabbed
-            const detail = record.data.importedPath ?? record.data.to ?? record.data.message ?? record.data.error ?? null
-            return (
-              <li key={record.id} className={`${styles.historyItem} ${event.failed ? styles.historyFailed : ''}`}>
-                <span className={`${styles.historyIcon} ${event.neutral ? styles.historyGrab : ''}`} title={event.label}>
-                  <StatusIcon name={event.icon} size={16} />
-                </span>
-                <div className={styles.historyMain}>
-                  <span className={styles.dlTitle}>{record.sourceTitle}</span>
-                  <span className={styles.meta}>
-                    <span className={styles.eventType}>{event.label}</span>
-                    {record.quality !== 'Unknown' && <span className={styles.quality}>{record.quality}</span>}
-                    {link && (
-                      <Link className={styles.mediaLink} to={link.to}>
-                        {link.label}
-                      </Link>
-                    )}
-                    <span>{joinParts(record.size > 0 ? formatBytes(record.size) : null, record.indexer, relativeTime(record.date))}</span>
-                  </span>
-                  {detail && (
-                    <span className={event.failed ? styles.historyError : styles.historyPath} title={detail}>
-                      {!event.failed && <StatusIcon name="folder" size={13} />}
-                      {detail}
-                    </span>
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <div className={`${ui.panel} ${styles.tablePanel} ${history.isPlaceholderData ? styles.stale : ''}`}>
+          <table className={`${ui.table} ${styles.table}`} aria-label="Events">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Release</th>
+                <th className={styles.hideSm}>Quality</th>
+                <th className={`${styles.r} ${styles.hideSm}`}>Size</th>
+                <th className={styles.hideMd}>Indexer</th>
+                <th className={styles.hideSm}>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record: HistoryRecord) => {
+                const link = media(record)
+                const event = eventLabels[record.eventType] ?? eventLabels.Grabbed
+                const detail = record.data.importedPath ?? record.data.to ?? record.data.message ?? record.data.error ?? null
+                const when = relativeTime(record.date)
+                const quality = record.quality !== 'Unknown' ? record.quality : null
+                return (
+                  <tr key={record.id}>
+                    <td className={styles.statusCell}>
+                      <span className={`${ui.pill} ${event.failed ? ui.pillErr : event.neutral ? '' : ui.pillOk} ${styles.statePill}`} title={event.label}>
+                        <Icon name={event.icon} size={13} />
+                        <span className={styles.pillText}>{event.label}</span>
+                      </span>
+                    </td>
+                    <td className={styles.release}>
+                      <span className={styles.relTitle} title={record.sourceTitle}>
+                        {record.sourceTitle}
+                      </span>
+                      <span className={styles.sub}>
+                        {link && (
+                          <Link className={styles.mediaLink} to={link.to}>
+                            {link.label}
+                          </Link>
+                        )}
+                        <span className={styles.showSm}>{joinParts(event.label, quality, record.size > 0 ? formatBytes(record.size) : null, when)}</span>
+                      </span>
+                      {detail && (
+                        <span className={event.failed ? styles.historyError : styles.historyPath} title={detail}>
+                          {!event.failed && <Icon name="folder" size={13} />}
+                          <span>{detail}</span>
+                        </span>
+                      )}
+                    </td>
+                    <td className={styles.hideSm}>{quality ? <span className={ui.tag}>{quality}</span> : <span className={styles.dim}>–</span>}</td>
+                    <td className={`${styles.r} ${ui.num} ${styles.hideSm} ${styles.nowrap}`}>{record.size > 0 ? formatBytes(record.size) : '–'}</td>
+                    <td className={`${styles.hideMd} ${styles.dim}`}>{record.indexer || '–'}</td>
+                    <td className={`${styles.hideSm} ${styles.dim} ${styles.nowrap}`}>{when}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
       <Pager page={page} pageSize={pageSize} total={total} noun="events" onPage={setPage} onPageSize={setPageSize} />
     </>
-  )
-}
-
-function Loading() {
-  return (
-    <div className={styles.loading} role="status">
-      <span className={styles.bigSpinner} aria-hidden="true" />
-      Loading the history…
-    </div>
   )
 }

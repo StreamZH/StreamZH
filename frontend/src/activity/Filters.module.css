@@ -1,115 +1,111 @@
+/* Filters above a list as one CloudZH toolbar row: segments and selects left, the search right; wraps on phones. */
+.wrap {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
 .bar {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.controls {
-  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.search {
-  flex: 1 1 240px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
   min-width: 0;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  color: var(--text-faint);
 }
 
-.search:focus-within {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-
-.searchInput {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-size: 14px;
-  color: var(--text);
-  background: transparent;
-  border: 0;
-  padding: 8px 0;
-  outline: none;
-}
-
-.searchInput::placeholder {
-  color: var(--text-faint);
+/* a toolbar on its own (no FilterBar around it) */
+.solo {
+  margin-bottom: 14px;
 }
 
 .select {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  font: inherit;
+  height: 36px;
   font-size: 13px;
-  color: var(--text-muted);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  padding: 8px 10px;
-}
-
-.select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-
-.select:disabled {
-  opacity: 0.5;
+  max-width: 220px;
 }
 
 .selectActive {
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+  color: var(--fg);
+  background: var(--accent-soft);
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 260px;
+  min-width: 180px;
+  margin-left: auto;
+}
+
+.search > svg {
+  position: absolute;
+  left: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 36px;
+  font-size: 13.5px;
+  padding-left: 34px;
+}
+
+.searchInput::-webkit-search-cancel-button {
+  cursor: pointer;
 }
 
 .status {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 13px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
 .matches {
-  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .clear {
-  all: unset;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  color: var(--text);
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--accent);
+  background: none;
+  border: 0;
   cursor: pointer;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
 }
 
 .clear:hover {
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.clear:focus-visible {
-  outline: 2px solid var(--accent);
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .search {
-    flex-basis: 100%;
+    flex: 1 1 100%;
+    margin-left: 0;
+    order: -1;
   }
 
   .select {
-    flex: 1 1 calc(50% - 4px);
+    flex: 1 1 140px;
+    max-width: none;
   }
 }

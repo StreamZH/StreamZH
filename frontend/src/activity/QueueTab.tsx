@@ -6,12 +6,12 @@ import { downloadKeys, downloadsApi, withLive, type DownloadItem } from '../api/
 import { mediaManagementApi, mediaManagementKeys } from '../api/mediaManagement'
 import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
-import { formatBytes } from '../lib/format'
-import { formatEta, formatSpeed } from '../status/format'
-import StatusIcon, { type StatusIconName } from '../status/icons'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
+import { Empty } from './Empty'
 import { useIsAdmin, useLiveProgress, useOngoing } from '../status/useOngoing'
 import DownloadCard, { type DownloadActions } from './DownloadCard'
-import { RemoveDialog, UploadDialog } from './Dialogs'
+import { RemoveDialog } from './Dialogs'
 import { downloadTypeOptions, matchesSearch, matchesType, pick, useCustomCategories } from './filterOptions'
 import { FilterBar, FilterSelect, NoMatches, SearchBox } from './Filters'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
@@ -20,8 +20,6 @@ import { useClampPage, useListParams } from './listParams'
 import Pager from './Pager'
 import { usePageSize } from './paging'
 import styles from './Activity.module.css'
-
-const lowSpace = 10 * 1024 ** 3
 
 const filterKeys = ['q', 'status', 'type'] as const
 
@@ -48,8 +46,8 @@ function matchesStatus(item: DownloadItem, status: string): boolean {
   }
 }
 
-/** Active downloads with live progress, the queue totals, and the actions. */
-export default function QueueTab() {
+/** Active downloads with live progress, the filters and the per-download actions (queue totals live in the page head). */
+export default function QueueTab({ onAddNzb }: { onAddNzb: () => void }) {
   const admin = useIsAdmin()
   const queue = useQuery({
     queryKey: downloadKeys.queue,
@@ -62,7 +60,6 @@ export default function QueueTab() {
   const live = useLiveProgress()
   const { toasts, push, dismiss } = useToasts()
   const [removing, setRemoving] = useState<DownloadItem | null>(null)
-  const [uploading, setUploading] = useState(false)
 
   const items = (queue.data?.items ?? []).map((i) => withLive(i, live, queue.dataUpdatedAt))
   const media = useMediaLinks(items)
@@ -95,8 +92,6 @@ export default function QueueTab() {
       push('ok', 'Download removed')
     },
   )
-  const pauseAll = useDownloadAction(downloadsApi.pauseAll, fail('Could not pause the queue'))
-  const resumeAll = useDownloadAction(downloadsApi.resumeAll, fail('Could not resume the queue'))
 
   const actions: DownloadActions | null = admin
     ? {
@@ -114,45 +109,6 @@ export default function QueueTab() {
   const blackhole = settings.data?.client === 'blackhole'
   const noServer = ongoing.data?.notices.some((n) => n.key === 'no-usenet-server') ?? false
   const data = queue.data
-  const liveNewer = live && live.at > queue.dataUpdatedAt
-  const speed = liveNewer ? Object.values(live.items).reduce((sum, i) => sum + (i.speedBps || 0), 0) : (data?.speedBps ?? 0)
-  const remaining = items.reduce((sum, i) => sum + Math.max(0, i.totalBytes - i.downloadedBytes), 0)
-  const eta = speed > 0 ? remaining / speed : null
-
-  const header = data && (
-    <div className={styles.summary}>
-      <Stat icon="gauge" label="Speed" value={data.paused ? 'Paused' : formatSpeed(speed)} sub={data.speedLimitKBps > 0 ? `Limit ${formatSpeed(data.speedLimitKBps * 1024)}` : 'No speed limit'} />
-      <Stat
-        icon="download"
-        label="Remaining"
-        value={formatBytes(remaining)}
-        sub={[`${items.length} ${items.length === 1 ? 'download' : 'downloads'}`, eta ? formatEta(eta) : ''].filter(Boolean).join(' · ')}
-      />
-      <Stat
-        icon="disk"
-        label="Free space"
-        value={data.freeSpaceBytes != null ? formatBytes(data.freeSpaceBytes) : '–'}
-        sub={data.freeSpaceBytes != null && data.freeSpaceBytes < lowSpace ? 'Low: downloads may stop' : 'Download folder'}
-        tone={data.freeSpaceBytes != null && data.freeSpaceBytes < lowSpace ? 'warn' : undefined}
-      />
-      {admin && (
-        <div className={styles.summaryActions}>
-          {data.paused ? (
-            <button type="button" className={ui.primary} onClick={() => resumeAll.mutate()} disabled={resumeAll.isPending}>
-              <StatusIcon name="play" size={14} /> Resume all
-            </button>
-          ) : (
-            <button type="button" className={ui.button} onClick={() => pauseAll.mutate()} disabled={pauseAll.isPending || items.length === 0}>
-              <StatusIcon name="pause" size={14} /> Pause all
-            </button>
-          )}
-          <button type="button" className={ui.button} onClick={() => setUploading(true)}>
-            <StatusIcon name="upload" size={14} /> Add NZB
-          </button>
-        </div>
-      )}
-    </div>
-  )
 
   let body: ReactNode
   if (blackhole) {
@@ -163,10 +119,10 @@ export default function QueueTab() {
           another downloader picks it up from there, so nothing shows up in this queue.
         </p>
         <div className={styles.emptyActions}>
-          <Link className={ui.button} to="/settings/media-management">
+          <Link className={`${ui.button} ${ui.sm}`} to="/settings/media-management">
             Settings → Downloads
           </Link>
-          <Link className={ui.button} to="/activity?tab=history">
+          <Link className={`${ui.button} ${ui.sm}`} to="/activity?tab=history">
             Grab history
           </Link>
         </div>
@@ -178,25 +134,20 @@ export default function QueueTab() {
       <Empty icon="error" title={missing ? 'The download engine is not available' : 'The queue could not be loaded'}>
         <p>{missing ? 'This StreamZH build has no built-in downloader yet.' : queue.error.message}</p>
         <div className={styles.emptyActions}>
-          <button type="button" className={ui.button} onClick={() => void queue.refetch()}>
+          <button type="button" className={`${ui.button} ${ui.sm}`} onClick={() => void queue.refetch()}>
             Try again
           </button>
         </div>
       </Empty>
     )
   } else if (!data) {
-    body = (
-      <div className={styles.loading} role="status">
-        <span className={styles.bigSpinner} aria-hidden="true" />
-        Loading the queue…
-      </div>
-    )
+    body = <Loader text="Loading the queue" />
   } else if (items.length === 0 && !active) {
     body = noServer ? (
       <Empty icon="server" title="Add your Usenet server first">
         <p>StreamZH downloads releases itself. It needs the address and login of your Usenet provider before anything can start.</p>
         <div className={styles.emptyActions}>
-          <Link className={ui.primary} to="/settings/usenet">
+          <Link className={`${ui.primary} ${ui.sm}`} to="/settings/usenet">
             Settings → Usenet servers
           </Link>
         </div>
@@ -205,15 +156,15 @@ export default function QueueTab() {
       <Empty icon="download" title="Nothing is downloading">
         <p>Grabbed releases appear here with their progress, from download to repair and unpack. Search a movie or episode, or add an NZB file yourself.</p>
         <div className={styles.emptyActions}>
-          <Link className={ui.button} to="/library/movies">
-            Movies
+          <Link className={`${ui.button} ${ui.sm}`} to="/library/movies">
+            <Icon name="film" size={14} /> Movies
           </Link>
-          <Link className={ui.button} to="/library/series">
-            Series
+          <Link className={`${ui.button} ${ui.sm}`} to="/library/series">
+            <Icon name="tv" size={14} /> Series
           </Link>
           {admin && (
-            <button type="button" className={ui.button} onClick={() => setUploading(true)}>
-              <StatusIcon name="upload" size={14} /> Add NZB
+            <button type="button" className={`${ui.button} ${ui.sm}`} onClick={onAddNzb}>
+              <Icon name="upload" size={14} /> Add NZB
             </button>
           )}
         </div>
@@ -224,20 +175,20 @@ export default function QueueTab() {
       <>
         {noServer && (
           <p className={styles.banner}>
-            <StatusIcon name="warn" size={15} />
+            <Icon name="alert" size={15} />
             <span>
               No Usenet server is configured, so these downloads cannot start. <Link to="/settings/usenet">Add a server</Link>
             </span>
           </p>
         )}
         <FilterBar label="Filter the queue" active={active} matches={filtered.length + pendingMatches} noun="downloads" onClear={clear}>
-          <SearchBox value={search} onChange={setSearch} placeholder="Search titles" label="Search the queue" />
           <FilterSelect label="Status" value={status} onChange={(v) => setFilters({ status: v })} options={statusOptions} />
           <FilterSelect label="Type" value={type} onChange={(v) => setFilters({ type: v })} options={downloadTypeOptions} groups={[{ label: 'Categories', options: categories }]} />
+          <SearchBox value={search} onChange={setSearch} placeholder="Search titles" label="Search the queue" />
         </FilterBar>
         {active && filtered.length + pendingMatches === 0 && <NoMatches noun="downloads" onClear={clear} />}
         {pageItems.length > 0 && (
-          <div className={styles.cards}>
+          <div className={styles.list}>
             {pageItems.map((item) => (
               <DownloadCard key={item.id} item={item} media={media(item)} actions={actions} busy={busyIds.has(item.id)} />
             ))}
@@ -250,7 +201,6 @@ export default function QueueTab() {
 
   return (
     <>
-      {!blackhole && header}
       {body}
       {!blackhole && (status === '' || status === 'import') && <PendingImports admin={admin} onToast={push} match={active ? matches : undefined} />}
       {removing && (
@@ -261,44 +211,10 @@ export default function QueueTab() {
           onConfirm={(deleteFiles) => remove.mutate({ id: removing.id, deleteFiles })}
         />
       )}
-      {uploading && (
-        <UploadDialog
-          onClose={() => setUploading(false)}
-          onUploaded={(title) => {
-            setUploading(false)
-            push('ok', 'Added to the queue', title)
-            void queue.refetch()
-          }}
-        />
-      )}
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </>
   )
 }
 
-function Stat({ icon, label, value, sub, tone }: { icon: StatusIconName; label: string; value: string; sub: string; tone?: 'warn' }) {
-  return (
-    <div className={`${styles.stat} ${tone === 'warn' ? styles.statWarn : ''}`}>
-      <span className={styles.statIcon}>
-        <StatusIcon name={icon} size={16} />
-      </span>
-      <div className={styles.statText}>
-        <span className={styles.statLabel}>{label}</span>
-        <span className={styles.statValue}>{value}</span>
-        <span className={styles.statSub}>{sub}</span>
-      </div>
-    </div>
-  )
-}
-
-export function Empty({ icon, title, children }: { icon: StatusIconName; title: string; children: ReactNode }) {
-  return (
-    <div className={styles.empty}>
-      <span className={styles.emptyIcon}>
-        <StatusIcon name={icon} size={22} />
-      </span>
-      <p className={styles.emptyTitle}>{title}</p>
-      {children}
-    </div>
-  )
-}
+/** Kept here for the Wanted page, which imports it from this module. */
+export { Empty } from './Empty'

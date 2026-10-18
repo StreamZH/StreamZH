@@ -5,7 +5,8 @@ import type { DownloadItem } from '../api/downloads'
 import { mediaManagementApi, mediaManagementKeys, type ImportState } from '../api/mediaManagement'
 import { formatBytes } from '../lib/format'
 import { joinParts, relativeTime } from '../status/format'
-import StatusIcon from '../status/icons'
+import Icon from '../components/Icon'
+import ui from '../components/ui.module.css'
 import { useMediaLinks } from './hooks'
 import { useImportActions } from './importHooks'
 import { categoryLabels } from './labels'
@@ -50,7 +51,7 @@ export function ImportLine({
     <div className={`${styles.importLine} ${tone}`}>
       <div className={styles.importText}>
         <span className={styles.importState}>
-          <StatusIcon name={state?.state === 'failed' ? 'error' : state?.state === 'imported' ? 'check' : state ? 'info' : 'folder'} size={14} />
+          <Icon name={state?.state === 'failed' ? 'alert' : state?.state === 'imported' ? 'check' : state ? 'clock' : 'folder'} size={14} />
           {state ? (
             <>
               {stateLabels[state.state]}
@@ -67,8 +68,8 @@ export function ImportLine({
         {state?.state === 'imported' &&
           state.files.slice(0, 3).map((file) => (
             <span key={file} className={styles.historyPath} title={file}>
-              <StatusIcon name="folder" size={13} />
-              {file}
+              <Icon name="folder" size={13} />
+              <span>{file}</span>
             </span>
           ))}
         {state?.state === 'imported' && state.files.length > 3 && <span className={styles.importMore}>and {state.files.length - 3} more files</span>}
@@ -76,17 +77,17 @@ export function ImportLine({
       {admin && state?.state !== 'queued' && state?.state !== 'importing' && (
         <div className={styles.importActions}>
           {linked && state?.state !== 'imported' && (
-            <button type="button" className={styles.smallButton} onClick={onImport} disabled={busy}>
-              <StatusIcon name="retry" size={13} /> {state ? 'Retry import' : 'Import now'}
+            <button type="button" className={`${ui.button} ${ui.sm}`} onClick={onImport} disabled={busy}>
+              <Icon name="restart" size={14} /> {state ? 'Retry import' : 'Import now'}
             </button>
           )}
           {state?.state !== 'imported' && (
-            <button type="button" className={styles.smallButton} onClick={onManual} disabled={busy}>
+            <button type="button" className={`${ui.button} ${ui.sm}`} onClick={onManual} disabled={busy}>
               Import…
             </button>
           )}
           {onDismiss && state?.state === 'failed' && (
-            <button type="button" className={styles.smallButton} onClick={onDismiss} disabled={busy} title="Hide this from the queue and the status window">
+            <button type="button" className={`${ui.button} ${ui.sm}`} onClick={onDismiss} disabled={busy} title="Hide this from the queue and the status window">
               Dismiss
             </button>
           )}
@@ -117,12 +118,14 @@ export function ImportCard({
   onDismiss: () => void
 }) {
   return (
-    <article className={styles.card} data-status={state.state === 'failed' ? 'failed' : 'importing'} aria-label={item.title}>
-      <div className={styles.cardHead}>
-        <div className={styles.cardTitleBlock}>
-          <h3 className={styles.dlTitle}>{item.title}</h3>
+    <article className={styles.row} data-status={state.state === 'failed' ? 'failed' : 'importing'} aria-label={item.title}>
+      <div className={styles.rowHead}>
+        <div className={styles.rowText}>
+          <h3 className={styles.rowTitle} title={item.title}>
+            {item.title}
+          </h3>
           <div className={styles.meta}>
-            <span className={`${styles.cat} ${styles[`cat_${item.category}`]}`}>{categoryLabels[item.category]}</span>
+            <span className={`${ui.tag} ${styles.cat} ${styles[`cat_${item.category}`]}`}>{categoryLabels[item.category]}</span>
             {media && (
               <Link className={styles.mediaLink} to={media.to}>
                 {media.label}
@@ -131,8 +134,14 @@ export function ImportCard({
             <span>{joinParts(formatBytes(item.totalBytes), item.indexer, `finished ${relativeTime(item.completed ?? item.added)}`)}</span>
           </div>
         </div>
+        <span className={`${ui.pill} ${state.state === 'failed' ? ui.pillErr : state.state === 'importing' ? ui.pillBusy : ui.pillWarn} ${styles.statusPill}`}>
+          {state.state === 'importing' && <span className={styles.liveDot} aria-hidden="true" />}
+          {stateLabels[state.state]}
+        </span>
       </div>
-      <PipelineStrip item={{ ...item, importState: state.state }} />
+      <div className={styles.numbers}>
+        <PipelineStrip item={{ ...item, importState: state.state }} />
+      </div>
       <ImportLine item={item} state={state} admin={admin} busy={busy} onImport={onImport} onManual={onManual} onDismiss={onDismiss} />
     </article>
   )
@@ -166,9 +175,9 @@ export function PendingImports({
   return (
     <section className={styles.pendingSection} aria-labelledby="pending-imports">
       <h2 id="pending-imports" className={styles.sectionTitle}>
-        Waiting for import <span className={styles.tabCount}>{list.length}</span>
+        Waiting for import <span className={styles.tcount}>{list.length}</span>
       </h2>
-      <div className={styles.cards}>
+      <div className={styles.list}>
         {list.map(({ download, import: state }) => (
           <ImportCard
             key={download.id}

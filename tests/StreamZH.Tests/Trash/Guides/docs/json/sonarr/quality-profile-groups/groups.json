@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Standard",
+    "profiles": {
+      "web-1080p": "72dae194fc92bf828f32cde7744e51a1",
+      "web-1080p-alternative": "9d142234e45d6143785ac55f5a9e8dc9",
+      "web-2160p": "d1498e7d189fbe6c7110ceaabb7473e6",
+      "web-2160p-combined": "c4cadd6b35b95f62c3d47a408e53e2f7",
+      "web-2160p-alternative": "dfa5eaae7894077ad6449169b6eb03e0",
+      "remux-web-1080p": "fe9470e577c300a5ad9a3274f6d1cdf2",
+      "remux-web-2160p": "76a5053bdb2d1e4a8f16a69a37d46c12",
+      "remux-2160p-combined": "911df0e05a395c19d8b3efc76a7467c1",
+      "remux-2160p-alternative": "361717d531db5a6002e0f547ace46551"
+    }
+  },
+  {
+    "name": "Anime",
+    "profiles": {
+      "anime-remux-1080p": "20e0fc959f1f1704bed501f23bdae76f"
+    }
+  },
+  {
+    "name": "French",
+    "profiles": {
+      "french-multi-vo-bluray-web-1080p": "4c48f506c1116a3a57ae33f12346bd15",
+      "french-multi-vo-bluray-web-2160p": "6fa7364373e8f06206871d9c20a4fb3e",
+      "french-multi-vf-bluray-web-1080p": "58e8dc75731040612dd6f4ac0676bfd7",
+      "french-multi-vf-bluray-web-2160p": "68c8b82ad2b7ea1941fce71eb56421c3",
+      "french-vostfr-bluray-web-1080p": "b34c968f58433a38e0e690d42a1dc37e",
+      "french-vostfr-bluray-web-2160p": "d6252dce6af535107ed4b03e68052ae8"
+    }
+  },
+  {
+    "name": "German",
+    "profiles": {
+      "german-anime-hd-bluray-web": "6fe5937e1dcc2269e23b49eb46dfe6d6",
+      "german-hd-bluray-web": "dca7e5e9e99c703bcbdaaa471dd40e98",
+      "german-hd-remux-web": "0dd5f085ed61a1e01f6d347779dfa1bc",
+      "german-uhd-bluray-web": "3b0fa37fddaaefc931b75f2889d4b4f5",
+      "german-uhd-bluray-web-alternative": "7324309a7d1e10dc0dc2cea6c70ed852",
+      "german-uhd-remux-web": "08cececf1840290f6fd490b7d79e8642"
+    }
+  },
+  {
+    "name": "TEST",
+    "profiles": {
+      "base-profile": "e58cf4e090184db3b3d7c79c1a9e9b4a"
+    }
+  }
+]

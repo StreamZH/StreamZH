@@ -82,6 +82,7 @@ public sealed class OngoingService(
         GeneralNotices.Add(notices, services);
         OrganizeNotices.Add(running, notices, services);
         ImportListNotices.Add(notices, services.GetService<ImportListRepository>(), time);
+        TrashNotices.Add(notices, services);
 
         return new OngoingResource(running, notices);
     }

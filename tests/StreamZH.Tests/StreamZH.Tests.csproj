@@ -17,5 +17,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Update="Indexers/Files/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Trash/Guides/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

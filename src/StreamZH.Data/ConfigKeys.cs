@@ -160,4 +160,19 @@ public static class ConfigKeys
     // Import lists (0.7)
     public const string ImportListSyncInterval = "ImportListSyncInterval";
     public const string ImportListCleanLibraryLevel = "ImportListCleanLibraryLevel";
+
+    // TRaSH (0.8): settings, then the state of the local copy of the guides.
+    public const string TrashEnabled = "TrashEnabled";
+    public const string TrashRepository = "TrashRepository";
+    public const string TrashBranch = "TrashBranch";
+    public const string TrashSyncIntervalHours = "TrashSyncIntervalHours";
+    public const string TrashAutoUpdate = "TrashAutoUpdate";
+    public const string TrashKeepScoreOverrides = "TrashKeepScoreOverrides";
+    public const string TrashFolder = "TrashFolder";
+    public const string TrashCommit = "TrashCommit";
+    public const string TrashETag = "TrashETag";
+    public const string TrashSource = "TrashSource";
+    public const string TrashLastSync = "TrashLastSync";
+    public const string TrashLastError = "TrashLastError";
+    public const string TrashQualitySizes = "TrashQualitySizes";
 }

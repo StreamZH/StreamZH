@@ -18,7 +18,8 @@ public sealed class ValidationFailedException(IReadOnlyDictionary<string, string
 }
 
 /// <summary>Creates, validates and removes quality profiles and keeps track of the default profile.</summary>
-public sealed class QualityProfileService(QualityProfileRepository profiles, ConfigRepository config, ILogger<QualityProfileService> logger)
+public sealed class QualityProfileService(
+    QualityProfileRepository profiles, ConfigRepository config, ILogger<QualityProfileService> logger, IEnumerable<IQualityProfileObserver>? observers = null)
 {
     public const int MaxNameLength = 100;
 
@@ -85,12 +86,18 @@ public sealed class QualityProfileService(QualityProfileRepository profiles, Con
 
     public QualityProfile Update(int id, QualityProfile profile)
     {
-        _ = profiles.Find(id) ?? throw new LibraryException("Quality profile not found.", LibraryError.NotFound);
+        var before = profiles.Find(id) ?? throw new LibraryException("Quality profile not found.", LibraryError.NotFound);
         var normalized = Normalize(profile) with { Id = id };
         Validate(normalized, id);
         profiles.Update(normalized);
         logger.LogInformation("Quality profile '{Name}' saved", normalized.Name);
-        return profiles.Find(id)!;
+        var saved = profiles.Find(id)!;
+        foreach (var observer in observers ?? [])
+        {
+            observer.Updated(before, saved);
+        }
+
+        return saved;
     }
 
     public void Delete(int id)
@@ -113,6 +120,10 @@ public sealed class QualityProfileService(QualityProfileRepository profiles, Con
         var wasDefault = DefaultProfileId() == id;
         profiles.Delete(id);
         logger.LogInformation("Quality profile '{Name}' deleted", profile.Name);
+        foreach (var observer in observers ?? [])
+        {
+            observer.Deleted(id);
+        }
 
         if (wasDefault && profiles.FirstId() is { } next)
         {

@@ -169,11 +169,16 @@ public sealed class QualityDefinitionRepository(Database database)
 {
     private static readonly Dictionary<int, int> Order = Quality.All.Select((q, i) => (q.Id, i)).ToDictionary(x => x.Id, x => x.i);
 
+    // The size columns hold whole numbers as INTEGER and fractions as REAL; Dapper reads every row with the types of the
+    // first one, so a table with 0 and 12.5 failed. CAST gives every row the same type.
+    private const string DefinitionColumns =
+        "QualityId, Title, CAST(MinSize AS REAL) AS MinSize, CAST(MaxSize AS REAL) AS MaxSize, CAST(PreferredSize AS REAL) AS PreferredSize";
+
     /// <summary>All definitions from worst to best quality.</summary>
     public IReadOnlyList<QualityDefinition> All()
     {
         using var connection = database.Open();
-        return [.. connection.Query<DefinitionRow>("SELECT QualityId, Title, MinSize, MaxSize, PreferredSize FROM QualityDefinitions")
+        return [.. connection.Query<DefinitionRow>($"SELECT {DefinitionColumns} FROM QualityDefinitions")
             .Select(r => r.ToDefinition())
             .OrderBy(d => Order.GetValueOrDefault(d.QualityId, int.MaxValue))];
     }
@@ -182,7 +187,7 @@ public sealed class QualityDefinitionRepository(Database database)
     {
         using var connection = database.Open();
         return connection.QuerySingleOrDefault<DefinitionRow>(
-            "SELECT QualityId, Title, MinSize, MaxSize, PreferredSize FROM QualityDefinitions WHERE QualityId = @qualityId",
+            $"SELECT {DefinitionColumns} FROM QualityDefinitions WHERE QualityId = @qualityId",
             new { qualityId })?.ToDefinition();
     }
 

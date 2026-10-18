@@ -11,6 +11,7 @@ here with the source path, so every change can be traced back.
 |---|---|---|---|
 | [Radarr](https://github.com/Radarr/Radarr) | GPL-3.0 | Quality and language definitions (same ids), quality, language and release-group parser, movie release parser, decision rules, Newznab client (caps, requests, RSS parser), release search, parser and indexer test fixtures | `src/StreamZH.Core/Quality/*`, `src/StreamZH.Indexers/Newznab/*`, `src/StreamZH.Library/Search/*`, `tests/StreamZH.Tests/Indexers/*`, `src/StreamZH.Parsing/*Parser.cs`, `src/StreamZH.Parsing/Internal/*`, `src/StreamZH.Parsing/Releases/*`, `src/StreamZH.Core/Decisions/*`, `tests/StreamZH.Tests/Parsing/*` |
 | [Sonarr](https://github.com/Sonarr/Sonarr) | GPL-3.0 | Episode release parser (SxxEyy, packs, daily, absolute), title normalisation, decision rules, TV search requests, episode/season matching | `src/StreamZH.Parsing/Releases/*`, `src/StreamZH.Indexers/Newznab/*`, `src/StreamZH.Library/Search/*`, `src/StreamZH.Core/Decisions/*`, `tests/StreamZH.Tests/Parsing/*` |
+| [TRaSH Guides](https://github.com/TRaSH-Guides/Guides) | MIT | A small subset of the guide JSON and the format index pages as test fixture (license file kept next to it); at runtime the guides are downloaded, not shipped | `tests/StreamZH.Tests/Trash/Guides/*` |
 | [Prowlarr](https://github.com/Prowlarr/Prowlarr) | GPL-3.0 | Indexer health back-off, Newznab indexer presets, query/grab limits, indexer stats and history, Prowlarr API mapping for the import | `src/StreamZH.Library/Indexers/*` |
 
 ## Runtime dependencies
@@ -22,6 +23,7 @@ here with the source path, so every change can be traced back.
 | FluentMigrator | Apache-2.0 |
 | Microsoft.Data.Sqlite / SQLite | MIT / Public Domain |
 | MailKit, MimeKit (email notifications) | MIT |
+| YamlDotNet (Recyclarr configuration import) | MIT |
 | BouncyCastle.Cryptography (used by MimeKit) | MIT |
 | React, React Router, TanStack Query | MIT |
 | @microsoft/signalr | MIT |

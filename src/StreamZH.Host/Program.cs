@@ -106,6 +106,7 @@ builder.Services.AddLibraryOrganize();
 builder.Services.AddWanted();
 builder.Services.AddRenamer();
 builder.Services.AddImportLists();
+builder.Services.AddTrash();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
@@ -155,6 +156,7 @@ app.MapWantedEndpoints();
 app.MapCalendarEndpoints();
 app.MapRenamerEndpoints();
 app.MapImportListEndpoints();
+app.MapTrashEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

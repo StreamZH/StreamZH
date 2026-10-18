@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { indexerOptionsApi, indexerOptionsKeys } from '../api/indexerOptions'
 import { libraryApi, queryKeys, type LookupResult, type MediaType } from '../api/library'
+import type { SeriesType } from '../api/seriesType'
 import Icon from '../components/Icon'
 import { Skeleton } from '../components/Loader'
 import Modal from '../components/Modal'
@@ -10,6 +11,7 @@ import Poster from '../components/Poster'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import styles from './AddDialog.module.css'
+import { SeriesTypeField } from './SeriesTypeField'
 
 export default function AddDialog({ type, onClose }: { type: MediaType; onClose: () => void }) {
   const [term, setTerm] = useState('')
@@ -106,6 +108,7 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
   const [rootFolderId, setRootFolderId] = useState<number | null>(null)
   const [monitored, setMonitored] = useState(true)
   const [qualityProfileId, setQualityProfileId] = useState<number | null>(null)
+  const [seriesType, setSeriesType] = useState<SeriesType>(item.suggestedSeriesType ?? 'standard')
   const effectiveRoot = rootFolderId ?? folders[0]?.id ?? null
   // "Start search for missing": the default comes from Settings → Indexers ("Search when adding").
   const options = useQuery({ queryKey: indexerOptionsKeys.options, queryFn: indexerOptionsApi.options, staleTime: 60_000 })
@@ -113,7 +116,8 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
   const searchForMissing = monitored && (search ?? options.data?.searchOnAdd ?? false)
 
   const add = useMutation({
-    mutationFn: () => libraryApi.add(type, item.tmdbId, effectiveRoot!, monitored, qualityProfileId, searchForMissing),
+    mutationFn: () =>
+      libraryApi.add(type, item.tmdbId, effectiveRoot!, monitored, qualityProfileId, searchForMissing, type === 'Series' ? seriesType : null),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: type === 'Movie' ? queryKeys.movies : queryKeys.series })
       onDone()
@@ -138,6 +142,7 @@ function AddOptions({ type, item, onDone }: { type: MediaType; item: LookupResul
           <span>Quality profile</span>
           <ProfileSelect value={qualityProfileId} onChange={setQualityProfileId} />
         </label>
+        {type === 'Series' && <SeriesTypeField value={seriesType} suggested={item.suggestedSeriesType} onChange={setSeriesType} />}
       </div>
       <label className={styles.switchRow}>
         <span className={ui.switch}>

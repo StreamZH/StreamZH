@@ -54,7 +54,8 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
         var url = $"search/tv?query={Uri.EscapeDataString(query)}&include_adult=false{(year is { } y ? $"&first_air_date_year={y}" : string.Empty)}";
         var page = await GetAsync<SearchPage<TvDto>>(url, null, cancellationToken);
         return [.. page.Results.Select(t => new TmdbSearchResult(
-            t.Id, t.Name ?? string.Empty, t.OriginalName ?? t.Name ?? string.Empty, YearOf(t.FirstAirDate), Blank(t.Overview), t.PosterPath))];
+            t.Id, t.Name ?? string.Empty, t.OriginalName ?? t.Name ?? string.Empty, YearOf(t.FirstAirDate), Blank(t.Overview), t.PosterPath,
+            t.GenreIds ?? [], t.OriginCountry ?? [], t.OriginalLanguage))];
     }
 
     public async Task<TmdbMovie> GetMovieAsync(int tmdbId, CancellationToken cancellationToken = default)
@@ -95,7 +96,9 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
             t.PosterPath,
             t.BackdropPath,
             [.. (t.Seasons ?? []).Select(s => s.SeasonNumber).Order()],
-            t.OriginalLanguage);
+            t.OriginalLanguage,
+            [.. (t.Genres ?? []).Select(g => g.Id).Where(id => id > 0)],
+            t.OriginCountry ?? []);
     }
 
     public async Task<IReadOnlyList<TmdbEpisode>> GetSeasonAsync(int tmdbId, int seasonNumber, CancellationToken cancellationToken = default)

@@ -51,7 +51,8 @@ public sealed class RssSyncService(
     ILogger<RssSyncService> logger,
     IDownloadQueue? queue = null,
     TimeProvider? timeProvider = null,
-    PendingImports? pendingImports = null)
+    PendingImports? pendingImports = null,
+    SceneNumbering.EpisodeMapper? episodeMapper = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -100,6 +101,11 @@ public sealed class RssSyncService(
             else if (index.FindMovie(parsed, info) is { } movie)
             {
                 (movieReleases.TryGetValue(movie.Id, out var entry) ? entry : movieReleases[movie.Id] = (movie, [])).Items.Add((info, parsed));
+            }
+            else if (ReleaseParser.ParseEpisode(info.Title) is { } episode && index.FindSeries(episode, info) is { } episodeShow)
+            {
+                // Names a movie parse wins ("Title.E12.German.1080p", anime with a year) but that belong to a series.
+                (seriesReleases.TryGetValue(episodeShow.Id, out var entry) ? entry : seriesReleases[episodeShow.Id] = (episodeShow, [])).Items.Add((info, episode));
             }
         }
 
@@ -197,7 +203,7 @@ public sealed class RssSyncService(
 
         foreach (var (info, parsed) in items)
         {
-            var (covered, rejection) = ReleaseMatching.MapEpisodes(parsed, library);
+            var (covered, rejection) = episodeMapper.MapEpisodes(parsed, show, library);
             if (rejection is not null || covered.Count == 0)
             {
                 continue;

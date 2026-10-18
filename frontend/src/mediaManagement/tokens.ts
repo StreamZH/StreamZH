@@ -107,6 +107,10 @@ const episode: TokenGroup = {
     { token: '{Episode CleanTitle}', example: 'Episode Title 1' },
     { token: '{Air-Date}', example: '2013-10-30' },
     { token: '{Air Date}', example: '2013 10 30' },
+    // Anime: the absolute episode number (counted over all seasons), like Sonarr.
+    { token: '{absolute}', example: '1' },
+    { token: '{absolute:00}', example: '01' },
+    { token: '{absolute:000}', example: '001' },
   ],
 }
 

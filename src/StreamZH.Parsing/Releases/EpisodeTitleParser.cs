@@ -193,12 +193,31 @@ internal static partial class EpisodeTitleParser
             ImdbId = ReleaseIds.ParseImdbId(releaseTitle),
             TmdbId = ReleaseIds.ParseTmdbId(releaseTitle),
             ReleaseGroup = subGroup ?? ReleaseGroupParser.ParseReleaseGroup(releaseTitle),
-            Languages = LanguageParser.ParseLanguages(info.ReleaseTokens),
+            Languages = LanguagesOf(info.ReleaseTokens, subGroup),
             Quality = QualityParser.ParseQuality(title),
             Hdr = QualityParser.ParseHdr(title),
             VideoCodec = CodecParser.ParseVideoCodec(info.ReleaseTokens),
             AudioCodec = CodecParser.ParseAudioCodec(info.ReleaseTokens),
         };
+    }
+
+    /// <summary>
+    /// Languages after the episode number; German anime releases often name it only in the leading tag instead of a sub
+    /// group ("[GER] Title - 05 [1080p]"), so that tag counts when nothing else names a language.
+    /// </summary>
+    private static IReadOnlyList<Language> LanguagesOf(string releaseTokens, string? subGroup)
+    {
+        var languages = LanguageParser.ParseLanguages(releaseTokens);
+        if (subGroup is { Length: > 0 and <= 12 } && languages.All(l => l == Language.Unknown))
+        {
+            var fromTag = LanguageParser.ParseLanguages(subGroup.Trim());
+            if (fromTag.Any(l => l != Language.Unknown))
+            {
+                return fromTag;
+            }
+        }
+
+        return languages;
     }
 
     internal enum EpisodeConfidence

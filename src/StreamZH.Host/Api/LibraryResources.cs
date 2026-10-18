@@ -25,30 +25,43 @@ public sealed record MovieResource(
 public sealed record SeriesResource(
     int Id, int TmdbId, int? TvdbId, string? ImdbId, string Title, string OriginalTitle, int Year, string? Overview, string Status,
     string? Network, IReadOnlyList<string> Genres, string? PosterPath, string? BackdropPath, bool Monitored, int QualityProfileId,
-    int RootFolderId, string FolderPath, DateTime Added, DateTime? LastRefreshed, int EpisodeCount, int AiredCount, int FileCount, long SizeOnDisk, string OriginalLanguage)
+    int RootFolderId, string FolderPath, DateTime Added, DateTime? LastRefreshed, int EpisodeCount, int AiredCount, int FileCount, long SizeOnDisk, string OriginalLanguage,
+    string SeriesType)
 {
     public static SeriesResource From(Series s, SeriesCounts? c) => new(
         s.Id, s.TmdbId, s.TvdbId, s.ImdbId, s.Title, s.OriginalTitle, s.Year, s.Overview, s.Status, s.Network, s.Genres, s.PosterPath,
         s.BackdropPath, s.Monitored, s.QualityProfileId, s.RootFolderId, s.FolderPath, s.Added, s.LastRefreshed,
         c?.EpisodeCount ?? 0, c?.AiredCount ?? 0, c?.FileCount ?? 0, c?.SizeOnDisk ?? 0,
-        StreamZH.Core.Quality.Language.FindById(s.OriginalLanguageId).Name);
+        StreamZH.Core.Quality.Language.FindById(s.OriginalLanguageId).Name,
+        SeriesTypes.ToApi(s.SeriesType));
 }
 
+/// <param name="AbsoluteEpisodeNumber">Counted over the regular seasons (anime).</param>
+/// <param name="SceneSeasonNumber">Scene numbering from TheXEM; null without a mapping.</param>
 public sealed record EpisodeResource(
-    int Id, int SeasonNumber, int EpisodeNumber, string Title, string? AirDate, string? Overview, bool Monitored, bool HasFile, MediaFileResource? File)
+    int Id, int SeasonNumber, int EpisodeNumber, string Title, string? AirDate, string? Overview, bool Monitored, bool HasFile, MediaFileResource? File,
+    int? AbsoluteEpisodeNumber = null, int? SceneSeasonNumber = null, int? SceneEpisodeNumber = null, int? SceneAbsoluteEpisodeNumber = null)
 {
     public static EpisodeResource From(Episode e) => new(
-        e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirDate, e.Overview, e.Monitored, e.File is not null, MediaFileResource.From(e.File));
+        e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirDate, e.Overview, e.Monitored, e.File is not null, MediaFileResource.From(e.File),
+        e.AbsoluteEpisodeNumber, e.SceneSeasonNumber, e.SceneEpisodeNumber, e.SceneAbsoluteEpisodeNumber);
 }
 
 public sealed record SeasonResource(int SeasonNumber, int EpisodeCount, int FileCount, bool Monitored);
 
 public sealed record SeriesDetailResource(SeriesResource Series, IReadOnlyList<SeasonResource> Seasons, IReadOnlyList<EpisodeResource> Episodes);
 
-public sealed record LookupResource(int TmdbId, string Title, string OriginalTitle, int Year, string? Overview, string? PosterPath, int? LibraryId);
+/// <param name="SuggestedSeriesType">Series: "anime" for Japanese animation, "daily" for talk shows and news, else "standard".</param>
+public sealed record LookupResource(
+    int TmdbId, string Title, string OriginalTitle, int Year, string? Overview, string? PosterPath, int? LibraryId, string? SuggestedSeriesType = null);
 
 /// <param name="SearchForMissing">Start a search for the missing movie or episodes; null = the default from Settings → Indexers.</param>
-public sealed record AddRequest(int TmdbId, int RootFolderId, bool Monitored = true, int? QualityProfileId = null, bool? SearchForMissing = null);
+/// <param name="SeriesType">Series: "standard", "daily" or "anime"; null = guessed from TMDB.</param>
+public sealed record AddRequest(
+    int TmdbId, int RootFolderId, bool Monitored = true, int? QualityProfileId = null, bool? SearchForMissing = null, string? SeriesType = null);
+
+/// <summary>PUT /series/{id}: the fields to change (null = keep).</summary>
+public sealed record SeriesUpdateRequest(string? SeriesType = null);
 
 public sealed record MonitorRequest(bool Monitored);
 

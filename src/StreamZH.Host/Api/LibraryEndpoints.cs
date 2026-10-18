@@ -70,10 +70,36 @@ public static class LibraryEndpoints
         });
         series.MapPost("/", async (AddRequest request, LibraryService library, JobQueue jobs, IndexerOptions options, CancellationToken ct) =>
         {
-            var item = await library.AddSeriesAsync(request.TmdbId, request.RootFolderId, request.Monitored, request.QualityProfileId, cancellationToken: ct);
+            SeriesType? seriesType = null;
+            if (request.SeriesType is not null)
+            {
+                if (!SeriesTypes.TryParse(request.SeriesType, out var parsedType))
+                {
+                    return SeriesTypeInvalid();
+                }
+
+                seriesType = parsedType;
+            }
+
+            var item = await library.AddSeriesAsync(
+                request.TmdbId, request.RootFolderId, request.Monitored, request.QualityProfileId, seriesType: seriesType, cancellationToken: ct);
             jobs.Enqueue(RefreshSeries(item.Id, item.Title));
             IndexerOptionsEndpoints.QueueSearchOnAdd(jobs, options, MediaType.Series, item.Id, item.Title, request.SearchForMissing);
             return Results.Created($"/api/v1/series/{item.Id}", SeriesResource.From(item, null));
+        });
+        series.MapPut("/{id:int}", async (int id, SeriesUpdateRequest request, LibraryService library, SeriesRepository repo) =>
+        {
+            if (request.SeriesType is not null)
+            {
+                if (!SeriesTypes.TryParse(request.SeriesType, out var seriesType))
+                {
+                    return SeriesTypeInvalid();
+                }
+
+                await library.SetSeriesTypeAsync(id, seriesType);
+            }
+
+            return repo.Find(id) is { } s ? Results.Ok(SeriesResource.From(s, repo.Counts().GetValueOrDefault(id))) : Results.NotFound();
         });
         series.MapPut("/{id:int}/monitor", async (int id, MonitorRequest request, LibraryService library) =>
         {
@@ -110,7 +136,10 @@ public static class LibraryEndpoints
         {
             var inLibrary = repo.TmdbIdToId();
             var results = await tmdb.SearchSeriesAsync(term.Trim(), year, ct);
-            return results.Select(r => ToLookup(r, inLibrary));
+            return results.Select(r => ToLookup(r, inLibrary) with
+            {
+                SuggestedSeriesType = SeriesTypes.ToApi(SeriesTypes.Suggest(r.GenreIds, null, r.OriginCountries, r.OriginalLanguage)),
+            });
         });
 
         // Root folders (configuration)
@@ -148,7 +177,7 @@ public static class LibraryEndpoints
                     : new Job($"import:{folder}", $"Import {item.FolderName}", async (sp, ct) =>
                     {
                         var library = sp.GetRequiredService<LibraryService>();
-                        var added = await library.AddSeriesAsync(item.TmdbId, root.Id, request.Monitored, profileId, folder, ct);
+                        var added = await library.AddSeriesAsync(item.TmdbId, root.Id, request.Monitored, profileId, folder, cancellationToken: ct);
                         await library.RefreshSeriesAsync(added.Id, ct);
                     }));
             }
@@ -213,6 +242,9 @@ public static class LibraryEndpoints
         jobs.Enqueue(job);
         return Results.Accepted(value: jobs.Status);
     }
+
+    private static IResult SeriesTypeInvalid() => Results.ValidationProblem(
+        new Dictionary<string, string[]> { ["seriesType"] = ["Use standard, daily or anime."] });
 
     private static LookupResource ToLookup(TmdbSearchResult r, IReadOnlyDictionary<int, int> inLibrary) =>
         new(r.TmdbId, r.Title, r.OriginalTitle, r.Year, r.Overview, r.PosterPath, inLibrary.TryGetValue(r.TmdbId, out var id) ? id : null);

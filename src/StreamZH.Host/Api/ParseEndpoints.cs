@@ -30,7 +30,8 @@ public static class ParseEndpoints
             SeriesRepository series,
             DecisionTargetFactory targets,
             QualityDefinitionRepository definitions,
-            IndexerOptions options) =>
+            IndexerOptions options,
+            StreamZH.Library.SceneNumbering.EpisodeMapper episodeMapper) =>
         {
             var parsed = ReleaseParser.Parse(title.Trim());
             if (parsed is null)
@@ -56,7 +57,7 @@ public static class ParseEndpoints
             {
                 var name = $"{show.Title} ({show.Year})";
                 var library = series.Episodes(show.Id);
-                IReadOnlyList<Episode> covered = parsed.IsEpisode ? ReleaseMatching.MapEpisodes(parsed, library).Episodes : [];
+                IReadOnlyList<Episode> covered = parsed.IsEpisode ? episodeMapper.Map(parsed, show, library).Episodes : [];
 
                 // Episodes that are not in the library (yet): count them from the name.
                 int? count = covered.Count > 0 ? null

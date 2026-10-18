@@ -108,17 +108,17 @@ public sealed class ConnectEventFactory(MovieRepository movies, SeriesRepository
         return null;
     }
 
-    /// <summary>The library episodes a release name points to (S01E02, S01E01-E03, a whole season).</summary>
+    /// <summary>The library episodes a release name points to (S01E02, S01E01-E03, a whole season, an air date, absolute numbers).</summary>
     private List<ConnectEpisode> EpisodesOf(int seriesId, Core.Quality.ParsedRelease? parsed)
     {
-        if (parsed?.SeasonNumber is not { } season)
+        if (parsed is not { IsEpisode: true } || series.Find(seriesId) is not { } show)
         {
             return [];
         }
 
-        return [.. series.Episodes(seriesId)
-            .Where(e => e.SeasonNumber == season && (parsed.FullSeason || parsed.EpisodeNumbers.Contains(e.EpisodeNumber)))
-            .OrderBy(e => e.EpisodeNumber)
+        return [.. Search.ReleaseMatching.MapEpisodes(parsed, series.Episodes(seriesId), show).Episodes
+            .OrderBy(e => e.SeasonNumber)
+            .ThenBy(e => e.EpisodeNumber)
             .Select(Episode)];
     }
 

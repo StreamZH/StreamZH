@@ -9,7 +9,7 @@ using StreamZH.Core.Media;
 
 namespace StreamZH.Core.CustomFormats;
 
-/// <summary>One input of a condition type. <see cref="Type"/>: text, regex, number, select, flags or checkbox.</summary>
+/// <summary>One input of a condition type (value, min or max). <see cref="Type"/>: text, regex, number, select or flags.</summary>
 public sealed record CustomFormatFieldSchema(
     string Name,
     string Label,
@@ -51,11 +51,10 @@ public static class CustomFormatSchema
                 [new(CustomFormatFields.Value, "Regular Expression", "regex", HelpText: RegexHelp)]));
         }
 
+        // Radarr's "except language" checkbox is not offered here (the editor knows value/min/max only); formats that carry
+        // exceptLanguage (TRaSH "Wrong Language" style) keep it and it is matched.
         list.Add(new(CustomFormatImplementations.Language, "Language", "The release has this audio language (Original = the movie's or series' original language).",
-        [
-            new(CustomFormatFields.Value, "Language", "select", Options: CustomFormatValues.Languages(mediaType)),
-            new(CustomFormatFields.ExceptLanguage, "Except Language", "checkbox", HelpText: "Matches when any other language than the selected one is present."),
-        ]));
+            [new(CustomFormatFields.Value, "Language", "select", Options: CustomFormatValues.Languages(mediaType))]));
         list.Add(new(CustomFormatImplementations.IndexerFlag, "Indexer Flag", "The indexer marks the release with this flag (Usenet indexers set none).",
             [new(CustomFormatFields.Value, "Flag", "flags", Options: CustomFormatValues.IndexerFlags(mediaType))]));
         list.Add(new(CustomFormatImplementations.Source, "Source", "The quality's source (WEB-DL, Bluray …).",

@@ -27,7 +27,7 @@ internal static class WantedTestSupport
 
     public static WantedService Wanted(this SearchTestBed bed) =>
         new(bed.Movies, bed.Series, bed.Profiles, bed.Queries(), bed.LastSearches(),
-            new DecisionTargetFactory(bed.Profiles, null, bed.FileDetails()), bed.QueueSnapshots(), bed.Events, bed.Options, bed.Time);
+            new DecisionTargetFactory(bed.Profiles, null, bed.FileDetails(), customFormats: new CustomFormatRepository(bed.Database)), bed.QueueSnapshots(), bed.Events, bed.Options, bed.Time);
 
     public static CalendarService Calendar(this SearchTestBed bed) =>
         new(bed.Movies, bed.Series, bed.Queries(), bed.QueueSnapshots(), bed.Options, bed.Time);

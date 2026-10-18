@@ -93,7 +93,7 @@ public sealed record CustomFormatInput
         return new CustomFormatInput
         {
             MediaType = mediaType,
-            ReleaseTitle = string.IsNullOrWhiteSpace(sceneName) ? fileName : sceneName,
+            ReleaseTitle = string.IsNullOrWhiteSpace(sceneName) ? WithoutVideoExtension(fileName) : sceneName,
             FileName = fileName,
             Quality = quality ?? QualityModel.Unknown,
             Languages = LanguageRules.Normalize(languages, originalLanguage),
@@ -106,4 +106,13 @@ public sealed record CustomFormatInput
             IndexerFlags = indexerFlags,
         };
     }
+
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mkv", ".mp4", ".m4v", ".avi", ".ts", ".m2ts", ".mts", ".wmv", ".mov", ".webm", ".mpg", ".mpeg", ".vob", ".divx", ".flv", ".ogm", ".iso",
+    };
+
+    /// <summary>"Movie.2020.1080p-GRP.mkv" → "Movie.2020.1080p-GRP", so a release name pattern ending in "-GRP$" works on files too.</summary>
+    private static string WithoutVideoExtension(string fileName) =>
+        VideoExtensions.Contains(Path.GetExtension(fileName)) ? Path.GetFileNameWithoutExtension(fileName) : fileName;
 }

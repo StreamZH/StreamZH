@@ -157,14 +157,16 @@ public static class CustomFormatCalculator
     }
 
     /// <summary>
-    /// Radarr's LanguageSpecification: -2 means the original language of the movie or series (when it is known);
-    /// "except language" matches when any other language is present.
+    /// Radarr's LanguageSpecification: -2 means the original language of the movie or series; "except language" matches
+    /// when any other language is present. When the original language is not known, -2 means English, the same fallback
+    /// the decision engine uses for untagged and "DL" releases (<see cref="Decisions.LanguageRules.Normalize"/>).
     /// </summary>
     private static bool MatchLanguage(CustomFormatSpecification s, CustomFormatInput input)
     {
         var value = CustomFormatFields.Int(s, CustomFormatFields.Value) ?? 0;
-        var compared = value == Language.Original.Id && input.OriginalLanguage != Language.Unknown && input.OriginalLanguage.Id > 0
-            ? input.OriginalLanguage.Id
+        var original = input.OriginalLanguage.Id > 0 ? input.OriginalLanguage : Language.English;
+        var compared = value == Language.Original.Id
+            ? original.Id
             : CustomFormatValues.LanguageId(input.MediaType, value) ?? int.MinValue;
 
         return CustomFormatFields.Bool(s, CustomFormatFields.ExceptLanguage)

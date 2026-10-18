@@ -60,6 +60,11 @@ public sealed class MediaManagementApiTests : IDisposable
         Assert.Equal(string.Empty, preview.StandardEpisode);
         Assert.Contains("standardEpisodeFormat", preview.Errors.Keys);
         Assert.Equal("The Series Title's! - 2013-10-30 - Episode Title (1) WEBDL-1080p.mkv", preview.DailyEpisode);
+
+        // {Custom Formats} with Radarr's sample formats.
+        reloaded["standardMovieFormat"] = "{Movie Title} {[Custom Formats]} {Custom Formats:-x264}";
+        var formats = (await (await client.PostAsJsonAsync("/api/v1/settings/media-management/preview", reloaded)).Content.ReadFromJsonAsync<NamingPreview>())!;
+        Assert.EndsWith(" Part Two [Surround Sound x264] Surround Sound.mkv", formats.MovieFile, StringComparison.Ordinal);
     }
 
     [Fact]

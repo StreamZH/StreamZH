@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
@@ -90,6 +91,39 @@ public sealed class DecisionTargetFactoryTests : IDisposable
     {
         _bed.Dune.QualityProfileId = 999;
         Assert.Equal(LibraryError.Invalid, Assert.Throws<LibraryException>(() => Factory.ForMovie(_bed.Dune)).Error);
+    }
+
+    [Fact]
+    public void Targets_carry_the_formats_of_their_media_type_and_the_formats_of_the_file_on_disk()
+    {
+        var formats = new CustomFormatRepository(_bed.Database);
+        var details = new MediaFileDetailsRepository(_bed.Database);
+        var dv = formats.Add(CustomFormats.CustomFormatTestData.Movie("DV", 0, CustomFormats.CustomFormatTestData.Title(@"\bDV\b")));
+        var group = formats.Add(CustomFormats.CustomFormatTestData.Movie(
+            "Group", 0, CustomFormats.CustomFormatTestData.Spec(CustomFormatImplementations.ReleaseGroup, "^GOOD$")));
+        formats.Add(CustomFormats.CustomFormatTestData.Format(MediaType.Series, "Season pack", 0, CustomFormats.CustomFormatTestData.Spec(CustomFormatImplementations.ReleaseType, 3)));
+
+        // Renamed file: the stored release name and group still count (Radarr's file custom formats).
+        _bed.Dune.FolderPath = Path.Combine(_bed.DataDirectory, "media", "Dune (2021)");
+        _bed.Dune.File = new MediaFile("Dune (2021) WEBDL-2160p.mkv", 20L << 30, DateTime.UtcNow);
+        details.Save(new MediaFileDetails(
+            Path.Combine(_bed.Dune.FolderPath, _bed.Dune.File.RelativePath), Quality.WebDl2160p.Id, 1, 0, false, [Language.English.Id],
+            "GOOD", "Dune.2021.2160p.WEB-DL.DV.H265-GOOD", null, "x265", null, DateTime.UtcNow));
+
+        var factory = new DecisionTargetFactory(_bed.Profiles, fileDetails: details, customFormats: formats);
+        var target = factory.ForMovie(_bed.Dune);
+
+        Assert.Equal(["DV", "Group"], target.CustomFormats.Select(f => f.Name));
+        Assert.Equal([dv, group], target.ExistingCustomFormats.Select(f => f.Id));
+        Assert.Equal(Quality.WebDl2160p, target.ExistingQuality!.Quality);
+
+        // Without stored details only the name counts.
+        var nameOnly = new DecisionTargetFactory(_bed.Profiles, customFormats: formats).ForMovie(_bed.Dune);
+        Assert.Empty(nameOnly.ExistingCustomFormats);
+
+        var series = factory.ForEpisodes(_bed.Show, [_bed.Episode(1, 1)]);
+        Assert.Equal(["Season pack"], series.CustomFormats.Select(f => f.Name));
+        Assert.Empty(series.ExistingCustomFormats);
     }
 
     public void Dispose() => _bed.Dispose();

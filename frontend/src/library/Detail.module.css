@@ -19,7 +19,7 @@
   background-position: center 22%;
   opacity: 0.3;
   mask-image: linear-gradient(90deg, transparent 18%, #000 75%);
-  animation: fade 0.5s ease;
+  animation: global(fade) 0.5s ease;
 }
 
 .backdrop::after {
@@ -135,7 +135,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
-  animation: pop 0.15s var(--ease);
+  animation: global(pop) 0.15s var(--ease);
   transform-origin: top right;
 }
 
@@ -329,7 +329,7 @@
 .seasonBody {
   border-top: 1px solid var(--line);
   padding: 4px 6px 6px;
-  animation: fade 0.2s ease;
+  animation: global(fade) 0.2s ease;
 }
 
 .seasonBody th {

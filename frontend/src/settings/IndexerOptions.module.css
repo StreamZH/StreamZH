@@ -41,7 +41,7 @@
   background: var(--sunk);
   border: 1px solid var(--line);
   border-radius: 7px;
-  animation: pop 0.16s var(--ease);
+  animation: global(pop) 0.16s var(--ease);
 }
 
 .chipText {

@@ -261,7 +261,7 @@ button.groupHead:focus-visible .chev,
   font-weight: 600;
   display: inline-grid;
   place-items: center;
-  animation: pop 0.2s var(--ease);
+  animation: global(pop) 0.2s var(--ease);
 }
 
 .badgeLive {
@@ -407,7 +407,7 @@ button.groupHead:focus-visible .chev,
   border-radius: 50%;
   border: 2px solid var(--ok);
   opacity: 0;
-  animation: livepulse 2.4s ease-out infinite;
+  animation: global(livepulse) 2.4s ease-out infinite;
 }
 
 .liveDotOff {
@@ -557,7 +557,7 @@ button.srvMain:hover {
   font-weight: 600;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  animation: pop 0.2s var(--ease);
+  animation: global(pop) 0.2s var(--ease);
 }
 
 .dlPill:hover {
@@ -638,7 +638,7 @@ button.srvMain:hover {
   box-shadow: var(--shadow);
   padding: 6px;
   z-index: 60;
-  animation: pop 0.14s var(--ease);
+  animation: global(pop) 0.14s var(--ease);
   transform-origin: top right;
 }
 
@@ -755,7 +755,7 @@ button.srvMain:hover {
   inset: 0;
   background: var(--scrim);
   z-index: 0;
-  animation: fade 0.15s;
+  animation: global(fade) 0.15s;
 }
 
 .palette {
@@ -778,7 +778,7 @@ button.srvMain:hover {
   border-radius: 14px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  animation: pop 0.15s var(--ease);
+  animation: global(pop) 0.15s var(--ease);
 }
 
 .pin {
@@ -919,7 +919,7 @@ button.srvMain:hover {
     inset: 0;
     z-index: 54;
     background: var(--scrim);
-    animation: fade 0.15s;
+    animation: global(fade) 0.15s;
   }
 
   .menuBtn {

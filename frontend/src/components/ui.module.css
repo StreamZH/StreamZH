@@ -486,7 +486,7 @@ textarea.input {
 .dotBusy {
   composes: dot;
   background: var(--accent);
-  animation: pulse 1s infinite;
+  animation: global(pulse) 1s infinite;
 }
 
 /* ---- Table (CloudZH .tbl) ---- */

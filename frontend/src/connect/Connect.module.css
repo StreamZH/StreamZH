@@ -12,7 +12,7 @@
 .grid > li {
   display: flex;
   min-width: 0;
-  animation: rise 0.25s var(--ease) backwards;
+  animation: global(rise) 0.25s var(--ease) backwards;
 }
 
 .card,
@@ -184,7 +184,7 @@
 
 .typeGrid > li {
   display: flex;
-  animation: rise 0.25s var(--ease) backwards;
+  animation: global(rise) 0.25s var(--ease) backwards;
 }
 
 .typeCard {

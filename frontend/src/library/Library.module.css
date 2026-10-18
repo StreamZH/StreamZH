@@ -56,7 +56,7 @@
 
 .grid > li {
   min-width: 0;
-  animation: rise 0.3s var(--ease) both;
+  animation: global(rise) 0.3s var(--ease) both;
 }
 
 .card {
@@ -222,7 +222,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  animation: rise 0.3s var(--ease);
+  animation: global(rise) 0.3s var(--ease);
 }
 
 .runIcon {

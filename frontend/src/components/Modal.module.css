@@ -11,12 +11,12 @@
 }
 
 .dialog[open] {
-  animation: pop 0.18s var(--ease);
+  animation: global(pop) 0.18s var(--ease);
 }
 
 .dialog::backdrop {
   background: var(--scrim);
-  animation: fade 0.15s;
+  animation: global(fade) 0.15s;
 }
 
 .body {

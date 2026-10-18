@@ -38,7 +38,7 @@
   border-radius: 12px;
   background: var(--surface);
   transition: border-color 0.15s, background 0.15s;
-  animation: rise 0.25s var(--ease) both;
+  animation: global(rise) 0.25s var(--ease) both;
 }
 
 .item:hover:not(.owned) {
@@ -151,7 +151,7 @@
   border-radius: 10px;
   background: var(--sunk);
   border: 1px solid var(--line);
-  animation: rise 0.2s var(--ease);
+  animation: global(rise) 0.2s var(--ease);
 }
 
 .fields {

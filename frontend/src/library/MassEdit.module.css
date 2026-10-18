@@ -49,7 +49,7 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
   box-shadow: var(--shadow);
-  animation: rise 0.25s var(--ease);
+  animation: global(rise) 0.25s var(--ease);
 }
 
 .barCount {
@@ -124,7 +124,7 @@
   padding: 12px 14px;
   border-top: 1px solid var(--line);
   transition: background 0.12s;
-  animation: rise 0.25s var(--ease) both;
+  animation: global(rise) 0.25s var(--ease) both;
 }
 
 .previewItem:first-child {

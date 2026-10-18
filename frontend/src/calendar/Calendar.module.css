@@ -22,7 +22,7 @@
 
 .view {
   min-width: 0;
-  animation: rise 0.28s var(--ease);
+  animation: global(rise) 0.28s var(--ease);
   transition: opacity 0.15s;
 }
 
@@ -188,7 +188,7 @@
 }
 
 .calendar [data-status='downloading'] .statusDot {
-  animation: pulse 1.6s ease-in-out infinite;
+  animation: global(pulse) 1.6s ease-in-out infinite;
 }
 
 .calendar [data-unmonitored='true'] {
@@ -444,7 +444,7 @@
 
 .dayList .entryList li,
 .agenda .entryList li {
-  animation: rise 0.25s var(--ease) backwards;
+  animation: global(rise) 0.25s var(--ease) backwards;
 }
 
 .rowMain {

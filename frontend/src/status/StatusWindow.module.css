@@ -15,7 +15,7 @@
   border-radius: var(--r);
   box-shadow: var(--shadow);
   overflow: hidden;
-  animation: pop 0.18s var(--ease);
+  animation: global(pop) 0.18s var(--ease);
   transform-origin: 100% 100%;
 }
 
@@ -30,7 +30,7 @@
   flex-direction: column;
   min-height: 0;
   max-height: min(60vh, 520px);
-  animation: rise 0.2s var(--ease);
+  animation: global(rise) 0.2s var(--ease);
 }
 
 .panel[hidden],
@@ -217,7 +217,7 @@
   display: flex;
   align-items: center;
   border-radius: 10px;
-  animation: rise 0.22s var(--ease) backwards;
+  animation: global(rise) 0.22s var(--ease) backwards;
 }
 
 .list > .chip:nth-child(2) { animation-delay: 0.03s; }
@@ -384,7 +384,7 @@
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, currentColor 22%, transparent);
   border-top-color: var(--accent);
-  animation: spin 0.75s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  animation: global(spin) 0.75s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
 }
 
 /* The last list row of a page must stay reachable above the window. */

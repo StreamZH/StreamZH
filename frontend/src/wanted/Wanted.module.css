@@ -70,7 +70,7 @@
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 13.5px;
-  animation: pop 0.15s ease-out;
+  animation: global(pop) 0.15s ease-out;
 }
 
 .bulkbar b {
@@ -126,7 +126,7 @@
 
 .table tbody tr {
   transition: background 0.12s;
-  animation: fade 0.25s ease backwards;
+  animation: global(fade) 0.25s ease backwards;
 }
 
 .table tbody tr:hover td {
@@ -232,7 +232,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  animation: fade 0.3s ease;
+  animation: global(fade) 0.3s ease;
 }
 
 .table tbody tr:hover .thumb {

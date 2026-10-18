@@ -1,0 +1,329 @@
+/* Library mass editor: select bar, Organize preview, root folder and remove dialogs, run progress. */
+
+.text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.text a {
+  color: var(--accent);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actions > :first-child {
+  margin-right: auto;
+}
+
+/* ---- Sticky bar ---- */
+
+.bar {
+  position: sticky;
+  /* Above the collapsed status window at the bottom right. */
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 10px 12px 10px 16px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+}
+
+.barCount {
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.barCount strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.barMessage {
+  color: var(--ok);
+}
+
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.barActions select {
+  padding-block: 7px;
+  font-size: 13px;
+}
+
+/* ---- Organize preview ---- */
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.previewList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(56vh, 560px);
+  overflow: auto;
+}
+
+.previewItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.previewItem > input {
+  align-self: start;
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.conflict {
+  border-color: color-mix(in srgb, #ef6b6b 45%, var(--line));
+}
+
+.unchanged {
+  opacity: 0.7;
+}
+
+.previewBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.previewTitle {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.paths {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.kind {
+  grid-row: span 2;
+  align-self: start;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  padding-top: 1px;
+}
+
+.old {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-faint) 60%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.new {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.new::before {
+  content: '→ ';
+  color: var(--accent);
+}
+
+.note {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.conflictText {
+  font-size: 12.5px;
+  color: #ef6b6b;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Progress and result ---- */
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progressHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.progressHead span {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.progressSub {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.result p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.resultOk {
+  color: var(--ok);
+}
+
+.resultWarn {
+  color: var(--warn);
+}
+
+.errors {
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  max-height: 40vh;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+}
+
+.errors strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ---- Root folder and remove ---- */
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deleteCheck {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.summaryDanger {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: color-mix(in srgb, #8f1820 22%, transparent);
+  border: 1px solid color-mix(in srgb, #8f1820 60%, var(--line));
+  border-radius: var(--radius-small);
+  overflow-wrap: anywhere;
+}
+
+.removeList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .bar {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .barActions {
+    gap: 6px;
+  }
+
+  /* "Cancel selection" at the top does the same; the bar stays two rows. */
+  .barDone {
+    display: none !important;
+  }
+
+  .barActions > button,
+  .barActions > select {
+    padding: 8px 10px;
+  }
+
+  .barActions {
+    width: 100%;
+  }
+
+  .barActions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .paths {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kind {
+    grid-row: auto;
+  }
+}

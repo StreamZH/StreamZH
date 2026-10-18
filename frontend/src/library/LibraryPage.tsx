@@ -7,9 +7,13 @@ import Poster from '../components/Poster'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
 import page from '../pages/Page.module.css'
+import { useIsAdmin } from '../status/useOngoing'
 import AddDialog from './AddDialog'
 import styles from './Library.module.css'
+import MassEditBar from './MassEditBar'
+import { UndoButton } from './RunProgress'
 import { SetupHint } from './SetupHint'
+import { useOrganizeStatus } from './useOrganizeStatus'
 
 type Sort = 'title' | 'year' | 'added'
 type Filter = 'all' | 'missing' | 'ondisk' | 'unmonitored'
@@ -24,6 +28,8 @@ interface Item {
   monitored: boolean
   status: 'ondisk' | 'missing' | 'unmonitored' | 'partial' | 'loading'
   detail: string
+  folder: string
+  size: number
 }
 
 export default function LibraryPage({ type }: { type: MediaType }) {
@@ -33,6 +39,10 @@ export default function LibraryPage({ type }: { type: MediaType }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<Sort>('title')
   const [filter, setFilter] = useState<Filter>('all')
+  const admin = useIsAdmin()
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const organize = useOrganizeStatus()
 
   const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies, enabled: isMovie })
   const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series, enabled: !isMovie })
@@ -61,6 +71,21 @@ export default function LibraryPage({ type }: { type: MediaType }) {
         return a.sortTitle.localeCompare(b.sortTitle)
       })
   }, [items, search, sort, filter])
+
+  const chosen = items.filter((i) => selected.has(i.id))
+  const toggle = (id: number) =>
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const stopSelecting = () => {
+    setSelecting(false)
+    setSelected(new Set())
+  }
+  const undo = organize.data?.undo?.mediaType === type ? organize.data.undo : null
+  const running = organize.data?.running?.mediaType === type ? organize.data.running : null
 
   const folders = (rootFolders.data ?? []).filter((r) => r.mediaType === type)
   const unmapped = folders.reduce((sum, r) => sum + r.unmappedFolders, 0)
@@ -91,6 +116,16 @@ export default function LibraryPage({ type }: { type: MediaType }) {
               Import {unmapped} existing
             </Link>
           )}
+          {admin && items.length > 0 && (
+            <button
+              className={ui.button}
+              type="button"
+              aria-pressed={selecting}
+              onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+            >
+              {selecting ? 'Cancel selection' : 'Select'}
+            </button>
+          )}
           <button className={ui.primary} type="button" onClick={() => setAdding(true)} disabled={!canAdd}>
             + Add {noun}
           </button>
@@ -98,6 +133,27 @@ export default function LibraryPage({ type }: { type: MediaType }) {
       </header>
 
       <SetupHint tmdbMissing={!!tmdbMissing} noRoot={!!noRoot} type={type} />
+
+      {admin && (undo || running) && (
+        <div className={styles.runBanner} role="status">
+          {running ? (
+            <span>
+              {running.title}
+              {running.started ? ` · ${running.done} of ${running.total}` : ' · waiting'}
+            </span>
+          ) : (
+            undo && (
+              <>
+                <span>
+                  Last organize renamed {undo.items} {isMovie ? (undo.items === 1 ? 'movie' : 'movies') : 'series'}. Undo is possible until{' '}
+                  {new Date(undo.until).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}.
+                </span>
+                <UndoButton status={organize.data} label="Undo last organize" />
+              </>
+            )
+          )}
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className={styles.toolbar}>
@@ -119,6 +175,21 @@ export default function LibraryPage({ type }: { type: MediaType }) {
             <option value="year">Year</option>
             <option value="added">Recently added</option>
           </select>
+          {selecting && (
+            <div className={styles.selectTools}>
+              <button
+                className={ui.button}
+                type="button"
+                onClick={() => setSelected((s) => new Set([...s, ...visible.map((i) => i.id)]))}
+                disabled={visible.every((i) => selected.has(i.id))}
+              >
+                Select {visible.length === items.length ? 'all' : 'shown'} ({visible.length})
+              </button>
+              <button className={ui.button} type="button" onClick={() => setSelected(new Set())} disabled={selected.size === 0}>
+                Select none
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -134,23 +205,52 @@ export default function LibraryPage({ type }: { type: MediaType }) {
       )}
 
       {visible.length > 0 && (
-        <ul className={styles.grid}>
-          {visible.map((item) => (
-            <li key={item.id}>
-              <Link className={styles.card} to={`/library/${isMovie ? 'movies' : 'series'}/${item.id}`}>
+        <ul className={`${styles.grid} ${selecting ? styles.selecting : ''}`}>
+          {visible.map((item) => {
+            const content = (
+              <>
                 <Poster path={item.posterPath} title={item.title} />
                 <span className={`${styles.bar} ${styles[item.status]}`} />
                 <span className={styles.cardTitle}>{item.title}</span>
                 <span className={styles.cardMeta}>
                   {item.year > 0 ? item.year : '–'} · {item.detail}
                 </span>
-              </Link>
-            </li>
-          ))}
+              </>
+            )
+            return (
+              <li key={item.id}>
+                {selecting ? (
+                  <label className={`${styles.card} ${styles.selectable} ${selected.has(item.id) ? styles.selected : ''}`}>
+                    <input
+                      className={styles.pick}
+                      type="checkbox"
+                      checked={selected.has(item.id)}
+                      onChange={() => toggle(item.id)}
+                      aria-label={`Select ${item.title}`}
+                    />
+                    {content}
+                  </label>
+                ) : (
+                  <Link className={styles.card} to={`/library/${isMovie ? 'movies' : 'series'}/${item.id}`}>
+                    {content}
+                  </Link>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
 
       {items.length > 0 && visible.length === 0 && <p className={ui.muted}>Nothing matches this filter.</p>}
+
+      {selecting && (
+        <MassEditBar
+          type={type}
+          selected={chosen.map((i) => ({ id: i.id, title: i.year > 0 ? `${i.title} (${i.year})` : i.title, folder: i.folder, size: i.size }))}
+          onClear={stopSelecting}
+          onDone={() => setSelected(new Set())}
+        />
+      )}
 
       {adding && <AddDialog type={type} onClose={() => setAdding(false)} />}
     </div>
@@ -168,6 +268,8 @@ function movieItem(m: Movie): Item {
     monitored: m.monitored,
     status: m.hasFile ? 'ondisk' : m.monitored ? 'missing' : 'unmonitored',
     detail: m.hasFile ? 'On disk' : m.monitored ? 'Missing' : 'Unmonitored',
+    folder: m.folderPath,
+    size: m.file?.size ?? 0,
   }
 }
 
@@ -184,5 +286,7 @@ function seriesItem(s: Series): Item {
     monitored: s.monitored,
     status: loading ? 'loading' : complete ? 'ondisk' : s.fileCount > 0 ? 'partial' : s.monitored ? 'missing' : 'unmonitored',
     detail: loading ? 'Loading episodes…' : `${s.fileCount} / ${s.airedCount} episodes`,
+    folder: s.folderPath,
+    size: s.sizeOnDisk,
   }
 }

@@ -116,6 +116,13 @@ public sealed class MovieRepository(Database database)
         connection.Execute("DELETE FROM Movies WHERE Id = @id", new { id });
     }
 
+    /// <summary>Moves the movie to another root folder (Update keeps the root folder).</summary>
+    public void SetRootFolder(int id, int rootFolderId)
+    {
+        using var connection = database.Open();
+        connection.Execute("UPDATE Movies SET RootFolderId = @rootFolderId WHERE Id = @id", new { id, rootFolderId });
+    }
+
     private sealed class MovieRow
     {
         public long Id { get; init; }
@@ -268,6 +275,13 @@ public sealed class SeriesRepository(Database database)
     {
         using var connection = database.Open();
         connection.Execute("DELETE FROM Episodes WHERE SeriesId = @id; DELETE FROM Series WHERE Id = @id", new { id });
+    }
+
+    /// <summary>Moves the series to another root folder (Update keeps the root folder).</summary>
+    public void SetRootFolder(int id, int rootFolderId)
+    {
+        using var connection = database.Open();
+        connection.Execute("UPDATE Series SET RootFolderId = @rootFolderId WHERE Id = @id", new { id, rootFolderId });
     }
 
     public IReadOnlyList<Episode> Episodes(int seriesId)

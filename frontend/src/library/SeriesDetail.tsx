@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { libraryApi, queryKeys, type Episode, type Season } from '../api/library'
 import Icon from '../components/Icon'
 import ProfileSelect from '../components/ProfileSelect'
@@ -12,7 +12,9 @@ import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
+import OrganizeDialog from './OrganizeDialog'
 import RemoveButton from './RemoveButton'
+import RemoveDialog from './RemoveDialog'
 import search from './ReleaseSearch.module.css'
 import ReleaseSearchModal from './ReleaseSearchModal'
 import SearchButtons from './SearchButtons'
@@ -24,6 +26,9 @@ export default function SeriesDetail() {
   const { monitor, refresh, remove, assignProfile } = useDetailActions('Series', id)
   const admin = useIsAdmin()
   const [renaming, setRenaming] = useState(false)
+  const [organizing, setOrganizing] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const navigate = useNavigate()
 
   if (detail.isError) return <p className={ui.error}>{detail.error.message}</p>
   if (!detail.data) return <div className={page.page} aria-busy="true" />
@@ -73,7 +78,18 @@ export default function SeriesDetail() {
                 Rename files
               </button>
             )}
-            <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            {admin && (
+              <button className={ui.button} type="button" onClick={() => setOrganizing(true)}>
+                Organize
+              </button>
+            )}
+            {admin ? (
+              <button className={ui.button} type="button" onClick={() => setRemoving(true)}>
+                Remove
+              </button>
+            ) : (
+              <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            )}
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
         }
@@ -93,6 +109,15 @@ export default function SeriesDetail() {
         />
       ))}
 
+      {organizing && <OrganizeDialog type="Series" ids={[s.id]} onClose={() => setOrganizing(false)} />}
+      {removing && (
+        <RemoveDialog
+          type="Series"
+          items={[{ id: s.id, title: s.title, folder: s.folderPath, size: s.sizeOnDisk }]}
+          onClose={() => setRemoving(false)}
+          onRemoved={() => void navigate('/library/series')}
+        />
+      )}
       <HistoryPanel seriesId={s.id} />
     </div>
   )

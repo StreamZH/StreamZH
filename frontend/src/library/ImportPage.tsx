@@ -2,6 +2,9 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { libraryApi, queryKeys, type ImportCandidate, type LookupResult, type MediaType } from '../api/library'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
@@ -32,30 +35,40 @@ export default function ImportPage() {
 
   return (
     <div className={page.page}>
-      <header>
-        <Link className={styles.back} to={type === 'Movie' ? '/library/movies' : '/library/series'}>
-          ← {type === 'Movie' ? 'Movies' : 'Series'}
-        </Link>
-        <h1 className={page.title}>Import existing {type === 'Movie' ? 'movies' : 'series'}</h1>
-        <p className={page.lead}>
-          StreamZH matches each folder with TMDB and adds it to the library. Nothing is moved or renamed.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow={
+          <Link className={styles.back} to={type === 'Movie' ? '/library/movies' : '/library/series'}>
+            <Icon name="left" size={13} />
+            {type === 'Movie' ? 'Movies' : 'Series'}
+          </Link>
+        }
+        title={`Import existing ${type === 'Movie' ? 'movies' : 'series'}`}
+        lead="StreamZH matches each folder with TMDB and adds it to the library. Nothing is moved or renamed."
+      />
 
-      <div className={styles.toolbar}>
-        <select className={ui.select} value={active ?? ''} onChange={(e) => setRootFolderId(Number(e.target.value))} aria-label="Root folder">
-          {folders.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.path} ({f.unmappedFolders} new)
-            </option>
-          ))}
-        </select>
-      </div>
+      {folders.length > 0 && (
+        <div className={styles.toolbar}>
+          <label className={styles.rootPick}>
+            <Icon name="folder" size={15} />
+            <select className={ui.select} value={active ?? ''} onChange={(e) => setRootFolderId(Number(e.target.value))} aria-label="Root folder">
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.path} ({f.unmappedFolders} new)
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {rootFolders.data && folders.length === 0 && (
-        <p className={ui.muted}>
-          No root folder for {type === 'Movie' ? 'movies' : 'series'} yet. <Link to="/settings/media-management">Add one in settings.</Link>
-        </p>
+        <div className={`${ui.panel} ${ui.empty}`}>
+          <Icon name="folderplus" size={22} />
+          <h3>No root folder yet</h3>
+          <span>
+            Add a root folder for {type === 'Movie' ? 'movies' : 'series'} <Link to="/settings/media-management">in settings</Link>.
+          </span>
+        </div>
       )}
 
       {active && <ImportTable key={active} rootFolderId={active} type={type} />}
@@ -125,21 +138,41 @@ function ImportTable({ rootFolderId, type }: { rootFolderId: number; type: Media
   }
 
   if (candidates.isError) return <p className={ui.error}>{candidates.error.message}</p>
-  if (!candidates.data) return <p className={ui.muted}>Reading folders…</p>
-  if (candidates.data.length === 0) return <p className={ui.muted}>Every folder in this root folder is already in the library.</p>
+  if (!candidates.data) return <Loader text="Reading folders…" />
+  if (candidates.data.length === 0)
+    return (
+      <div className={`${ui.panel} ${ui.empty}`}>
+        <Icon name="check" size={22} />
+        <h3>Nothing to import</h3>
+        <span>Every folder in this root folder is already in the library.</span>
+      </div>
+    )
 
   if (importFolders.isSuccess) {
     const busy = (jobs.data?.queued ?? 0) > 0 || jobs.data?.running
+    // Rough share done: the queue left against the folders handed over (other jobs can be in the queue too).
+    const share = Math.min(1, Math.max(0, 1 - (jobs.data?.queued ?? 0) / Math.max(1, importFolders.data.queued)))
     return (
-      <div className={page.panel}>
-        <h2 className={page.panelTitle}>{busy ? 'Importing…' : 'Import finished'}</h2>
-        <p className={ui.muted}>
+      <div className={`${ui.panel} ${styles.done}`}>
+        <div className={ui.panelHead}>
+          <h2 className={styles.doneTitle}>
+            {busy ? <span className={ui.dotBusy} /> : <span className={ui.dotOk} />}
+            {busy ? 'Importing…' : 'Import finished'}
+          </h2>
+        </div>
+        {busy && (
+          <div className={styles.track}>
+            <i style={{ width: `${Math.max(3, share * 100)}%` }} />
+          </div>
+        )}
+        <p className={`${ui.muted} ${ui.num}`}>
           {busy
-            ? `${jobs.data?.queued ?? 0} left in the queue${jobs.data?.running ? ` · ${jobs.data.running}` : ''}`
+            ? `${Math.floor(share * 100)} % · ${jobs.data?.queued ?? 0} left in the queue${jobs.data?.running ? ` · ${jobs.data.running}` : ''}`
             : `${importFolders.data.queued} folders were added.`}
         </p>
-        <Link className={ui.button} to={type === 'Movie' ? '/library/movies' : '/library/series'}>
+        <Link className={busy ? ui.button : ui.primary} to={type === 'Movie' ? '/library/movies' : '/library/series'}>
           Go to library
+          <Icon name="right" size={14} />
         </Link>
       </div>
     )
@@ -148,22 +181,34 @@ function ImportTable({ rootFolderId, type }: { rootFolderId: number; type: Media
   return (
     <>
       <div className={styles.summary}>
-        <span>
-          {rows.length} folders · {searching > 0 ? `matching ${rows.length - searching} / ${rows.length}…` : `${selected.length} ready to import`}
+        <span className={`${styles.count} ${ui.num}`}>
+          <strong>{rows.length}</strong> folders ·{' '}
+          {searching > 0 ? (
+            <span className={styles.matching}>
+              <span className={ui.dotBusy} />
+              matching {rows.length - searching} / {rows.length}…
+            </span>
+          ) : (
+            `${selected.length} ready to import`
+          )}
         </span>
-        <ProfileSelect value={qualityProfileId} onChange={setQualityProfileId} />
-        <label className={ui.check}>
-          <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />
-          <span>Monitored</span>
+        <ProfileSelect className={`${ui.select} ${styles.compact}`} value={qualityProfileId} onChange={setQualityProfileId} />
+        <label className={styles.switchRow}>
+          <span className={ui.switch}>
+            <input type="checkbox" checked={monitored} onChange={(e) => setMonitored(e.target.checked)} />
+            <span />
+          </span>
+          Monitored
         </label>
         <button className={ui.primary} type="button" disabled={selected.length === 0 || importFolders.isPending} onClick={() => importFolders.mutate()}>
+          <Icon name="inbox" size={15} />
           Import {selected.length} {selected.length === 1 ? 'folder' : 'folders'}
         </button>
       </div>
       {importFolders.error && <p className={ui.error}>{importFolders.error.message}</p>}
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
+        <table className={`${ui.table} ${styles.table}`}>
           <thead>
             <tr>
               <th>
@@ -194,10 +239,10 @@ function ImportTable({ rootFolderId, type }: { rootFolderId: number; type: Media
                   />
                 </td>
                 <td className={styles.folder}>{row.candidate.folderName}</td>
-                <td>
+                <td className={styles.match}>
                   <MatchCell row={row} type={type} onChange={(change) => update(row, change)} />
                 </td>
-                <td className={styles.right}>
+                <td className={`${styles.right} ${styles.files}`}>
                   {row.candidate.videoFiles > 0 ? (
                     <>
                       {row.candidate.videoFiles} · {formatBytes(row.candidate.size)}
@@ -282,11 +327,11 @@ function MatchCell({ row, type, onChange }: { row: Row; type: MediaType; onChang
   if (searching) {
     return (
       <form className={styles.searchRow} onSubmit={search}>
-        <input className={ui.input} value={term} onChange={(e) => setTerm(e.target.value)} autoFocus aria-label="Search TMDB" />
-        <button className={ui.button} type="submit" disabled={busy}>
+        <input className={`${ui.input} ${styles.compact}`} value={term} onChange={(e) => setTerm(e.target.value)} autoFocus aria-label="Search TMDB" />
+        <button className={`${ui.button} ${ui.sm}`} type="submit" disabled={busy}>
           {busy ? '…' : 'Search'}
         </button>
-        <button className={styles.linkButton} type="button" onClick={() => setSearching(false)}>
+        <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={() => setSearching(false)}>
           Cancel
         </button>
         {failed && <span className={ui.error}>Search failed</span>}
@@ -296,12 +341,12 @@ function MatchCell({ row, type, onChange }: { row: Row; type: MediaType; onChang
 
   return (
     <div className={styles.matchRow}>
-      {row.state === 'searching' && <span className={ui.muted}>Searching…</span>}
+      {row.state === 'searching' && <span className="sk" style={{ width: '60%' }} />}
       {row.state === 'error' && <span className={ui.error}>Search failed</span>}
       {row.state === 'done' && row.matches.length === 0 && <span className={ui.muted}>No match for “{row.candidate.title}”</span>}
       {row.state === 'done' && row.matches.length > 0 && (
         <select
-          className={ui.select}
+          className={`${ui.select} ${styles.compact}`}
           value={row.tmdbId ?? ''}
           onChange={(e) => onChange({ tmdbId: e.target.value ? Number(e.target.value) : null, include: !!e.target.value })}
         >
@@ -315,8 +360,8 @@ function MatchCell({ row, type, onChange }: { row: Row; type: MediaType; onChang
         </select>
       )}
       {row.state !== 'searching' && (
-        <button className={styles.linkButton} type="button" onClick={() => setSearching(true)} title="Search TMDB by hand">
-          Search
+        <button className={`${ui.ghost} ${ui.sm} ${ui.icon}`} type="button" onClick={() => setSearching(true)} title="Search TMDB by hand" aria-label="Search TMDB by hand">
+          <Icon name="search" size={15} />
         </button>
       )}
     </div>

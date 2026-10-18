@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { MediaType } from '../api/library'
 import { releaseKeys, releasesApi, type Command, type SearchFinished, type SearchTarget } from '../api/releases'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import styles from './ReleaseSearch.module.css'
 import ReleaseSearchModal from './ReleaseSearchModal'
@@ -28,6 +29,8 @@ export default function SearchButtons(props: {
   modalTitle: string
   searchLabel?: string
   small?: boolean
+  /** The automatic search as the page's main button. */
+  primary?: boolean
 }) {
   const [manual, setManual] = useState(false)
   const [startedAt, setStartedAt] = useState<number | null>(null)
@@ -49,17 +52,21 @@ export default function SearchButtons(props: {
   else if (done) note = finishedNote(done)
   else if (run.isSuccess) note = { text: run.data.queued > 0 ? 'Searching in the background…' : 'A search is already queued' }
 
-  const size = props.small ? ` ${styles.small}` : ''
+  const size = props.small ? ` ${ui.sm}` : ''
+  const iconSize = props.small ? 14 : 15
   return (
     <span className={styles.searchActions}>
-      <button className={`${ui.button}${size}`} type="button" onClick={() => run.mutate()} disabled={run.isPending}>
+      <button className={`${props.primary ? ui.primary : ui.button}${size}`} type="button" onClick={() => run.mutate()} disabled={run.isPending}>
+        <Icon name="search" size={iconSize} />
         {props.searchLabel ?? 'Search'}
       </button>
       <button className={`${ui.button}${size}`} type="button" onClick={() => setManual(true)}>
+        <Icon name="list" size={iconSize} />
         Manual search
       </button>
       {note && (
         <span className={`${styles.note} ${note.ok ? styles.noteDone : ''} ${run.error ? ui.error : ''}`} role="status">
+          {note.ok && <Icon name="check" size={13} />}
           {note.text}
         </span>
       )}

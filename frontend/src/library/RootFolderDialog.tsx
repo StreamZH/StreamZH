@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
 import { organizeApi, organizeKeys } from '../api/organize'
+import Icon from '../components/Icon'
 import Modal from '../components/Modal'
+import Loader from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
 import styles from './MassEdit.module.css'
@@ -38,7 +40,7 @@ export default function RootFolderDialog({ type, ids, onClose }: { type: MediaTy
     return (
       <Modal title={finished ? 'Move finished' : 'Moving…'} onClose={onClose}>
         {run && <RunProgress run={run} />}
-        {!run && !finished && <p className={styles.text}>Starting…</p>}
+        {!run && !finished && <Loader text="Starting…" />}
         {finished && <RunResult result={finished} />}
         <div className={styles.actions}>
           <span />
@@ -66,18 +68,24 @@ export default function RootFolderDialog({ type, ids, onClose }: { type: MediaTy
         </select>
       </label>
       <div className={styles.choices} role="radiogroup" aria-label="Files">
-        <label className={ui.check}>
+        <label className={styles.choice}>
           <input type="radio" name="move" checked={moveFiles} onChange={() => setMoveFiles(true)} />
-          Move the folders there
+          <span>
+            Move the folders there
+            <small>Each folder keeps its name.</small>
+          </span>
         </label>
-        <label className={ui.check}>
+        <label className={styles.choice}>
           <input type="radio" name="move" checked={!moveFiles} onChange={() => setMoveFiles(false)} />
-          Only change the path; I move the files myself
+          <span>
+            Only change the path
+            <small>I move the files myself.</small>
+          </span>
         </label>
       </div>
       <p className={styles.hint}>
         {moveFiles
-          ? 'Each folder keeps its name. To another drive the files are copied first and the old folder is deleted only after the copy is complete.'
+          ? 'To another drive the files are copied first and the old folder is deleted only after the copy is complete.'
           : 'Nothing moves on disk. Until the files are there, the items show as missing.'}
       </p>
       {edit.error && (
@@ -90,6 +98,7 @@ export default function RootFolderDialog({ type, ids, onClose }: { type: MediaTy
           Cancel
         </button>
         <button type="button" className={ui.primary} disabled={selected == null || edit.isPending || (moveFiles && !!run)} onClick={() => edit.mutate()}>
+          <Icon name={moveFiles ? 'folder' : 'edit'} size={15} />
           {moveFiles ? `Move ${ids.length} ${noun}` : 'Change path'}
         </button>
       </div>

@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { libraryApi, queryKeys } from '../api/library'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDate, formatRuntime } from '../lib/format'
@@ -11,7 +13,9 @@ import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
+import MoreMenu, { type MoreItem } from './MoreMenu'
 import OrganizeDialog from './OrganizeDialog'
+import PathRow from './PathRow'
 import RemoveButton from './RemoveButton'
 import RemoveDialog from './RemoveDialog'
 import SearchButtons from './SearchButtons'
@@ -28,18 +32,24 @@ export default function MovieDetail() {
   const navigate = useNavigate()
 
   if (movie.isError) return <p className={ui.error}>{movie.error.message}</p>
-  if (!movie.data) return <div className={page.page} aria-busy="true" />
+  if (!movie.data) return <Loader size="lg" text="Loading the movie…" />
 
   const m = movie.data
+  const more: MoreItem[] = admin
+    ? [
+        ...(m.hasFile ? [{ label: 'Rename files', icon: 'rename' as const, onClick: () => setRenaming(true) }] : []),
+        { label: 'Organize', icon: 'folder', onClick: () => setOrganizing(true) },
+        { label: 'Remove', icon: 'trash', onClick: () => setRemoving(true), danger: true },
+      ]
+    : []
+
   return (
     <div className={page.page}>
-      <Link className={styles.back} to="/library/movies">
-        ← Movies
-      </Link>
       <DetailHeader
         title={m.title}
         posterPath={m.posterPath}
         backdropPath={m.backdropPath}
+        back={{ to: '/library/movies', label: 'Movies' }}
         facts={[m.year > 0 && String(m.year), formatRuntime(m.runtime), m.genres.slice(0, 3).join(', '), m.status]}
         overview={m.overview}
         badges={
@@ -48,46 +58,36 @@ export default function MovieDetail() {
               {m.hasFile ? 'On disk' : 'Missing'}
             </span>
             <span className={`${ui.badge} ${m.monitored ? ui.ok : ui.idle}`}>{m.monitored ? 'Monitored' : 'Unmonitored'}</span>
+            {m.file && <span className={`${ui.pill} ${ui.num}`}>{formatBytes(m.file.size)}</span>}
           </>
         }
         actions={
           <>
-            <button className={ui.button} type="button" onClick={() => monitor.mutate(!m.monitored)} disabled={monitor.isPending}>
-              {m.monitored ? 'Unmonitor' : 'Monitor'}
-            </button>
-            <button className={ui.button} type="button" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
-              {refresh.isSuccess ? 'Refresh queued' : 'Refresh & rescan'}
-            </button>
             <SearchButtons
               command={{ name: 'MoviesSearch', movieIds: [m.id] }}
               mediaType="Movie"
               id={m.id}
               target={{ kind: 'movie', movieId: m.id }}
               modalTitle={m.year > 0 ? `${m.title} (${m.year})` : m.title}
+              primary
             />
-            <label className={styles.profile}>
-              <span>Profile</span>
-              <ProfileSelect
-                className=""
-                value={m.qualityProfileId}
-                onChange={(profileId) => assignProfile.mutate(profileId)}
-                disabled={assignProfile.isPending}
-              />
-            </label>
-            {admin && m.hasFile && (
-              <button className={ui.button} type="button" onClick={() => setRenaming(true)}>
-                Rename files
-              </button>
-            )}
-            {admin && (
-              <button className={ui.button} type="button" onClick={() => setOrganizing(true)}>
-                Organize
-              </button>
-            )}
+            <span className={styles.divider} aria-hidden="true" />
+            <button className={ui.button} type="button" onClick={() => monitor.mutate(!m.monitored)} disabled={monitor.isPending}>
+              <Icon name={m.monitored ? 'eyeoff' : 'eye'} size={15} />
+              {m.monitored ? 'Unmonitor' : 'Monitor'}
+            </button>
+            <button className={ui.button} type="button" onClick={() => refresh.mutate()} disabled={refresh.isPending} title="Refresh metadata and rescan the folder">
+              <Icon name={refresh.isSuccess ? 'check' : 'restart'} size={15} />
+              {refresh.isSuccess ? 'Refresh queued' : 'Refresh & rescan'}
+            </button>
+            <ProfileSelect
+              className={`${ui.select} ${styles.profile}`}
+              value={m.qualityProfileId}
+              onChange={(profileId) => assignProfile.mutate(profileId)}
+              disabled={assignProfile.isPending}
+            />
             {admin ? (
-              <button className={ui.button} type="button" onClick={() => setRemoving(true)}>
-                Remove
-              </button>
+              <MoreMenu items={more} />
             ) : (
               <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} item={{ mediaType: 'Movie', tmdbId: m.tmdbId, title: m.title, year: m.year }} />
             )}
@@ -96,13 +96,19 @@ export default function MovieDetail() {
         }
       />
 
-      <section className={page.panel}>
-        <h2 className={page.panelTitle}>Files</h2>
-        <dl className={styles.facts2}>
-          <dt>Folder</dt>
-          <dd className={ui.mono}>{m.folderPath}</dd>
-          <dt>File</dt>
-          <dd className={ui.mono}>{m.file ? m.file.relativePath : <span className={ui.muted}>No video file found</span>}</dd>
+      <section className={ui.panel}>
+        <div className={ui.panelHead}>
+          <h2 className={styles.panelTitle}>
+            <Icon name="folder" size={17} />
+            Files
+          </h2>
+          {m.file && <span className={styles.panelCount}>{formatBytes(m.file.size)}</span>}
+        </div>
+        <div className={styles.paths}>
+          <PathRow label="Folder" path={m.folderPath} />
+          <PathRow label="Video file" path={m.file ? m.file.relativePath : null} empty="No video file found" />
+        </div>
+        <dl className={styles.kv}>
           {m.file && (
             <>
               <dt>Size</dt>
@@ -117,15 +123,19 @@ export default function MovieDetail() {
           <dd className={styles.links}>
             <a href={`https://www.themoviedb.org/movie/${m.tmdbId}`} target="_blank" rel="noreferrer">
               TMDB
+              <Icon name="external" size={12} />
             </a>
             {m.imdbId && (
               <a href={`https://www.imdb.com/title/${m.imdbId}`} target="_blank" rel="noreferrer">
                 IMDb
+                <Icon name="external" size={12} />
               </a>
             )}
           </dd>
         </dl>
       </section>
+
+      <HistoryPanel movieId={m.id} />
 
       {organizing && <OrganizeDialog type="Movie" ids={[m.id]} onClose={() => setOrganizing(false)} />}
       {removing && (
@@ -137,7 +147,6 @@ export default function MovieDetail() {
           listItem={{ mediaType: 'Movie', tmdbId: m.tmdbId, title: m.title, year: m.year }}
         />
       )}
-      <HistoryPanel movieId={m.id} />
       {renaming && <RenameDialog type="Movie" id={m.id} title={m.year > 0 ? `${m.title} (${m.year})` : m.title} onClose={() => setRenaming(false)} />}
     </div>
   )

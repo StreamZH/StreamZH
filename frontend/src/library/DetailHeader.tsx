@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
+import Icon from '../components/Icon'
 import Poster from '../components/Poster'
 import { tmdbImage } from '../lib/format'
 import styles from './Detail.module.css'
 
+/** The head of a movie or series page (CloudZH .detail): backdrop, poster, serif title, meta pills, a compact action row. */
 export default function DetailHeader(props: {
   title: string
   posterPath: string | null
@@ -11,6 +14,7 @@ export default function DetailHeader(props: {
   badges: ReactNode
   overview: string | null
   actions: ReactNode
+  back: { to: string; label: string }
 }) {
   const backdrop = tmdbImage(props.backdropPath, 'w1280')
 
@@ -22,6 +26,10 @@ export default function DetailHeader(props: {
           <Poster path={props.posterPath} title={props.title} size="w500" />
         </div>
         <div className={styles.info}>
+          <Link className={styles.back} to={props.back.to}>
+            <Icon name="left" size={14} />
+            {props.back.label}
+          </Link>
           <h1 className={styles.title}>{props.title}</h1>
           <p className={styles.facts}>{props.facts.filter(Boolean).join(' · ')}</p>
           <div className={styles.badges}>{props.badges}</div>

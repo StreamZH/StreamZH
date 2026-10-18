@@ -5,6 +5,8 @@ import { Link } from 'react-router'
 import { historyKeys } from '../api/history'
 import { formatScore } from '../api/indexerOptions'
 import { episodeLabel, formatAge, releaseKeys, releasesApi, type Release, type SearchTarget } from '../api/releases'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDateTime } from '../lib/format'
@@ -78,37 +80,49 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
     <Modal title={title} onClose={onClose}>
       <div className={styles.root}>
         {search.isFetching ? (
-          <div className={styles.state} role="status">
-            <span className={styles.spinner} aria-hidden="true" />
-            <span>{indexerCount ? `Searching ${indexerCount} indexer${indexerCount === 1 ? '' : 's'}…` : 'Searching indexers…'}</span>
+          <div className={styles.state}>
+            <Loader size="lg" text={indexerCount ? `Searching ${indexerCount} indexer${indexerCount === 1 ? '' : 's'}…` : 'Searching indexers…'} />
             <span className={ui.muted}>This can take up to a minute when an indexer is slow.</span>
           </div>
         ) : search.isError ? (
           <div className={styles.state}>
-            <p className={ui.error}>{search.error.message}</p>
+            <p className={ui.errBox}>
+              <Icon name="alert" size={16} />
+              {search.error.message}
+            </p>
             <button className={ui.button} type="button" onClick={() => void search.refetch()}>
+              <Icon name="restart" size={15} />
               Try again
             </button>
           </div>
         ) : data && data.indexers === 0 ? (
           <div className={styles.state}>
-            <p>No indexer is enabled for manual search.</p>
+            <Icon name="network" size={22} />
+            <h3>No indexer for manual search</h3>
             <p className={ui.muted}>StreamZH searches Usenet indexers (Newznab) for releases. Add one, or check that manual search is switched on for it.</p>
             <Link className={ui.primary} to="/indexers">
               Set up indexers
+              <Icon name="right" size={14} />
             </Link>
           </div>
         ) : data ? (
           <>
             <div className={styles.toolbar}>
               <p className={styles.summary}>
-                <strong>{data.releases.length}</strong> release{data.releases.length === 1 ? '' : 's'} from {data.indexers} indexer
-                {data.indexers === 1 ? '' : 's'} · <span className={styles.okText}>{accepted} accepted</span>
+                <span>
+                  <strong>{data.releases.length}</strong> release{data.releases.length === 1 ? '' : 's'} from {data.indexers} indexer
+                  {data.indexers === 1 ? '' : 's'}
+                </span>
+                <span className={`${ui.pill} ${ui.pillOk} ${styles.countPill}`}>{accepted} accepted</span>
+                {rejected > 0 && <span className={`${ui.pill} ${styles.countPill}`}>{rejected} rejected</span>}
               </p>
               <div className={styles.tools}>
-                <label className={ui.check}>
-                  <input type="checkbox" checked={showRejected} onChange={(e) => setShowRejected(e.target.checked)} />
-                  <span>Show rejected ({rejected})</span>
+                <label className={styles.switchLabel}>
+                  <span className={ui.switch}>
+                    <input type="checkbox" checked={showRejected} onChange={(e) => setShowRejected(e.target.checked)} />
+                    <span />
+                  </span>
+                  Show rejected
                 </label>
                 <select
                   className={`${ui.select} ${styles.sortSelect}`}
@@ -128,25 +142,30 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   <option value="indexer:asc">Indexer</option>
                   <option value="title:asc">Title</option>
                 </select>
-                <button className={ui.button} type="button" onClick={() => void search.refetch()}>
+                <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => void search.refetch()}>
+                  <Icon name="restart" size={14} />
                   Search again
                 </button>
               </div>
             </div>
 
             {data.failedIndexers.length > 0 && (
-              <p className={styles.warning}>
-                {data.failedIndexers.map((f) => (
-                  <span key={f.indexerId}>
-                    <strong>{f.indexer}</strong> failed: {f.message}
-                  </span>
-                ))}
-              </p>
+              <div className={styles.warning}>
+                <Icon name="alert" size={16} />
+                <p>
+                  {data.failedIndexers.map((f) => (
+                    <span key={f.indexerId}>
+                      <strong>{f.indexer}</strong> failed: {f.message}
+                    </span>
+                  ))}
+                </p>
+              </div>
             )}
 
             {releases.length === 0 ? (
               <div className={styles.state}>
-                <p>{data.releases.length === 0 ? 'No releases found.' : 'No accepted releases.'}</p>
+                <Icon name="search" size={22} />
+                <h3>{data.releases.length === 0 ? 'No releases found' : 'No accepted releases'}</h3>
                 <p className={ui.muted}>
                   {data.releases.length === 0
                     ? 'The indexers have nothing for this title yet. Try again later.'
@@ -156,7 +175,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
             ) : (
               <div className={`${styles.table} ${hasScores ? styles.withScore : ''}`} role="table" aria-label="Releases">
                 <div className={styles.head} role="row">
-                  <span role="columnheader" aria-label="Status" />
+                  <span role="columnheader">Verdict</span>
                   {(['title', 'indexer', 'age', 'size'] as SortKey[]).map((key) => (
                     <SortHeader key={key} sortKey={key} sort={sort} onSort={sortBy} />
                   ))}
@@ -211,16 +230,25 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
   return (
     <div className={`${styles.row} ${release.accepted ? '' : styles.rejectedRow}`} role="row">
       <span role="cell" className={styles.status}>
-        <button
-          type="button"
-          className={`${styles.statusIcon} ${release.accepted ? styles.statusOk : styles.statusRejected}`}
-          title={release.accepted ? 'Accepted' : reasons}
-          aria-label={release.accepted ? 'Accepted' : `Rejected: ${reasons}`}
-          aria-expanded={release.accepted ? undefined : reasonsOpen}
-          onClick={() => !release.accepted && setReasonsOpen((open) => !open)}
-        >
-          {release.accepted ? '✓' : '!'}
-        </button>
+        {release.accepted ? (
+          <span className={`${styles.verdict} ${styles.verdictOk}`} title="Accepted">
+            <Icon name="check" size={12} />
+            Accepted
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={`${styles.verdict} ${styles.verdictRejected}`}
+            title={reasons}
+            aria-label={`Rejected: ${reasons}`}
+            aria-expanded={reasonsOpen}
+            onClick={() => setReasonsOpen((open) => !open)}
+          >
+            <Icon name="ban" size={12} />
+            Rejected
+            <Icon name="down" size={12} className={reasonsOpen ? styles.flip : undefined} />
+          </button>
+        )}
       </span>
 
       <span role="cell" className={styles.title}>
@@ -245,7 +273,7 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
         </span>
         <span role="cell" className={styles.cell}>
           {episodes && <span className={styles.episodes}>{episodes}</span>}
-          <span className={styles.quality}>{release.quality}</span>
+          <span className={`${ui.tag} ${styles.quality}`}>{release.quality}</span>
         </span>
         <span role="cell" className={styles.cell}>
           {release.languages.length > 0 ? release.languages.join(', ') : <span className={ui.muted}>–</span>}
@@ -268,11 +296,14 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
 
       <span role="cell" className={styles.action}>
         {grab.isSuccess ? (
-          <span className={styles.grabbed}>Grabbed</span>
+          <span className={styles.grabbed}>
+            <Icon name="check" size={14} />
+            Grabbed
+          </span>
         ) : confirming ? (
           <span className={styles.confirm}>
             <button
-              className={ui.primary}
+              className={`${ui.primary} ${ui.sm}`}
               type="button"
               onClick={() => {
                 setConfirming(false)
@@ -281,17 +312,18 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
             >
               Grab anyway
             </button>
-            <button className={ui.button} type="button" onClick={() => setConfirming(false)}>
+            <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={() => setConfirming(false)}>
               Cancel
             </button>
           </span>
         ) : (
           <button
-            className={release.accepted ? ui.primary : ui.button}
+            className={`${release.accepted ? ui.button : ui.ghost} ${ui.sm} ${styles.grab}`}
             type="button"
             disabled={grab.isPending}
             onClick={() => (release.accepted ? grab.mutate() : setConfirming(true))}
           >
+            <Icon name="download" size={14} />
             {grab.isPending ? 'Grabbing…' : 'Grab'}
           </button>
         )}

@@ -5,6 +5,9 @@ import { libraryApi, queryKeys } from '../api/library'
 import { mediaManagementApi, mediaManagementKeys } from '../api/mediaManagement'
 import { renamerApi, renamerKeys, type ExtensionPreset, type RenamerFilter, type RenamerOptions, type RenamerRequest, type RenamerSource } from '../api/renamer'
 import FolderPicker from '../components/FolderPicker'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
 import { AdvancedToggle } from '../lib/Advanced'
 import { useAdvanced } from '../lib/advancedMode'
@@ -92,6 +95,15 @@ function simpleRule(setup: SimpleSetup, kind: SimpleSetup['kind']): EditorRule {
     episodeFormat: setup.episodeFormat,
     movieFormat: setup.movieFormat,
   }
+}
+
+/** "about 20 s left" from the start time and the progress of a run. */
+function timeLeft(started: string, done: number, total: number): string | null {
+  if (done <= 0 || done >= total) return null
+  const elapsed = (Date.now() - new Date(started).getTime()) / 1000
+  if (!(elapsed > 0)) return null
+  const left = Math.max(1, Math.round((elapsed / done) * (total - done)))
+  return left < 60 ? `about ${left} s left` : `about ${Math.round(left / 60)} min left`
 }
 
 const extensionPresets: { value: ExtensionPreset; label: string }[] = [
@@ -250,17 +262,16 @@ export default function FileRenamerPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <div className={styles.eyebrow}>Tools</div>
-          <h1 className={styles.title}>File renamer</h1>
-          <p className={styles.lead}>
-            {advanced
-              ? 'Rename many files at once with rules, filters and regular expressions. Episodes and movies get their real titles. Nothing changes before you press Rename, and every run can be undone.'
-              : 'Give episodes and movies clean names with their real titles. Nothing changes before you press Rename, and every run can be undone.'}
-          </p>
-        </div>
-        <div className={styles.headerActions}>
+      <PageHeader
+        eyebrow="Tools"
+        title="File renamer"
+        lead={
+          advanced
+            ? 'Rename many files at once with rules, filters and regular expressions. Episodes and movies get their real titles. Nothing changes before you press Rename, and every run can be undone.'
+            : 'Give episodes and movies clean names with their real titles. Nothing changes before you press Rename, and every run can be undone.'
+        }
+        actions={
+          <>
           {advanced && (
             <>
               <select
@@ -277,13 +288,15 @@ export default function FileRenamerPage() {
                 ))}
               </select>
               <button type="button" className={ui.button} onClick={() => setPresetName(presets.data?.find((p) => p.id === presetId)?.name ?? '')} disabled={rules.length === 0}>
+                <Icon name="save" size={15} />
                 Save preset
               </button>
             </>
           )}
           <AdvancedToggle />
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {advanced && presetName != null && (
         <form
@@ -348,6 +361,7 @@ export default function FileRenamerPage() {
                   onBlur={() => setSource((s) => ({ ...s, path: typedPath.trim() || null }))}
                 />
                 <button type="button" className={ui.button} onClick={() => setPicking(true)}>
+                  <Icon name="folder" size={15} />
                   Browse…
                 </button>
               </form>
@@ -488,7 +502,11 @@ export default function FileRenamerPage() {
       <section className={`${styles.card} ${styles.previewCard}`} aria-labelledby="renamer-preview">
         <h2 id="renamer-preview" className={styles.cardTitle}>
           <span className={styles.step}>{advanced ? 4 : 3}</span> Preview
-          {preview.isFetching && <span className={styles.cardCount}>Updating…</span>}
+          {preview.isFetching && (
+            <span className={styles.cardCount}>
+              <Loader size="row" text="Updating…" />
+            </span>
+          )}
         </h2>
         {advanced && (
           <div className={styles.fields}>
@@ -542,7 +560,7 @@ export default function FileRenamerPage() {
             }
           />
         ) : preview.isPending && !sourceError ? (
-          <p className={styles.emptyRows}>Reading the folder…</p>
+          <Loader text="Reading the folder…" />
         ) : null}
 
         <div className={styles.applyBar}>
@@ -552,9 +570,11 @@ export default function FileRenamerPage() {
                 <span>
                   {active.state === 'undoing' ? 'Undoing…' : `Renaming ${active.done} of ${active.total}…`}
                 </span>
+                {active.total > 0 && <span className={styles.percent}>{Math.round((active.done / active.total) * 100)} %</span>}
                 <span className={styles.progressTrack}>
                   <span className={styles.progressFill} style={{ width: `${active.total > 0 ? Math.round((active.done / active.total) * 100) : 0}%` }} />
                 </span>
+                {timeLeft(active.started, active.done, active.total) && <span className={ui.muted}>{timeLeft(active.started, active.done, active.total)}</span>}
               </span>
             ) : finished ? (
               <span>
@@ -580,6 +600,7 @@ export default function FileRenamerPage() {
             {apply.error && <span className={ui.error}>{apply.error.message}</span>}
           </div>
           <button type="button" className={ui.primary} disabled={!hasSource || renameCount === 0 || blocked || apply.isPending || !!active} onClick={() => apply.mutate()}>
+            <Icon name="rename" size={15} />
             {apply.isPending ? 'Starting…' : `Rename ${renameCount} file${renameCount === 1 ? '' : 's'}`}
           </button>
         </div>
@@ -587,7 +608,9 @@ export default function FileRenamerPage() {
 
       <section className={styles.card} aria-labelledby="renamer-history">
         <h2 id="renamer-history" className={styles.cardTitle}>
+          <Icon name="history" size={17} className={styles.titleIcon} />
           History
+          {runs.length > 0 && <span className={styles.cardCount}>{runs.length} run{runs.length === 1 ? '' : 's'}</span>}
         </h2>
         {history.isError ? <p className={ui.error}>{history.error.message}</p> : <HistoryPanel runs={runs} />}
       </section>

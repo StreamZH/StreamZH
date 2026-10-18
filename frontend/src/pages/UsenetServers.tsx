@@ -15,12 +15,14 @@ import {
   type UsenetServerStatus,
 } from '../api/usenet'
 import { useAuth } from '../auth/auth'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { Pill } from '../indexers/Chips'
 import Dialog from '../indexers/Dialog'
 import form from '../indexers/Form.module.css'
 import { Advanced, AdvancedHint, AdvancedToggle } from '../lib/Advanced'
-import { SettingsPage } from '../settings/SettingsKit'
+import { Section, SettingsPage } from '../settings/SettingsKit'
 import { advancedLabel, setAdvanced } from '../lib/advancedMode'
 import { formatDate, formatTime } from '../lib/format'
 import page from './Page.module.css'
@@ -117,33 +119,42 @@ function ServerList({ canEdit }: { canEdit: boolean }) {
   const add = () => setView({ kind: 'form', server: newUsenetServer() })
 
   return (
-    <section className={page.panel}>
-      <div className={styles.panelHead}>
-        <div>
-          <h2 className={page.panelTitle}>Servers</h2>
-          {list.length > 0 && (
-            <p className={styles.summary}>
-              {list.length} server{list.length === 1 ? '' : 's'} · {connections} connections
-              {status.data && status.data.speedBps > 0 && <> · {formatBytes(status.data.speedBps)}/s now</>}
-            </p>
-          )}
-        </div>
-        {canEdit && list.length > 0 && (
-          <button className={ui.primary} type="button" onClick={add}>
+    <Section
+      id="servers"
+      title="Servers"
+      description={
+        list.length > 0 && (
+          <span className={ui.num}>
+            {list.length} server{list.length === 1 ? '' : 's'} · {connections} connections
+            {status.data && status.data.speedBps > 0 && <> · {formatBytes(status.data.speedBps)}/s now</>}
+          </span>
+        )
+      }
+      actions={
+        canEdit &&
+        list.length > 0 && (
+          <button className={`${ui.primary} ${ui.sm}`} type="button" onClick={add}>
+            <Icon name="plus" size={14} />
             Add server
           </button>
-        )}
-      </div>
+        )
+      }
+    >
+      {servers.isPending && <Skeleton rows={2} />}
       {servers.isError && <p className={ui.error}>{servers.error.message}</p>}
 
       {servers.isSuccess && list.length === 0 && (
         <div className={styles.empty}>
+          <span className={styles.emptyIcon} aria-hidden="true">
+            <Icon name="server" size={20} />
+          </span>
           <p>
             Add the news server of your Usenet provider, with the user name and password from your account. Most providers use{' '}
             <strong>port 563 with SSL</strong>.
           </p>
           {canEdit ? (
             <button className={ui.primary} type="button" onClick={add}>
+              <Icon name="plus" size={15} />
               Add server
             </button>
           ) : (
@@ -176,7 +187,7 @@ function ServerList({ canEdit }: { canEdit: boolean }) {
       )}
 
       {view.kind === 'form' && <ServerForm key={view.server.id} server={view.server} canEdit={canEdit} onClose={close} />}
-    </section>
+    </Section>
   )
 }
 
@@ -275,13 +286,14 @@ function ServerRow({
       <div className={styles.actions}>
         {canEdit && (
           <button
-            className={ui.button}
+            className={`${ui.ghost} ${ui.sm}`}
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               onEdit()
             }}
           >
+            <Icon name="edit" size={14} />
             Edit
           </button>
         )}

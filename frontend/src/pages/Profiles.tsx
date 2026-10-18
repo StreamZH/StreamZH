@@ -3,10 +3,11 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { profileKeys, profilesApi, type Language, type QualityDefinition, type QualityProfile } from '../api/profiles'
 import { useAuth } from '../auth/auth'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
-import { SettingsPage } from '../settings/SettingsKit'
-import page from './Page.module.css'
+import { SaveBar, Section, SettingsPage } from '../settings/SettingsKit'
 import styles from './Profiles.module.css'
 
 export default function Profiles() {
@@ -44,18 +45,20 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
   const defaultId = settings.data?.defaultQualityProfileId
 
   return (
-    <section className={page.panel}>
-      <div className={styles.panelHead}>
-        <h2 className={page.panelTitle}>Quality profiles</h2>
-        {canEdit && (
-          <button className={ui.primary} type="button" onClick={() => create.mutate()} disabled={create.isPending}>
+    <Section
+      id="quality-profiles"
+      title="Quality profiles"
+      description="Each movie and series uses one profile. New items get the default profile unless you choose another one."
+      actions={
+        canEdit && (
+          <button className={`${ui.primary} ${ui.sm}`} type="button" onClick={() => create.mutate()} disabled={create.isPending}>
+            <Icon name="plus" size={14} />
             New profile
           </button>
-        )}
-      </div>
-      <p className={styles.text}>
-        Each movie and series uses one profile. New items get the default profile unless you choose another one.
-      </p>
+        )
+      }
+    >
+      {profiles.isPending && <Skeleton rows={4} />}
       {profiles.isError && <p className={ui.error}>{profiles.error.message}</p>}
       {create.error && <p className={ui.error}>{create.error.message}</p>}
       {makeDefault.error && <p className={ui.error}>{makeDefault.error.message}</p>}
@@ -67,8 +70,11 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
           return (
             <li key={p.id} className={styles.row}>
               <div className={styles.rowMain}>
+                <span className={`${styles.rowIcon} ${p.id === defaultId ? styles.rowIconOn : ''}`} aria-hidden="true">
+                  <Icon name="star" size={16} />
+                </span>
                 <span className={styles.name}>{p.name}</span>
-                {p.id === defaultId && <span className={`${ui.badge} ${ui.ok}`}>Default</span>}
+                {p.id === defaultId && <span className={`${ui.pill} ${ui.pillOk}`}>Default</span>}
               </div>
               <dl className={styles.meta}>
                 <div>
@@ -89,11 +95,12 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
               </dl>
               <div className={styles.rowActions}>
                 {canEdit && p.id !== defaultId && (
-                  <button className={ui.button} type="button" onClick={() => makeDefault.mutate(p.id)} disabled={makeDefault.isPending}>
+                  <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={() => makeDefault.mutate(p.id)} disabled={makeDefault.isPending}>
                     Set as default
                   </button>
                 )}
-                <button className={ui.button} type="button" onClick={() => setEditing(p)}>
+                <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => setEditing(p)}>
+                  <Icon name={canEdit ? 'edit' : 'eye'} size={14} />
                   {canEdit ? 'Edit' : 'View'}
                 </button>
               </div>
@@ -111,7 +118,7 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
           onClose={() => setEditing(null)}
         />
       )}
-    </section>
+    </Section>
   )
 }
 
@@ -255,28 +262,28 @@ function ProfileDialog({
                     <input type="checkbox" checked={item.allowed} onChange={(e) => toggle(item.qualityId, e.target.checked)} />
                     <span>{item.name}</span>
                   </label>
-                  {item.qualityId === draft.cutoffQualityId && item.allowed && <span className={styles.cutoffTag}>cutoff</span>}
+                  {item.qualityId === draft.cutoffQualityId && item.allowed && <span className={`${ui.tag} ${styles.cutoffTag}`}>Cutoff</span>}
                   {canEdit && (
                     <span className={styles.moveButtons}>
                       <button
                         type="button"
-                        className={styles.move}
+                        className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
                         data-move="up"
                         onClick={() => move(item.qualityId, 'up')}
                         disabled={index === 0}
                         aria-label={`Move ${item.name} up`}
                       >
-                        ↑
+                        <Icon name="up" size={15} />
                       </button>
                       <button
                         type="button"
-                        className={styles.move}
+                        className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
                         data-move="down"
                         onClick={() => move(item.qualityId, 'down')}
                         disabled={index === shown.length - 1}
                         aria-label={`Move ${item.name} down`}
                       >
-                        ↓
+                        <Icon name="down" size={15} />
                       </button>
                     </span>
                   )}
@@ -289,13 +296,6 @@ function ProfileDialog({
 
         {canEdit && (
           <div className={styles.footer}>
-            <button className={ui.primary} type="submit" disabled={save.isPending}>
-              {save.isPending ? 'Saving…' : 'Save'}
-            </button>
-            <button className={ui.button} type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <span className={styles.spacer} />
             {!isNew &&
               (confirmDelete ? (
                 <>
@@ -308,10 +308,18 @@ function ProfileDialog({
                   </button>
                 </>
               ) : (
-                <button className={ui.button} type="button" onClick={() => setConfirmDelete(true)}>
+                <button className={ui.ghost} type="button" onClick={() => setConfirmDelete(true)}>
+                  <Icon name="trash" size={15} />
                   Delete
                 </button>
               ))}
+            <span className={styles.spacer} />
+            <button className={ui.button} type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button className={ui.primary} type="submit" disabled={save.isPending}>
+              {save.isPending ? 'Saving…' : 'Save'}
+            </button>
           </div>
         )}
         {save.error && Object.keys(fieldErrors).length === 0 && <p className={ui.error}>{save.error.message}</p>}
@@ -369,19 +377,27 @@ export function SizeLimits({ canEdit, defaultOpen = false }: { canEdit: boolean;
   const change = (index: number, field: keyof DefinitionDraft, value: string) =>
     setDrafts(rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
 
+  // Scale of the small range bars: the largest limit that is set, with some room.
+  const limits = rows.flatMap((r) => [r.minSize, r.preferredSize, r.maxSize].map(toNumber).filter((n): n is number => n != null && Number.isFinite(n)))
+  const scale = Math.max(10, ...limits) * 1.08
+  const pct = (value: number) => `${Math.min(100, Math.max(0, (value / scale) * 100))}%`
+
   return (
-    <section className={page.panel}>
+    <section className={`${ui.panel} ${styles.sizePanel}`}>
       <button type="button" className={styles.collapse} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="size-limits">
-        <span className={styles.chevron}>{open ? '▾' : '▸'}</span>
-        <span className={page.panelTitle}>Quality size limits</span>
+        <span className={styles.collapseText}>
+          <span className={styles.collapseTitle}>Quality size limits</span>
+          <span className={styles.collapseDesc}>
+            In MB per minute of runtime. Releases outside the limits are skipped; StreamZH prefers sizes close to the preferred value. Leave maximum or
+            preferred empty for no limit.
+          </span>
+        </span>
+        <Icon name="down" size={16} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />
       </button>
       {open && (
-        <div id="size-limits">
-          <p className={styles.text}>
-            In MB per minute of runtime. Releases outside the limits are skipped; StreamZH prefers sizes close to the preferred value. Leave
-            maximum or preferred empty for no limit.
-          </p>
+        <div id="size-limits" className={styles.sizeBody}>
           {definitions.isError && <p className={ui.error}>{definitions.error.message}</p>}
+          {definitions.isPending && <Skeleton rows={6} />}
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -393,6 +409,9 @@ export function SizeLimits({ canEdit, defaultOpen = false }: { canEdit: boolean;
                 <thead>
                   <tr>
                     <th>Quality</th>
+                    <th className={styles.rangeCol} aria-hidden="true">
+                      Range
+                    </th>
                     <th>Min</th>
                     <th>Preferred</th>
                     <th>Max</th>
@@ -403,16 +422,28 @@ export function SizeLimits({ canEdit, defaultOpen = false }: { canEdit: boolean;
                     const error = ['minSize', 'preferredSize', 'maxSize', 'qualityId']
                       .map((f) => fieldErrors[`[${index}].${f}`]?.[0])
                       .find(Boolean)
+                    const min = toNumber(r.minSize) ?? 0
+                    const max = toNumber(r.maxSize)
+                    const preferred = toNumber(r.preferredSize)
                     return (
-                      <tr key={r.qualityId}>
+                      <tr key={r.qualityId} className={error ? styles.sizeInvalid : undefined}>
                         <th scope="row">
                           {r.title}
                           {error && <small className={ui.error}>{error}</small>}
                         </th>
+                        <td className={styles.rangeCol} aria-hidden="true">
+                          <span className={styles.range}>
+                            <i
+                              className={`${styles.rangeFill} ${max == null ? styles.rangeOpen : ''}`}
+                              style={{ left: pct(min), right: max == null ? '0%' : `calc(100% - ${pct(max)})` }}
+                            />
+                            {preferred != null && <b className={styles.rangeMark} style={{ left: pct(preferred) }} />}
+                          </span>
+                        </td>
                         {(['minSize', 'preferredSize', 'maxSize'] as const).map((field) => (
                           <td key={field}>
                             <input
-                              className={ui.input}
+                              className={`${ui.input} ${ui.num}`}
                               type="number"
                               min={0}
                               step="any"
@@ -432,19 +463,19 @@ export function SizeLimits({ canEdit, defaultOpen = false }: { canEdit: boolean;
               </table>
             </div>
             {canEdit && (
-              <div className={styles.footer}>
-                <button className={ui.primary} type="submit" disabled={!drafts || save.isPending}>
-                  {save.isPending ? 'Saving…' : 'Save'}
-                </button>
-                {drafts && (
-                  <button className={ui.button} type="button" onClick={() => setDrafts(null)}>
-                    Discard changes
-                  </button>
-                )}
-                {saved && <span className={ui.ok}>Saved</span>}
-                {save.error && Object.keys(fieldErrors).length === 0 && <span className={ui.error}>{save.error.message}</span>}
-                {Object.keys(fieldErrors).length > 0 && <span className={ui.error}>Some limits are not valid.</span>}
-              </div>
+              <SaveBar
+                dirty={!!drafts}
+                saving={save.isPending}
+                saved={saved}
+                error={
+                  Object.keys(fieldErrors).length > 0 ? 'Some limits are not valid.' : save.error ? save.error.message : null
+                }
+                onSave={() => save.mutate()}
+                onReset={() => {
+                  setDrafts(null)
+                  save.reset()
+                }}
+              />
             )}
           </form>
         </div>

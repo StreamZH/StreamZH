@@ -1,15 +1,21 @@
-/* System pages (Status, Tasks, Backup, Logs) and the restart overlay. */
+/* System pages (Status, Tasks, Backup, Logs) and the restart overlay, in the CloudZH look
+   (app.css .metric, .chk, .bar, .tbl, .logbox). */
 
+.loading {
+  padding: 22px;
+}
+
+/* ---- Key/value facts (CloudZH .kv) ---- */
 .facts {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 10px 24px;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 9px 24px;
   margin: 0;
   font-size: 13.5px;
 }
 
 .facts dt {
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .facts dd {
@@ -35,228 +41,7 @@
 }
 
 .muted {
-  color: var(--text-faint);
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Tables: a grid of rows that turns into cards on phones. */
-.table {
-  display: flex;
-  flex-direction: column;
-  font-size: 13.5px;
-}
-
-.head,
-.row {
-  display: grid;
-  gap: 4px 16px;
-  align-items: center;
-  padding: 10px 0;
-}
-
-.head {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-faint);
-  border-bottom: 1px solid var(--line);
-}
-
-.row {
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.cell {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.right {
-  justify-self: end;
-  text-align: right;
-}
-
-.cellLabel {
-  display: none;
-  font-size: 11.5px;
-  color: var(--text-faint);
-  margin-right: 6px;
-}
-
-.tasks .head,
-.tasks .row {
-  grid-template-columns: minmax(160px, 1.4fr) 110px minmax(120px, 1fr) 90px minmax(120px, 1fr) 110px;
-}
-
-.disk .head,
-.disk .row {
-  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr) 110px 110px minmax(120px, 1fr);
-}
-
-.backups .head,
-.backups .row {
-  grid-template-columns: minmax(220px, 2.4fr) 100px 80px minmax(100px, 1fr) 270px;
-}
-
-.files .head,
-.files .row {
-  grid-template-columns: minmax(160px, 1.4fr) 90px minmax(160px, 1fr) 190px;
-}
-
-@media (max-width: 860px) {
-  .head {
-    display: none;
-  }
-
-  .tasks .row,
-  .disk .row,
-  .backups .row,
-  .files .row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
-
-  .right {
-    justify-self: start;
-    text-align: left;
-  }
-
-  .cellLabel {
-    display: inline;
-  }
-}
-
-.name {
-  font-weight: 500;
-}
-
-.bar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--line);
-  overflow: hidden;
-}
-
-.barFill {
-  height: 100%;
-  background: var(--ok);
-}
-
-.barWarn {
-  background: var(--warn);
-}
-
-.barError {
-  background: #ef6b6b;
-}
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-faint);
-  flex: none;
-}
-
-.dotOk {
-  background: var(--ok);
-}
-
-.dotWarn {
-  background: var(--warn);
-}
-
-.dotError {
-  background: #ef6b6b;
-}
-
-.dotRun {
-  background: var(--accent);
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.health {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.notice {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
-  font-size: 13.5px;
-}
-
-.notice .dot {
-  margin-top: 6px;
-}
-
-.noticeText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.noticeSub {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  overflow-wrap: anywhere;
-}
-
-.noticeLink {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  white-space: nowrap;
+  color: var(--muted);
 }
 
 .ok {
@@ -268,23 +53,577 @@
 }
 
 .errorText {
-  color: #ef6b6b;
+  color: var(--err);
 }
 
 .small {
   font-size: 12.5px;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.link {
+  color: var(--accent);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* ---- Metrics (CloudZH .g-metrics / .metric) ---- */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1180px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .metrics {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+.metric {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.metricTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.metricIcon {
+  color: var(--muted);
+}
+
+.metricValue {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.metricValue small {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+
+.metricText {
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.metricSub {
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Health and disk space side by side */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.panelIcon {
+  color: var(--accent);
+  flex: none;
+}
+
+/* Panel head (CloudZH .panel-h): icon, 14 px title, optional note on the right. */
+.phead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.phead h2 {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pheadAside {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---- Health checks (CloudZH .chk) ---- */
+.allGood {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r);
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-size: 13.5px;
+}
+
+.allGood b {
+  font-weight: 600;
+}
+
+.health {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  animation: rise 0.25s var(--ease) backwards;
+}
+
+.check:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.checkIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.checkErr .checkIcon {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
+.checkWarn .checkIcon {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.checkInfo .checkIcon {
+  background: var(--sunk);
+  color: var(--muted);
+}
+
+.noticeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.noticeText b {
+  font-weight: 600;
+}
+
+.noticeText small {
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Disk space ---- */
+.disks {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.disk {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.disk:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.diskTop,
+.diskBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.diskTop {
+  font-size: 13.5px;
+}
+
+.diskFree {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.diskBottom {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diskPath {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* CloudZH .bar */
+.bar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--ok);
+  transform-origin: left;
+  transition: width 0.6s var(--ease);
+  animation: barIn 0.8s var(--ease) backwards;
+}
+
+@keyframes barIn {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.barWarn {
+  background: var(--warn);
+}
+
+.barError {
+  background: var(--err);
+}
+
+/* ---- Tables (CloudZH .tbl): a grid of rows that turns into cards on phones ---- */
+.table {
+  display: flex;
+  flex-direction: column;
+  font-size: 13.5px;
+}
+
+.head,
+.row {
+  display: grid;
+  gap: 4px 16px;
+  align-items: center;
+}
+
+.head {
+  padding: 0 8px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.12s;
+  animation: rise 0.25s var(--ease) backwards;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+.rowRunning {
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+}
+
+.cell {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.right {
+  justify-self: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cellLabel {
+  display: none;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+.tasks .head,
+.tasks .row {
+  grid-template-columns: minmax(180px, 1.5fr) 110px minmax(120px, 1fr) 90px minmax(130px, 1fr) 118px;
+}
+
+.backups .head,
+.backups .row {
+  grid-template-columns: minmax(220px, 2.4fr) 100px 80px minmax(100px, 1fr) 250px;
+}
+
+.files .head,
+.files .row {
+  grid-template-columns: minmax(180px, 1.6fr) 90px minmax(160px, 1fr) 160px;
+}
+
+.backups .actions,
+.files .actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  .head {
+    display: none;
+  }
+
+  .tasks .row,
+  .backups .row,
+  .files .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 12px 4px;
+  }
+
+  .right {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .cellLabel {
+    display: inline;
+  }
+
+  .backups .actions,
+  .files .actions {
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+}
+
+.name {
+  font-weight: 500;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+.fileCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fileIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--sunk);
+  color: var(--fg-2);
+}
+
+.fileCell > .mono {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fileCell > div {
+  flex-basis: 100%;
+}
+
+.inlinePill {
+  height: 20px;
+  margin-left: 8px;
+  font-size: 11px;
+  vertical-align: 1px;
+}
+
+/* Run now: the label changes, the width stays. */
+.runButton {
+  min-width: 96px;
+}
+
+/* Running task: a thin moving bar under the name. */
+.indeterminate {
+  position: relative;
+  display: block;
+  height: 3px;
+  margin-top: 7px;
+  max-width: 220px;
+  border-radius: 99px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+
+.indeterminate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 99px;
+  background: var(--accent);
+  animation: slide 1.3s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-105%);
+  }
+
+  to {
+    transform: translateX(260%);
+  }
+}
+
+/* Job queue: three small metrics */
+.queue {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .queue {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.queueItem {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 12px 14px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.queueValue {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.queueValue small {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 5px;
+}
+
+.queueValue small.errorText {
+  color: var(--err);
+}
+
+.queueRunning {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 28px;
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  flex: none;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+/* ---- Banners and the restart overlay (Restart.tsx) ---- */
 .banner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 16px;
   padding: 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line));
-  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
-  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+  background: var(--warn-soft);
+  border-radius: var(--r);
   font-size: 13.5px;
+  animation: rise 0.3s var(--ease) backwards;
 }
 
 .bannerText {
@@ -294,11 +633,15 @@
   gap: 2px;
 }
 
-.bannerText small {
-  color: var(--text-muted);
+.bannerText strong {
+  color: var(--warn);
+  font-weight: 600;
 }
 
-/* Restart overlay */
+.bannerText small {
+  color: var(--fg-2);
+}
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -306,8 +649,9 @@
   display: grid;
   place-items: center;
   padding: 16px;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  background: var(--scrim);
   backdrop-filter: blur(3px);
+  animation: fade 0.15s;
 }
 
 .overlayCard {
@@ -318,64 +662,153 @@
   padding: 22px 24px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
   font-size: 14px;
+  animation: pop 0.2s var(--ease);
 }
 
 .overlayTitle {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 17px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
 }
 
 .overlayCard p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--fg-2);
   font-size: 13.5px;
 }
 
-/* Logs */
-.filters {
+/* ---- Logs (CloudZH .logbox) ---- */
+.logBar {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  margin: 6px 0 12px;
+  padding: 6px 0;
+  background: var(--surface);
 }
 
-.search {
+.logBar .seg {
+  flex-wrap: wrap;
+}
+
+.searchBox {
+  position: relative;
+  display: flex;
+  align-items: center;
   flex: 1 1 220px;
-  max-width: 360px;
+  max-width: 380px;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.searchBox svg {
+  position: absolute;
+  left: 11px;
+  pointer-events: none;
+}
+
+.searchBox input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.liveDot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.liveDot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: livepulse 1.6s ease-out infinite;
+}
+
+@media (max-width: 720px) {
+  .searchBox {
+    order: -1;
+    flex-basis: 100%;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .logBar {
+    position: static;
+  }
 }
 
 .log {
   display: flex;
   flex-direction: column;
-  max-height: 560px;
+  height: min(60vh, 560px);
   overflow: auto;
-  background: var(--bg);
+  padding: 12px 0;
+  background: var(--code-bg);
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  border-radius: 12px;
   font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.logEmpty {
+  padding: 0 14px;
+  color: var(--muted);
+}
+
+.logCount {
+  margin: 8px 2px 0;
+  min-height: 1em;
   font-size: 12px;
+  color: var(--muted);
 }
 
 .entry {
   display: grid;
-  grid-template-columns: 172px 44px minmax(90px, 160px) minmax(0, 1fr);
-  gap: 2px 12px;
-  padding: 5px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+  grid-template-columns: 172px 54px minmax(90px, 160px) minmax(0, 1fr);
+  gap: 0 10px;
+  padding: 0 14px;
 }
 
-.entry:last-child {
-  border-bottom: none;
+.entry:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.entryNew {
+  animation: fadein 0.9s ease;
+}
+
+@keyframes fadein {
+  from {
+    background: var(--accent-soft);
+  }
 }
 
 @media (max-width: 860px) {
   .entry {
     grid-template-columns: auto auto minmax(0, 1fr);
+    padding-block: 4px;
   }
 
   .entryMessage {
@@ -384,12 +817,17 @@
 }
 
 .entryTime {
-  color: var(--text-faint);
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.entryLevel {
   white-space: nowrap;
 }
 
 .entryLogger {
-  color: var(--text-muted);
+  color: var(--accent);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -403,49 +841,90 @@
 
 .entryDetails {
   grid-column: 1 / -1;
-  margin: 4px 0 2px;
-  padding: 8px;
+  margin: 4px 0 6px;
+  padding: 10px 12px;
   white-space: pre-wrap;
   overflow-x: auto;
-  color: var(--text-muted);
+  color: var(--fg-2);
   background: var(--surface);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  animation: fade 0.15s;
 }
 
 .levelTrace,
 .levelDebug {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .levelInfo {
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .levelWarn {
   color: var(--warn);
+  font-weight: 500;
 }
 
 .levelError,
 .levelFatal {
-  color: #ef6b6b;
+  color: var(--err);
+  font-weight: 500;
 }
 
 .detailsToggle {
   font: inherit;
+  font-family: var(--font-body);
   font-size: 11.5px;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--accent);
   background: none;
   border: none;
   padding: 0;
   margin-left: 8px;
   cursor: pointer;
+}
+
+.detailsToggle:hover {
   text-decoration: underline;
 }
 
-.hiddenInput {
-  display: none;
+/* Kept for older markup */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
-.link {
-  color: var(--text);
+.search {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.dotOk {
+  background: var(--ok);
+}
+
+.dotWarn {
+  background: var(--warn);
+}
+
+.dotError {
+  background: var(--err);
+}
+
+.dotRun {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
 }

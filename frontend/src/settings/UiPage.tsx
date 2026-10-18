@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { generalApi, generalKeys, type UiSettings } from '../api/general'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
 import { formatDate, formatDateTime, formatLongDate, formatTime, relativeTime, setUiFormats } from '../lib/format'
+import { toggleTheme, useTheme } from '../lib/theme'
 import styles from './General.module.css'
 import { Row, SaveBar, Section, Select, SettingsPage, Toggle } from './SettingsKit'
 import { useSettingsForm } from './useSettingsForm'
@@ -100,8 +102,8 @@ export default function UiPage() {
           </Section>
 
           <Section id="style" title="Style and language">
-            <Row label="Theme" help="A light theme is planned.">
-              <span className={styles.value}>Dark</span>
+            <Row label="Theme" help="Remembered in this browser; the sun and moon button in the top bar switches it too.">
+              <ThemeSwitch />
             </Row>
             <Row label="UI language" help="German follows in a later version. Titles and descriptions follow Settings → Metadata.">
               <span className={styles.value}>English</span>
@@ -110,5 +112,20 @@ export default function UiPage() {
         </>
       )}
     </SettingsPage>
+  )
+}
+
+/** Light or dark, like the button in the top bar (lib/theme.ts). */
+function ThemeSwitch() {
+  const theme = useTheme()
+  return (
+    <div className={ui.seg} role="group" aria-label="Theme">
+      {(['light', 'dark'] as const).map((t) => (
+        <button key={t} type="button" aria-pressed={theme === t} onClick={() => theme !== t && toggleTheme()}>
+          <Icon name={t === 'light' ? 'sun' : 'moon'} size={15} />
+          {t === 'light' ? 'Light' : 'Dark'}
+        </button>
+      ))}
+    </div>
   )
 }

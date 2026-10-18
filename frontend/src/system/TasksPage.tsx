@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { generalApi, generalKeys, type ScheduledTask } from '../api/general'
 import { libraryApi, queryKeys } from '../api/library'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { formatAgo, formatDateTime } from '../lib/format'
 import { Section } from '../settings/SettingsKit'
@@ -34,6 +36,7 @@ export default function TasksPage() {
     <SystemPage title="Tasks" lead="Scheduled tasks run on their own; Run now starts one at once. All work goes through one queue, one job at a time.">
       <Section id="scheduled" title="Scheduled">
         {tasks.isError && <p className={ui.error}>{tasks.error.message}</p>}
+        {tasks.isPending && <Skeleton rows={6} />}
         {tasks.data && tasks.data.length === 0 && <p className={styles.muted}>No scheduled tasks.</p>}
         {tasks.data && tasks.data.length > 0 && (
           <div className={`${styles.table} ${styles.tasks}`} role="table" aria-label="Scheduled tasks">
@@ -54,26 +57,31 @@ export default function TasksPage() {
 
       <Section id="queue" title="Queue" description="Refreshes, searches, imports and scheduled tasks wait here. The status window shows the running one too.">
         {jobs.data && (
-          <dl className={styles.facts}>
-            <dt>Running</dt>
-            <dd>
+          <div className={styles.queue}>
+            <div className={styles.queueItem}>
+              <span className={ui.eyebrow}>Running</span>
               {jobs.data.running ? (
-                <span className={styles.status}>
-                  <span className={`${styles.dot} ${styles.dotRun}`} />
+                <span className={styles.queueRunning}>
+                  <span className={ui.dotBusy} />
                   {jobs.data.running}
                 </span>
               ) : (
-                <span className={styles.muted}>Idle</span>
+                <span className={`${styles.queueValue} ${styles.muted}`}>Idle</span>
               )}
-            </dd>
-            <dt>Waiting</dt>
-            <dd>{jobs.data.queued}</dd>
-            <dt>Since start</dt>
-            <dd>
-              {jobs.data.completedSinceStart} done
-              {jobs.data.failedSinceStart > 0 && <span className={styles.errorText}> · {jobs.data.failedSinceStart} failed</span>}
-            </dd>
-          </dl>
+            </div>
+            <div className={styles.queueItem}>
+              <span className={ui.eyebrow}>Waiting</span>
+              <span className={styles.queueValue}>{jobs.data.queued}</span>
+            </div>
+            <div className={styles.queueItem}>
+              <span className={ui.eyebrow}>Since start</span>
+              <span className={styles.queueValue}>
+                {jobs.data.completedSinceStart}
+                <small>done</small>
+                {jobs.data.failedSinceStart > 0 && <small className={styles.errorText}>· {jobs.data.failedSinceStart} failed</small>}
+              </span>
+            </div>
+          </div>
         )}
       </Section>
     </SystemPage>
@@ -89,9 +97,10 @@ function TaskRow({ task }: { task: ScheduledTask }) {
   const busy = task.running || task.queued || run.isPending
 
   return (
-    <div className={styles.row} role="row">
+    <div className={`${styles.row} ${task.running ? styles.rowRunning : ''}`} role="row">
       <span role="cell" className={styles.cell}>
         <span className={styles.name}>{task.name}</span>
+        {task.running && <span className={styles.indeterminate} aria-hidden="true" />}
         {task.lastSuccess === false && task.lastError && (
           <div className={`${styles.errorText} ${styles.small}`}>{task.lastError}</div>
         )}
@@ -104,7 +113,7 @@ function TaskRow({ task }: { task: ScheduledTask }) {
         <span className={styles.cellLabel}>Last run</span>
         {task.lastRun ? (
           <span className={styles.status}>
-            <span className={`${styles.dot} ${task.lastSuccess === false ? styles.dotError : task.lastSuccess ? styles.dotOk : ''}`} />
+            <span className={task.lastSuccess === false ? ui.dotErr : task.lastSuccess ? ui.dotOk : ui.dot} />
             {formatAgo(task.lastRun)}
           </span>
         ) : (
@@ -120,8 +129,8 @@ function TaskRow({ task }: { task: ScheduledTask }) {
         {task.running ? 'Running now' : task.queued ? 'Waiting in the queue' : task.nextRun ? formatAgo(task.nextRun) : '–'}
       </span>
       <span role="cell" className={`${styles.cell} ${styles.right}`}>
-        <button className={ui.button} type="button" onClick={() => run.mutate()} disabled={busy} aria-label={`Run ${task.name} now`}>
-          {busy && <span className={styles.spinner} />}
+        <button className={`${ui.button} ${ui.sm} ${styles.runButton}`} type="button" onClick={() => run.mutate()} disabled={busy} aria-label={`Run ${task.name} now`}>
+          {busy ? <span className={styles.spinner} /> : <Icon name="play" size={13} />}
           {task.running ? 'Running' : task.queued ? 'Queued' : 'Run now'}
         </button>
       </span>

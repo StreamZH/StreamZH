@@ -11,13 +11,13 @@
   min-width: 0;
   margin-top: auto;
   font-size: 12.5px;
-  color: var(--text-muted);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 
 .cardAdded {
   display: block;
-  color: var(--text-faint);
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -34,7 +34,7 @@
 
 .note {
   font-size: 12.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 /* Type picker: one group per source. */
@@ -48,40 +48,46 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .typeMedia {
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 /* Movies / Series switch in the form. */
 .segmented {
   display: inline-flex;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
   width: fit-content;
 }
 
 .segmented button {
   font: inherit;
   font-size: 13px;
-  padding: 7px 14px;
-  color: var(--text-muted);
+  font-weight: 500;
+  height: 30px;
+  padding: 0 12px;
+  color: var(--fg-2);
   background: transparent;
   border: none;
+  border-radius: 7px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-.segmented button + button {
-  border-left: 1px solid var(--line);
+.segmented button:hover:not(:disabled) {
+  color: var(--fg);
 }
 
 .segmented button[aria-pressed='true'] {
-  color: var(--text);
-  background: var(--surface-hover);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .segmented button:disabled {
@@ -92,8 +98,10 @@
 .preview {
   margin-top: 4px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
+  animation: rise 0.25s var(--ease) backwards;
 }
 
 .previewHead {
@@ -103,6 +111,7 @@
   gap: 6px 12px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
+  background: var(--sunk);
   font-size: 13px;
 }
 
@@ -119,17 +128,26 @@
 .filter {
   font: inherit;
   font-size: 12px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  color: var(--text-muted);
+  font-weight: 500;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  color: var(--fg-2);
   background: var(--surface);
   border: 1px solid var(--line);
   cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter:hover {
+  color: var(--fg);
 }
 
 .filter[aria-pressed='true'] {
-  color: var(--text);
-  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
 }
 
 .previewList {
@@ -145,9 +163,14 @@
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  border-top: 1px solid var(--line);
   font-size: 13px;
   min-width: 0;
+  transition: background 0.12s;
+}
+
+.previewItem:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .previewItem:first-child {
@@ -172,7 +195,7 @@
 }
 
 .year {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .itemActions {
@@ -182,14 +205,16 @@
 }
 
 .small {
-  padding: 5px 9px;
-  font-size: 12px;
+  height: 28px !important;
+  padding: 0 9px !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
 }
 
 .empty {
   padding: 14px 12px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 /* Exclusions */
@@ -210,22 +235,30 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .table th {
   text-align: left;
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-faint);
-  padding: 6px 8px;
+  color: var(--muted);
+  padding: 0 12px 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
 .table td {
-  padding: 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--line);
   vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .table td:last-child,
@@ -247,7 +280,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 @media (max-width: 600px) {

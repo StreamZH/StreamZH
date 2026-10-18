@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { RuleType } from '../../api/renamer'
+import Icon from '../../components/Icon'
 import ui from '../../components/ui.module.css'
 import styles from './Renamer.module.css'
 import { CaseForm, CounterForm, ExtensionForm, InsertForm, MediaForm, RemoveForm, ReplaceForm, TrimForm } from './RuleForms'
@@ -79,7 +80,7 @@ export default function RuleList({
           const stem = sample && rule.type === 'replace' && rule.scope === 'name' ? sample.replace(/\.[^.]+$/, '') : sample
           const set = (patch: Partial<EditorRule>) => update(rule.id, patch)
           return (
-            <li key={rule.id} className={`${styles.rule} ${!rule.enabled ? styles.ruleOff : ''} ${error ? styles.ruleInvalid : ''} ${rule.type === 'media' ? styles.ruleMedia : ''}`}>
+            <li key={rule.id} className={`${styles.rule} ${isOpen ? styles.ruleOpen : ''} ${!rule.enabled ? styles.ruleOff : ''} ${error ? styles.ruleInvalid : ''} ${rule.type === 'media' ? styles.ruleMedia : ''}`}>
               <div className={styles.ruleHead}>
                 <span className={styles.ruleNumber} aria-hidden="true">
                   {index + 1}
@@ -88,7 +89,7 @@ export default function RuleList({
                   <span className={styles.ruleType}>{ruleLabel(rule.type)}</span>
                   <span className={styles.ruleSummary}>{ruleSummary(rule)}</span>
                   <span className={styles.chevron} aria-hidden="true">
-                    {isOpen ? '▴' : '▾'}
+                    <Icon name="down" size={15} />
                   </span>
                 </button>
                 <div className={styles.ruleTools}>
@@ -97,13 +98,13 @@ export default function RuleList({
                     <span aria-hidden="true" />
                   </label>
                   <button type="button" className={styles.iconButton} disabled={index === 0} onClick={() => move(index, -1)} aria-label={`Move rule ${index + 1} up`} title="Up">
-                    ↑
+                    <Icon name="up" size={15} />
                   </button>
                   <button type="button" className={styles.iconButton} disabled={index === rules.length - 1} onClick={() => move(index, 1)} aria-label={`Move rule ${index + 1} down`} title="Down">
-                    ↓
+                    <Icon name="down" size={15} />
                   </button>
                   <button type="button" className={styles.iconButton} onClick={() => onChange(rules.filter((r) => r.id !== rule.id))} aria-label={`Remove rule ${index + 1}`} title="Remove">
-                    ×
+                    <Icon name="x" size={15} />
                   </button>
                 </div>
               </div>
@@ -139,7 +140,8 @@ export default function RuleList({
         </div>
       ) : (
         <button type="button" className={`${ui.button} ${styles.addButton}`} onClick={() => setAdding(true)} disabled={rules.length >= 50}>
-          + Add rule
+          <Icon name="plus" size={15} />
+          Add rule
         </button>
       )}
     </div>

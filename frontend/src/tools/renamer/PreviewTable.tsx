@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { PreviewResult, PreviewRow } from '../../api/renamer'
+import Icon from '../../components/Icon'
 import ui from '../../components/ui.module.css'
 import { formatBytes } from '../../lib/format'
 import styles from './Renamer.module.css'
@@ -180,6 +181,7 @@ export default function PreviewTable({
           {groups.map(([folder, list]) => (
             <div key={folder || '.'} role="rowgroup">
               <div className={styles.folderRow} role="row">
+                <Icon name="folder" size={14} />
                 <span role="cell" className={styles.folderName}>
                   {folder === '' ? preview.folder : folder}
                 </span>
@@ -196,6 +198,8 @@ export default function PreviewTable({
                       : row.status === 'error'
                         ? styles.statusError
                         : styles.statusIdle
+                const statusPill =
+                  row.status === 'rename' ? ui.pillOk : row.status === 'conflict' ? ui.pillWarn : row.status === 'error' ? ui.pillErr : ''
                 return (
                   <div key={row.key} role="row" className={`${styles.row} ${row.companionOf ? styles.companion : ''} ${row.status === 'excluded' ? styles.rowOff : ''}`}>
                     <span role="cell" className={styles.cellCheck}>
@@ -212,7 +216,7 @@ export default function PreviewTable({
                       {!row.isFolder && <span className={styles.size}>{formatBytes(row.size)}</span>}
                     </span>
                     <span role="cell" className={styles.arrow} aria-hidden="true">
-                      →
+                      <Icon name="right" size={14} />
                     </span>
                     <span role="cell" className={styles.cellNew}>
                       {moved && <span className={styles.movedTo}>{row.newFolder || preview.folder}/</span>}
@@ -220,7 +224,7 @@ export default function PreviewTable({
                       <MediaChip row={row} />
                     </span>
                     <span role="cell" className={`${styles.cellStatus} ${statusClass}`}>
-                      <span className={styles.statusLabel}>{row.problem ? problemLabel[row.problem] ?? statusLabel[row.status] : statusLabel[row.status]}</span>
+                      <span className={`${ui.pill} ${statusPill} ${styles.statusLabel}`}>{row.problem ? problemLabel[row.problem] ?? statusLabel[row.status] : statusLabel[row.status]}</span>
                       {row.message && <small>{row.message}</small>}
                     </span>
                   </div>

@@ -58,6 +58,7 @@ export default function ReleaseProfileDialog({ profile, onClose }: { profile: Re
         </Row>
         <Row
           label="Must contain"
+          wide
           htmlFor="rp-required"
           help={
             <>
@@ -69,17 +70,18 @@ export default function ReleaseProfileDialog({ profile, onClose }: { profile: Re
         >
           <TermInput id="rp-required" label="Must contain" value={draft.required} onChange={(required) => set({ required })} />
         </Row>
-        <Row label="Must not contain" htmlFor="rp-ignored" help="The release is rejected when it contains any of these terms." error={error('ignored')}>
+        <Row label="Must not contain" wide htmlFor="rp-ignored" help="The release is rejected when it contains any of these terms." error={error('ignored')}>
           <TermInput id="rp-ignored" label="Must not contain" value={draft.ignored} onChange={(ignored) => set({ ignored })} />
         </Row>
         <Row
           label="Preferred"
+          wide
           help="Matching terms add their score. A higher total ranks a release higher after quality and language, and can replace a file of the same quality when the profile allows upgrades."
           error={error('preferred')}
         >
           <PreferredInput value={draft.preferred} onChange={(preferred) => set({ preferred })} />
         </Row>
-        <Row label="Indexers" help="None selected: all indexers." error={error('indexerIds')}>
+        <Row label="Indexers" wide help="None selected: all indexers." error={error('indexerIds')}>
           <div className={styles.picks}>
             {(indexers.data ?? []).map((i) => (
               <label key={i.id} className={ui.check}>
@@ -90,7 +92,7 @@ export default function ReleaseProfileDialog({ profile, onClose }: { profile: Re
             {indexers.data?.length === 0 && <span className={ui.muted}>No indexers yet.</span>}
           </div>
         </Row>
-        <Row label="Quality profiles" help="None selected: all quality profiles." error={error('qualityProfileIds')}>
+        <Row label="Quality profiles" wide help="None selected: all quality profiles." error={error('qualityProfileIds')}>
           <div className={styles.picks}>
             {(qualityProfiles.data ?? []).map((p) => (
               <label key={p.id} className={ui.check}>

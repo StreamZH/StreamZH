@@ -4,10 +4,12 @@ import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
 import FolderPicker from '../components/FolderPicker'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
-import page from '../pages/Page.module.css'
 import styles from '../pages/Settings.module.css'
+import { Section } from './SettingsKit'
 
 export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
   const queryClient = useQueryClient()
@@ -35,36 +37,47 @@ export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
   }
 
   return (
-    <section className={page.panel}>
-      <h2 className={page.panelTitle}>Root folders</h2>
-      <p className={styles.text}>The folders where your movies and series live. StreamZH reads them and imports finished downloads into them.</p>
-
+    <Section id="root-folders" title="Root folders" description="The folders where your movies and series live. StreamZH reads them and imports finished downloads into them.">
+      {folders.isPending && <Skeleton rows={2} />}
       {(folders.data ?? []).length > 0 && (
         <ul className={styles.rootList}>
           {folders.data!.map((f) => (
             <li key={f.id}>
-              <span className={`${ui.badge} ${f.accessible ? ui.ok : ui.missing}`}>{f.mediaType === 'Movie' ? 'Movies' : 'Series'}</span>
-              <code className={styles.rootPath}>{f.path}</code>
-              {f.accessible && !f.writable && (
-                <span className={`${ui.badge} ${ui.waiting}`} title={f.writeProblem ?? undefined}>
-                  Read only
-                </span>
-              )}
-              <span className={styles.rootMeta}>
-                {!f.accessible
-                  ? 'Not reachable'
-                  : f.freeSpace != null
-                    ? `${formatBytes(f.freeSpace)} free`
-                    : ''}
+              <span className={styles.rootIcon} aria-hidden="true">
+                <Icon name={f.mediaType === 'Movie' ? 'film' : 'tv'} size={16} />
               </span>
-              {f.unmappedFolders > 0 && (
-                <Link className={styles.rootImport} to={`/library/import?type=${f.mediaType}`}>
-                  Import {f.unmappedFolders}
-                </Link>
-              )}
-              <button className={styles.secondary} type="button" onClick={() => remove.mutate(f.id)} disabled={remove.isPending}>
-                Remove
-              </button>
+              <div className={styles.rootMain}>
+                <code className={styles.rootPath}>{f.path}</code>
+                <span className={styles.rootMeta}>
+                  <span className={`${ui.pill} ${f.accessible ? ui.pillOk : ui.pillErr}`}>{f.mediaType === 'Movie' ? 'Movies' : 'Series'}</span>
+                  {f.accessible && !f.writable && (
+                    <span className={`${ui.pill} ${ui.pillWarn}`} title={f.writeProblem ?? undefined}>
+                      Read only
+                    </span>
+                  )}
+                  <span className={ui.num}>
+                    {!f.accessible ? 'Not reachable' : f.freeSpace != null ? `${formatBytes(f.freeSpace)} free` : ''}
+                  </span>
+                </span>
+              </div>
+              <div className={styles.rootSide}>
+                {f.unmappedFolders > 0 && (
+                  <Link className={`${ui.button} ${ui.sm}`} to={`/library/import?type=${f.mediaType}`}>
+                    <Icon name="folderplus" size={14} />
+                    Import {f.unmappedFolders}
+                  </Link>
+                )}
+                <button
+                  className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
+                  type="button"
+                  onClick={() => remove.mutate(f.id)}
+                  disabled={remove.isPending}
+                  aria-label={`Remove ${f.path}`}
+                  title="Remove"
+                >
+                  <Icon name="trash" size={15} />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -97,14 +110,16 @@ export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
           onClick={() => !path && setPicking(true)}
           aria-label="Folder path"
         />
-        <button className={styles.secondary} type="button" onClick={() => setPicking(true)}>
+        <button className={ui.button} type="button" onClick={() => setPicking(true)}>
+          <Icon name="folder" size={15} />
           Browse…
         </button>
         <select className={ui.select} value={mediaType} onChange={(e) => setMediaType(e.target.value as MediaType)} aria-label="Media type">
           <option value="Movie">Movies</option>
           <option value="Series">Series</option>
         </select>
-        <button className={styles.primary} type="submit" disabled={!path.trim() || add.isPending}>
+        <button className={ui.primary} type="submit" disabled={!path.trim() || add.isPending}>
+          <Icon name="plus" size={15} />
           Add folder
         </button>
       </form>
@@ -121,6 +136,6 @@ export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
       {add.error && (
         <p className={styles.error}>{add.error instanceof ApiError ? add.error.message : 'Could not add the folder.'}</p>
       )}
-    </section>
+    </Section>
   )
 }

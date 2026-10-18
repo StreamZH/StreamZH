@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { queryKeys, type MediaType } from '../api/library'
 import { mediaManagementApi, mediaManagementKeys } from '../api/mediaManagement'
+import Loader from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import styles from './MediaManagement.module.css'
@@ -33,7 +34,7 @@ export default function RenameDialog({ type, id, title, onClose }: { type: Media
   return (
     <Modal title={`Rename files · ${title}`} onClose={onClose}>
       {preview.isError && <p className={ui.error}>{preview.error.message}</p>}
-      {preview.isPending && <p className={styles.dialogText}>Checking the file names…</p>}
+      {preview.isPending && <Loader text="Checking the file names…" />}
       {preview.isSuccess && items.length === 0 && (
         <p className={styles.dialogText}>
           All files already follow the naming scheme (or renaming is off). The formats are in{' '}

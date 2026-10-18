@@ -1,31 +1,12 @@
-.back {
-  display: inline-block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-
-.back:hover {
-  color: var(--text);
-}
-
-.panelHead {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-}
-
+/* Settings → Profiles (list, profile dialog) and Settings → Quality (size limits), CloudZH look. */
 .text {
   margin: 0 0 12px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .list {
   list-style: none;
-  margin: 0;
+  margin: 4px 0 0;
   padding: 0;
 }
 
@@ -33,17 +14,45 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 24px;
-  padding: 12px 0;
+  gap: 10px 24px;
+  padding: 12px 6px;
+  margin: 0 -6px;
   border-top: 1px solid var(--line);
+  border-radius: 8px;
+  transition: background 0.12s;
+  animation: rise 0.25s var(--ease) backwards;
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .rowMain {
-  flex: 1 1 200px;
+  flex: 1 1 220px;
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.rowIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--sunk);
+  color: var(--muted);
+}
+
+.rowIconOn {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .name {
@@ -62,28 +71,35 @@
 .meta div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 110px;
 }
 
 .meta dt {
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .meta dd {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .rowActions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  min-width: 190px;
+  gap: 6px;
+  min-width: 180px;
   margin-left: auto;
 }
 
+@media (max-width: 640px) {
+  .rowActions {
+    min-width: 0;
+  }
+}
+
+/* ---- Profile dialog ---- */
 .form {
   display: flex;
   flex-direction: column;
@@ -119,99 +135,110 @@
   max-height: 340px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
+  border-radius: var(--r-sm);
+  background: var(--surface);
 }
 
 .qualities li {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
+  padding: 4px 6px 4px 12px;
   border-top: 1px solid var(--line);
+  transition: background 0.12s;
 }
 
 .qualities li:first-child {
   border-top: none;
 }
 
+.qualities li:hover {
+  background: var(--sunk);
+}
+
 .qualities li > label {
   flex: 1;
-  color: var(--text);
+  color: var(--fg);
+  min-height: 30px;
 }
 
 .notAllowed > label {
-  color: var(--text-faint) !important;
+  color: var(--muted) !important;
 }
 
 .cutoffTag {
-  font-size: 11.5px;
-  font-family: var(--font-mono);
   color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
 }
 
 .moveButtons {
   display: inline-flex;
-  gap: 4px;
-}
-
-.move {
-  width: 28px;
-  height: 28px;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--text-muted);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.move:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--surface-hover);
-}
-
-.move:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.move:disabled {
-  opacity: 0.3;
-  cursor: default;
+  gap: 2px;
 }
 
 .footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 .spacer {
   flex: 1;
 }
 
+/* ---- Quality size limits ---- */
+.sizePanel {
+  display: flex;
+  flex-direction: column;
+}
+
 .collapse {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
   width: 100%;
   padding: 0;
   font: inherit;
-  color: var(--text);
+  color: var(--fg);
   text-align: left;
   background: none;
   border: none;
   cursor: pointer;
 }
 
-.collapse .chevron {
-  width: 12px;
-  color: var(--text-faint);
+.collapseText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.collapseTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.collapseDesc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 76ch;
+}
+
+.chevron {
+  flex: none;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform 0.2s var(--ease);
+}
+
+.chevronOpen {
+  transform: none;
 }
 
 .collapse:focus-visible {
@@ -220,8 +247,9 @@
   border-radius: 4px;
 }
 
-.collapse:not([aria-expanded='true']) > :last-child {
-  margin-bottom: 0;
+.sizeBody {
+  margin-top: 14px;
+  animation: fade 0.2s ease;
 }
 
 .tableWrap {
@@ -231,26 +259,37 @@
 .sizes {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .sizes th,
 .sizes td {
-  padding: 6px 8px;
+  padding: 6px 12px 6px 0;
   text-align: left;
   border-top: 1px solid var(--line);
+  vertical-align: middle;
 }
 
 .sizes thead th {
   font-weight: 500;
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--muted);
   border-top: none;
+  padding-bottom: 10px;
+}
+
+.sizes tbody tr {
+  transition: background 0.12s;
+}
+
+.sizes tbody tr:hover > * {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .sizes tbody th {
   font-weight: 500;
   white-space: nowrap;
+  padding-left: 4px;
 }
 
 .sizes tbody th small {
@@ -259,18 +298,66 @@
   white-space: normal;
 }
 
+.sizes td:last-child {
+  padding-right: 4px;
+}
+
 .sizes input {
   width: 100%;
   min-width: 80px;
-  padding: 6px 10px;
-  font-family: var(--font-mono);
+  max-width: 130px;
+  height: 32px;
+  padding: 0 10px;
   font-size: 13px;
+  border-radius: 8px;
 }
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px 24px;
+.sizeInvalid input {
+  border-color: var(--err);
+}
+
+/* Small range bar: min to max, a mark at the preferred size. */
+.rangeCol {
+  width: 38%;
+}
+
+.range {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+}
+
+.rangeFill {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  transition: left 0.3s var(--ease), right 0.3s var(--ease);
+}
+
+.rangeOpen {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent) 60%, transparent);
+}
+
+.rangeMark {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: left 0.3s var(--ease);
+}
+
+@media (max-width: 860px) {
+  .rangeCol {
+    display: none;
+  }
 }

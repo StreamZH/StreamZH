@@ -68,7 +68,7 @@ public sealed class ToolSettingsApiTests : IDisposable
             Files = [OperatingSystem.IsWindows() ? "7z.exe" : "7zz"],
         };
         _factory.ToolDownloads.Add(par2.Download, data);
-        _factory.ToolCatalog = new ToolCatalog((tool, _) => tool == PostProcessTool.Par2 ? par2 : sevenZip);
+        _factory.ToolCatalog = new ToolCatalog((tool, _) => tool switch { PostProcessTool.Par2 => par2, PostProcessTool.SevenZip => sevenZip, _ => null });
         var client = await _factory.CreateOwnerClientAsync();
         var toolsFolder = Path.Combine(_factory.DataDirectory, "tools");
 
@@ -103,7 +103,12 @@ public sealed class ToolSettingsApiTests : IDisposable
         Assert.Contains("HTTP 404", after.SevenZipInstallError);
         Assert.Null(after.SevenZipInstalledVersion);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/v1/settings/tools/ffmpeg/install", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/v1/settings/tools/handbrake/install", null)).StatusCode);
+
+        // ffprobe has no package in this catalog (like on Linux, where it comes from the ffmpeg package).
+        var ffprobe = await client.PostAsync("/api/v1/settings/tools/ffprobe/install", null);
+        Assert.Equal(HttpStatusCode.BadRequest, ffprobe.StatusCode);
+        Assert.Contains("cannot install ffprobe", await ffprobe.Content.ReadAsStringAsync());
     }
 
     [Fact]

@@ -298,7 +298,34 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
         }
     }
 
-    /// <summary>Removes empty folders below <paramref name="folder"/> (and the folder itself when <paramref name="includeSelf"/>).</summary>
+    /// <summary>Files the operating system leaves in folders (thumbnail caches, folder settings); never media, subtitles or NFOs.</summary>
+    public static IReadOnlySet<string> JunkFileNames { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "Thumbs.db", "ehthumbs.db", "ehthumbs_vista.db", "desktop.ini", ".DS_Store", ".localized",
+    };
+
+    /// <summary>True when the folder holds no subfolders and no files except <see cref="JunkFileNames"/> (listed in <paramref name="junk"/>).</summary>
+    public static bool OnlyJunk(string folder, out IReadOnlyList<string> junk)
+    {
+        var found = new List<string>();
+        junk = found;
+        foreach (var entry in Directory.EnumerateFileSystemEntries(folder))
+        {
+            if (Directory.Exists(entry) || !JunkFileNames.Contains(Path.GetFileName(entry)))
+            {
+                return false;
+            }
+
+            found.Add(entry);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Removes empty folders below <paramref name="folder"/> (and the folder itself when <paramref name="includeSelf"/>);
+    /// a folder with only system junk (<see cref="JunkFileNames"/>) counts as empty.
+    /// </summary>
     public void DeleteEmptyFolders(string folder, bool includeSelf)
     {
         try
@@ -313,8 +340,14 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
                 DeleteEmptyFolders(sub, includeSelf: true);
             }
 
-            if (includeSelf && !Directory.EnumerateFileSystemEntries(folder).Any())
+            if (includeSelf && OnlyJunk(folder, out var junk))
             {
+                foreach (var file in junk)
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
+                }
+
                 Directory.Delete(folder);
                 logger.LogDebug("Deleted empty folder {Folder}", folder);
             }

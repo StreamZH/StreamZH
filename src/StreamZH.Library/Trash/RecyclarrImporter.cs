@@ -358,7 +358,9 @@ public sealed class RecyclarrImporter(
                 errors.ContainsKey("naming.seriesFile") ? null : naming.SeriesFile);
             errors.Clear();
             values = apply.NamingValues(naming, guides, errors);
-            if (errors.Count > 0)
+
+            // An anime variant StreamZH cannot use leaves only the anime format unchanged (warned above).
+            if (errors.Keys.Any(k => k != TrashApplyService.AnimeKey))
             {
                 return;
             }

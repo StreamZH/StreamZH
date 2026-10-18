@@ -175,11 +175,12 @@ public sealed class RecyclarrImporterTests : IDisposable
         Assert.Equal("movie:movie:0.5,series:series", _bed.Config.Get(StreamZH.Data.ConfigKeys.TrashQualitySizes));
         Assert.Equal("{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}", _bed.Media.Current.MovieFolderFormat);
 
-        // Variants with tokens StreamZH's renamer does not know yet stay as they were, with a warning.
-        Assert.Equal(MediaManagementValues.DefaultSeriesFolderFormat, _bed.Media.Current.SeriesFolderFormat);
-        Assert.Equal(MediaManagementValues.DefaultMovieFormat, _bed.Media.Current.StandardMovieFormat);
-        Assert.Contains(result.Warnings, w => w.StartsWith("Naming (seriesFolder)", StringComparison.Ordinal));
-        Assert.Contains(result.Warnings, w => w.StartsWith("Naming (movieFile)", StringComparison.Ordinal));
+        // The media info tokens make the TRaSH file variants usable; only an anime variant with unknown tokens stays as it was.
+        Assert.Equal("{Series CleanTitleWithoutYear} {(Series Year)}", _bed.Media.Current.SeriesFolderFormat);
+        Assert.Equal(TrashTestBed.Guides.Movie.Naming["file"]["plex-tmdb"], _bed.Media.Current.StandardMovieFormat);
+        Assert.Equal(TrashTestBed.Guides.Series.Naming["episodes.standard"]["default"], _bed.Media.Current.StandardEpisodeFormat);
+        Assert.DoesNotContain(result.Warnings, w => w.StartsWith("Naming (seriesFolder)", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Warnings, w => w.StartsWith("Naming (movieFile)", StringComparison.Ordinal));
     }
 
     [Fact]

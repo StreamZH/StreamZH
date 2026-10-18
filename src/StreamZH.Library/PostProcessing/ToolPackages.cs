@@ -32,7 +32,7 @@ public sealed record ToolDownload(string FileName, Uri Url, string Sha256);
 
 public enum ToolInstallMethod
 {
-    /// <summary>Zip archive with the executable (par2cmdline-turbo).</summary>
+    /// <summary>Zip archive with the executable (par2cmdline-turbo, the FFmpeg build with ffprobe); only the needed files are unpacked.</summary>
     Zip,
 
     /// <summary>7-Zip .msi, unpacked with an administrative install (msiexec /a, no admin rights needed).</summary>
@@ -70,8 +70,8 @@ public sealed record ToolCatalog(Func<PostProcessTool, ToolPlatform, ToolPackage
 }
 
 /// <summary>
-/// The pinned par2cmdline-turbo and 7-Zip releases StreamZH installs by itself (official GitHub releases, SHA-256 from the
-/// release pages). Both are separate programs under their own licenses; StreamZH only calls them.
+/// The pinned par2cmdline-turbo, 7-Zip and FFmpeg (ffprobe) releases StreamZH installs by itself (official GitHub releases,
+/// SHA-256 from the release pages). All are separate programs under their own licenses; StreamZH only calls them.
 /// </summary>
 public static class ToolPackages
 {
@@ -81,6 +81,16 @@ public static class ToolPackages
     public const string SevenZipName = "7-Zip";
     public const string SevenZipVersion = "26.03";
     public const string SevenZipLicense = "LGPL-2.1-or-later with the unRAR restriction";
+
+    /// <summary>
+    /// ffprobe for Windows x64 from Gyan Doshi's FFmpeg "essentials" build (one of the Windows builds ffmpeg.org links to),
+    /// from its versioned GitHub release; the SHA-256 is the one www.gyan.dev publishes for the same file
+    /// (ffmpeg-release-essentials.zip.sha256). Only ffprobe.exe (with LICENSE and README.txt, which names the source) is
+    /// unpacked. Linux, macOS and Docker use ffprobe from PATH (the ffmpeg package).
+    /// </summary>
+    public const string FfprobeName = "FFmpeg (gyan.dev essentials build)";
+    public const string FfprobeVersion = "9.0.2";
+    public const string FfprobeLicense = "GPL-3.0-or-later";
 
     private const string Par2Base = "https://github.com/animetosho/par2cmdline-turbo/releases/download/v1.5.0/";
     private const string SevenZipBase = "https://github.com/ip7z/7zip/releases/download/26.03/";
@@ -100,6 +110,11 @@ public static class ToolPackages
     public static ToolDownload SevenZipLinuxArm64 { get; } = SevenZip("7z2603-linux-arm64.tar.xz", "2389ba20e4d8295e8709c20b6263b69bd1ec4972fe38a04ad7a1badbf595b996");
     public static ToolDownload SevenZipMacOs { get; } = SevenZip("7z2603-mac.tar.xz", "5ca87677072c59f5602e5c49baa27d4694bacd2259b4e507f0094249d4281480");
 
+    public static ToolDownload FfprobeWinX64 { get; } = new(
+        "ffmpeg-9.0.2-essentials_build.zip",
+        new Uri("https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip"),
+        "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba");
+
     /// <summary>License and readme files copied along when the download has them.</summary>
     public static IReadOnlyList<string> NoticeFiles { get; } = ["License.txt", "license.txt", "COPYING", "LICENSE", "readme.txt", "README.md"];
 
@@ -107,8 +122,19 @@ public static class ToolPackages
     public static ToolPackage? For(PostProcessTool tool, ToolPlatform platform)
     {
         ArgumentNullException.ThrowIfNull(platform);
-        return tool == PostProcessTool.Par2 ? ForPar2(platform) : ForSevenZip(platform);
+        return tool switch
+        {
+            PostProcessTool.Par2 => ForPar2(platform),
+            PostProcessTool.FFprobe => ForFfprobe(platform),
+            _ => ForSevenZip(platform),
+        };
     }
+
+    /// <summary>Windows x64 only; elsewhere ffprobe comes with the system's ffmpeg package.</summary>
+    private static ToolPackage? ForFfprobe(ToolPlatform platform) =>
+        (platform.Os, platform.Architecture) is (ToolOs.Windows, Architecture.X64)
+            ? new ToolPackage(PostProcessTool.FFprobe, FfprobeName, FfprobeVersion, FfprobeLicense, ToolInstallMethod.Zip, FfprobeWinX64, ["ffprobe.exe"])
+            : null;
 
     private static ToolPackage? ForPar2(ToolPlatform platform)
     {

@@ -20,5 +20,6 @@
     <None Update="Indexers/Files/**" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TrashSync/Guides/**" CopyToOutputDirectory="PreserveNewest" />
     <None Update="CustomFormats/Files/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Library/MediaFiles/Files/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

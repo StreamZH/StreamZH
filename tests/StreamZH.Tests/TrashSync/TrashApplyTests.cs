@@ -307,16 +307,63 @@ public sealed class TrashApplyTests : IDisposable
     [Fact]
     public void Naming_variant_with_tokens_streamzh_lacks_is_skipped_with_a_warning()
     {
+        var anime = TrashTestBed.Guides.Series.Naming["episodes.anime"]["default"];
+        var animeProblem = FileNameBuilder.ValidateFormat(anime, NamingFormatKind.AnimeEpisode);
         var result = _bed.Apply.ApplyWithExtras(
             new TrashApplyRequest { MovieTemplate = TrashTestBed.MovieGerman },
             applyQualitySizes: false,
-            new TrashNaming(MovieFolder: "plex-imdb", SeriesFolder: "default"),
+            new TrashNaming(MovieFolder: "plex-imdb", SeriesFolder: "default", SeriesFile: "default"),
             TrashTestBed.Guides);
 
-        var warning = Assert.Single(result.Warnings, w => w.StartsWith("Naming seriesFolder 'default' not applied: Unknown token", StringComparison.Ordinal));
-        Assert.NotNull(warning);
-        Assert.Equal(MediaManagementValues.DefaultSeriesFolderFormat, _bed.Media.Current.SeriesFolderFormat);
+        // Standard and daily apply; the anime variant only when StreamZH knows all its tokens ({absolute} for absolute numbering).
+        Assert.Equal(TrashTestBed.Guides.Series.Naming["episodes.standard"]["default"], _bed.Media.Current.StandardEpisodeFormat);
+        Assert.Equal(TrashTestBed.Guides.Series.Naming["episodes.daily"]["default"], _bed.Media.Current.DailyEpisodeFormat);
+        if (animeProblem is null)
+        {
+            Assert.Equal(anime, _bed.Media.Current.AnimeEpisodeFormat);
+        }
+        else
+        {
+            Assert.Single(result.Warnings, w => w.StartsWith("Naming seriesFileAnime 'default' not applied: Unknown token", StringComparison.Ordinal));
+            Assert.Equal(MediaManagementValues.DefaultAnimeFormat, _bed.Media.Current.AnimeEpisodeFormat);
+        }
+
+        Assert.Equal("{Series CleanTitleWithoutYear} {(Series Year)}", _bed.Media.Current.SeriesFolderFormat);
         Assert.Equal("{Movie CleanTitle} ({Release Year}) {imdb-{ImdbId}}", _bed.Media.Current.MovieFolderFormat);
+    }
+
+    /// <summary>Every naming variant of the guides fixture is usable now that the renamer has the media info tokens (anime: see above).</summary>
+    [Fact]
+    public void All_trash_naming_variants_validate()
+    {
+        var guides = TrashTestBed.Guides;
+        var kinds = new Dictionary<string, NamingFormatKind>
+        {
+            ["folder"] = NamingFormatKind.MovieFolder,
+            ["file"] = NamingFormatKind.MovieFile,
+        };
+        foreach (var (section, kind) in kinds)
+        {
+            foreach (var (name, format) in guides.Movie.Naming[section])
+            {
+                Assert.True(FileNameBuilder.ValidateFormat(format, kind) is null, $"radarr {section} {name}: {FileNameBuilder.ValidateFormat(format, kind)}");
+            }
+        }
+
+        var seriesKinds = new Dictionary<string, NamingFormatKind>
+        {
+            ["series"] = NamingFormatKind.SeriesFolder,
+            ["season"] = NamingFormatKind.SeasonFolder,
+            ["episodes.standard"] = NamingFormatKind.StandardEpisode,
+            ["episodes.daily"] = NamingFormatKind.DailyEpisode,
+        };
+        foreach (var (section, kind) in seriesKinds)
+        {
+            foreach (var (name, format) in guides.Series.Naming[section])
+            {
+                Assert.True(FileNameBuilder.ValidateFormat(format, kind) is null, $"sonarr {section} {name}: {FileNameBuilder.ValidateFormat(format, kind)}");
+            }
+        }
     }
 
     [Fact]

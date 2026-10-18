@@ -10,7 +10,7 @@ using StreamZH.Library.PostProcessing;
 
 namespace StreamZH.Host.Api;
 
-/// <summary>Settings → Downloads → Tools: where par2 and 7-Zip are, whether they were found, and installing them.</summary>
+/// <summary>Settings → Downloads → Tools: where par2, 7-Zip and ffprobe are, whether they were found, and installing them.</summary>
 public static class ToolSettingsEndpoints
 {
     public static IEndpointRouteBuilder MapToolSettingsEndpoints(this IEndpointRouteBuilder app)
@@ -33,6 +33,7 @@ public static class ToolSettingsEndpoints
             var errors = new Dictionary<string, string[]>();
             var par2 = request.Par2Path?.Trim();
             var sevenZip = request.SevenZipPath?.Trim();
+            var ffprobe = request.FfprobePath?.Trim();
 
             if (!string.IsNullOrEmpty(par2) && tools.ResolveConfigured(PostProcessTool.Par2, par2) is null)
             {
@@ -42,6 +43,11 @@ public static class ToolSettingsEndpoints
             if (!string.IsNullOrEmpty(sevenZip) && tools.ResolveConfigured(PostProcessTool.SevenZip, sevenZip) is null)
             {
                 errors["sevenZipPath"] = ["7-Zip was not found there. Enter the path of 7z (7z.exe on Windows) or its folder, or leave it empty to search automatically."];
+            }
+
+            if (!string.IsNullOrEmpty(ffprobe) && tools.ResolveConfigured(PostProcessTool.FFprobe, ffprobe) is null)
+            {
+                errors["ffprobePath"] = ["ffprobe was not found there. Enter the path of ffprobe (ffprobe.exe on Windows) or its folder, or leave it empty to search automatically."];
             }
 
             if (errors.Count > 0)
@@ -58,6 +64,11 @@ public static class ToolSettingsEndpoints
             if (sevenZip is not null)
             {
                 config.Set(ConfigKeys.SevenZipPath, sevenZip);
+            }
+
+            if (ffprobe is not null)
+            {
+                config.Set(ConfigKeys.FfprobePath, ffprobe);
             }
 
             if (request.AutoInstall is { } autoInstall)
@@ -79,9 +90,10 @@ public static class ToolSettingsEndpoints
 
             var resource = await ToolSettingsResource.FromAsync(tools, installer, settings, ct);
             logger.LogInformation(
-                "Tool settings saved: par2 {Par2}, 7-Zip {SevenZip}, install automatically {AutoInstall}",
+                "Tool settings saved: par2 {Par2}, 7-Zip {SevenZip}, ffprobe {Ffprobe}, install automatically {AutoInstall}",
                 resource.Par2ResolvedPath ?? "not found",
                 resource.SevenZipResolvedPath ?? "not found",
+                resource.FfprobeResolvedPath ?? "not found",
                 resource.AutoInstall);
             return Results.Ok(resource);
         });
@@ -98,11 +110,12 @@ public static class ToolSettingsEndpoints
             {
                 "par2" => PostProcessTool.Par2,
                 "sevenzip" or "7zip" or "7-zip" => PostProcessTool.SevenZip,
+                "ffprobe" or "ffmpeg" => PostProcessTool.FFprobe,
                 _ => null,
             };
             if (which is not { } selected)
             {
-                return Results.Problem($"Unknown tool \"{tool}\". Use par2 or sevenZip.", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem($"Unknown tool \"{tool}\". Use par2, sevenZip or ffprobe.", statusCode: StatusCodes.Status400BadRequest);
             }
 
             if (!installer.IsInstallable(selected))
@@ -138,6 +151,7 @@ public static class ToolSettingsEndpoints
 /// <param name="Par2InstallVersion">The version StreamZH installs; null when it cannot install it here.</param>
 /// <param name="AutoInstall">Missing tools are installed automatically.</param>
 /// <param name="InstallFolder">&lt;data&gt;/tools, where StreamZH installs the tools.</param>
+/// <param name="FfprobePath">ffprobe (media info), with the same fields as par2 and 7-Zip.</param>
 public sealed record ToolSettingsResource(
     string Par2Path,
     string SevenZipPath,
@@ -166,7 +180,19 @@ public sealed record ToolSettingsResource(
     string? Par2InstallVersion,
     string? SevenZipInstallVersion,
     bool AutoInstall,
-    string? InstallFolder)
+    string? InstallFolder,
+    string FfprobePath,
+    bool FfprobeFound,
+    string? FfprobeVersion,
+    string? FfprobeResolvedPath,
+    string FfprobeSource,
+    string? FfprobeProblem,
+    bool FfprobeInstallable,
+    bool FfprobeInstalling,
+    double? FfprobeInstallProgress,
+    string? FfprobeInstallError,
+    string? FfprobeInstalledVersion,
+    string? FfprobeInstallVersion)
 {
     public static async Task<ToolSettingsResource> FromAsync(
         PostProcessTools tools, ToolInstaller installer, IPostProcessToolSettings settings, CancellationToken cancellationToken)
@@ -177,6 +203,9 @@ public sealed record ToolSettingsResource(
         var sevenZipVersion = sevenZip.Path is null ? null : await tools.GetVersionAsync(sevenZip.Path, cancellationToken);
         var par2Status = installer.Status(PostProcessTool.Par2);
         var sevenZipStatus = installer.Status(PostProcessTool.SevenZip);
+        var ffprobe = tools.Find(PostProcessTool.FFprobe);
+        var ffprobeVersion = ffprobe.Path is null ? null : await tools.GetVersionAsync(ffprobe.Path, cancellationToken);
+        var ffprobeStatus = installer.Status(PostProcessTool.FFprobe);
 
         return new ToolSettingsResource(
             par2.ConfiguredPath,
@@ -206,9 +235,21 @@ public sealed record ToolSettingsResource(
             installer.Package(PostProcessTool.Par2)?.Version,
             installer.Package(PostProcessTool.SevenZip)?.Version,
             settings.AutoInstall,
-            tools.Environment.InstalledDirectory);
+            tools.Environment.InstalledDirectory,
+            ffprobe.ConfiguredPath,
+            ffprobe.Found,
+            ffprobeVersion,
+            ffprobe.Path,
+            ffprobe.Source.ToString(),
+            ffprobe.Problem,
+            installer.IsInstallable(PostProcessTool.FFprobe),
+            ffprobeStatus.Installing,
+            ffprobeStatus.Installing ? ffprobeStatus.Progress : null,
+            ffprobeStatus.Error,
+            installer.Installed(PostProcessTool.FFprobe)?.Version,
+            installer.Package(PostProcessTool.FFprobe)?.Version);
     }
 }
 
 /// <summary>null leaves a value unchanged; "" switches a path back to the automatic search.</summary>
-public sealed record UpdateToolSettings(string? Par2Path, string? SevenZipPath, bool? AutoInstall = null);
+public sealed record UpdateToolSettings(string? Par2Path, string? SevenZipPath, bool? AutoInstall = null, string? FfprobePath = null);

@@ -704,8 +704,9 @@ public sealed partial class RenamerService(
 
     /// <summary>
     /// Folders inside the source that this run emptied ("Season 1" after its files moved to "Season 01") are removed,
-    /// deepest first, and logged for the undo. Folders that still hold anything, library item folders and the source
-    /// folder itself stay.
+    /// deepest first, and logged for the undo. A folder left with only system junk (Thumbs.db, desktop.ini, .DS_Store) counts
+    /// as empty: the junk files go with it (the undo recreates the folder, not the junk). Folders that still hold anything
+    /// else, library item folders and the source folder itself stay.
     /// </summary>
     private void RemoveEmptiedFolders(int runId, string root, IReadOnlyList<Op> done, LibraryIndex library, int order)
     {
@@ -725,9 +726,15 @@ public sealed partial class RenamerService(
         {
             try
             {
-                if (!Directory.Exists(folder) || library.IsLibraryFolder(folder) || Directory.EnumerateFileSystemEntries(folder).Any())
+                if (!Directory.Exists(folder) || library.IsLibraryFolder(folder) || !ImportFileSystem.OnlyJunk(folder, out var junk))
                 {
                     continue;
+                }
+
+                foreach (var file in junk)
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
                 }
 
                 Directory.Delete(folder);

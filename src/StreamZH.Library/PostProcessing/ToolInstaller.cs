@@ -31,7 +31,7 @@ public sealed record InstalledToolInfo(string Name, string Version, string Asset
 public sealed class ToolInstallException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
-/// Installs par2cmdline-turbo and 7-Zip into &lt;data&gt;/tools/par2 and &lt;data&gt;/tools/7-Zip from their official, pinned
+/// Installs par2cmdline-turbo, 7-Zip and ffprobe into &lt;data&gt;/tools/par2, /7-Zip and /ffprobe from their official, pinned
 /// releases (SHA-256 checked). Downloads and unpacks into &lt;data&gt;/tools/.download first and only then swaps the folder, so a
 /// half installation never counts. One installation per tool at a time: a second request joins the running one.
 /// </summary>
@@ -50,7 +50,7 @@ public sealed class ToolInstaller(
     public const string VersionFileName = "version.json";
     public const string DownloadFolderName = ".download";
 
-    public static IReadOnlyList<PostProcessTool> AllTools { get; } = [PostProcessTool.Par2, PostProcessTool.SevenZip];
+    public static IReadOnlyList<PostProcessTool> AllTools { get; } = [PostProcessTool.Par2, PostProcessTool.SevenZip, PostProcessTool.FFprobe];
 
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(3);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -219,7 +219,7 @@ public sealed class ToolInstaller(
 
             await ReportAsync(package.Tool, "Installing", 0.95).ConfigureAwait(false);
             var stage = Path.Combine(work, "stage");
-            Stage(package, source, stage);
+            Stage(package, source, work, stage);
             return Replace(package.Tool, stage, work);
         }
         finally
@@ -236,7 +236,7 @@ public sealed class ToolInstaller(
         var target = Path.Combine(work, "zip");
         try
         {
-            ZipFile.ExtractToDirectory(archive, target);
+            ExtractNeeded(package, archive, target);
         }
         catch (InvalidDataException e)
         {
@@ -244,6 +244,33 @@ public sealed class ToolInstaller(
         }
 
         return FindFolder(package, target, package.Download.FileName);
+    }
+
+    /// <summary>
+    /// Unpacks only the files the tool needs and the license files (the FFmpeg build is 115 MB packed and three times that
+    /// unpacked; StreamZH needs ffprobe.exe from it). Entries that would land outside the folder are skipped.
+    /// </summary>
+    private static void ExtractNeeded(ToolPackage package, string archive, string target)
+    {
+        var wanted = new HashSet<string>(package.Files.Concat(ToolPackages.NoticeFiles), StringComparer.OrdinalIgnoreCase);
+        var root = Path.GetFullPath(target) + Path.DirectorySeparatorChar;
+        using var zip = ZipFile.OpenRead(archive);
+        foreach (var entry in zip.Entries)
+        {
+            if (entry.Name.Length == 0 || !wanted.Contains(entry.Name))
+            {
+                continue;
+            }
+
+            var path = Path.GetFullPath(Path.Combine(target, entry.FullName));
+            if (!path.StartsWith(root, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            entry.ExtractToFile(path, overwrite: true);
+        }
     }
 
     /// <summary>
@@ -423,14 +450,35 @@ public sealed class ToolInstaller(
             .FirstOrDefault(folder => package.Files.All(file => FindFile(folder, file) is not null));
     }
 
+    /// <summary>A license file in the tool's folder, else in the folders above it up to (not including) the work folder.</summary>
+    private static string? NoticeFile(string source, string work, string name)
+    {
+        var top = Path.TrimEndingDirectorySeparator(Path.GetFullPath(work));
+        var folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(source));
+        while (folder.Length > top.Length && folder.StartsWith(top, StringComparison.Ordinal))
+        {
+            if (FindFile(folder, name) is { } path)
+            {
+                return path;
+            }
+
+            folder = Path.GetDirectoryName(folder) ?? top;
+        }
+
+        return null;
+    }
+
     private static string? FindFile(string folder, string name)
     {
         var options = new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive, IgnoreInaccessible = true };
         return Directory.EnumerateFiles(folder, name, options).FirstOrDefault();
     }
 
-    /// <summary>Copies the required files (plus license files) into the stage folder and writes version.json.</summary>
-    private void Stage(ToolPackage package, string source, string stage)
+    /// <summary>
+    /// Copies the required files into the stage folder, plus the license files next to them or in a folder above (the
+    /// FFmpeg build keeps LICENSE beside bin/), and writes version.json.
+    /// </summary>
+    private void Stage(ToolPackage package, string source, string work, string stage)
     {
         Directory.CreateDirectory(stage);
         foreach (var file in package.Files)
@@ -447,7 +495,7 @@ public sealed class ToolInstaller(
         var copied = new HashSet<string>(package.Files, StringComparer.OrdinalIgnoreCase);
         foreach (var notice in ToolPackages.NoticeFiles)
         {
-            if (FindFile(source, notice) is { } path && copied.Add(Path.GetFileName(path)))
+            if (NoticeFile(source, work, notice) is { } path && copied.Add(Path.GetFileName(path)))
             {
                 File.Copy(path, Path.Combine(stage, Path.GetFileName(path)));
             }

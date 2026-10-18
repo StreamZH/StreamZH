@@ -455,7 +455,7 @@ public sealed class ToolInstallerTests : IDisposable
     }
 
     private static ToolCatalog Catalog(ToolPackage? par2 = null, ToolPackage? sevenZip = null) =>
-        new((tool, _) => tool == PostProcessTool.Par2 ? par2 : sevenZip);
+        new((tool, _) => tool switch { PostProcessTool.Par2 => par2, PostProcessTool.SevenZip => sevenZip, _ => null });
 
     private static FakeToolRunner NoProcesses() => new((file, _) => throw new InvalidOperationException($"{file} must not be started"));
 

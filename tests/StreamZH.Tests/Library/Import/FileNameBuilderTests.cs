@@ -158,8 +158,13 @@ public sealed class FileNameBuilderTests
     {
         var movie = new Movie { Title = "CON", Year = 0 };
         Assert.Equal("CON_", Builder(v => v with { StandardMovieFormat = "{Movie Title} {Release Year}" }).MovieFileName(movie, new NamingFileInfo()));
-        var dotted = new Movie { Title = "Hello...", Year = 0 };
+        var dotted = new Movie { Title = "Hello.", Year = 0 };
         Assert.Equal("Hello", Builder(v => v with { StandardMovieFormat = "{Movie Title}" }).MovieFileName(dotted, new NamingFileInfo()));
+
+        // A trailing ellipsis stays in file names (the extension follows) but not in folder names (Windows drops trailing dots).
+        var ellipsis = new Movie { Title = "Hello...", Year = 0 };
+        Assert.Equal("Hello...", Builder(v => v with { StandardMovieFormat = "{Movie Title}" }).MovieFileName(ellipsis, new NamingFileInfo()));
+        Assert.Equal("Hello", Builder(v => v with { MovieFolderFormat = "{Movie Title}" }).MovieFolderName(ellipsis));
         var longTitle = new Movie { Title = new string('a', 400), Year = 2000 };
         Assert.True(Builder().MovieFileName(longTitle, File).Length <= FileNameBuilder.MaxNameLength);
     }

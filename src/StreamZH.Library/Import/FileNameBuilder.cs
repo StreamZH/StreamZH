@@ -54,6 +54,9 @@ public sealed record NamingFileInfo
     /// <summary>The custom formats the file matches, ordered by name ({Custom Formats} shows those with "include in rename").</summary>
     public IReadOnlyList<CustomFormat> CustomFormats { get; init; } = [];
 
+    /// <summary>What ffprobe found in the file; the {MediaInfo …} tokens use it first and fall back to the release name.</summary>
+    public MediaInfo? MediaInfo { get; init; }
+
     public static NamingFileInfo From(ParsedRelease? parsed, string? sceneName, string? originalFileName) => new()
     {
         Quality = parsed?.Quality ?? QualityModel.Unknown,
@@ -70,13 +73,14 @@ public sealed record NamingFileInfo
     public static NamingFileInfo From(MediaFileDetails details, string? originalFileName) => new()
     {
         Quality = new QualityModel(Core.Quality.Quality.FindById(details.QualityId), new Revision(details.RevisionVersion, details.RevisionReal, details.IsRepack)),
-        Languages = [.. details.LanguageIds.Select(Language.FindById).Where(l => l != Language.Unknown)],
+        Languages = details.Languages,
         ReleaseGroup = details.ReleaseGroup,
         Edition = details.Edition,
         VideoCodec = details.VideoCodec,
         AudioCodec = details.AudioCodec,
         SceneName = details.SceneName,
         OriginalFileName = originalFileName,
+        MediaInfo = details.MediaInfo,
     };
 }
 
@@ -88,6 +92,9 @@ public sealed record NamingFileInfo
 /// replaced as configured, so the names work on every system. <c>{Custom Formats}</c> lists the matching custom formats
 /// marked "include in rename" (space separated, like Radarr); <c>{Custom Formats:-DV,HDR}</c> leaves some out,
 /// <c>{Custom Formats:DV,HDR}</c> keeps only those, and <c>{Custom Format:DV}</c> shows one format by name.
+/// The <c>{MediaInfo …}</c> tokens use what ffprobe found in the file (falling back to the release name), with Radarr's
+/// language filters (<c>{MediaInfo AudioLanguages:DE}</c>, <c>:-DE</c>, <c>:DE+EN+</c>); titles can be cut to a length
+/// like Sonarr (<c>{Episode CleanTitle:90}</c>, ending in "..."). A title ending in "..." keeps its dots in file names.
 /// </summary>
 public sealed partial class FileNameBuilder(MediaManagementValues settings)
 {
@@ -108,15 +115,43 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
     private static readonly string[] MovieTitleTokens = ["movie title", "movie cleantitle", "movie titlethe", "movie originaltitle", "movie titlefirstcharacter"];
     private static readonly string[] SeriesTitleTokens =
-        ["series title", "series cleantitle", "series titleyear", "series cleantitleyear", "series titlethe", "series titlefirstcharacter"];
-    private static readonly string[] FileTokens =
     [
-        "quality full", "quality title", "quality proper", "quality real", "release group", "edition tags", "mediainfo videocodec", "mediainfo audiocodec", "mediainfo simple",
-        "mediainfo videodynamicrange", "mediainfo audiolanguages", "original title", "original filename", "custom formats", "custom format",
+        "series title", "series cleantitle", "series titleyear", "series cleantitleyear", "series titlethe", "series titlefirstcharacter",
+        "series titlewithoutyear", "series cleantitlewithoutyear",
     ];
 
-    /// <summary>Tokens that take a filter after the colon (<c>{Custom Formats:-x265}</c>) instead of a number format.</summary>
-    private static readonly IReadOnlySet<string> FilterTokens = new HashSet<string> { "custom formats", "custom format" };
+    private static readonly string[] FileTokens =
+    [
+        "quality full", "quality title", "quality proper", "quality real", "release group", "edition tags", "original title", "original filename",
+        "custom formats", "custom format", "mediainfo simple", "mediainfo full", "mediainfo video", "mediainfo videocodec", "mediainfo videobitdepth",
+        "mediainfo videodynamicrange", "mediainfo videodynamicrangetype", "mediainfo audio", "mediainfo audiocodec", "mediainfo audiochannels",
+        "mediainfo audiolanguages", "mediainfo audiolanguagesall", "mediainfo subtitlelanguages", "mediainfo subtitlelanguagesall", "mediainfo 3d",
+    ];
+
+    /// <summary>
+    /// Tokens that take a filter after the colon instead of a number format: custom format names (<c>{Custom Formats:-x265}</c>)
+    /// and languages (<c>{MediaInfo AudioLanguages:DE}</c>).
+    /// </summary>
+    private static readonly IReadOnlySet<string> FilterTokens = new HashSet<string>
+    {
+        "custom formats", "custom format", "mediainfo audiolanguages", "mediainfo audiolanguagesall", "mediainfo subtitlelanguages",
+        "mediainfo subtitlelanguagesall", "mediainfo full",
+    };
+
+    private static readonly IReadOnlySet<string> LanguageFilterTokens = new HashSet<string>
+    {
+        "mediainfo audiolanguages", "mediainfo audiolanguagesall", "mediainfo subtitlelanguages", "mediainfo subtitlelanguagesall", "mediainfo full",
+    };
+
+    /// <summary>Titles that can be cut to a length: <c>{Episode Title:30}</c> keeps the start, <c>{Episode Title:-30}</c> the end (Sonarr).</summary>
+    private static readonly IReadOnlySet<string> TruncatableTokens = new HashSet<string>
+    {
+        "movie title", "movie cleantitle", "movie titlethe", "movie originaltitle", "series title", "series cleantitle", "series titleyear",
+        "series cleantitleyear", "series titlethe", "series titlewithoutyear", "series cleantitlewithoutyear", "episode title", "episode cleantitle",
+    };
+
+    /// <summary>Stands for "..." while the name is tidied (which removes repeated and trailing dots); restored at the end.</summary>
+    private const char EllipsisMark = '\u2026';
 
     private static readonly IReadOnlySet<string> MovieIdTokens = new HashSet<string> { "imdb id", "imdbid", "tmdb id", "tmdbid" };
     private static readonly IReadOnlySet<string> SeriesIdTokens = new HashSet<string> { "imdb id", "imdbid", "tmdb id", "tmdbid", "tvdb id", "tvdbid" };
@@ -133,6 +168,9 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
         [NamingFormatKind.SpecialsFolder] = Set(SeriesTitleTokens, ["series year", "season"], SeriesIdTokens),
     };
 
+    /// <summary>Every token of any format, to tell <c>{{Edition Tags}}</c> (the value in braces) from literal text in double braces.</summary>
+    private static readonly IReadOnlySet<string> AllTokens = Allowed.Values.SelectMany(t => t).ToHashSet();
+
     private static string[] EpisodeTokens() => ["series year", "season", "episode", "episode title", "episode cleantitle", "air date"];
 
     private static HashSet<string> Set(params IEnumerable<string>[] groups) => [.. groups.SelectMany(g => g)];
@@ -143,7 +181,7 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
     public string MovieFileName(Movie movie, NamingFileInfo file)
     {
         ArgumentNullException.ThrowIfNull(movie);
-        return Build(settings.StandardMovieFormat, new Context(movie, null, [], file, null));
+        return Build(settings.StandardMovieFormat, new Context(movie, null, [], file, null), isFile: true);
     }
 
     public string MovieFolderName(Movie movie)
@@ -172,7 +210,7 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             pattern = ExpandMultiEpisode(pattern, ordered);
         }
 
-        return Build(pattern, new Context(null, series, ordered, file, ordered.FirstOrDefault()?.SeasonNumber));
+        return Build(pattern, new Context(null, series, ordered, file, ordered.FirstOrDefault()?.SeasonNumber), isFile: true);
     }
 
     public string SeriesFolderName(Series series)
@@ -220,13 +258,14 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             return kind == NamingFormatKind.SpecialsFolder ? "Enter a folder name, e.g. Specials." : "Enter a format.";
         }
 
-        if (text.Length > 300)
+        if (text.Length > 600)
         {
-            return "Use at most 300 characters.";
+            return "Use at most 600 characters.";
         }
 
         var used = new List<string>();
-        var rest = LabelRegex().Replace(text, m => m.Groups["inner"].Value);
+        var rest = BracedTokenRegex().Replace(text, m => AllTokens.Contains(Key(m.Groups["inner"].Value)) ? $"{{{m.Groups["inner"].Value}}}" : m.Value);
+        rest = LabelRegex().Replace(rest, m => m.Groups["inner"].Value);
         var badFilter = false;
         rest = TokenRegex().Replace(rest, m =>
         {
@@ -234,7 +273,8 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             {
                 var key = Key(m.Groups["token"].Value);
                 used.Add(key);
-                badFilter |= m.Groups["filter"].Success && !FilterTokens.Contains(key);
+                badFilter |= m.Groups["filter"].Success && !FilterTokens.Contains(key)
+                             && !(TruncatableTokens.Contains(key) && LengthRegex().IsMatch(m.Groups["filter"].Value));
             }
 
             return string.Empty;
@@ -242,7 +282,7 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
         if (badFilter)
         {
-            return "Only number formats like {season:00} may follow a colon here; {Custom Formats:…} takes format names.";
+            return "Only number formats like {season:00} or a length like {Episode Title:30} may follow a colon here; {Custom Formats:…} takes format names and {MediaInfo AudioLanguages:…} languages.";
         }
 
         if (rest.Contains('{', StringComparison.Ordinal) || rest.Contains('}', StringComparison.Ordinal))
@@ -286,12 +326,25 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
     private sealed record Context(Movie? Movie, Series? Series, IReadOnlyList<Episode> Episodes, NamingFileInfo? File, int? Season);
 
-    private string Build(string format, Context context)
+    private string Build(string format, Context context, bool isFile = false)
     {
+        // TRaSH's "{{Edition Tags}}": the value in braces ("{IMAX}"), or nothing with an empty value. "{{text}}" stays literal.
+        format = BracedTokenRegex().Replace(format, m =>
+        {
+            var inner = m.Groups["inner"].Value;
+            if (!AllTokens.Contains(Key(inner)))
+            {
+                return m.Value;
+            }
+
+            var value = Build($"{{{inner}}}", context, isFile: true).Replace("{", string.Empty, StringComparison.Ordinal).Replace("}", string.Empty, StringComparison.Ordinal);
+            return value.Length == 0 ? string.Empty : $"{{{{{value.Replace("...", EllipsisMark.ToString(), StringComparison.Ordinal)}}}}}";
+        });
+
         // Plex style "{edition-{Edition Tags}}": kept with its braces, or gone with an empty value.
         format = LabelRegex().Replace(format, m =>
         {
-            var inner = Build(m.Groups["inner"].Value, context);
+            var inner = Build(m.Groups["inner"].Value, context, isFile: true).Replace("...", EllipsisMark.ToString(), StringComparison.Ordinal);
             return inner.Length == 0 ? string.Empty : $"{{{{{m.Groups["label"].Value}-{inner.Replace("{", string.Empty, StringComparison.Ordinal).Replace("}", string.Empty, StringComparison.Ordinal)}}}}}";
         });
 
@@ -304,15 +357,27 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
             var token = m.Groups["token"].Value;
             var key = Key(token);
-            var value = FilterTokens.Contains(key)
-                ? CustomFormatValue(key, m.Groups["filter"].Value, context.File)
-                : m.Groups["filter"].Success ? null : Value(key, m.Groups["format"].Value, context);
+            var filter = m.Groups["filter"].Value;
+            var value = key switch
+            {
+                _ when LanguageFilterTokens.Contains(key) => MediaInfoLanguageValue(key, filter, context.File),
+                _ when FilterTokens.Contains(key) => CustomFormatValue(key, filter, context.File),
+                _ when TruncatableTokens.Contains(key) && LengthRegex().IsMatch(filter) => Truncate(Value(key, string.Empty, context), filter),
+                _ => m.Groups["filter"].Success ? null : Value(key, m.Groups["format"].Value, context),
+            };
             if (string.IsNullOrEmpty(value))
             {
                 return string.Empty;
             }
 
-            value = CleanValue(value);
+            // "[DE+EN]" inside "{[MediaInfo AudioLanguages]}" keeps one pair of brackets.
+            if (m.Groups["prefix"].Value.Contains('[', StringComparison.Ordinal) && m.Groups["suffix"].Value.Contains(']', StringComparison.Ordinal)
+                && value.Length > 2 && value[0] == '[' && value[^1] == ']')
+            {
+                value = value[1..^1];
+            }
+
+            value = ProtectEllipsis(CleanValue(value));
             var separator = m.Groups["separator"].Value;
             if (separator.Length > 0 && separator != " ")
             {
@@ -331,7 +396,45 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             return m.Groups["prefix"].Value + value + m.Groups["suffix"].Value;
         });
 
-        return Tidy(built);
+        return RestoreEllipsis(Tidy(built), isFile);
+    }
+
+    /// <summary>An ellipsis ("..." or "…") in a value survives tidying (which removes repeated and trailing dots).</summary>
+    private static string ProtectEllipsis(string value) => EllipsisRegex().Replace(value, EllipsisMark.ToString());
+
+    /// <summary>
+    /// The marks become "..." again. A name never starts with dots (a hidden file on Linux and macOS). A folder name cannot
+    /// end in a dot on Windows, so there a trailing ellipsis goes; in a file name the extension follows, so it stays.
+    /// </summary>
+    private static string RestoreEllipsis(string name, bool isFile)
+    {
+        var text = name.Replace(EllipsisMark.ToString(), "...", StringComparison.Ordinal).TrimStart(' ', '.');
+        if (!isFile)
+        {
+            text = text.TrimEnd(' ', '.');
+        }
+
+        return text.Length > MaxNameLength ? text[..MaxNameLength].TrimEnd(' ', '-', '_') : text;
+    }
+
+    /// <summary>Sonarr's title length: "30" keeps the first characters, "-30" the last, with "..." where it was cut.</summary>
+    private static string? Truncate(string? value, string filter)
+    {
+        if (string.IsNullOrEmpty(value) || !int.TryParse(filter, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var length) || length == 0)
+        {
+            return value;
+        }
+
+        var max = Math.Abs(length);
+        if (value.Length <= max)
+        {
+            return value;
+        }
+
+        var keep = Math.Max(1, max - 3);
+        return length > 0
+            ? value[..keep].TrimEnd(' ', '.') + "..."
+            : "..." + value[^keep..].TrimStart(' ', '.');
     }
 
     private static string? Value(string key, string numberFormat, Context c)
@@ -353,6 +456,8 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             "series cleantitleyear" => series is null ? null : WithYear(CleanTitle(series.Title), series.Year),
             "series titlethe" => series is null ? null : TitleThe(series.Title),
             "series titlefirstcharacter" => series is null ? null : FirstCharacter(series.Title),
+            "series titlewithoutyear" => series is null ? null : WithoutYear(series.Title),
+            "series cleantitlewithoutyear" => series is null ? null : CleanTitle(WithoutYear(series.Title)),
             "series year" => series is { Year: > 0 } ? series.Year.ToString(CultureInfo.InvariantCulture) : null,
             "season" => c.Season is { } season ? Number(season, numberFormat) : null,
             "episode" => c.Episodes.Count == 0 ? null : string.Join('-', c.Episodes.Select(e => Number(e.EpisodeNumber, numberFormat))),
@@ -365,11 +470,14 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
             "quality real" => file is { Quality.Revision.Real: > 0 } ? "REAL" : null,
             "release group" => file?.ReleaseGroup,
             "edition tags" => file?.Edition,
-            "mediainfo videocodec" => file?.VideoCodec,
-            "mediainfo audiocodec" => file?.AudioCodec,
-            "mediainfo simple" => file is null ? null : string.Join(' ', new[] { file.VideoCodec, file.AudioCodec }.Where(v => !string.IsNullOrEmpty(v))),
-            "mediainfo videodynamicrange" => file is { Hdr: not HdrFormat.None } ? "HDR" : null,
-            "mediainfo audiolanguages" => file is null ? null : AudioLanguages(file.Languages),
+            "mediainfo videocodec" or "mediainfo video" => file is null ? null : VideoCodec(file),
+            "mediainfo audiocodec" or "mediainfo audio" => file is null ? null : AudioCodec(file),
+            "mediainfo simple" => file is null ? null : string.Join(' ', new[] { VideoCodec(file), AudioCodec(file) }.Where(v => !string.IsNullOrEmpty(v))),
+            "mediainfo videobitdepth" => file?.MediaInfo?.Video is { } video ? (video.BitDepth > 0 ? video.BitDepth : 8).ToString(CultureInfo.InvariantCulture) : null,
+            "mediainfo videodynamicrange" => file is null ? null : DynamicRange(file),
+            "mediainfo videodynamicrangetype" => file is null ? null : DynamicRangeType(file),
+            "mediainfo audiochannels" => file?.MediaInfo?.PrimaryAudio is { Channels: > 0 } audio ? audio.ChannelsText : null,
+            "mediainfo 3d" => file?.MediaInfo?.Video is { Is3D: true } ? "3D" : null,
             "original title" => file?.SceneName,
             "original filename" => file?.OriginalFileName,
             "imdb id" or "imdbid" => movie?.ImdbId ?? series?.ImdbId,
@@ -454,6 +562,9 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
     private static string Number(int value, string format) =>
         format.Length > 0 ? value.ToString(format, CultureInfo.InvariantCulture) : value.ToString(CultureInfo.InvariantCulture);
 
+    /// <summary>"The Office (US) (2005)" → "The Office (US)": a year in brackets at the end goes.</summary>
+    private static string WithoutYear(string title) => TrailingYearRegex().Replace(title, string.Empty).Trim();
+
     private static string WithYear(string title, int year) =>
         year > 0 && !title.EndsWith($"({year})", StringComparison.Ordinal) ? $"{title} ({year})" : title;
 
@@ -491,10 +602,86 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
         return text;
     }
 
-    private static string? AudioLanguages(IReadOnlyList<Language> languages)
+    // ------------------------------------------------------------------ media info
+
+    private static string? VideoCodec(NamingFileInfo file) =>
+        file.MediaInfo?.Video is { Codec.Length: > 0 } video ? video.Codec : file.VideoCodec;
+
+    private static string? AudioCodec(NamingFileInfo file) =>
+        file.MediaInfo?.PrimaryAudio is { Codec.Length: > 0 } audio ? audio.Codec : file.AudioCodec;
+
+    private static string? DynamicRange(NamingFileInfo file) => file.MediaInfo?.Video is { } video
+        ? NullIfEmpty(video.DynamicRange)
+        : file.Hdr != HdrFormat.None ? "HDR" : null;
+
+    /// <summary>From the video, else from the release name (DV, HDR10, HDR10Plus, HLG).</summary>
+    private static string? DynamicRangeType(NamingFileInfo file) => file.MediaInfo?.Video is { } video
+        ? NullIfEmpty(video.DynamicRangeType)
+        : file.Hdr switch
+        {
+            HdrFormat.DolbyVision => "DV",
+            HdrFormat.DolbyVisionHdr10 => "DV HDR10",
+            HdrFormat.Hdr10 => "HDR10",
+            HdrFormat.Hdr10Plus => "HDR10Plus",
+            HdrFormat.Hlg => "HLG",
+            HdrFormat.Hdr => "HDR",
+            _ => null,
+        };
+
+    private static string? NullIfEmpty(string value) => value.Length == 0 ? null : value;
+
+    /// <summary>
+    /// Radarr's language tokens: ISO codes joined with "+" in brackets ("[DE+EN]"). AudioLanguages leaves out a lone "EN";
+    /// the "All" variants do not. A filter keeps only some languages ("DE", "DE+EN"; a trailing "+" adds "--" when others
+    /// were left out) or leaves some out ("-DE"). {MediaInfo Full} is "video audio [audio languages] [subtitle languages]".
+    /// Without media info the audio languages are the languages of the release name.
+    /// </summary>
+    private static string? MediaInfoLanguageValue(string key, string filter, NamingFileInfo? file)
     {
-        var codes = languages.Where(l => l.Id > 0).Select(l => IsoByLanguage.GetValueOrDefault(l.Id)).Where(c => c is not null).Distinct().ToList();
-        return codes.Count == 0 ? null : string.Join('+', codes);
+        if (file is null)
+        {
+            return null;
+        }
+
+        var audio = file.MediaInfo is { } info
+            ? info.AudioTracks.Where(a => !a.Commentary).Select(a => MediaLanguages.NameCode(a.LanguageCode)).OfType<string>().ToList()
+            : [.. file.Languages.Where(l => l.Id > 0).Select(l => IsoByLanguage.GetValueOrDefault(l.Id)).OfType<string>()];
+        var subtitles = file.MediaInfo?.Subtitles.Select(s => MediaLanguages.NameCode(s.LanguageCode)).OfType<string>().ToList() ?? [];
+
+        return key switch
+        {
+            "mediainfo audiolanguages" => LanguagesToken(audio, filter, skipEnglishOnly: true),
+            "mediainfo audiolanguagesall" => LanguagesToken(audio, filter, skipEnglishOnly: false),
+            "mediainfo subtitlelanguages" or "mediainfo subtitlelanguagesall" => LanguagesToken(subtitles, filter, skipEnglishOnly: false),
+            _ => string.Join(' ', new[]
+            {
+                VideoCodec(file), AudioCodec(file), LanguagesToken(audio, filter, skipEnglishOnly: true), LanguagesToken(subtitles, filter, skipEnglishOnly: false),
+            }.Where(v => !string.IsNullOrEmpty(v))),
+        };
+    }
+
+    private static string? LanguagesToken(IReadOnlyList<string> codes, string filter, bool skipEnglishOnly)
+    {
+        var tokens = codes.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var filtered = tokens;
+        if (filter.Length > 0)
+        {
+            var named = filter.Split(['-', '+', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            filtered = filter.StartsWith('-')
+                ? [.. tokens.Where(t => !named.Contains(t, StringComparer.OrdinalIgnoreCase))]
+                : [.. named.Select(n => tokens.FirstOrDefault(t => t.Equals(n, StringComparison.OrdinalIgnoreCase))).OfType<string>()];
+            if (filter.EndsWith('+') && filtered.Count != tokens.Count)
+            {
+                filtered.Add("--");
+            }
+        }
+
+        if (filtered.Count == 0 || (skipEnglishOnly && filtered is ["EN"]))
+        {
+            return null;
+        }
+
+        return $"[{string.Join('+', filtered)}]";
     }
 
     /// <summary>"The Matrix" → "Matrix, The" (Radarr's TitleThe).</summary>
@@ -606,6 +793,9 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
     [GeneratedRegex(@"\{(?<label>[a-z]+)-(?<inner>\{[^{}]+\})\}", RegexOptions.IgnoreCase)]
     private static partial Regex LabelRegex();
 
+    [GeneratedRegex(@"\{\{(?<inner>[a-z][a-z0-9]*(?:[- ._]+[a-z0-9]+)?)\}\}", RegexOptions.IgnoreCase)]
+    private static partial Regex BracedTokenRegex();
+
     [GeneratedRegex(@"^(?<first>[a-z0-9]+)[- ._]+(?<second>[a-z0-9]+)$", RegexOptions.IgnoreCase)]
     private static partial Regex TokenWordsRegex();
 
@@ -614,6 +804,16 @@ public sealed partial class FileNameBuilder(MediaManagementValues settings)
 
     [GeneratedRegex(@"\s?\(\d+\)$")]
     private static partial Regex PartNumberRegex();
+
+    [GeneratedRegex(@"\s*\((?:19|20)\d{2}\)$")]
+    private static partial Regex TrailingYearRegex();
+
+    [GeneratedRegex(@"^-?\d{1,3}$")]
+    private static partial Regex LengthRegex();
+
+    // "Who Are You...", "Who Are You…", "...And Then".
+    [GeneratedRegex(@"\.\.\.|\u2026")]
+    private static partial Regex EllipsisRegex();
 
     [GeneratedRegex(@"^(?<article>The|An|A)\s+(?<rest>.+)$", RegexOptions.IgnoreCase)]
     private static partial Regex ArticleRegex();

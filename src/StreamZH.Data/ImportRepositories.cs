@@ -292,8 +292,11 @@ public sealed class BlocklistRepository(Database database)
 
 /// <summary>
 /// What StreamZH knows about a media file it imported: quality and revision, languages, release group and the release
-/// it came from. Keyed by the full path, so a disk scan (which only sees names and sizes) never loses it.
+/// it came from, and what ffprobe found in it (<see cref="MediaInfo"/>). Keyed by the full path, so a disk scan (which
+/// only sees names and sizes) never loses it. Library files that were not imported get a row when they are analysed.
 /// </summary>
+/// <param name="MediaInfo">ffprobe's analysis; null when the file was not analysed yet.</param>
+/// <param name="MediaInfoUpdated">When it was analysed (UTC).</param>
 public sealed record MediaFileDetails(
     string Path,
     int QualityId,
@@ -306,12 +309,30 @@ public sealed record MediaFileDetails(
     string? Edition,
     string? VideoCodec,
     string? AudioCodec,
-    DateTime DateAdded);
+    DateTime DateAdded,
+    Core.Media.MediaInfo? MediaInfo = null,
+    DateTime? MediaInfoUpdated = null)
+{
+    /// <summary>
+    /// The languages of the file: from the release name, else (no language in the name) the audio languages ffprobe found,
+    /// so an existing German file counts as German (or German + original as dual language) for profiles and custom formats.
+    /// </summary>
+    public IReadOnlyList<Core.Quality.Language> Languages
+    {
+        get
+        {
+            var named = LanguageIds.Select(Core.Quality.Language.FindById).Where(l => l.Id > 0).ToList();
+            return named.Count > 0 ? named : MediaInfo?.AudioLanguages ?? [];
+        }
+    }
+}
 
 public sealed class MediaFileDetailsRepository(Database database)
 {
     private const string Columns =
-        "Path, QualityId, RevisionVersion, RevisionReal, IsRepack, Languages, ReleaseGroup, SceneName, Edition, VideoCodec, AudioCodec, DateAdded";
+        "Path, QualityId, RevisionVersion, RevisionReal, IsRepack, Languages, ReleaseGroup, SceneName, Edition, VideoCodec, AudioCodec, DateAdded, MediaInfo, MediaInfoUpdated";
+
+    private static readonly System.Text.Json.JsonSerializerOptions MediaInfoJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
     /// <summary>The stored key: the full path, lower-case where file names are not case-sensitive (Windows, macOS).</summary>
     public static string Key(string path)
@@ -332,11 +353,12 @@ public sealed class MediaFileDetailsRepository(Database database)
         using var connection = database.Open();
         connection.Execute(
             """
-            INSERT INTO MediaFileDetails (Path, QualityId, RevisionVersion, RevisionReal, IsRepack, Languages, ReleaseGroup, SceneName, Edition, VideoCodec, AudioCodec, DateAdded)
-            VALUES (@Path, @QualityId, @RevisionVersion, @RevisionReal, @IsRepack, @Languages, @ReleaseGroup, @SceneName, @Edition, @VideoCodec, @AudioCodec, @DateAdded)
+            INSERT INTO MediaFileDetails (Path, QualityId, RevisionVersion, RevisionReal, IsRepack, Languages, ReleaseGroup, SceneName, Edition, VideoCodec, AudioCodec, DateAdded, MediaInfo, MediaInfoUpdated)
+            VALUES (@Path, @QualityId, @RevisionVersion, @RevisionReal, @IsRepack, @Languages, @ReleaseGroup, @SceneName, @Edition, @VideoCodec, @AudioCodec, @DateAdded, @MediaInfo, @MediaInfoUpdated)
             ON CONFLICT(Path) DO UPDATE SET QualityId = excluded.QualityId, RevisionVersion = excluded.RevisionVersion, RevisionReal = excluded.RevisionReal,
                 IsRepack = excluded.IsRepack, Languages = excluded.Languages, ReleaseGroup = excluded.ReleaseGroup, SceneName = excluded.SceneName,
-                Edition = excluded.Edition, VideoCodec = excluded.VideoCodec, AudioCodec = excluded.AudioCodec, DateAdded = excluded.DateAdded
+                Edition = excluded.Edition, VideoCodec = excluded.VideoCodec, AudioCodec = excluded.AudioCodec, DateAdded = excluded.DateAdded,
+                MediaInfo = excluded.MediaInfo, MediaInfoUpdated = excluded.MediaInfoUpdated
             """,
             new
             {
@@ -352,7 +374,51 @@ public sealed class MediaFileDetailsRepository(Database database)
                 details.VideoCodec,
                 details.AudioCodec,
                 details.DateAdded,
+                MediaInfo = Serialize(details.MediaInfo),
+                details.MediaInfoUpdated,
             });
+    }
+
+    /// <summary>Stores a new analysis of the file; the rest of the row stays. False when the file has no row.</summary>
+    public bool SetMediaInfo(string path, Core.Media.MediaInfo? mediaInfo, DateTime updated)
+    {
+        using var connection = database.Open();
+        return connection.Execute(
+            "UPDATE MediaFileDetails SET MediaInfo = @mediaInfo, MediaInfoUpdated = @updated WHERE Path = @path",
+            new { path = Key(path), mediaInfo = Serialize(mediaInfo), updated }) > 0;
+    }
+
+    /// <summary>The rows of the files in a folder (and its subfolders), by stored key.</summary>
+    public IReadOnlyDictionary<string, MediaFileDetails> InFolder(string folder)
+    {
+        var prefix = Key(folder) + System.IO.Path.DirectorySeparatorChar;
+        using var connection = database.Open();
+        return connection.Query<Row>(
+                $"SELECT {Columns} FROM MediaFileDetails WHERE substr(Path, 1, @length) = @prefix",
+                new { prefix, length = prefix.Length })
+            .Select(r => r.ToDetails())
+            .ToDictionary(d => d.Path, StringComparer.Ordinal);
+    }
+
+    private static string? Serialize(Core.Media.MediaInfo? mediaInfo) =>
+        mediaInfo is null ? null : System.Text.Json.JsonSerializer.Serialize(mediaInfo, MediaInfoJson);
+
+    /// <summary>The stored analysis; null when there is none or it cannot be read (it is analysed again then).</summary>
+    public static Core.Media.MediaInfo? Deserialize(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<Core.Media.MediaInfo>(json, MediaInfoJson);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The file was renamed or moved: the details move with it.</summary>
@@ -383,10 +449,13 @@ public sealed class MediaFileDetailsRepository(Database database)
         public string? VideoCodec { get; init; }
         public string? AudioCodec { get; init; }
         public DateTime DateAdded { get; init; }
+        public string? MediaInfo { get; init; }
+        public DateTime? MediaInfoUpdated { get; init; }
 
         public MediaFileDetails ToDetails() => new(
             Path, (int)QualityId, (int)RevisionVersion, (int)RevisionReal, IsRepack, Ids.Split(Languages), ReleaseGroup, SceneName, Edition,
-            VideoCodec, AudioCodec, DateTime.SpecifyKind(DateAdded, DateTimeKind.Utc));
+            VideoCodec, AudioCodec, DateTime.SpecifyKind(DateAdded, DateTimeKind.Utc), Deserialize(MediaInfo),
+            MediaInfoUpdated is { } updated ? DateTime.SpecifyKind(updated, DateTimeKind.Utc) : null);
     }
 }
 

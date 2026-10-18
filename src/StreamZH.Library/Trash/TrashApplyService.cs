@@ -690,6 +690,13 @@ public sealed class TrashApplyService(
         var daily = seriesFile is null ? null : guides.Series.Naming.GetValueOrDefault("episodes.daily")?.GetValueOrDefault(key);
         var anime = seriesFile is null ? null : guides.Series.Naming.GetValueOrDefault("episodes.anime")?.GetValueOrDefault(key);
 
+        // The anime variant may use tokens the standard one does not ({absolute}); then only the anime format stays as it was.
+        if (anime is not null && FileNameBuilder.ValidateFormat(anime, NamingFormatKind.AnimeEpisode) is { } animeProblem)
+        {
+            errors[AnimeKey] = [UnsupportedVariant + animeProblem];
+            anime = null;
+        }
+
         var updated = values with
         {
             MovieFolderFormat = movieFolder ?? values.MovieFolderFormat,
@@ -724,6 +731,9 @@ public sealed class TrashApplyService(
 
     /// <summary>Start of the naming error for a variant whose tokens StreamZH's renamer does not support.</summary>
     public const string UnsupportedVariant = "StreamZH cannot use this variant: ";
+
+    /// <summary>Error key of an anime episode variant StreamZH cannot use; the standard and daily variants still apply.</summary>
+    public const string AnimeKey = "naming.seriesFileAnime";
 
     private static string? Field(TrashNaming naming, string key) => key switch
     {

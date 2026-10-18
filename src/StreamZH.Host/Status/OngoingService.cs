@@ -218,7 +218,7 @@ public sealed class OngoingService(
 
     private const string ToolsLink = "/settings/downloads#tools";
 
-    private static string ToolKey(PostProcessTool tool) => tool == PostProcessTool.Par2 ? "par2" : "7zip";
+    private static string ToolKey(PostProcessTool tool) => PostProcessTools.Key(tool);
 
     private void AddDownloadClientNotices(List<OngoingNotice> notices)
     {

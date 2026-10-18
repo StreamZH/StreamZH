@@ -15,6 +15,7 @@ using StreamZH.Core.Quality;
 using StreamZH.Data;
 using StreamZH.Library.CustomFormats;
 using StreamZH.Library.Downloads;
+using StreamZH.Library.MediaFiles;
 using StreamZH.Library.Search;
 using StreamZH.Metadata.Tmdb;
 using StreamZH.Parsing;
@@ -67,7 +68,8 @@ public sealed class DownloadImportService(
     DownloadEngine? engine = null,
     ITmdbClient? tmdb = null,
     TimeProvider? timeProvider = null,
-    CustomFormatRepository? customFormats = null)
+    CustomFormatRepository? customFormats = null,
+    MediaInfoService? mediaInfo = null)
 {
     /// <summary>Sonarr waits this long after the air date for a missing episode title.</summary>
     public static readonly TimeSpan EpisodeTitleWait = TimeSpan.FromHours(48);
@@ -232,7 +234,7 @@ public sealed class DownloadImportService(
             source = videos.MaxBy(f => f.Length) ?? throw new ImportException(NoVideoMessage(folder));
         }
 
-        var info = Describe(item.Title, source.FullName).WithCustomFormats(
+        var info = (await WithMediaInfoAsync(Describe(item.Title, source.FullName), source.FullName, item.Title, cancellationToken)).WithCustomFormats(
             customFormats?.ForMediaType(MediaType.Movie) ?? [], MediaType.Movie, Language.FindById(movie.OriginalLanguageId), movie.Year, source.Name, source.Length);
         var existingPath = movie.File is { } current && !IsDisc(current) ? Path.Combine(movie.FolderPath, current.RelativePath) : null;
         if (existingPath is not null && !File.Exists(existingPath))
@@ -241,7 +243,8 @@ public sealed class DownloadImportService(
         }
 
         var upgrade = existingPath is not null;
-        if (manual is null && existingPath is not null && UpgradeProblem(movie.QualityProfileId, existingPath, movie.FolderPath, info, options) is { } notBetter)
+        if (manual is null && existingPath is not null
+            && UpgradeProblem(movie.QualityProfileId, existingPath, movie.FolderPath, info, options, MediaType.Movie, Language.FindById(movie.OriginalLanguageId), movie.Year) is { } notBetter)
         {
             return Outcome.Failed(notBetter, [new ImportedFile(source.FullName, null, [], notBetter, false)]);
         }
@@ -387,7 +390,7 @@ public sealed class DownloadImportService(
         var seriesFormats = customFormats?.ForMediaType(MediaType.Series) ?? [];
         foreach (var (file, episodes, daily) in planned)
         {
-            var info = Describe(item.Title, file.FullName).WithCustomFormats(
+            var info = (await WithMediaInfoAsync(Describe(item.Title, file.FullName), file.FullName, item.Title, cancellationToken, single: planned.Count == 1)).WithCustomFormats(
                 seriesFormats, MediaType.Series, Language.FindById(show.OriginalLanguageId), show.Year, file.Name, file.Length,
                 CustomFormatNaming.EpisodeFileType(episodes.Count));
             var existing = episodes
@@ -397,7 +400,9 @@ public sealed class DownloadImportService(
                 .Where(File.Exists)
                 .ToList();
 
-            if (manual is null && existing.Select(p => UpgradeProblem(show.QualityProfileId, p, show.FolderPath, info, options)).FirstOrDefault(p => p is not null) is { } notBetter)
+            if (manual is null
+                && existing.Select(p => UpgradeProblem(show.QualityProfileId, p, show.FolderPath, info, options, MediaType.Series, Language.FindById(show.OriginalLanguageId), show.Year))
+                    .FirstOrDefault(p => p is not null) is { } notBetter)
             {
                 results.Add(new ImportedFile(file.FullName, null, [.. episodes.Select(e => e.Id)], $"{Label(episodes)}: {notBetter}", false));
                 continue;
@@ -539,6 +544,36 @@ public sealed class DownloadImportService(
         };
     }
 
+    /// <summary>
+    /// Like Radarr, the downloaded file is analysed before the checks: the media info goes into the naming, the quality gets
+    /// the video's resolution when neither the release nor the file name states one, and a release name without a language
+    /// takes the audio languages. Without ffprobe (or with analysing switched off) nothing changes.
+    /// </summary>
+    /// <param name="single">The release is this one file, so its name tells x264 from h264 (else the file name does).</param>
+    private async Task<NamingFileInfo> WithMediaInfoAsync(NamingFileInfo info, string path, string releaseTitle, CancellationToken cancellationToken, bool single = true)
+    {
+        if (mediaInfo is not { Enabled: true })
+        {
+            return info;
+        }
+
+        try
+        {
+            var probed = await mediaInfo.ProbeAsync(path, single ? releaseTitle : Path.GetFileName(path), cancellationToken);
+            return info with
+            {
+                MediaInfo = probed,
+                Quality = MediaInfoQuality.Augment(info.Quality, probed, releaseTitle, Path.GetFileName(path)),
+                Languages = info.Languages.Count > 0 ? info.Languages : probed.AudioLanguages,
+            };
+        }
+        catch (MediaInfoException e)
+        {
+            logger.LogWarning("Media info of {Path} could not be read: {Message}", path, e.Message);
+            return info;
+        }
+    }
+
     /// <summary>Season and episodes of a file: its name, then (for a single file) the release name.</summary>
     private static ParsedRelease? ParseEpisodeFile(string path, string releaseTitle, bool single)
     {
@@ -564,8 +599,13 @@ public sealed class DownloadImportService(
         return fromRelease is { FullSeason: false } ? fromRelease : parsed;
     }
 
-    /// <summary>Null when the new file may replace the file on disk; otherwise why not (like Radarr's import UpgradeSpecification).</summary>
-    private string? UpgradeProblem(int profileId, string existingPath, string itemFolder, NamingFileInfo candidate, MediaManagementValues options)
+    /// <summary>
+    /// Null when the new file may replace the file on disk; otherwise why not (like Radarr's import UpgradeSpecification):
+    /// a lower quality, an older revision, or the same quality with a lower custom format score ("Not a custom format
+    /// upgrade"). A file in the wrong language is always replaced by one in the profile's language.
+    /// </summary>
+    private string? UpgradeProblem(
+        int profileId, string existingPath, string itemFolder, NamingFileInfo candidate, MediaManagementValues options, MediaType mediaType, Language originalLanguage, int year)
     {
         if (profiles.Find(profileId) is not { } profile)
         {
@@ -595,7 +635,30 @@ public sealed class DownloadImportService(
             return $"Not an upgrade: the file in the library has a newer revision ({existing})";
         }
 
+        if (compare == 0 && customFormats is not null)
+        {
+            var existingFormats = new DecisionTargetFactory(profiles, null, fileDetails, null, customFormats).FileFormats(
+                mediaType, ExistingMediaFile(existingPath, itemFolder), itemFolder, originalLanguage, year);
+            var existingScore = Core.CustomFormats.CustomFormatCalculator.Score(profile, existingFormats);
+            var candidateScore = Core.CustomFormats.CustomFormatCalculator.Score(profile, candidate.CustomFormats);
+            if (candidateScore < existingScore)
+            {
+                return $"Not a custom format upgrade: the file in the library scores {Scored(existingScore, existingFormats)}, this one {Scored(candidateScore, candidate.CustomFormats)}";
+            }
+        }
+
         return null;
+    }
+
+    private static string Scored(int score, IReadOnlyList<Core.CustomFormats.CustomFormat> formats) =>
+        formats.Count == 0
+            ? score.ToString("+#;-#;0", CultureInfo.InvariantCulture)
+            : $"{score.ToString("+#;-#;0", CultureInfo.InvariantCulture)} ({string.Join(", ", formats.Select(f => f.Name).Order(StringComparer.OrdinalIgnoreCase))})";
+
+    private static MediaFile ExistingMediaFile(string path, string itemFolder)
+    {
+        var file = new FileInfo(path);
+        return new MediaFile(Path.GetRelativePath(itemFolder, path), file.Exists ? file.Length : 0, file.Exists ? file.LastWriteTimeUtc : DateTime.MinValue);
     }
 
     /// <summary>Quality of a file in the library: what the import stored, else read from its name and folder.</summary>
@@ -604,7 +667,7 @@ public sealed class DownloadImportService(
         if (fileDetails.Find(path) is { } stored)
         {
             return (new QualityModel(Core.Quality.Quality.FindById(stored.QualityId), new Revision(stored.RevisionVersion, stored.RevisionReal, stored.IsRepack)),
-                [.. stored.LanguageIds.Select(Language.FindById).Where(l => l != Language.Unknown)]);
+                stored.Languages);
         }
 
         return DecisionTargetFactory.Existing(new MediaFile(Path.GetRelativePath(itemFolder, path), 0, DateTime.MinValue), itemFolder);
@@ -836,7 +899,8 @@ public sealed class DownloadImportService(
     private void SaveDetails(string path, NamingFileInfo info) =>
         fileDetails.Save(new MediaFileDetails(
             path, info.Quality.Quality.Id, info.Quality.Revision.Version, info.Quality.Revision.Real, info.Quality.Revision.IsRepack,
-            [.. info.Languages.Select(l => l.Id)], info.ReleaseGroup, info.SceneName, info.Edition, info.VideoCodec, info.AudioCodec, Now));
+            [.. info.Languages.Select(l => l.Id)], info.ReleaseGroup, info.SceneName, info.Edition, info.VideoCodec, info.AudioCodec, Now,
+            info.MediaInfo, info.MediaInfo is null ? null : Now));
 
     /// <summary>Cleanup, download list, events. Problems here no longer make the import fail.</summary>
     private async Task AfterImportAsync(DownloadItem item, Outcome outcome, CancellationToken cancellationToken)

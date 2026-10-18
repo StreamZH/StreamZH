@@ -12,6 +12,9 @@ public enum PostProcessTool
 {
     Par2,
     SevenZip,
+
+    /// <summary>ffprobe (FFmpeg) reads the media info of video files.</summary>
+    FFprobe,
 }
 
 public enum ToolSource
@@ -41,6 +44,9 @@ public interface IPostProcessToolSettings
 
     string? SevenZipPath { get; }
 
+    /// <summary>The configured ffprobe ("" or null = find automatically).</summary>
+    string? FfprobePath => null;
+
     /// <summary>Install missing tools automatically (at startup and when the settings are saved).</summary>
     bool AutoInstall => true;
 }
@@ -50,6 +56,8 @@ public sealed class ConfigPostProcessToolSettings(ConfigRepository config) : IPo
     public string? Par2Path => config.Get(ConfigKeys.Par2Path);
 
     public string? SevenZipPath => config.Get(ConfigKeys.SevenZipPath);
+
+    public string? FfprobePath => config.Get(ConfigKeys.FfprobePath);
 
     /// <summary>On unless the setting is "false".</summary>
     public bool AutoInstall => !string.Equals(config.Get(ConfigKeys.ToolsAutoInstall), "false", StringComparison.OrdinalIgnoreCase);
@@ -85,12 +93,17 @@ public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, 
     public string? InstalledToolDirectory(PostProcessTool tool) =>
         InstalledDirectory is null ? null : System.IO.Path.Combine(InstalledDirectory, InstalledFolderName(tool));
 
-    public static string InstalledFolderName(PostProcessTool tool) => tool == PostProcessTool.Par2 ? "par2" : "7-Zip";
+    public static string InstalledFolderName(PostProcessTool tool) => tool switch
+    {
+        PostProcessTool.Par2 => "par2",
+        PostProcessTool.FFprobe => "ffprobe",
+        _ => "7-Zip",
+    };
 }
 
 /// <summary>
-/// Finds par2 and 7-Zip: configured path, then the copy installed by StreamZH (&lt;data&gt;/tools/par2, &lt;data&gt;/tools/7-Zip),
-/// then &lt;app&gt;/tools, then PATH, then the Windows default (C:\Program Files\7-Zip\7z.exe). Versions are read once
+/// Finds par2, 7-Zip and ffprobe: configured path, then the copy installed by StreamZH (&lt;data&gt;/tools/par2, &lt;data&gt;/tools/7-Zip),
+/// then &lt;app&gt;/tools, then PATH, then the Windows default (C:\Program Files\7-Zip\7z.exe, 7-Zip only). Versions are read once
 /// per executable.
 /// </summary>
 public sealed partial class PostProcessTools(IPostProcessToolSettings settings, IToolProcessRunner runner, ToolEnvironment environment)
@@ -101,7 +114,12 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
 
     public ToolLocation Find(PostProcessTool tool)
     {
-        var configured = (tool == PostProcessTool.Par2 ? settings.Par2Path : settings.SevenZipPath)?.Trim() ?? string.Empty;
+        var configured = (tool switch
+        {
+            PostProcessTool.Par2 => settings.Par2Path,
+            PostProcessTool.FFprobe => settings.FfprobePath,
+            _ => settings.SevenZipPath,
+        })?.Trim() ?? string.Empty;
         string? problem = null;
 
         if (configured.Length > 0)
@@ -182,12 +200,27 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
         (PostProcessTool.Par2, true) => ["par2.exe"],
         (PostProcessTool.Par2, false) => ["par2"],
         (PostProcessTool.SevenZip, true) => ["7z.exe", "7za.exe"],
+        (PostProcessTool.FFprobe, true) => ["ffprobe.exe"],
+        (PostProcessTool.FFprobe, false) => ["ffprobe"],
         _ => ["7z", "7zz", "7za"],
     };
 
-    public static string DisplayName(PostProcessTool tool) => tool == PostProcessTool.Par2 ? "par2" : "7-Zip";
+    public static string DisplayName(PostProcessTool tool) => tool switch
+    {
+        PostProcessTool.Par2 => "par2",
+        PostProcessTool.FFprobe => "ffprobe",
+        _ => "7-Zip",
+    };
 
-    /// <summary>"par2cmdline 0.8.1" or "7-Zip 23.01"; null when the tool does not run.</summary>
+    /// <summary>The key used in the API and the status window: par2, 7zip, ffprobe.</summary>
+    public static string Key(PostProcessTool tool) => tool switch
+    {
+        PostProcessTool.Par2 => "par2",
+        PostProcessTool.FFprobe => "ffprobe",
+        _ => "7zip",
+    };
+
+    /// <summary>"par2cmdline 0.8.1", "7-Zip 23.01" or "ffprobe 9.0.2"; null when the tool does not run.</summary>
     public async Task<string?> GetVersionAsync(string path, CancellationToken cancellationToken)
     {
         var key = $"{path}|{SafeWriteTime(path)}";
@@ -199,8 +232,11 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
         string? version;
         try
         {
-            var is7Zip = System.IO.Path.GetFileNameWithoutExtension(path).StartsWith("7z", StringComparison.OrdinalIgnoreCase);
-            var result = await runner.RunAsync(path, is7Zip ? [] : ["-V"], null, null, TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            IReadOnlyList<string> arguments = name.StartsWith("7z", StringComparison.OrdinalIgnoreCase) ? []
+                : name.StartsWith("ffprobe", StringComparison.OrdinalIgnoreCase) ? ["-version"]
+                : ["-V"];
+            var result = await runner.RunAsync(path, arguments, null, null, TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
             version = ParseVersion(result.Output);
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or TimeoutException or UnauthorizedAccessException)
@@ -218,6 +254,12 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
         if (sevenZip.Success)
         {
             return $"7-Zip {sevenZip.Groups[1].Value}";
+        }
+
+        var ffprobe = FfprobeVersionRegex().Match(output);
+        if (ffprobe.Success)
+        {
+            return $"ffprobe {ffprobe.Groups[1].Value}";
         }
 
         var par2 = Par2VersionRegex().Match(output);
@@ -243,4 +285,8 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
     // "par2cmdline version 0.8.1", "par2cmdline-turbo version 1.1.1"
     [GeneratedRegex(@"(par2\S*) version (\S+)", RegexOptions.IgnoreCase)]
     private static partial Regex Par2VersionRegex();
+
+    // "ffprobe version 9.0.2-essentials_build-www.gyan.dev", "ffprobe version 6.1.1-3ubuntu5", "ffprobe version n7.1"
+    [GeneratedRegex(@"ffprobe version n?(\d+(?:\.\d+)*)", RegexOptions.IgnoreCase)]
+    private static partial Regex FfprobeVersionRegex();
 }

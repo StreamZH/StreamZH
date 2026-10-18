@@ -175,4 +175,9 @@ public static class ConfigKeys
     public const string TrashLastSync = "TrashLastSync";
     public const string TrashLastError = "TrashLastError";
     public const string TrashQualitySizes = "TrashQualitySizes";
+
+    // Media info (0.8.1): ffprobe path, analysing files, the weekly refresh.
+    public const string FfprobePath = "FfprobePath";
+    public const string MediaInfoAnalyze = "MediaInfoAnalyze";
+    public const string MediaInfoRefreshIntervalDays = "MediaInfoRefreshIntervalDays";
 }

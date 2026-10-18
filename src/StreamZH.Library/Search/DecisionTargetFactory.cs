@@ -136,7 +136,10 @@ public sealed class DecisionTargetFactory(
         return all.Count == 0 ? [] : FileFormats(mediaType, Facts(file, folderPath), originalLanguage, year, all);
     }
 
-    /// <summary>The stored details of an imported file (quality survives renaming), else <see cref="Existing"/>.</summary>
+    /// <summary>
+    /// The stored details of a file (quality survives renaming; languages from the release name, else the audio languages
+    /// ffprobe found; the resolution from the video when no name states one), else <see cref="Existing"/>.
+    /// </summary>
     public (QualityModel? Quality, IReadOnlyList<Language> Languages) ExistingFile(MediaFile? file, string folderPath)
     {
         if (file is null)
@@ -177,7 +180,7 @@ public sealed class DecisionTargetFactory(
             return new FileFacts(
                 file,
                 new QualityModel(Quality.FindById(stored.QualityId), new Revision(stored.RevisionVersion, stored.RevisionReal, stored.IsRepack)),
-                [.. stored.LanguageIds.Select(Language.FindById).Where(l => l != Language.Unknown)],
+                stored.Languages,
                 stored);
         }
 

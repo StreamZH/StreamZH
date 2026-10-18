@@ -7,13 +7,15 @@ using StreamZH.Core.Indexers;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
 using StreamZH.Library.Search;
+using StreamZH.Library.Titles;
 using StreamZH.Parsing.Releases;
 
 namespace StreamZH.Library.Rss;
 
 /// <summary>
 /// Finds the library movie or series an RSS release belongs to without comparing it with every item: lookup by the ids
-/// the indexer sends (TMDB, TVDB, IMDb) and by clean title, then the same check as a search (<see cref="ReleaseMatching"/>).
+/// the indexer sends (TMDB, TVDB, IMDb) and by clean title (title, original title and alternative titles), then the same
+/// check as a search (<see cref="ReleaseMatching"/>).
 /// </summary>
 public sealed class LibraryIndex
 {
@@ -24,17 +26,22 @@ public sealed class LibraryIndex
     private readonly Dictionary<int, Series> _seriesByTvdb = [];
     private readonly Dictionary<int, Series> _seriesByTmdb = [];
     private readonly Dictionary<long, Series> _seriesByImdb = [];
+    private readonly AlternativeTitleLookup _alternativeTitles;
 
-    public LibraryIndex(IEnumerable<Movie> movies, IEnumerable<Series> series)
+    public LibraryIndex(IEnumerable<Movie> movies, IEnumerable<Series> series, AlternativeTitleLookup? alternativeTitles = null)
     {
         ArgumentNullException.ThrowIfNull(movies);
         ArgumentNullException.ThrowIfNull(series);
+        _alternativeTitles = alternativeTitles ?? AlternativeTitleLookup.Empty;
 
         foreach (var movie in movies)
         {
-            foreach (var title in new[] { movie.Title, movie.OriginalTitle }.Where(t => !string.IsNullOrWhiteSpace(t)))
+            foreach (var title in ReleaseMatching.MovieTitles(movie, _alternativeTitles.For(MediaType.Movie, movie.Id)).Where(t => !string.IsNullOrWhiteSpace(t)))
             {
-                Add(_moviesByTitle, TitleNormalizer.Clean(title), movie);
+                foreach (var clean in TitleNormalizer.CleanVariants(title))
+                {
+                    Add(_moviesByTitle, clean, movie);
+                }
             }
 
             _moviesByTmdb.TryAdd(movie.TmdbId, movie);
@@ -46,13 +53,16 @@ public sealed class LibraryIndex
 
         foreach (var show in series)
         {
-            foreach (var title in new[] { show.Title, show.OriginalTitle }.Where(t => !string.IsNullOrWhiteSpace(t)))
+            // Every title regardless of its season: the season check happens in ReleaseMatching.
+            foreach (var title in ReleaseMatching.SeriesTitles(show, null, _alternativeTitles.For(MediaType.Series, show.Id)).Where(t => !string.IsNullOrWhiteSpace(t)))
             {
-                var clean = TitleNormalizer.Clean(title);
-                Add(_seriesByTitle, clean, show);
-                if (show.Year > 0)
+                foreach (var clean in TitleNormalizer.CleanVariants(title))
                 {
-                    Add(_seriesByTitle, clean + show.Year.ToString(CultureInfo.InvariantCulture), show);
+                    Add(_seriesByTitle, clean, show);
+                    if (show.Year > 0)
+                    {
+                        Add(_seriesByTitle, clean + show.Year.ToString(CultureInfo.InvariantCulture), show);
+                    }
                 }
             }
 
@@ -70,14 +80,13 @@ public sealed class LibraryIndex
     }
 
     /// <summary>The movie the release is for, or null.</summary>
-    public Movie? FindMovie(ParsedRelease parsed, ReleaseInfo info)
+    public Movie? FindMovie(ParsedRelease parsed, ReleaseInfo? info = null)
     {
         ArgumentNullException.ThrowIfNull(parsed);
-        ArgumentNullException.ThrowIfNull(info);
         var candidates = new List<Movie>();
-        AddFound(candidates, _moviesByTmdb, info.TmdbId);
+        AddFound(candidates, _moviesByTmdb, info?.TmdbId ?? 0);
         AddFound(candidates, _moviesByTmdb, parsed.TmdbId ?? 0);
-        AddFound(candidates, _moviesByImdb, ImdbNumber(info.ImdbId));
+        AddFound(candidates, _moviesByImdb, ImdbNumber(info?.ImdbId));
         AddFound(candidates, _moviesByImdb, ImdbNumber(parsed.ImdbId));
         if (_moviesByTitle.TryGetValue(parsed.CleanTitle, out var byTitle))
         {
@@ -86,26 +95,25 @@ public sealed class LibraryIndex
 
         return candidates
             .Distinct()
-            .Where(m => ReleaseMatching.MatchMovie(parsed, m, info) == ReleaseMatch.Match)
+            .Where(m => ReleaseMatching.MatchMovie(parsed, m, info, _alternativeTitles.For(MediaType.Movie, m.Id)) == ReleaseMatch.Match)
             .OrderBy(m => parsed.Year > 0 && m.Year > 0 ? Math.Abs(parsed.Year - m.Year) : 0)
             .FirstOrDefault();
     }
 
     /// <summary>The series the release is for, or null.</summary>
-    public Series? FindSeries(ParsedRelease parsed, ReleaseInfo info)
+    public Series? FindSeries(ParsedRelease parsed, ReleaseInfo? info = null)
     {
         ArgumentNullException.ThrowIfNull(parsed);
-        ArgumentNullException.ThrowIfNull(info);
         var candidates = new List<Series>();
-        AddFound(candidates, _seriesByTvdb, info.TvdbId);
-        AddFound(candidates, _seriesByTmdb, info.TmdbId);
-        AddFound(candidates, _seriesByImdb, ImdbNumber(info.ImdbId));
+        AddFound(candidates, _seriesByTvdb, info?.TvdbId ?? 0);
+        AddFound(candidates, _seriesByTmdb, info?.TmdbId ?? 0);
+        AddFound(candidates, _seriesByImdb, ImdbNumber(info?.ImdbId));
         if (_seriesByTitle.TryGetValue(parsed.CleanTitle, out var byTitle))
         {
             candidates.AddRange(byTitle);
         }
 
-        return candidates.Distinct().FirstOrDefault(s => ReleaseMatching.MatchSeries(parsed, s, info) == ReleaseMatch.Match);
+        return candidates.Distinct().FirstOrDefault(s => ReleaseMatching.MatchSeries(parsed, s, info, _alternativeTitles.For(MediaType.Series, s.Id)) == ReleaseMatch.Match);
     }
 
     private static void Add<T>(Dictionary<string, List<T>> map, string key, T item)

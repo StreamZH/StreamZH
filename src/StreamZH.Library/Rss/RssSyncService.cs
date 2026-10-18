@@ -13,6 +13,7 @@ using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
 using StreamZH.Library.Search;
+using StreamZH.Library.Titles;
 using StreamZH.Parsing.Releases;
 
 namespace StreamZH.Library.Rss;
@@ -51,7 +52,8 @@ public sealed class RssSyncService(
     ILogger<RssSyncService> logger,
     IDownloadQueue? queue = null,
     TimeProvider? timeProvider = null,
-    PendingImports? pendingImports = null)
+    PendingImports? pendingImports = null,
+    AlternativeTitleRepository? alternativeTitles = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -77,7 +79,8 @@ public sealed class RssSyncService(
         var defs = definitions.All().ToDictionary(d => d.QualityId);
         var rules = options.Rules();
         var pending = new PendingGrabs(history, downloadSettings, queue, _time, pendingImports);
-        var index = new LibraryIndex(movies.All(), series.All());
+        var index = new LibraryIndex(
+            movies.All(), series.All(), alternativeTitles is null ? null : new AlternativeTitleLookup([.. alternativeTitles.All(MediaType.Movie), .. alternativeTitles.All(MediaType.Series)]));
         var run = new Run();
 
         var movieReleases = new Dictionary<int, (Movie Movie, List<(ReleaseInfo Info, ParsedRelease Parsed)> Items)>();

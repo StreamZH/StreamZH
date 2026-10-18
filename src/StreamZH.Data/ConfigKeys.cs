@@ -175,4 +175,7 @@ public static class ConfigKeys
     public const string TrashLastSync = "TrashLastSync";
     public const string TrashLastError = "TrashLastError";
     public const string TrashQualitySizes = "TrashQualitySizes";
+
+    // Alternative titles (0.8.1)
+    public const string IndexerSearchAlternativeTitles = "IndexerSearchAlternativeTitles";
 }

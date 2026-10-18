@@ -52,7 +52,8 @@ public sealed class RenamerCatalog(
     MediaFileDetailsRepository details,
     RenamerTmdbCache cache,
     ITmdbClient? tmdb = null,
-    CustomFormatRepository? customFormats = null)
+    CustomFormatRepository? customFormats = null,
+    AlternativeTitleRepository? alternativeTitles = null)
 {
     private readonly Dictionary<MediaType, IReadOnlyList<Core.CustomFormats.CustomFormat>> _formats = [];
 
@@ -78,6 +79,7 @@ public sealed class RenamerCatalog(
 
     private IReadOnlyList<Series>? _series;
     private IReadOnlyList<Movie>? _movies;
+    private Titles.AlternativeTitleLookup? _alternativeTitles;
     private readonly Dictionary<int, IReadOnlyList<Episode>> _episodes = [];
 
     public bool TmdbConfigured => tmdb?.IsConfigured == true;
@@ -87,6 +89,7 @@ public sealed class RenamerCatalog(
     {
         _series = null;
         _movies = null;
+        _alternativeTitles = null;
         _episodes.Clear();
     }
 
@@ -111,12 +114,22 @@ public sealed class RenamerCatalog(
 
     public MediaFileDetails? Details(string path) => details.Find(path);
 
-    /// <summary>The library series with this title (and year, when the name has one).</summary>
-    public Series? MatchSeries(string title, int year) => Match(Series, title, year, s => s.Title, s => s.OriginalTitle, s => s.Year);
+    /// <summary>All alternative titles of the library, read once per catalog.</summary>
+    private Titles.AlternativeTitleLookup AlternativeTitles => _alternativeTitles ??= alternativeTitles is null
+        ? Titles.AlternativeTitleLookup.Empty
+        : new([.. alternativeTitles.All(MediaType.Movie), .. alternativeTitles.All(MediaType.Series)]);
 
-    public Movie? MatchMovie(string title, int year) => Match(Movies, title, year, m => m.Title, m => m.OriginalTitle, m => m.Year);
+    /// <summary>
+    /// The library series with this title (and year, when the name has one): title, original title or an alternative title
+    /// ("Die Simpsons" finds "The Simpsons").
+    /// </summary>
+    public Series? MatchSeries(string title, int year, int? seasonNumber = null) => Match(
+        Series, title, year, s => Search.ReleaseMatching.SeriesTitles(s, seasonNumber, AlternativeTitles.For(MediaType.Series, s.Id)), s => s.Title, s => s.Year);
 
-    private static T? Match<T>(IEnumerable<T> items, string title, int year, Func<T, string> name, Func<T, string> original, Func<T, int> itemYear)
+    public Movie? MatchMovie(string title, int year) => Match(
+        Movies, title, year, m => Search.ReleaseMatching.MovieTitles(m, AlternativeTitles.For(MediaType.Movie, m.Id)), m => m.Title, m => m.Year);
+
+    private static T? Match<T>(IEnumerable<T> items, string title, int year, Func<T, IEnumerable<string>> names, Func<T, string> name, Func<T, int> itemYear)
         where T : class
     {
         var clean = TitleNormalizer.Clean(title);
@@ -126,8 +139,7 @@ public sealed class RenamerCatalog(
         }
 
         var candidates = items
-            .Where(i => TitleNormalizer.Clean(name(i)) == clean
-                || TitleNormalizer.Clean(original(i)) == clean
+            .Where(i => names(i).Where(n => !string.IsNullOrWhiteSpace(n)).SelectMany(TitleNormalizer.CleanVariants).Contains(clean)
                 || TitleNormalizer.Clean($"{name(i)} {itemYear(i)}") == clean)
             .ToList();
         if (year > 0)

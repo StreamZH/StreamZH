@@ -60,7 +60,7 @@ public static class ReleaseMatcher
         var clean = release.CleanTitle;
         var titleMatches = titles
             .Where(t => !string.IsNullOrWhiteSpace(t))
-            .Select(TitleNormalizer.Clean)
+            .SelectMany(TitleNormalizer.CleanVariants)
             .Any(t => t.Length > 0 && (t == clean || (isSeries && year > 0 && t + year == clean)));
 
         if (!titleMatches)

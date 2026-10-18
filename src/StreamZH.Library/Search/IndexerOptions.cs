@@ -39,7 +39,8 @@ public sealed record IndexerOptionValues(
     int AvailabilityDelay,
     int RssSyncInterval,
     int MissingSearchInterval,
-    bool SearchOnAdd);
+    bool SearchOnAdd,
+    bool SearchAlternativeTitles = true);
 
 /// <summary>
 /// Settings → Indexers: release rules for all indexers (Radarr's "Indexers → Options"), release profiles, RSS sync and
@@ -74,7 +75,8 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         AvailabilityDelay: 0,
         RssSyncInterval: DefaultRssSyncInterval,
         MissingSearchInterval: 0,
-        SearchOnAdd: false);
+        SearchOnAdd: false,
+        SearchAlternativeTitles: true);
 
     public IndexerOptionValues Values => new(
         Int(ConfigKeys.IndexerMinimumAge, Defaults.MinimumAge, 0, MaxMinimumAge),
@@ -89,7 +91,8 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         Int(ConfigKeys.IndexerAvailabilityDelay, Defaults.AvailabilityDelay, -MaxAvailabilityDelay, MaxAvailabilityDelay),
         RssInterval(),
         MissingInterval(),
-        Bool(ConfigKeys.IndexerSearchOnAdd, Defaults.SearchOnAdd));
+        Bool(ConfigKeys.IndexerSearchOnAdd, Defaults.SearchOnAdd),
+        Bool(ConfigKeys.IndexerSearchAlternativeTitles, Defaults.SearchAlternativeTitles));
 
     /// <summary>RSS sync interval; null when switched off.</summary>
     public TimeSpan? RssSyncInterval => RssInterval() is > 0 and var minutes ? TimeSpan.FromMinutes(minutes) : null;
@@ -98,6 +101,9 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
     public TimeSpan? MissingSearchInterval => MissingInterval() is > 0 and var hours ? TimeSpan.FromHours(hours) : null;
 
     public bool SearchOnAdd => Bool(ConfigKeys.IndexerSearchOnAdd, Defaults.SearchOnAdd);
+
+    /// <summary>Text searches also use alternative titles (German title, scene names, yours); at most three titles per search.</summary>
+    public bool SearchAlternativeTitles => Bool(ConfigKeys.IndexerSearchAlternativeTitles, Defaults.SearchAlternativeTitles);
 
     /// <summary>The release rules for the decision engine, with the release profiles.</summary>
     public ReleaseRules Rules()
@@ -128,6 +134,7 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         Set(ConfigKeys.IndexerRssSyncInterval, values.RssSyncInterval);
         Set(ConfigKeys.IndexerMissingSearchInterval, values.MissingSearchInterval);
         config.Set(ConfigKeys.IndexerSearchOnAdd, values.SearchOnAdd ? "true" : "false");
+        config.Set(ConfigKeys.IndexerSearchAlternativeTitles, values.SearchAlternativeTitles ? "true" : "false");
     }
 
     /// <summary>

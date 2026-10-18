@@ -39,7 +39,8 @@ public sealed class LibraryService(
     QualityProfileService profiles,
     IEventBus events,
     ILogger<LibraryService> logger,
-    Import.MediaManagementSettings? mediaManagement = null)
+    Import.MediaManagementSettings? mediaManagement = null,
+    Titles.AlternativeTitleService? alternativeTitles = null)
 {
     private Import.MediaManagementValues Media => mediaManagement?.Current ?? new Import.MediaManagementValues();
 
@@ -70,6 +71,13 @@ public sealed class LibraryService(
 
         movies.Add(movie);
         logger.LogInformation("Added movie '{Title} ({Year})' {File}", movie.Title, movie.Year, movie.File is null ? "without file" : "with file");
+        if (alternativeTitles is not null)
+        {
+            // Ids can be reused after a removal: titles left from an earlier item must not stick to this one.
+            alternativeTitles.DeleteForItem(MediaType.Movie, movie.Id);
+            await alternativeTitles.RefreshMovieAsync(movie, cancellationToken);
+        }
+
         await events.PublishAsync(new LibraryChanged(MediaType.Movie, movie.Id), cancellationToken);
         return movie;
     }
@@ -100,6 +108,12 @@ public sealed class LibraryService(
 
         series.Add(item);
         logger.LogInformation("Added series '{Title} ({Year})'", item.Title, item.Year);
+        if (alternativeTitles is not null)
+        {
+            alternativeTitles.DeleteForItem(MediaType.Series, item.Id);
+            await alternativeTitles.RefreshSeriesAsync(item, cancellationToken);
+        }
+
         await events.PublishAsync(new LibraryChanged(MediaType.Series, item.Id), cancellationToken);
         return item;
     }
@@ -122,6 +136,11 @@ public sealed class LibraryService(
 
         movie.LastRefreshed = DateTime.UtcNow;
         movies.Update(movie);
+        if (alternativeTitles is not null)
+        {
+            await alternativeTitles.RefreshMovieAsync(movie, cancellationToken);
+        }
+
         await events.PublishAsync(new LibraryChanged(MediaType.Movie, id), cancellationToken);
     }
 
@@ -159,6 +178,11 @@ public sealed class LibraryService(
 
         item.LastRefreshed = DateTime.UtcNow;
         series.Update(item);
+        if (alternativeTitles is not null)
+        {
+            await alternativeTitles.RefreshSeriesAsync(item, cancellationToken);
+        }
+
 
         logger.LogInformation("Refreshed series '{Title}': {Count} episodes", item.Title, episodes.Count);
         await events.PublishAsync(new LibraryChanged(MediaType.Series, id), cancellationToken);
@@ -235,6 +259,7 @@ public sealed class LibraryService(
     {
         var movie = movies.Find(id) ?? throw new LibraryException("Movie not found.", LibraryError.NotFound);
         movies.Delete(id);
+        alternativeTitles?.DeleteForItem(MediaType.Movie, id);
         logger.LogInformation("Removed movie '{Title}' from the library (files kept)", movie.Title);
         await events.PublishAsync(new LibraryChanged(MediaType.Movie, id));
     }
@@ -243,6 +268,7 @@ public sealed class LibraryService(
     {
         var item = series.Find(id) ?? throw new LibraryException("Series not found.", LibraryError.NotFound);
         series.Delete(id);
+        alternativeTitles?.DeleteForItem(MediaType.Series, id);
         logger.LogInformation("Removed series '{Title}' from the library (files kept)", item.Title);
         await events.PublishAsync(new LibraryChanged(MediaType.Series, id));
     }

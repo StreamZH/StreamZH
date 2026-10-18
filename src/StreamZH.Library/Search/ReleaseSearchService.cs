@@ -10,6 +10,7 @@ using StreamZH.Core.Media;
 using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
 using StreamZH.Data;
+using StreamZH.Library.Titles;
 using StreamZH.Parsing.Releases;
 
 namespace StreamZH.Library.Search;
@@ -29,7 +30,8 @@ public sealed class ReleaseSearchService(
     ReleaseCache cache,
     ILogger<ReleaseSearchService> logger,
     TimeProvider? timeProvider = null,
-    IndexerOptions? options = null)
+    IndexerOptions? options = null,
+    AlternativeTitleRepository? alternativeTitles = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -47,9 +49,10 @@ public sealed class ReleaseSearchService(
         var target = targets.ForMovie(movie) with { Monitored = true };
         var subject = new SearchSubject(MediaType.Movie, movie.Id, null, movie.Title);
         var targetName = movie.Year > 0 ? $"{movie.Title} ({movie.Year})" : movie.Title;
+        var alternatives = AlternativeTitles(MediaType.Movie, movie.Id);
         var criteria = new MovieSearchCriteria
         {
-            Titles = Titles(movie.Title, movie.OriginalTitle),
+            Titles = SearchTitles(movie.Title, movie.OriginalTitle, alternatives, target, null),
             Year = movie.Year,
             TmdbId = movie.TmdbId,
             ImdbId = movie.ImdbId,
@@ -71,7 +74,7 @@ public sealed class ReleaseSearchService(
                 continue;
             }
 
-            if (ReleaseMatching.MismatchRejection(ReleaseMatching.MatchMovie(parsed, movie, info), parsed, targetName) is { } mismatch)
+            if (ReleaseMatching.MismatchRejection(ReleaseMatching.MatchMovie(parsed, movie, info, alternatives), parsed, targetName) is { } mismatch)
             {
                 results.Add(new Ranked(Decide(info, parsed, [mismatch], subject, []), Tier.NotForTarget));
                 continue;
@@ -111,9 +114,10 @@ public sealed class ReleaseSearchService(
         var requestedIds = requested.Select(e => e.Id).ToHashSet();
         var subject = new SearchSubject(MediaType.Series, null, show.Id, show.Title);
         var targetName = show.Year > 0 ? $"{show.Title} ({show.Year})" : show.Title;
+        var alternatives = AlternativeTitles(MediaType.Series, show.Id);
         var criteria = new EpisodeSearchCriteria
         {
-            Titles = Titles(show.Title, show.OriginalTitle),
+            Titles = SearchTitles(show.Title, show.OriginalTitle, alternatives, targets.ForEpisodes(show, requested), seasonNumber),
             Year = show.Year,
             TvdbId = show.TvdbId ?? 0,
             TmdbId = show.TmdbId,
@@ -138,7 +142,7 @@ public sealed class ReleaseSearchService(
                 continue;
             }
 
-            if (ReleaseMatching.MismatchRejection(ReleaseMatching.MatchSeries(parsed, show, info), parsed, targetName) is { } mismatch)
+            if (ReleaseMatching.MismatchRejection(ReleaseMatching.MatchSeries(parsed, show, info, alternatives), parsed, targetName) is { } mismatch)
             {
                 results.Add(new Ranked(Decide(info, parsed, [mismatch], subject, []), Tier.NotForTarget));
                 continue;
@@ -273,8 +277,20 @@ public sealed class ReleaseSearchService(
 
     private IReadOnlyDictionary<int, QualityDefinition> Definitions() => definitions.All().ToDictionary(d => d.QualityId);
 
-    private static IReadOnlyList<string> Titles(string title, string originalTitle) =>
-        [.. new[] { title, originalTitle }.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase)];
+    private IReadOnlyList<AlternativeTitle> AlternativeTitles(MediaType mediaType, int itemId) =>
+        alternativeTitles?.For(mediaType, itemId) ?? [];
+
+    /// <summary>
+    /// The text queries for indexers without an id search (or when it found nothing): with "Search alternative titles" the
+    /// title in the profile's language first (Sonarr's scene titles, Radarr's translated title), at most three.
+    /// </summary>
+    private IReadOnlyList<string> SearchTitles(
+        string title, string originalTitle, IReadOnlyList<AlternativeTitle> alternatives, DecisionTarget target, int? seasonNumber)
+    {
+        var language = target.Profile.LanguageId == Language.Original.Id ? target.OriginalLanguage.Id : target.Profile.LanguageId;
+        return AlternativeTitleRules.SearchTitles(
+            title, originalTitle, alternatives, language, options?.SearchAlternativeTitles ?? true, seasonNumber);
+    }
 
     internal static ReleaseCandidate Candidate(ReleaseInfo info, ParsedRelease parsed) =>
         new(parsed, info.Size, info.Indexer, info.IndexerPriority, info.PublishDate, info.DownloadUrl, info.Guid) { IndexerId = info.IndexerId };

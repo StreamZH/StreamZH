@@ -40,9 +40,11 @@ public static class IndexerOptionsEndpoints
             options.Save(values!);
             logger.LogInformation(
                 "Indexer settings saved: minimum age {MinimumAge} min, retention {Retention} days, maximum size {MaximumSize} MB, hardcoded subs {Hardcoded}, "
-                + "minimum availability {Availability} (+{Delay} days), RSS sync every {Rss} min, missing search every {Missing} h, search on add {SearchOnAdd}",
+                + "minimum availability {Availability} (+{Delay} days), RSS sync every {Rss} min, missing search every {Missing} h, search on add {SearchOnAdd}, "
+                + "search alternative titles {AlternativeTitles}",
                 values!.MinimumAge, values.Retention, values.MaximumSize, values.AllowHardcodedSubs ? "allowed" : "rejected",
-                values.MinimumAvailability, values.AvailabilityDelay, values.RssSyncInterval, values.MissingSearchInterval, values.SearchOnAdd);
+                values.MinimumAvailability, values.AvailabilityDelay, values.RssSyncInterval, values.MissingSearchInterval, values.SearchOnAdd,
+                values.SearchAlternativeTitles);
             return Results.Ok(IndexerOptionsResource.From(options.Values));
         });
 
@@ -157,7 +159,8 @@ public static class IndexerOptionsEndpoints
                 request.AvailabilityDelay,
                 request.RssSyncInterval,
                 request.MissingSearchInterval,
-                request.SearchOnAdd);
+                request.SearchOnAdd,
+                request.SearchAlternativeTitles);
         }
 
         return errors;
@@ -254,11 +257,12 @@ public sealed record IndexerOptionsResource(
     int AvailabilityDelay,
     int RssSyncInterval,
     int MissingSearchInterval,
-    bool SearchOnAdd)
+    bool SearchOnAdd,
+    bool SearchAlternativeTitles = true)
 {
     public static IndexerOptionsResource From(IndexerOptionValues v) => new(
         v.MinimumAge, v.Retention, v.MaximumSize, v.AllowHardcodedSubs, v.WhitelistedHardcodedSubs, v.MinimumAvailability, v.AvailabilityDelay,
-        v.RssSyncInterval, v.MissingSearchInterval, v.SearchOnAdd);
+        v.RssSyncInterval, v.MissingSearchInterval, v.SearchOnAdd, v.SearchAlternativeTitles);
 }
 
 public sealed record PreferredTermResource(string? Term, int Score);

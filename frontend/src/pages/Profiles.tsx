@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError } from '../api/client'
 import { profileKeys, profilesApi, type Language, type QualityDefinition, type QualityProfile } from '../api/profiles'
 import { useAuth } from '../auth/auth'
 import Icon from '../components/Icon'
 import { Skeleton } from '../components/Loader'
-import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
+import ProfileDialog from '../profiles/ProfileDialog'
+import { toBlocks } from '../profiles/qualityBlocks'
+import { changedScores, useTemplateNames, useTemplateScores } from '../profiles/trashTemplates'
 import { SaveBar, Section, SettingsPage } from '../settings/SettingsKit'
+import TrashSection, { UpdateFromTrashDialog } from '../trash/TrashSection'
 import styles from './Profiles.module.css'
 
 export default function Profiles() {
@@ -15,7 +18,8 @@ export default function Profiles() {
   const canEdit = user?.role === 'Owner' || user?.role === 'Admin'
 
   return (
-    <SettingsPage title="Profiles" lead="Which qualities and languages StreamZH grabs, and until when it keeps upgrading. Size limits per quality are under Quality.">
+    <SettingsPage title="Profiles" lead="Which qualities and languages StreamZH grabs, how it scores custom formats, and until when it keeps upgrading. Size limits per quality are under Quality.">
+      <TrashSection canEdit={canEdit} />
       <ProfileList canEdit={canEdit} />
     </SettingsPage>
   )
@@ -31,6 +35,9 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
   const settings = useQuery({ queryKey: profileKeys.settings, queryFn: profilesApi.settings })
   const languages = useQuery({ queryKey: profileKeys.languages, queryFn: profilesApi.languages, staleTime: Infinity })
   const [editing, setEditing] = useState<QualityProfile | null>(null)
+  const [updating, setUpdating] = useState<QualityProfile | null>(null)
+  const managed = (profiles.data ?? []).some((p) => p.trashMovieTemplate || p.trashSeriesTemplate)
+  const templateNames = useTemplateNames(managed)
 
   const makeDefault = useMutation({
     mutationFn: profilesApi.saveSettings,
@@ -51,7 +58,7 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
       description="Each movie and series uses one profile. New items get the default profile unless you choose another one."
       actions={
         canEdit && (
-          <button className={`${ui.primary} ${ui.sm}`} type="button" onClick={() => create.mutate()} disabled={create.isPending}>
+          <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => create.mutate()} disabled={create.isPending}>
             <Icon name="plus" size={14} />
             New profile
           </button>
@@ -64,49 +71,20 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
       {makeDefault.error && <p className={ui.error}>{makeDefault.error.message}</p>}
 
       <ul className={styles.list}>
-        {(profiles.data ?? []).map((p) => {
-          const allowed = p.items.filter((i) => i.allowed).length
-          const cutoff = p.items.find((i) => i.qualityId === p.cutoffQualityId)?.name ?? '–'
-          return (
-            <li key={p.id} className={styles.row}>
-              <div className={styles.rowMain}>
-                <span className={`${styles.rowIcon} ${p.id === defaultId ? styles.rowIconOn : ''}`} aria-hidden="true">
-                  <Icon name="star" size={16} />
-                </span>
-                <span className={styles.name}>{p.name}</span>
-                {p.id === defaultId && <span className={`${ui.pill} ${ui.pillOk}`}>Default</span>}
-              </div>
-              <dl className={styles.meta}>
-                <div>
-                  <dt>Language</dt>
-                  <dd>
-                    {languageName(languages.data ?? [], p.languageId)}
-                    {p.preferDualLanguage ? ' · dual' : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Cutoff</dt>
-                  <dd>{p.upgradeAllowed ? cutoff : 'No upgrades'}</dd>
-                </div>
-                <div>
-                  <dt>Qualities</dt>
-                  <dd>{allowed} allowed</dd>
-                </div>
-              </dl>
-              <div className={styles.rowActions}>
-                {canEdit && p.id !== defaultId && (
-                  <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={() => makeDefault.mutate(p.id)} disabled={makeDefault.isPending}>
-                    Set as default
-                  </button>
-                )}
-                <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => setEditing(p)}>
-                  <Icon name={canEdit ? 'edit' : 'eye'} size={14} />
-                  {canEdit ? 'Edit' : 'View'}
-                </button>
-              </div>
-            </li>
-          )
-        })}
+        {(profiles.data ?? []).map((p) => (
+          <ProfileRow
+            key={p.id}
+            profile={p}
+            languages={languages.data ?? []}
+            templateNames={templateNames}
+            isDefault={p.id === defaultId}
+            canEdit={canEdit}
+            busy={makeDefault.isPending}
+            onDefault={() => makeDefault.mutate(p.id)}
+            onEdit={() => setEditing(p)}
+            onUpdate={() => setUpdating(p)}
+          />
+        ))}
       </ul>
 
       {editing && (
@@ -118,214 +96,109 @@ function ProfileList({ canEdit }: { canEdit: boolean }) {
           onClose={() => setEditing(null)}
         />
       )}
+      {updating && <UpdateFromTrashDialog profile={updating} onClose={() => setUpdating(null)} />}
     </Section>
   )
 }
 
-function ProfileDialog({
-  profile,
+function ProfileRow({
+  profile: p,
   languages,
-  canEdit,
+  templateNames,
   isDefault,
-  onClose,
+  canEdit,
+  busy,
+  onDefault,
+  onEdit,
+  onUpdate,
 }: {
   profile: QualityProfile
   languages: Language[]
-  canEdit: boolean
+  templateNames: Map<string, string>
   isDefault: boolean
-  onClose: () => void
+  canEdit: boolean
+  busy: boolean
+  onDefault: () => void
+  onEdit: () => void
+  onUpdate: () => void
 }) {
-  const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<QualityProfile>(profile)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const pendingFocus = useRef<{ qualityId: number; dir: 'up' | 'down' } | null>(null)
-  const listRef = useRef<HTMLOListElement>(null)
-  const isNew = profile.id === 0
-
-  const done = async () => {
-    await queryClient.invalidateQueries({ queryKey: profileKeys.profiles })
-    await queryClient.invalidateQueries({ queryKey: profileKeys.settings })
-    onClose()
-  }
-
-  const save = useMutation({
-    mutationFn: () => (isNew ? profilesApi.create(draft) : profilesApi.update(draft)),
-    onSuccess: done,
-  })
-  const remove = useMutation({ mutationFn: () => profilesApi.remove(profile.id), onSuccess: done })
-
-  // Keep keyboard focus on the move button after the row moved.
-  useEffect(() => {
-    const focus = pendingFocus.current
-    pendingFocus.current = null
-    if (!focus || !listRef.current) return
-    const row = listRef.current.querySelector<HTMLElement>(`[data-quality="${focus.qualityId}"]`)
-    const wanted = row?.querySelector<HTMLButtonElement>(`[data-move="${focus.dir}"]`)
-    const other = row?.querySelector<HTMLButtonElement>(`[data-move="${focus.dir === 'up' ? 'down' : 'up'}"]`)
-    ;(wanted && !wanted.disabled ? wanted : other)?.focus()
-  }, [draft.items])
-
-  const fieldErrors = save.error instanceof ApiError ? save.error.fieldErrors : {}
-  const allowedItems = draft.items.filter((i) => i.allowed)
-  // Shown best first; stored worst first.
-  const shown = [...draft.items].reverse()
-
-  const update = (change: Partial<QualityProfile>) => setDraft((d) => ({ ...d, ...change }))
-
-  const toggle = (qualityId: number, allowed: boolean) =>
-    setDraft((d) => {
-      const items = d.items.map((i) => (i.qualityId === qualityId ? { ...i, allowed } : i))
-      const stillAllowed = items.some((i) => i.allowed && i.qualityId === d.cutoffQualityId)
-      // Keep the cutoff valid: fall back to the best allowed quality.
-      const best = [...items].reverse().find((i) => i.allowed)
-      return { ...d, items, cutoffQualityId: stillAllowed ? d.cutoffQualityId : (best?.qualityId ?? 0) }
-    })
-
-  /** Moves a quality one step better (up) or worse (down). */
-  const move = (qualityId: number, dir: 'up' | 'down') => {
-    setDraft((d) => {
-      const index = d.items.findIndex((i) => i.qualityId === qualityId)
-      const target = dir === 'up' ? index + 1 : index - 1
-      if (index < 0 || target < 0 || target >= d.items.length) return d
-      const items = [...d.items]
-      ;[items[index], items[target]] = [items[target], items[index]]
-      return { ...d, items }
-    })
-    pendingFocus.current = { qualityId, dir }
-  }
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    save.mutate()
-  }
+  const template = useTemplateScores(p)
+  const changed = changedScores(p, template).length
+  const blocks = toBlocks(p.items)
+  const cutoffBlock = blocks.find((b) => b.items.some((i) => i.qualityId === p.cutoffQualityId))
+  const cutoff = cutoffBlock ? (cutoffBlock.group ?? cutoffBlock.items[0].name) : '–'
+  const scored = (p.formatItems ?? []).filter((i) => i.score !== 0).length
+  const templates = [p.trashMovieTemplate, p.trashSeriesTemplate].filter((t): t is string => !!t)
+  const names = [...new Set(templates.map((t) => templateNames.get(t)).filter((n): n is string => !!n))]
+  const managed = templates.length > 0
 
   return (
-    <Modal title={isNew ? 'New profile' : canEdit ? `Edit ${profile.name}` : profile.name} onClose={onClose}>
-      <form className={styles.form} onSubmit={submit}>
-        <fieldset className={styles.fieldset} disabled={!canEdit}>
-          <div className={styles.grid}>
-            <label className={ui.field}>
-              <span>Name</span>
-              <input className={ui.input} value={draft.name} maxLength={100} onChange={(e) => update({ name: e.target.value })} autoFocus />
-              {fieldErrors.name && <small className={ui.error}>{fieldErrors.name[0]}</small>}
-            </label>
-            <label className={ui.field}>
-              <span>Language</span>
-              <select className={ui.select} value={draft.languageId} onChange={(e) => update({ languageId: Number(e.target.value) })}>
-                {languages.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.id === -1 ? 'Any language' : l.id === -2 ? 'Original language' : l.name}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.languageId && <small className={ui.error}>{fieldErrors.languageId[0]}</small>}
-            </label>
-          </div>
-
-          <div className={styles.checks}>
-            <label className={ui.check}>
-              <input type="checkbox" checked={draft.preferDualLanguage} onChange={(e) => update({ preferDualLanguage: e.target.checked })} />
-              <span>Prefer dual language (e.g. German.DL)</span>
-            </label>
-            <label className={ui.check}>
-              <input type="checkbox" checked={draft.upgradeAllowed} onChange={(e) => update({ upgradeAllowed: e.target.checked })} />
-              <span>Upgrades allowed</span>
-            </label>
-          </div>
-
-          <label className={ui.field}>
-            <span>Upgrade until (cutoff)</span>
-            <select
-              className={ui.select}
-              value={allowedItems.some((i) => i.qualityId === draft.cutoffQualityId) ? draft.cutoffQualityId : ''}
-              onChange={(e) => update({ cutoffQualityId: Number(e.target.value) })}
-              disabled={allowedItems.length === 0 || !draft.upgradeAllowed}
-            >
-              {allowedItems.length === 0 && <option value="">Allow a quality first</option>}
-              {[...allowedItems].reverse().map((i) => (
-                <option key={i.qualityId} value={i.qualityId}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-            <small>Once a file has this quality, StreamZH stops looking for better releases.</small>
-            {fieldErrors.cutoffQualityId && <small className={ui.error}>{fieldErrors.cutoffQualityId[0]}</small>}
-          </label>
-
-          <div className={ui.field}>
-            <span id="qualities-label">Qualities</span>
-            <small>Best first. Higher in the list is preferred; only checked qualities are grabbed.</small>
-            <ol className={styles.qualities} ref={listRef} aria-labelledby="qualities-label">
-              {shown.map((item, index) => (
-                <li key={item.qualityId} data-quality={item.qualityId} className={item.allowed ? undefined : styles.notAllowed}>
-                  <label className={ui.check}>
-                    <input type="checkbox" checked={item.allowed} onChange={(e) => toggle(item.qualityId, e.target.checked)} />
-                    <span>{item.name}</span>
-                  </label>
-                  {item.qualityId === draft.cutoffQualityId && item.allowed && <span className={`${ui.tag} ${styles.cutoffTag}`}>Cutoff</span>}
-                  {canEdit && (
-                    <span className={styles.moveButtons}>
-                      <button
-                        type="button"
-                        className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
-                        data-move="up"
-                        onClick={() => move(item.qualityId, 'up')}
-                        disabled={index === 0}
-                        aria-label={`Move ${item.name} up`}
-                      >
-                        <Icon name="up" size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className={`${ui.ghost} ${ui.sm} ${ui.icon}`}
-                        data-move="down"
-                        onClick={() => move(item.qualityId, 'down')}
-                        disabled={index === shown.length - 1}
-                        aria-label={`Move ${item.name} down`}
-                      >
-                        <Icon name="down" size={15} />
-                      </button>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-            {fieldErrors.items && <small className={ui.error}>{fieldErrors.items[0]}</small>}
-          </div>
-        </fieldset>
-
-        {canEdit && (
-          <div className={styles.footer}>
-            {!isNew &&
-              (confirmDelete ? (
-                <>
-                  <span className={ui.muted}>{isDefault ? 'This is the default profile.' : 'Delete this profile?'}</span>
-                  <button className={ui.danger} type="button" onClick={() => remove.mutate()} disabled={remove.isPending}>
-                    Yes, delete
-                  </button>
-                  <button className={ui.button} type="button" onClick={() => setConfirmDelete(false)}>
-                    Keep
-                  </button>
-                </>
-              ) : (
-                <button className={ui.ghost} type="button" onClick={() => setConfirmDelete(true)}>
-                  <Icon name="trash" size={15} />
-                  Delete
-                </button>
-              ))}
-            <span className={styles.spacer} />
-            <button className={ui.button} type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button className={ui.primary} type="submit" disabled={save.isPending}>
-              {save.isPending ? 'Saving…' : 'Save'}
-            </button>
+    <li className={styles.row}>
+      <div className={styles.rowMain}>
+        <span className={`${styles.rowIcon} ${isDefault ? styles.rowIconOn : ''}`} aria-hidden="true">
+          <Icon name="star" size={16} />
+        </span>
+        <span className={styles.rowTitle}>
+          <span className={styles.nameLine}>
+            <span className={styles.name}>{p.name}</span>
+            {isDefault && <span className={`${ui.pill} ${ui.pillOk}`}>Default</span>}
+          </span>
+          {managed && (
+            <span className={styles.trashLine}>
+              <span className={styles.trashPill}>
+                <Icon name="sparkle" size={11} />
+                TRaSH: {names.length > 0 ? names.join(' · ') : 'template'}
+              </span>
+              {changed > 0 && (
+                <span className={styles.changedText} title="Scores that differ from the TRaSH template">
+                  {changed} score{changed === 1 ? '' : 's'} changed
+                </span>
+              )}
+            </span>
+          )}
+        </span>
+      </div>
+      <dl className={styles.meta}>
+        <div>
+          <dt>Language</dt>
+          <dd>
+            {languageName(languages, p.languageId)}
+            {p.preferDualLanguage ? ' · dual' : ''}
+          </dd>
+        </div>
+        <div>
+          <dt>Cutoff</dt>
+          <dd>{p.upgradeAllowed ? cutoff : 'No upgrades'}</dd>
+        </div>
+        <div>
+          <dt>Qualities</dt>
+          <dd>{p.items.filter((i) => i.allowed).length} allowed</dd>
+        </div>
+        {p.formatItems && (
+          <div>
+            <dt>Formats</dt>
+            <dd>{scored > 0 ? `${scored} scored` : 'none scored'}</dd>
           </div>
         )}
-        {save.error && Object.keys(fieldErrors).length === 0 && <p className={ui.error}>{save.error.message}</p>}
-        {remove.error && <p className={ui.error}>{remove.error.message}</p>}
-      </form>
-    </Modal>
+      </dl>
+      <div className={styles.rowActions}>
+        {canEdit && !isDefault && (
+          <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={onDefault} disabled={busy}>
+            Set as default
+          </button>
+        )}
+        {canEdit && managed && (
+          <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={onUpdate} title="Apply the current TRaSH template to this profile again">
+            <Icon name="restart" size={14} />
+            Update
+          </button>
+        )}
+        <button className={`${ui.button} ${ui.sm}`} type="button" onClick={onEdit}>
+          <Icon name={canEdit ? 'edit' : 'eye'} size={14} />
+          {canEdit ? 'Edit' : 'View'}
+        </button>
+      </div>
+    </li>
   )
 }
 

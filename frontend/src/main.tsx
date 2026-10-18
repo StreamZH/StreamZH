@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import ActivityPage from './activity/ActivityPage'
 import AuthGate from './auth/AuthGate'
 import Layout from './components/Layout'
+import CustomFormatsPage from './customFormats/CustomFormatsPage'
 import ImportPage from './library/ImportPage'
 import LibraryPage from './library/LibraryPage'
 import MovieDetail from './library/MovieDetail'
@@ -74,6 +75,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="settings/media-management" element={<MediaManagementPage />} />
             <Route path="settings/import-lists" element={<ImportListsPage />} />
             <Route path="settings/profiles" element={<Profiles />} />
+            <Route path="settings/custom-formats" element={<CustomFormatsPage />} />
             <Route path="settings/quality" element={<QualityPage />} />
             <Route path="settings/indexers" element={<IndexerOptionsPage />} />
             <Route path="settings/downloads" element={<DownloadsPage />} />

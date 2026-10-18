@@ -20,6 +20,7 @@ import Icon from '../components/Icon'
 import Loader from '../components/Loader'
 import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
+import { FormatLine } from '../customFormats/FormatTags'
 import { formatBytes, formatDateTime } from '../lib/format'
 import MultiSelect, { type MultiOption } from './MultiSelect'
 import Toasts, { type ToastMessage } from './Toast'
@@ -260,7 +261,7 @@ function Results({
       words.length === 0
         ? all
         : all.filter((r) => {
-            const text = `${r.title} ${r.indexer} ${r.quality} ${r.languages.join(' ')}`.toLowerCase()
+            const text = `${r.title} ${r.indexer} ${r.quality} ${r.languages.join(' ')} ${(r.customFormats ?? []).map((f) => f.name).join(' ')}`.toLowerCase()
             return words.every((w) => text.includes(w))
           })
     return [...shown].sort((a, b) => (sort.desc ? -1 : 1) * compare(a, b, sort.key))
@@ -482,6 +483,7 @@ function ReleaseRow({
       </span>
       <span role="cell" className={styles.titleCell}>
         {release.title}
+        <FormatLine formats={release.customFormats} score={release.customFormatScore} />
       </span>
       <span className={styles.metaCells}>
         <span role="cell" className={`${styles.cell} ${styles.num}`} title={formatDateTime(release.publishDate)}>

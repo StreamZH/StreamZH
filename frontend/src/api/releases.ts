@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { MatchedFormat } from './customFormats'
 import type { JobStatus, MediaType } from './library'
 
 export interface Rejection {
@@ -31,6 +32,9 @@ export interface Release {
   episodeIds: number[]
   /** Sum of the matching preferred terms of the release profiles (Settings → Indexers). */
   preferredScore: number
+  /** Custom formats the release matched (0.8) and their summed score in the item's profile. */
+  customFormats?: MatchedFormat[]
+  customFormatScore?: number
 }
 
 export interface ReleaseSearch {

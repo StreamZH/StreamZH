@@ -74,7 +74,7 @@ export default function MovieDetail() {
                 Rename files
               </button>
             )}
-            <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} item={{ mediaType: 'Movie', tmdbId: m.tmdbId, title: m.title, year: m.year }} />
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
         }

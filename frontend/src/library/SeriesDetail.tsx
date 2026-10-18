@@ -73,7 +73,7 @@ export default function SeriesDetail() {
                 Rename files
               </button>
             )}
-            <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} item={{ mediaType: 'Series', tmdbId: s.tmdbId, title: s.title, year: s.year }} />
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
         }

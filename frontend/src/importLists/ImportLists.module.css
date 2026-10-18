@@ -1,0 +1,266 @@
+/* Settings → Import lists. Cards and type picker come from connect/Connect.module.css; these are the extras. */
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.cardSync {
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.cardAdded {
+  display: block;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.sectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.note {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+/* Type picker: one group per source. */
+.group + .group {
+  margin-top: 18px;
+}
+
+.groupTitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.typeMedia {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* Movies / Series switch in the form. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--line);
+}
+
+.segmented button[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.segmented button:disabled {
+  cursor: default;
+}
+
+/* Preview inside the dialog. */
+.preview {
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+}
+
+.previewHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.previewTitle {
+  font-weight: 600;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.filter[aria-pressed='true'] {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.previewList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.previewItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.previewItem:first-child {
+  border-top: none;
+}
+
+.itemTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemTitle a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.itemTitle a:hover {
+  text-decoration: underline;
+}
+
+.year {
+  color: var(--text-faint);
+}
+
+.itemActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.small {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Exclusions */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 360px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-faint);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  vertical-align: middle;
+}
+
+.table td:last-child,
+.table th:last-child {
+  text-align: right;
+}
+
+.titleCell {
+  overflow-wrap: anywhere;
+}
+
+.more {
+  margin-top: 10px;
+}
+
+/* "Also add to import list exclusions" next to Remove. */
+.removeCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 600px) {
+  .hideNarrow {
+    display: none;
+  }
+
+  .previewItem {
+    flex-wrap: wrap;
+  }
+
+  .itemTitle {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+}

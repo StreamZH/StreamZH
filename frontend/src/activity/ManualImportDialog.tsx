@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { alternativeTitlesApi } from '../api/alternativeTitles'
 import { ApiError } from '../api/client'
 import type { DownloadItem } from '../api/downloads'
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
@@ -36,6 +37,20 @@ export default function ManualImportDialog({
   const [chosenFile, setChosenFile] = useState<string | null>(null)
   const [episodeText, setEpisodeText] = useState<Record<string, string>>({})
   const [skipped, setSkipped] = useState<Set<string>>(new Set())
+
+  // A download that belongs to nothing: preselect the library item its name stands for (any title, also German ones).
+  const unlinked = item.movieId == null && item.seriesId == null
+  const suggestion = useQuery({ queryKey: ['library-match', item.title], queryFn: () => alternativeTitlesApi.match(item.title), enabled: unlinked })
+  const [suggested, setSuggested] = useState(!unlinked)
+  if (!suggested && suggestion.data) {
+    setSuggested(true)
+    const match = suggestion.data.match
+    if (match && movieId == null && seriesId == null) {
+      setType(match.mediaType === 'movie' ? 'Movie' : 'Series')
+      if (match.mediaType === 'movie') setMovieId(match.id)
+      else setSeriesId(match.id)
+    }
+  }
 
   const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies, enabled: type === 'Movie', staleTime: 60_000 })
   const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series, enabled: type === 'Series', staleTime: 60_000 })

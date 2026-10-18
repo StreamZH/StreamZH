@@ -23,7 +23,7 @@ public enum ReleaseMatch
 
 /// <summary>
 /// Does a release belong to a movie or series? Ids in the name (IMDb, TMDB) decide first; otherwise the clean title
-/// must match the title or the original title, and a year in the name must be within one year
+/// must match one of the item's titles (title, original title, alternative titles; umlauts also without "e"), and a year in the name must be within one year
 /// (Radarr does the same: German and US releases often carry different years).
 /// </summary>
 public static class ReleaseMatcher

@@ -93,6 +93,19 @@ public sealed class AlternativeTitleServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task An_unchanged_refresh_keeps_the_ids()
+    {
+        var service = Service();
+        _tmdb.Movie = new TmdbTitles([new("Duna", "BR", null)], [new("de", "DE", "Der Wüstenplanet")]);
+        await service.RefreshMovieAsync(_bed.Dune);
+        var before = _repository.For(MediaType.Movie, _bed.Dune.Id).Select(t => t.Id).Order().ToList();
+
+        await service.RefreshMovieAsync(_bed.Dune);
+
+        Assert.Equal(before, _repository.For(MediaType.Movie, _bed.Dune.Id).Select(t => t.Id).Order());
+    }
+
+    [Fact]
     public async Task Tmdb_problems_keep_the_old_titles()
     {
         var service = Service();

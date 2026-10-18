@@ -1,3 +1,4 @@
+import type { LibraryMatch } from './alternativeTitles'
 import { request } from './client'
 import type { MatchedFormat } from './customFormats'
 
@@ -58,6 +59,8 @@ export interface ParseResult {
   releaseProfiles: ReleaseProfileMatch[]
   preferredScore: number
   hardcodedSubs: string | null
+  /** The library item the name belongs to (by any of its titles, 0.8.1). */
+  library?: LibraryMatch | null
 }
 
 export function parseRelease(title: string, target: string, sizeMb: number | null, indexerId: number | null = null): Promise<ParseResult> {

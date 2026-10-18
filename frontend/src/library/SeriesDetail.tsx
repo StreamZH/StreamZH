@@ -21,6 +21,7 @@ import RemoveDialog from './RemoveDialog'
 import ReleaseSearchModal from './ReleaseSearchModal'
 import SearchButtons from './SearchButtons'
 import { useDetailActions } from './useDetailActions'
+import AlternativeTitles from './AlternativeTitles'
 
 export default function SeriesDetail() {
   const id = Number(useParams().id)
@@ -113,6 +114,7 @@ export default function SeriesDetail() {
           listItem={{ mediaType: 'Series', tmdbId: s.tmdbId, title: s.title, year: s.year }}
         />
       )}
+      <AlternativeTitles type="Series" id={s.id} seasons={seasons.map((x) => x.seasonNumber)} />
       <HistoryPanel seriesId={s.id} />
     </div>
   )

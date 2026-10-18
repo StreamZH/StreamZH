@@ -134,18 +134,30 @@ public sealed class AlternativeTitleService(
             return false;
         }
 
-        var keep = repository.For(mediaType, itemId)
+        var existing = repository.For(mediaType, itemId);
+        var keep = existing
             .Where(t => t.Source is not (AlternativeTitleSources.Tmdb or AlternativeTitleSources.Translation))
             .Select(t => t.Title);
         var originalLanguage = IsoCode(originalLanguageId);
         var (alternatives, translations) = AlternativeTitleRules.FromTmdb(
             mediaType, itemId, titles, title, originalTitle, originalLanguage, tmdbSettings?.Language, keep);
 
-        repository.ReplaceSource(mediaType, itemId, AlternativeTitleSources.Translation, translations);
-        repository.ReplaceSource(mediaType, itemId, AlternativeTitleSources.Tmdb, alternatives);
+        Replace(AlternativeTitleSources.Translation, translations);
+        Replace(AlternativeTitleSources.Tmdb, alternatives);
         logger.LogDebug(
             "Alternative titles of '{Title}': {Translations} translations, {Alternatives} TMDB titles", title, translations.Count, alternatives.Count);
         return true;
+
+        // Unchanged titles keep their ids (an open "Also known as" panel stays valid).
+        void Replace(string source, IReadOnlyList<AlternativeTitle> fresh)
+        {
+            static string Key(AlternativeTitle t) => $"{t.Title}\u0001{t.LanguageId}\u0001{t.SeasonNumber}\u0001{t.SceneSeasonNumber}";
+            var old = existing.Where(t => t.Source == source).Select(Key).Order(StringComparer.Ordinal);
+            if (!old.SequenceEqual(fresh.Select(Key).Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            {
+                repository.ReplaceSource(mediaType, itemId, source, fresh);
+            }
+        }
     }
 
     /// <summary>The ISO 639-1 code of a language id ("de" for German), for picking the translation in the original language.</summary>

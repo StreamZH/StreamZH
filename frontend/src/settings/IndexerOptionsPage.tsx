@@ -28,7 +28,7 @@ type NumberField = 'minimumAge' | 'retention' | 'maximumSize' | 'availabilityDel
 type Draft = Omit<IndexerOptions, NumberField> & Record<NumberField, number | null>
 
 const optionFields = ['minimumAge', 'retention', 'maximumSize', 'allowHardcodedSubs', 'whitelistedHardcodedSubs', 'minimumAvailability', 'availabilityDelay'] as const
-const automationFields = ['rssSyncInterval', 'missingSearchInterval', 'searchOnAdd'] as const
+const automationFields = ['rssSyncInterval', 'missingSearchInterval', 'searchOnAdd', 'searchAlternativeTitles'] as const
 
 const availabilityOptions: { value: MinimumAvailability; label: string }[] = [
   { value: 'announced', label: 'Announced' },
@@ -176,7 +176,7 @@ function AutomationSection() {
       id="rss"
       title="RSS & automation"
       description="RSS sync reads the newest releases of every indexer with RSS switched on and grabs what your monitored movies and episodes still need."
-      hiddenCount={2}
+      hiddenCount={3}
       footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
     >
       <Row
@@ -223,6 +223,14 @@ function AutomationSection() {
       </Row>
       <Row label="Search when adding" advanced help='Default for "Start search for missing" when you add a movie or series.' error={form.error('searchOnAdd')}>
         <Toggle checked={v.searchOnAdd} onChange={(searchOnAdd) => form.set({ searchOnAdd })} />
+      </Row>
+      <Row
+        label="Search alternative titles"
+        advanced
+        help="When an indexer cannot search by id or finds nothing, also search the title in the profile language (e.g. German), scene names and your own titles. At most three per search."
+        error={form.error('searchAlternativeTitles')}
+      >
+        <Toggle checked={v.searchAlternativeTitles} onChange={(searchAlternativeTitles) => form.set({ searchAlternativeTitles })} />
       </Row>
     </Section>
   )

@@ -56,6 +56,12 @@ public static class AlternativeTitleEndpoints
             return Results.NoContent();
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
+        // Every alternative title of the library (the command palette finds items by them too).
+        api.MapGet("/library/titles", (AlternativeTitleRepository alternativeTitles) =>
+            alternativeTitles.All(MediaType.Movie).Select(t => new LibraryTitleResource("movie", t.ItemId, t.Title))
+                .Concat(alternativeTitles.All(MediaType.Series).Select(t => new LibraryTitleResource("series", t.ItemId, t.Title))))
+            .WithTags("Library");
+
         // Which library item a release or download name belongs to (by any of its titles); the manual import preselects it.
         api.MapGet("/library/match", (string? title, MovieRepository movies, SeriesRepository series, AlternativeTitleRepository alternativeTitles) =>
         {
@@ -68,6 +74,8 @@ public static class AlternativeTitleEndpoints
 }
 
 public sealed record LibraryMatchAnswer(LibraryMatchResource? Match);
+
+public sealed record LibraryTitleResource(string MediaType, int Id, string Title);
 
 /// <summary>Your own title; <see cref="SeasonNumber"/> limits it to one season of a series.</summary>
 public sealed record AddAlternativeTitleRequest(string? Title, int? SeasonNumber);

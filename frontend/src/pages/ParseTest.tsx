@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { formatScore } from '../api/indexerOptions'
 import { indexerKeys, indexersApi } from '../api/indexers'
 import { libraryApi, queryKeys } from '../api/library'
+import type { LibraryMatch } from '../api/alternativeTitles'
 import { parseRelease, type ParsedRelease, type ParseResult } from '../api/parse'
 import Icon from '../components/Icon'
 import Loader from '../components/Loader'
@@ -177,7 +178,7 @@ export default function ParseTest() {
 
       {result.data?.parsed && (
         <div className={styles.results}>
-          <ParsedTable parsed={result.data.parsed} hardcodedSubs={result.data.hardcodedSubs} />
+          <ParsedTable parsed={result.data.parsed} hardcodedSubs={result.data.hardcodedSubs} library={result.data.library ?? null} />
           <div className={styles.side}>
             <ParseFormatsPanel title={submitted!.title} parsed={result.data.parsed} decision={decision ?? null} sizeMb={submitted!.size} />
             <ReleaseProfiles result={result.data} />
@@ -245,7 +246,7 @@ function Term({ tone, children }: { tone: 'ok' | 'bad'; children: ReactNode }) {
   return <span className={`${ui.pill} ${tone === 'ok' ? ui.pillOk : ui.pillErr} ${styles.term}`}>{children}</span>
 }
 
-function ParsedTable({ parsed: p, hardcodedSubs }: { parsed: ParsedRelease; hardcodedSubs: string | null }) {
+function ParsedTable({ parsed: p, hardcodedSubs, library }: { parsed: ParsedRelease; hardcodedSubs: string | null; library: LibraryMatch | null }) {
   const episodes =
     p.kind === 'Episode'
       ? p.airDate
@@ -287,6 +288,7 @@ function ParsedTable({ parsed: p, hardcodedSubs }: { parsed: ParsedRelease; hard
     ['Hardcoded subs', hardcodedSubs && <span key="v" className={`${ui.pill} ${ui.pillWarn}`}>{hardcodedSubs}</span>],
     ['IMDb / TMDB', [p.imdbId, p.tmdbId].filter(Boolean).join(' / ') || null],
     ['Matching key', p.cleanTitle && <span key="v" className={ui.mono}>{p.cleanTitle}</span>],
+    ['In library', library ? <LibraryMatchText key="v" match={library} /> : <span key="v" className={ui.muted}>no movie or series in the library</span>],
   ]
 
   return (
@@ -311,4 +313,33 @@ function ParsedTable({ parsed: p, hardcodedSubs }: { parsed: ParsedRelease; hard
 
 function pad(n: number) {
   return String(n).padStart(2, '0')
+}
+
+const matchedBy: Record<string, string> = {
+  originalTitle: 'original title',
+  translation: 'translation',
+  tmdb: 'TMDB alternative title',
+  xem: 'scene name',
+  user: 'your title',
+  id: 'id in the name',
+}
+
+/** "Money Heist (2017) · via translation (German) «Haus des Geldes»". */
+function LibraryMatchText({ match }: { match: LibraryMatch }) {
+  const via = matchedBy[match.source]
+  return (
+    <span>
+      <Link to={`/library/${match.mediaType === 'movie' ? 'movies' : 'series'}/${match.id}`}>
+        {match.year > 0 ? `${match.title} (${match.year})` : match.title}
+      </Link>
+      {via && (
+        <span className={ui.muted}>
+          {' '}
+          · via {via}
+          {match.language ? ` (${match.language})` : ''}
+          {match.source !== 'id' && match.matchedTitle !== match.title ? ` «${match.matchedTitle}»` : ''}
+        </span>
+      )}
+    </span>
+  )
 }

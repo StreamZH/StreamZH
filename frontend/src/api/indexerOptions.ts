@@ -20,6 +20,8 @@ export interface IndexerOptions {
   /** Hours: 0 or 6 to 720. */
   missingSearchInterval: number
   searchOnAdd: boolean
+  /** Text searches also use alternative titles (German title, scene names, yours), at most three per search. */
+  searchAlternativeTitles: boolean
 }
 
 export interface PreferredTerm {

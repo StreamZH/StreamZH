@@ -3,6 +3,7 @@
 // Portions based on Radarr (https://github.com/Radarr/Radarr) and Sonarr (https://github.com/Sonarr/Sonarr), Copyright (c) their contributors, GPL-3.0.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using StreamZH.Core.CustomFormats;
 using StreamZH.Core.Media;
 using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
@@ -22,6 +23,9 @@ public sealed record ReleaseCandidate(
 {
     /// <summary>Id of the indexer (0 when unknown, e.g. the release test page); release profiles can be limited to indexers.</summary>
     public int IndexerId { get; init; }
+
+    /// <summary>Indexer flags (freeleech, internal …) as bit flags of the media type's enum; Usenet indexers set none yet (0).</summary>
+    public int IndexerFlags { get; init; }
 }
 
 /// <summary>What the search was for: one movie, or one set of episodes (single episode, multi-episode or season pack).</summary>
@@ -54,6 +58,12 @@ public sealed record DecisionTarget(
 
     /// <summary>Settings → Media Management → "Propers and repacks"; the default keeps the old behaviour.</summary>
     public ProperHandling Propers { get; init; } = ProperHandling.PreferAndUpgrade;
+
+    /// <summary>The custom formats of this media type; releases are scored against them with the profile's scores.</summary>
+    public IReadOnlyList<CustomFormat> CustomFormats { get; init; } = [];
+
+    /// <summary>The custom formats the file on disk matches (from its name, release group and quality); empty without a file.</summary>
+    public IReadOnlyList<CustomFormat> ExistingCustomFormats { get; init; } = [];
 }
 
 /// <summary>How PROPER, REPACK and REAL releases (a higher revision of the same quality) are treated, like Radarr and Sonarr.</summary>
@@ -91,6 +101,12 @@ public sealed record Decision(ReleaseCandidate Candidate, IReadOnlyList<Rejectio
     /// <summary>Sum of the matching preferred terms of the release profiles (0 without release profiles).</summary>
     public int PreferredScore { get; init; }
 
+    /// <summary>The custom formats the release matches, ordered by name.</summary>
+    public IReadOnlyList<CustomFormat> CustomFormats { get; init; } = [];
+
+    /// <summary>Their summed score in the target's quality profile.</summary>
+    public int CustomFormatScore { get; init; }
+
     public bool Accepted => Rejections.Count == 0;
 
     /// <summary>Rejected, but only for reasons that may go away later.</summary>
@@ -116,4 +132,54 @@ public sealed record DecisionContext(
 
     public QualityDefinition? DefinitionFor(int qualityId) =>
         Definitions.TryGetValue(qualityId, out var definition) ? definition : null;
+
+    private readonly FormatCache _formats = new();
+
+    /// <summary>
+    /// The custom formats a release matches and their score in the profile, computed once per candidate and target
+    /// (the engine's specifications and the ranking share it).
+    /// </summary>
+    public CustomFormatResult CustomFormatsFor(ReleaseCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        if (Target.CustomFormats.Count == 0)
+        {
+            return CustomFormatResult.None;
+        }
+
+        return _formats.Get(Target, candidate, () =>
+        {
+            var input = CustomFormatInput.ForRelease(
+                candidate.Release, candidate.SizeBytes, Target.MediaType, Target.OriginalLanguage, Target.Year, candidate.IndexerFlags);
+            return CustomFormatCalculator.Calculate(Profile, Target.CustomFormats, input);
+        });
+    }
+
+    /// <summary>Score of the file on disk in the profile (0 without a file or formats).</summary>
+    public int ExistingCustomFormatScore => CustomFormatCalculator.Score(Profile, Target.ExistingCustomFormats);
+
+    /// <summary>Per-candidate cache; a context copied with another target never reuses results of the old one.</summary>
+    private sealed class FormatCache
+    {
+        private readonly Dictionary<ReleaseCandidate, (DecisionTarget Target, CustomFormatResult Result)> _items = new(ReferenceEqualityComparer.Instance);
+
+        public CustomFormatResult Get(DecisionTarget target, ReleaseCandidate candidate, Func<CustomFormatResult> compute)
+        {
+            lock (_items)
+            {
+                if (_items.TryGetValue(candidate, out var entry) && ReferenceEquals(entry.Target, target))
+                {
+                    return entry.Result;
+                }
+            }
+
+            var result = compute();
+            lock (_items)
+            {
+                _items[candidate] = (target, result);
+            }
+
+            return result;
+        }
+    }
 }

@@ -8,7 +8,9 @@ namespace StreamZH.Core.Decisions.Specifications;
 /// <summary>
 /// When a file exists, only real upgrades are accepted (see <see cref="UpgradeRules"/>). Release profiles add one way
 /// (Sonarr v3): the same quality and revision with a higher preferred score than the file on disk is an upgrade, when
-/// the profile allows upgrades, even past the cutoff. The file's score comes from its file name.
+/// the profile allows upgrades, even past the cutoff. The file's score comes from its file name. Custom formats work like
+/// Radarr: within the same quality rank the custom format score decides (see <see cref="UpgradeRules"/>); the file's
+/// formats come from its name, release group and stored quality (<see cref="DecisionTarget.ExistingCustomFormats"/>).
 /// </summary>
 public sealed class UpgradeSpecification : IDecisionSpecification
 {
@@ -23,6 +25,8 @@ public sealed class UpgradeSpecification : IDecisionSpecification
         }
 
         var profile = context.Profile;
+        var existingScore = context.ExistingCustomFormatScore;
+        var candidateScore = context.CustomFormatsFor(candidate).Score;
         var verdict = UpgradeRules.Check(
             profile,
             existing,
@@ -30,9 +34,11 @@ public sealed class UpgradeSpecification : IDecisionSpecification
             candidate.Release.Quality,
             LanguageRules.EffectiveLanguages(candidate.Release, target.OriginalLanguage),
             target.OriginalLanguage,
-            target.Propers);
+            target.Propers,
+            existingScore,
+            candidateScore);
 
-        if (verdict is (UpgradeVerdict.NotBetter or UpgradeVerdict.CutoffMet) && IsPreferredScoreUpgrade(candidate, context))
+        if (verdict is (UpgradeVerdict.NotBetter or UpgradeVerdict.CutoffMet) && candidateScore >= existingScore && IsPreferredScoreUpgrade(candidate, context))
         {
             return null;
         }
@@ -47,11 +53,25 @@ public sealed class UpgradeSpecification : IDecisionSpecification
             UpgradeVerdict.UpgradesNotAllowed => new Rejection(
                 RejectionCodes.DiskUpgradesNotAllowed, $"A file exists and profile {profile.Name} does not allow upgrades"),
             UpgradeVerdict.CutoffMet => new Rejection(
-                RejectionCodes.DiskCutoffMet, $"Existing file meets the cutoff: {existing}"),
+                RejectionCodes.DiskCutoffMet, $"Existing file meets the cutoff: {existing}{FormatsOf(target)}"),
+            UpgradeVerdict.FormatCutoffMet => new Rejection(
+                RejectionCodes.DiskCustomFormatCutoffMet,
+                Invariant($"Existing file meets the custom format cutoff score {profile.CutoffFormatScore}: score {existingScore}{FormatsOf(target)}")),
+            UpgradeVerdict.FormatScoreNotBetter => new Rejection(
+                RejectionCodes.DiskCustomFormatScore,
+                Invariant($"Existing file has an equal or higher custom format score: {existingScore}{FormatsOf(target)}, this release {candidateScore}")),
+            UpgradeVerdict.FormatScoreIncrement => new Rejection(
+                RejectionCodes.DiskCustomFormatScoreIncrement,
+                Invariant($"Custom format score {candidateScore} is less than {profile.MinUpgradeFormatScore} above the existing file's {existingScore}")),
             _ => new Rejection(
                 RejectionCodes.DiskHigherPreference, $"Existing file has the same quality: {existing}"),
         };
     }
+
+    private static string FormatsOf(DecisionTarget target) =>
+        target.ExistingCustomFormats.Count == 0 ? string.Empty : $" [{string.Join(", ", target.ExistingCustomFormats.Select(f => f.Name))}]";
+
+    private static string Invariant(FormattableString text) => FormattableString.Invariant(text);
 
     /// <summary>Same quality and revision as the file, upgrades allowed, and a higher preferred score than the file name.</summary>
     public static bool IsPreferredScoreUpgrade(ReleaseCandidate candidate, DecisionContext context)

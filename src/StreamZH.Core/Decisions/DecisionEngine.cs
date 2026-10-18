@@ -29,6 +29,7 @@ public static class DecisionEngine
         new NotSampleSpecification(),
         new HardcodedSubsSpecification(),
         new ReleaseProfileSpecification(),
+        new CustomFormatScoreSpecification(),
         new BlocklistSpecification(),
         new UpgradeSpecification(),
     ];
@@ -78,7 +79,16 @@ public static class DecisionEngine
         var comparer = new DecisionComparer(context);
 
         return candidates
-            .Select(candidate => new Decision(candidate, Check(candidate, context, specifications)) { PreferredScore = comparer.PreferredScore(candidate) })
+            .Select(candidate =>
+            {
+                var formats = context.CustomFormatsFor(candidate);
+                return new Decision(candidate, Check(candidate, context, specifications))
+                {
+                    PreferredScore = comparer.PreferredScore(candidate),
+                    CustomFormats = formats.Formats,
+                    CustomFormatScore = formats.Score,
+                };
+            })
             .OrderByDescending(d => d.Accepted)
             .ThenByDescending(d => d.Candidate, comparer)
             .ToList();

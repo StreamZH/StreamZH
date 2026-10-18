@@ -233,6 +233,13 @@ public sealed record NamingPreview(
         Hdr = HdrFormat.None,
         SceneName = "The.Movie.Title.Part.Two.2010.IMAX.German.DL.1080p.BluRay.PROPER.x264-RlsGrp",
         OriginalFileName = "the.movie.title.part.two.2010.1080p-rlsgrp",
+
+        // Radarr's sample formats for {Custom Formats}.
+        CustomFormats =
+        [
+            new Core.CustomFormats.CustomFormat { Id = -1, Name = "Surround Sound", MediaType = MediaType.Movie, IncludeInRename = true },
+            new Core.CustomFormats.CustomFormat { Id = -2, Name = "x264", MediaType = MediaType.Movie, IncludeInRename = true },
+        ],
     };
 
     private static readonly NamingFileInfo EpisodeFileInfo = MovieFileInfo with

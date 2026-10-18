@@ -19,6 +19,7 @@ using StreamZH.Host.Status;
 using StreamZH.Host.Tray;
 using StreamZH.Indexers;
 using StreamZH.Library;
+using StreamZH.Library.CustomFormats;
 using StreamZH.Library.Downloads;
 using StreamZH.Library.Rss;
 using StreamZH.Library.Import;
@@ -108,6 +109,7 @@ builder.Services.AddWanted();
 builder.Services.AddRenamer();
 builder.Services.AddImportLists();
 builder.Services.AddTrayAccess();
+builder.Services.AddCustomFormats();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
@@ -158,6 +160,7 @@ app.MapCalendarEndpoints();
 app.MapRenamerEndpoints();
 app.MapImportListEndpoints();
 app.MapTrayEndpoints();
+app.MapCustomFormatEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

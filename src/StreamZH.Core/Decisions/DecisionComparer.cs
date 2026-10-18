@@ -9,8 +9,9 @@ namespace StreamZH.Core.Decisions;
 /// Ranks candidates for one target, modelled on Radarr's DownloadDecisionComparer.
 /// Compare(x, y) &gt; 0 means x is better. Rules, first difference wins:
 /// <list type="number">
-/// <item>Profile quality rank, higher first.</item>
+/// <item>Profile quality rank, higher first (qualities of one group rank equally).</item>
 /// <item>Revision (REAL, then version), higher first; skipped with <see cref="ProperHandling.DoNotPrefer"/>.</item>
+/// <item>Custom format score in the profile, higher first (Radarr's CompareCustomFormatScore).</item>
 /// <item>Dual language first, when the profile prefers it.</item>
 /// <item>Preferred score of the release profiles, higher first (after quality and language, like Sonarr v3).</item>
 /// <item>Indexer priority, lower number first.</item>
@@ -73,6 +74,7 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
         [
             CompareQuality(x, y),
             _context.Target.Propers == ProperHandling.DoNotPrefer ? 0 : x.Release.Quality.Revision.CompareTo(y.Release.Quality.Revision),
+            CustomFormatScore(x).CompareTo(CustomFormatScore(y)),
             CompareDualLanguage(x, y),
             PreferredScore(x).CompareTo(PreferredScore(y)),
             y.IndexerPriority.CompareTo(x.IndexerPriority),
@@ -82,6 +84,9 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
 
         return results.FirstOrDefault(r => r != 0);
     }
+
+    /// <summary>Custom format score of a candidate in the target's profile (cached by the context).</summary>
+    public int CustomFormatScore(ReleaseCandidate candidate) => _context.CustomFormatsFor(candidate).Score;
 
     private int CompareQuality(ReleaseCandidate x, ReleaseCandidate y) =>
         _context.Profile.RankOf(x.Release.Quality.Quality.Id).CompareTo(_context.Profile.RankOf(y.Release.Quality.Quality.Id));

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    StreamZH.Tray.exe: the icon in the Windows notification area (the service runs in session 0 and cannot show one).
+    Windows only; EnableWindowsTargeting lets Linux and macOS build it (CI), it just does not run there.
+    Published framework-dependent as one small file (tools\Update-Local.ps1); needs the .NET 10 Windows Desktop
+    Runtime, which the .NET SDK on Windows includes.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>StreamZH.Tray</AssemblyName>
+    <RootNamespace>StreamZH.Tray</RootNamespace>
+    <ApplicationIcon>streamzh.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="streamzh.ico" LogicalName="streamzh.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../StreamZH.Tray.Core/StreamZH.Tray.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.13" />
+  </ItemGroup>
+</Project>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { libraryApi, queryKeys } from '../api/library'
 import ProfileSelect from '../components/ProfileSelect'
 import ui from '../components/ui.module.css'
@@ -11,7 +11,9 @@ import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
+import OrganizeDialog from './OrganizeDialog'
 import RemoveButton from './RemoveButton'
+import RemoveDialog from './RemoveDialog'
 import SearchButtons from './SearchButtons'
 import { useDetailActions } from './useDetailActions'
 
@@ -21,6 +23,9 @@ export default function MovieDetail() {
   const { monitor, refresh, remove, assignProfile } = useDetailActions('Movie', id)
   const admin = useIsAdmin()
   const [renaming, setRenaming] = useState(false)
+  const [organizing, setOrganizing] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const navigate = useNavigate()
 
   if (movie.isError) return <p className={ui.error}>{movie.error.message}</p>
   if (!movie.data) return <div className={page.page} aria-busy="true" />
@@ -74,7 +79,18 @@ export default function MovieDetail() {
                 Rename files
               </button>
             )}
-            <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            {admin && (
+              <button className={ui.button} type="button" onClick={() => setOrganizing(true)}>
+                Organize
+              </button>
+            )}
+            {admin ? (
+              <button className={ui.button} type="button" onClick={() => setRemoving(true)}>
+                Remove
+              </button>
+            ) : (
+              <RemoveButton onConfirm={() => remove.mutate()} pending={remove.isPending} />
+            )}
             {assignProfile.error && <span className={ui.error}>{assignProfile.error.message}</span>}
           </>
         }
@@ -111,6 +127,15 @@ export default function MovieDetail() {
         </dl>
       </section>
 
+      {organizing && <OrganizeDialog type="Movie" ids={[m.id]} onClose={() => setOrganizing(false)} />}
+      {removing && (
+        <RemoveDialog
+          type="Movie"
+          items={[{ id: m.id, title: m.year > 0 ? `${m.title} (${m.year})` : m.title, folder: m.folderPath, size: m.file?.size ?? 0 }]}
+          onClose={() => setRemoving(false)}
+          onRemoved={() => void navigate('/library/movies')}
+        />
+      )}
       <HistoryPanel movieId={m.id} />
       {renaming && <RenameDialog type="Movie" id={m.id} title={m.year > 0 ? `${m.title} (${m.year})` : m.title} onClose={() => setRenaming(false)} />}
     </div>

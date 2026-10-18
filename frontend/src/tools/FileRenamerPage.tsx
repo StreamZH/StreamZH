@@ -13,7 +13,8 @@ import PreviewTable from './renamer/PreviewTable'
 import styles from './renamer/Renamer.module.css'
 import { Check, Field } from './renamer/RuleForms'
 import RuleList from './renamer/RuleList'
-import { activeStates, defaultFilter, defaultOptions, defaultSource, folderFormats, fromApiRules, toApiRules, type EditorRule } from './renamer/rules'
+import { activeStates, defaultFilter, defaultOptions, defaultSimple, defaultSource, folderFormats, fromApiRules, newRule, toApiRules, type EditorRule, type SimpleSetup } from './renamer/rules'
+import SimpleName from './renamer/SimpleName'
 import { useDebounced } from './renamer/useDebounced'
 
 const draftKey = 'streamzh-renamer-draft'
@@ -52,6 +53,47 @@ function writeDraft(draft: Draft) {
   }
 }
 
+const simpleKey = 'streamzh-renamer-simple'
+
+/** The simple setup of this browser. */
+function readSimple(): SimpleSetup {
+  try {
+    const text = localStorage.getItem(simpleKey)
+    if (!text) return defaultSimple
+    const saved = JSON.parse(text) as Partial<SimpleSetup>
+    return {
+      kind: saved.kind === 'movie' ? 'movie' : 'episode',
+      episodeFormat: saved.episodeFormat?.trim() || defaultSimple.episodeFormat,
+      movieFormat: saved.movieFormat?.trim() || defaultSimple.movieFormat,
+      seasonFolders: saved.seasonFolders ?? defaultSimple.seasonFolders,
+    }
+  } catch {
+    return defaultSimple
+  }
+}
+
+function writeSimple(setup: SimpleSetup) {
+  try {
+    localStorage.setItem(simpleKey, JSON.stringify(setup))
+  } catch {
+    // no storage
+  }
+}
+
+/** "Season {season:00}" → "Season 01", for the checkbox label. */
+const seasonExample = (format: string) =>
+  format.replace(/\{season:0+\}/gi, '01').replace(/\{season\}/gi, '1').replace(/\{[^}]*\}/g, '').trim() || null
+
+/** The simple setup as one media rule (titles from the library, then TMDB). */
+function simpleRule(setup: SimpleSetup, kind: SimpleSetup['kind']): EditorRule {
+  return {
+    ...(newRule('media') as Extract<EditorRule, { type: 'media' }>),
+    kind,
+    episodeFormat: setup.episodeFormat,
+    movieFormat: setup.movieFormat,
+  }
+}
+
 const extensionPresets: { value: ExtensionPreset; label: string }[] = [
   { value: 'video', label: 'Video' },
   { value: 'videoAndSubtitles', label: 'Video + subtitles' },
@@ -81,8 +123,10 @@ export default function FileRenamerPage() {
   const [presetName, setPresetName] = useState<string | null>(null)
   const [presetId, setPresetId] = useState<number | null>(null)
   const [lastRun, setLastRun] = useState<number | null>(null)
+  const [simple, setSimple] = useState<SimpleSetup>(readSimple)
 
   useEffect(() => writeDraft({ mode, source, filter, rules, options }), [mode, source, filter, rules, options])
+  useEffect(() => writeSimple(simple), [simple])
 
   const effectiveSource: RenamerSource = useMemo(
     () => (mode === 'folder' ? { ...source, movieId: null, seriesId: null } : { ...source, path: null }),
@@ -90,9 +134,32 @@ export default function FileRenamerPage() {
   )
   const hasSource = mode === 'folder' ? !!source.path : source.movieId != null || source.seriesId != null
 
+  const settings = useQuery({ queryKey: mediaManagementKeys.settings, queryFn: mediaManagementApi.settings })
+  const seasonFormat = settings.data?.seasonFolderFormat || 'Season {season}'
+
+  // Simple mode: a movie or series from the library decides episodes or movies.
+  const kindFixed = mode === 'library' && (source.seriesId != null || source.movieId != null)
+  const simpleKind: SimpleSetup['kind'] = kindFixed ? (source.seriesId != null ? 'episode' : 'movie') : simple.kind
+
+  // Turning on Advanced with no rules yet starts from the simple pattern.
+  useEffect(() => {
+    if (advanced) setRules((r) => (r.length === 0 ? [simpleRule(simple, simpleKind)] : r))
+    // only when the switch changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanced])
+
   const request: RenamerRequest = useMemo(
-    () => ({ source: effectiveSource, filter, rules: toApiRules(rules), options, excluded: [...excluded] }),
-    [effectiveSource, filter, rules, options, excluded],
+    () =>
+      advanced
+        ? { source: effectiveSource, filter, rules: toApiRules(rules), options, excluded: [...excluded] }
+        : {
+            source: { ...effectiveSource, depth: defaultSource.depth, target: 'files' },
+            filter: defaultFilter,
+            rules: toApiRules([simpleRule(simple, simpleKind)]),
+            options: { folderFormat: simpleKind === 'episode' && simple.seasonFolders ? seasonFormat : '', companions: true },
+            excluded: [...excluded],
+          },
+    [advanced, effectiveSource, filter, rules, options, excluded, simple, simpleKind, seasonFormat],
   )
   const requestKey = useDebounced(JSON.stringify(request), 350)
   // The debounced request can still be the one from before a folder was chosen.
@@ -109,7 +176,6 @@ export default function FileRenamerPage() {
     retry: false,
   })
 
-  const settings = useQuery({ queryKey: mediaManagementKeys.settings, queryFn: mediaManagementApi.settings })
   const settingsFormats = settings.data ? { episode: settings.data.standardEpisodeFormat, movie: settings.data.standardMovieFormat } : null
   const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies, enabled: mode === 'library' })
   const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series, enabled: mode === 'library' })
@@ -172,6 +238,8 @@ export default function FileRenamerPage() {
   const sourceError = fieldErrors['source.path']?.[0] ?? fieldErrors['source.depth']?.[0] ?? (preview.error && !(preview.error instanceof ApiError && Object.keys(preview.error.fieldErrors).length > 0) ? preview.error.message : null)
   const data = preview.data
   const sample = data?.rows.find((r) => !r.isFolder && !r.companionOf)?.oldName ?? null
+  const exampleRow = data?.rows.find((r) => !r.isFolder && !r.companionOf && (r.status === 'rename' || r.status === 'unchanged'))
+  const example = hasSource && exampleRow ? exampleRow.newName : null
   const libraryFiles = data?.rows.filter((r) => r.status === 'rename' && (r.movieId != null || r.seriesId != null)).length ?? 0
   const ruleErrors = data?.ruleErrors ?? {}
   const blocked = Object.keys(ruleErrors).length > 0 || !!data?.folderFormatError
@@ -186,30 +254,38 @@ export default function FileRenamerPage() {
         <div>
           <div className={styles.eyebrow}>Tools</div>
           <h1 className={styles.title}>File renamer</h1>
-          <p className={styles.lead}>Rename many files at once with rules, filters and regular expressions. Episodes and movies get their real titles. Nothing changes before you press Rename, and every run can be undone.</p>
+          <p className={styles.lead}>
+            {advanced
+              ? 'Rename many files at once with rules, filters and regular expressions. Episodes and movies get their real titles. Nothing changes before you press Rename, and every run can be undone.'
+              : 'Give episodes and movies clean names with their real titles. Nothing changes before you press Rename, and every run can be undone.'}
+          </p>
         </div>
         <div className={styles.headerActions}>
-          <select
-            className={`${ui.select} ${styles.presetSelect}`}
-            value={presetId ?? ''}
-            aria-label="Preset"
-            onChange={(e) => e.target.value && loadPreset(Number(e.target.value))}
-          >
-            <option value="">{presets.data?.length ? 'Load a preset…' : 'No presets yet'}</option>
-            {presets.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className={ui.button} onClick={() => setPresetName(presets.data?.find((p) => p.id === presetId)?.name ?? '')} disabled={rules.length === 0}>
-            Save preset
-          </button>
+          {advanced && (
+            <>
+              <select
+                className={`${ui.select} ${styles.presetSelect}`}
+                value={presetId ?? ''}
+                aria-label="Preset"
+                onChange={(e) => e.target.value && loadPreset(Number(e.target.value))}
+              >
+                <option value="">{presets.data?.length ? 'Load a preset…' : 'No presets yet'}</option>
+                {presets.data?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className={ui.button} onClick={() => setPresetName(presets.data?.find((p) => p.id === presetId)?.name ?? '')} disabled={rules.length === 0}>
+                Save preset
+              </button>
+            </>
+          )}
           <AdvancedToggle />
         </div>
       </header>
 
-      {presetName != null && (
+      {advanced && presetName != null && (
         <form
           className={styles.presetForm}
           onSubmit={(e) => {
@@ -340,84 +416,97 @@ export default function FileRenamerPage() {
           </section>
 
           {/* 2 Filter */}
-          <section className={styles.card} aria-labelledby="renamer-filter">
-            <h2 id="renamer-filter" className={styles.cardTitle}>
-              <span className={styles.step}>2</span> Filter
-              {data && hasSource && (
-                <span className={styles.cardCount}>
-                  {data.matched} of {data.total} match
-                </span>
+          {advanced && (
+            <section className={styles.card} aria-labelledby="renamer-filter">
+              <h2 id="renamer-filter" className={styles.cardTitle}>
+                <span className={styles.step}>2</span> Filter
+                {data && hasSource && (
+                  <span className={styles.cardCount}>
+                    {data.matched} of {data.total} match
+                  </span>
+                )}
+              </h2>
+              <div className={styles.chips} role="group" aria-label="File types">
+                {extensionPresets.map((p) => (
+                  <button key={p.value} type="button" aria-pressed={filter.extensions === p.value} className={`${styles.chip} ${filter.extensions === p.value ? styles.chipOn : ''}`} onClick={() => setFilterField('extensions', p.value)}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {filter.extensions === 'custom' && (
+                <Field label="Extensions" hint={fieldErrors['filter.customExtensions']?.[0] ?? 'Separated by commas, e.g. mkv, mp4, srt.'}>
+                  <input className={`${ui.input} ${ui.mono}`} value={filter.customExtensions} onChange={(e) => setFilterField('customExtensions', e.target.value)} placeholder="mkv, mp4, srt" />
+                </Field>
               )}
-            </h2>
-            <div className={styles.chips} role="group" aria-label="File types">
-              {extensionPresets.map((p) => (
-                <button key={p.value} type="button" aria-pressed={filter.extensions === p.value} className={`${styles.chip} ${filter.extensions === p.value ? styles.chipOn : ''}`} onClick={() => setFilterField('extensions', p.value)}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            {filter.extensions === 'custom' && (
-              <Field label="Extensions" hint={fieldErrors['filter.customExtensions']?.[0] ?? 'Separated by commas, e.g. mkv, mp4, srt.'}>
-                <input className={`${ui.input} ${ui.mono}`} value={filter.customExtensions} onChange={(e) => setFilterField('customExtensions', e.target.value)} placeholder="mkv, mp4, srt" />
-              </Field>
-            )}
-            <div className={styles.fields}>
-              <Field label="Name contains" hint={fieldErrors['filter.include']?.[0] ? <span className={ui.error}>{fieldErrors['filter.include'][0]}</span> : <>Text, a pattern like *S01* (several with ;) or /regex/</>}>
-                <input className={`${ui.input} ${ui.mono}`} value={filter.include} spellCheck={false} onChange={(e) => setFilterField('include', e.target.value)} placeholder="*S01*" />
-              </Field>
-              <Field label="Leave out" hint={fieldErrors['filter.exclude']?.[0] ? <span className={ui.error}>{fieldErrors['filter.exclude'][0]}</span> : undefined}>
-                <input className={`${ui.input} ${ui.mono}`} value={filter.exclude} spellCheck={false} onChange={(e) => setFilterField('exclude', e.target.value)} placeholder="*trailer*" />
-              </Field>
-              {advanced && (
-                <>
-                  <Field label="Minimum size (MB)">
-                    <input className={`${ui.input} ${styles.num}`} type="number" min={0} value={filter.minSizeMb ?? ''} onChange={(e) => setFilterField('minSizeMb', e.target.value === '' ? null : e.target.valueAsNumber)} />
-                  </Field>
-                  <Field label="Maximum size (MB)" hint={fieldErrors['filter.maxSizeMb']?.[0]}>
-                    <input className={`${ui.input} ${styles.num}`} type="number" min={0} value={filter.maxSizeMb ?? ''} onChange={(e) => setFilterField('maxSizeMb', e.target.value === '' ? null : e.target.valueAsNumber)} />
-                  </Field>
-                </>
-              )}
-            </div>
-            <div className={styles.checks}>
-              <Check checked={filter.hideSamples} onChange={(hideSamples) => setFilterField('hideSamples', hideSamples)}>
-                Leave out samples
-              </Check>
-            </div>
-          </section>
+              <div className={styles.fields}>
+                <Field label="Name contains" hint={fieldErrors['filter.include']?.[0] ? <span className={ui.error}>{fieldErrors['filter.include'][0]}</span> : <>Text, a pattern like *S01* (several with ;) or /regex/</>}>
+                  <input className={`${ui.input} ${ui.mono}`} value={filter.include} spellCheck={false} onChange={(e) => setFilterField('include', e.target.value)} placeholder="*S01*" />
+                </Field>
+                <Field label="Leave out" hint={fieldErrors['filter.exclude']?.[0] ? <span className={ui.error}>{fieldErrors['filter.exclude'][0]}</span> : undefined}>
+                  <input className={`${ui.input} ${ui.mono}`} value={filter.exclude} spellCheck={false} onChange={(e) => setFilterField('exclude', e.target.value)} placeholder="*trailer*" />
+                </Field>
+                {advanced && (
+                  <>
+                    <Field label="Minimum size (MB)">
+                      <input className={`${ui.input} ${styles.num}`} type="number" min={0} value={filter.minSizeMb ?? ''} onChange={(e) => setFilterField('minSizeMb', e.target.value === '' ? null : e.target.valueAsNumber)} />
+                    </Field>
+                    <Field label="Maximum size (MB)" hint={fieldErrors['filter.maxSizeMb']?.[0]}>
+                      <input className={`${ui.input} ${styles.num}`} type="number" min={0} value={filter.maxSizeMb ?? ''} onChange={(e) => setFilterField('maxSizeMb', e.target.value === '' ? null : e.target.valueAsNumber)} />
+                    </Field>
+                  </>
+                )}
+              </div>
+              <div className={styles.checks}>
+                <Check checked={filter.hideSamples} onChange={(hideSamples) => setFilterField('hideSamples', hideSamples)}>
+                  Leave out samples
+                </Check>
+              </div>
+            </section>
+          )}
         </div>
 
-        {/* 3 Rules */}
-        <section className={`${styles.card} ${styles.rulesCard}`} aria-labelledby="renamer-rules">
-          <h2 id="renamer-rules" className={styles.cardTitle}>
-            <span className={styles.step}>3</span> Rules
-            {rules.length > 0 && <span className={styles.cardCount}>run from top to bottom</span>}
-          </h2>
-          <RuleList rules={rules} onChange={setRules} errors={ruleErrors} sample={sample} settingsFormats={settingsFormats} />
-        </section>
+        {!advanced ? (
+          <section className={styles.card} aria-labelledby="renamer-name">
+            <h2 id="renamer-name" className={styles.cardTitle}>
+              <span className={styles.step}>2</span> New name
+            </h2>
+            <SimpleName setup={{ ...simple, kind: simpleKind }} onChange={setSimple} kindFixed={kindFixed} seasonFolder={seasonExample(seasonFormat)} example={example} />
+          </section>
+        ) : (
+          /* 3 Rules */
+          <section className={`${styles.card} ${styles.rulesCard}`} aria-labelledby="renamer-rules">
+            <h2 id="renamer-rules" className={styles.cardTitle}>
+              <span className={styles.step}>3</span> Rules
+              {rules.length > 0 && <span className={styles.cardCount}>run from top to bottom</span>}
+            </h2>
+            <RuleList rules={rules} onChange={setRules} errors={ruleErrors} sample={sample} settingsFormats={settingsFormats} />
+          </section>
+        )}
       </div>
 
       {/* 4 Preview */}
       <section className={`${styles.card} ${styles.previewCard}`} aria-labelledby="renamer-preview">
         <h2 id="renamer-preview" className={styles.cardTitle}>
-          <span className={styles.step}>4</span> Preview
+          <span className={styles.step}>{advanced ? 4 : 3}</span> Preview
           {preview.isFetching && <span className={styles.cardCount}>Updating…</span>}
         </h2>
-        <div className={styles.fields}>
-          <Field
-            label="Move into a folder"
-            hint={data?.folderFormatError ? <span className={ui.error}>{data.folderFormatError}</span> : 'A subfolder of each file’s folder, e.g. Season {season:00}. Empty: files stay where they are.'}
-          >
-            <input className={`${ui.input} ${ui.mono}`} value={options.folderFormat} spellCheck={false} list="renamer-folder-formats" placeholder="No folder" onChange={(e) => setOptions((o) => ({ ...o, folderFormat: e.target.value }))} />
-            <datalist id="renamer-folder-formats">
-              {folderFormats.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </datalist>
-          </Field>
-        </div>
+        {advanced && (
+          <div className={styles.fields}>
+            <Field
+              label="Move into a folder"
+              hint={data?.folderFormatError ? <span className={ui.error}>{data.folderFormatError}</span> : 'A subfolder of each file’s folder, e.g. Season {season:00}. Empty: files stay where they are.'}
+            >
+              <input className={`${ui.input} ${ui.mono}`} value={options.folderFormat} spellCheck={false} list="renamer-folder-formats" placeholder="No folder" onChange={(e) => setOptions((o) => ({ ...o, folderFormat: e.target.value }))} />
+              <datalist id="renamer-folder-formats">
+                {folderFormats.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </datalist>
+            </Field>
+          </div>
+        )}
         {advanced && (
           <div className={styles.checks}>
             <Check checked={options.companions} onChange={(companions) => setOptions((o) => ({ ...o, companions }))}>
@@ -431,6 +520,7 @@ export default function FileRenamerPage() {
         ) : data ? (
           <PreviewTable
             preview={data}
+            nothingText={advanced ? undefined : 'All names already fit the pattern.'}
             excluded={excluded}
             onToggle={(key, include) =>
               setExcluded((s) => {

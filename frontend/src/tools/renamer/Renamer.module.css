@@ -1142,3 +1142,35 @@
 .runItemFailed .runItemState {
   color: #ef6b6b;
 }
+
+/* ---- simple mode ---- */
+
+.simpleFormat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.simpleExample {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.simpleExample code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.simpleHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}

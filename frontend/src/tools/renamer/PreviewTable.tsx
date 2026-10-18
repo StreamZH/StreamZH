@@ -74,8 +74,11 @@ export default function PreviewTable({
   excluded,
   onToggle,
   onToggleAll,
+  nothingText = 'Nothing changes yet. Add rules, or show all files.',
 }: {
   preview: PreviewResult
+  /** Shown when no row changes. */
+  nothingText?: string
   excluded: Set<string>
   onToggle: (key: string, include: boolean) => void
   onToggleAll: (keys: string[], include: boolean) => void
@@ -154,7 +157,7 @@ export default function PreviewTable({
             ? 'No files match the filter.'
             : view === 'problems'
               ? 'No problems.'
-              : 'Nothing changes yet. Add rules, or show all files.'}
+              : nothingText}
         </p>
       ) : (
         <div className={styles.table} role="table" aria-label="Preview">

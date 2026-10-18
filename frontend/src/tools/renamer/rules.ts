@@ -200,5 +200,33 @@ export const starters: { label: string; hint: string; rules: () => EditorRule[] 
   },
 ]
 
+/* ---- simple mode ---- */
+
+/** The simple renamer: one name pattern for episodes or movies, optionally season folders. */
+export interface SimpleSetup {
+  kind: 'episode' | 'movie'
+  episodeFormat: string
+  movieFormat: string
+  seasonFolders: boolean
+}
+
+export const simpleEpisodeFormats = [
+  { label: 'Title - S01E01 - Episode', value: '{Series Title} - S{season:00}E{episode:00} - {Episode Title}' },
+  { label: 'Title - S01E01', value: '{Series Title} - S{season:00}E{episode:00}' },
+  { label: 'With quality', value: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} {Quality Full}' },
+]
+
+export const simpleMovieFormats = [
+  { label: 'Title (Year)', value: '{Movie Title} ({Release Year})' },
+  { label: 'With quality', value: '{Movie Title} ({Release Year}) {Quality Full}' },
+]
+
+export const defaultSimple: SimpleSetup = {
+  kind: 'episode',
+  episodeFormat: simpleEpisodeFormats[0].value,
+  movieFormat: simpleMovieFormats[0].value,
+  seasonFolders: true,
+}
+
 /** Runs that are still going (the history refreshes every second while one is). */
 export const activeStates: RunState[] = ['queued', 'running', 'undoing']

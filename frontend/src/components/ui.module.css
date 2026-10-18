@@ -369,7 +369,7 @@ textarea.input {
   font-weight: 600;
 }
 
-.panelHead > :last-child:not(:first-child) {
+.panelHead > :last-child:not(:first-child):not(h2):not(h3) {
   margin-left: auto;
 }
 

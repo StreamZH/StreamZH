@@ -92,6 +92,7 @@
 .ld.row { display: inline-flex; gap: 8px; padding: 0; align-items: center; }
 .ld-m { width: 34px; height: 34px; color: var(--fg); opacity: 0.9; }
 .ld.row .ld-m { width: 18px; height: 18px; }
+.ld.lg { padding: 4px 0 6px; }
 .ld.lg .ld-m { width: 56px; height: 56px; }
 .ld-h { fill: currentColor; opacity: 0.85; }
 .ld-z { fill: var(--logo-red); }

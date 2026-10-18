@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import Icon from '../components/Icon'
 import styles from './Dialog.module.css'
 
 /**
@@ -55,7 +56,7 @@ export default function Dialog({
           <div className={styles.headerActions}>
             {headerAction}
             <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-              ×
+              <Icon name="x" size={18} />
             </button>
           </div>
         </header>

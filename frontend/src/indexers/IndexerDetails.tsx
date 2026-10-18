@@ -83,7 +83,7 @@ export default function IndexerDetails({
       <button className={ui.button} type="button" onClick={() => setConfirmDelete(false)}>
         Keep
       </button>
-      <button className={ui.danger} type="button" onClick={() => remove.mutate()} disabled={remove.isPending}>
+      <button className={ui.dangerSolid} type="button" onClick={() => remove.mutate()} disabled={remove.isPending}>
         {remove.isPending ? 'Deleting…' : 'Yes, delete'}
       </button>
     </>
@@ -92,7 +92,7 @@ export default function IndexerDetails({
       {remove.error && <p className={`${ui.error} ${styles.footerError}`}>{remove.error.message}</p>}
       {canEdit && (
         <>
-          <button className={`${ui.button} ${styles.delete}`} type="button" onClick={() => setConfirmDelete(true)}>
+          <button className={ui.danger} type="button" onClick={() => setConfirmDelete(true)}>
             Delete
           </button>
           <button className={ui.button} type="button" disabled={!details.data} onClick={() => details.data && onClone(details.data)}>

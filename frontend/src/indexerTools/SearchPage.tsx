@@ -16,8 +16,10 @@ import {
   type SearchParams,
   type SearchType,
 } from '../api/search'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
-import page from '../pages/Page.module.css'
 import { formatBytes, formatDateTime } from '../lib/format'
 import MultiSelect, { type MultiOption } from './MultiSelect'
 import Toasts, { type ToastMessage } from './Toast'
@@ -121,12 +123,8 @@ export default function SearchPage() {
   const askedCount = submitted && submitted.indexerIds.length > 0 ? submitted.indexerIds.length : searchable.length
 
   return (
-    <div className={`${page.page} ${styles.wide}`}>
-      <header>
-        <p className={styles.eyebrow}>Indexers</p>
-        <h1 className={page.title}>Search</h1>
-        <p className={page.lead}>Search all your indexers at once, without adding anything to the library.</p>
-      </header>
+    <div className={styles.page}>
+      <PageHeader title="Search" lead="Search all your indexers at once, without adding anything to the library." />
 
       {/* Keyed by the URL: back and forward put the submitted search back into the form. */}
       <SearchForm
@@ -167,14 +165,11 @@ function SearchForm({
   }
 
   return (
-    <form className={`${page.panel} ${styles.searchForm}`} onSubmit={submit} role="search">
+    <form className={`${ui.panel} ${styles.searchForm}`} onSubmit={submit} role="search">
       <div className={styles.searchRow}>
         <label className={styles.queryField}>
           <span className={styles.srOnly}>Search text</span>
-          <svg className={styles.queryIcon} width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.75" />
-            <path d="m20 20-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-          </svg>
+          <Icon name="search" size={17} className={styles.queryIcon} />
           <input
             className={`${ui.input} ${styles.queryInput}`}
             type="search"
@@ -185,14 +180,14 @@ function SearchForm({
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <div className={styles.segmented} role="radiogroup" aria-label="Search type">
+        <div className={`${ui.seg} ${styles.typeSeg}`} role="radiogroup" aria-label="Search type">
           {(Object.keys(typeLabels) as SearchType[]).map((t) => (
             <button
               key={t}
               type="button"
               role="radio"
               aria-checked={type === t}
-              className={type === t ? styles.segmentActive : styles.segment}
+              className={type === t ? ui.segOn : undefined}
               onClick={() => setType(t)}
             >
               {typeLabels[t]}
@@ -200,6 +195,7 @@ function SearchForm({
           ))}
         </div>
         <button className={`${ui.primary} ${styles.searchButton}`} type="submit" disabled={busy}>
+          <Icon name="search" size={15} />
           {busy ? 'Searching…' : 'Search'}
         </button>
       </div>
@@ -279,33 +275,40 @@ function Results({
 
   if (!submitted) {
     return (
-      <div className={styles.empty}>
-        <p className={styles.emptyTitle}>Find any release</p>
-        <p className={ui.muted}>
-          Type a title or a release name and press Search. Narrow it down by type, category or indexer. Grabbed results go to the download queue
-          (Activity).
-        </p>
+      <div className={ui.panel}>
+        <div className={ui.empty}>
+          <span className={styles.emptyIcon}>
+            <Icon name="search" size={20} />
+          </span>
+          <h3>Find any release</h3>
+          <p className={styles.emptyText}>
+            Type a title or a release name and press Search. Narrow it down by type, category or indexer. Grabbed results go to the download
+            queue (Activity).
+          </p>
+        </div>
       </div>
     )
   }
 
   if (search.isFetching) {
     return (
-      <div className={styles.state} role="status">
-        <span className={styles.spinner} aria-hidden="true" />
-        <span>{askedCount ? `Searching ${askedCount} indexer${askedCount === 1 ? '' : 's'}…` : 'Searching indexers…'}</span>
-        <span className={ui.muted}>This can take up to a minute when an indexer is slow.</span>
+      <div className={ui.panel}>
+        <Loader size="lg" text={askedCount ? `Searching ${askedCount} indexer${askedCount === 1 ? '' : 's'}…` : 'Searching indexers…'} />
+        <p className={styles.stateHint}>This can take up to a minute when an indexer is slow.</p>
       </div>
     )
   }
 
   if (search.isError) {
     return (
-      <div className={styles.state}>
-        <p className={ui.error}>{search.error.message}</p>
-        <button className={ui.button} type="button" onClick={() => void search.refetch()}>
-          Try again
-        </button>
+      <div className={ui.panel}>
+        <div className={ui.empty}>
+          <h3>The search failed</h3>
+          <p className={ui.error}>{search.error.message}</p>
+          <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => void search.refetch()}>
+            Try again
+          </button>
+        </div>
       </div>
     )
   }
@@ -314,12 +317,14 @@ function Results({
 
   if (data.indexers === 0) {
     return (
-      <div className={styles.state}>
-        <p>No indexer is enabled for manual search.</p>
-        <p className={ui.muted}>Add a Usenet indexer, or check that manual search is switched on for the ones you chose.</p>
-        <Link className={ui.primary} to="/indexers">
-          Set up indexers
-        </Link>
+      <div className={ui.panel}>
+        <div className={ui.empty}>
+          <h3>No indexer is enabled for manual search</h3>
+          <p>Add a Usenet indexer, or check that manual search is switched on for the ones you chose.</p>
+          <Link className={`${ui.primary} ${ui.sm}`} to="/indexers">
+            Set up indexers
+          </Link>
+        </div>
       </div>
     )
   }
@@ -335,6 +340,8 @@ function Results({
           {filter && releases.length !== data.releases.length && <span className={ui.muted}> · {releases.length} match the filter</span>}
         </p>
         <div className={styles.tools}>
+          <span className={styles.filterBox}>
+            <Icon name="filter" size={14} />
           <input
             className={`${ui.input} ${styles.filterInput}`}
             type="search"
@@ -346,6 +353,7 @@ function Results({
               setLimit(pageStep)
             }}
           />
+          </span>
           <select
             className={`${ui.select} ${styles.sortSelect}`}
             aria-label="Sort by"
@@ -365,7 +373,7 @@ function Results({
           </select>
           {categories.data && (
             <select
-              className={`${ui.select} ${styles.sortSelect}`}
+              className={`${ui.select} ${styles.toolSelect}`}
               aria-label="Download category for grabs"
               title="Download category for grabs"
               value={category}
@@ -392,9 +400,9 @@ function Results({
       )}
 
       {releases.length === 0 ? (
-        <div className={styles.state}>
-          <p>{data.releases.length === 0 ? 'No releases found.' : 'No release matches the filter.'}</p>
-          <p className={ui.muted}>
+        <div className={`${ui.panel} ${ui.empty}`}>
+          <h3>{data.releases.length === 0 ? 'No releases found' : 'No release matches the filter'}</h3>
+          <p>
             {data.releases.length === 0
               ? 'Try fewer words, another type, or fewer categories.'
               : `${data.releases.length} release${data.releases.length === 1 ? ' is' : 's are'} hidden by "${filter}".`}
@@ -449,7 +457,7 @@ function SortHeader({ sortKey, sort, onSort }: { sortKey: SortKey; sort: { key: 
     <span role="columnheader" aria-sort={active ? (sort.desc ? 'descending' : 'ascending') : 'none'}>
       <button type="button" className={`${styles.sort} ${active ? styles.sortActive : ''}`} onClick={() => onSort(sortKey)}>
         {sortLabels[sortKey]}
-        {active && <span aria-hidden="true">{sort.desc ? ' ↓' : ' ↑'}</span>}
+        {active && <Icon name={sort.desc ? 'down' : 'up'} size={12} />}
       </button>
     </span>
   )
@@ -510,17 +518,16 @@ function ReleaseRow({
       <span role="cell" className={styles.actions}>
         {release.infoUrl && (
           <a className={styles.infoLink} href={release.infoUrl} target="_blank" rel="noreferrer" title="Open on the indexer" aria-label="Open on the indexer">
-            <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Icon name="ext" size={15} />
           </a>
         )}
         {grabbedFile ? (
           <span className={styles.grabbed} title={grabbedFile}>
-            Grabbed
+            <Icon name="check" size={14} /> Grabbed
           </span>
         ) : (
-          <button className={`${ui.button} ${styles.grabButton}`} type="button" disabled={grabbing} onClick={onGrab}>
+          <button className={`${ui.button} ${ui.sm} ${styles.grabButton}`} type="button" disabled={grabbing} onClick={onGrab}>
+            <Icon name="download" size={14} />
             {grabbing ? 'Grabbing…' : 'Grab'}
           </button>
         )}

@@ -7,7 +7,7 @@ import { mediaManagementApi, mediaManagementKeys, type ImportFileCandidate } fro
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
-import mm from '../mediaManagement/MediaManagement.module.css'
+import styles from './Activity.module.css'
 import { parseEpisodes } from './importHooks'
 
 function label(candidate: ImportFileCandidate): string {
@@ -97,15 +97,15 @@ export default function ManualImportDialog({
 
   return (
     <Modal title="Import download" onClose={onClose}>
-      <div className={mm.choice}>
-        <p className={mm.dialogText}>
+      <div className={styles.choice}>
+        <p className={styles.dialogText}>
           <span className={ui.mono}>{item.title}</span>
           <br />
           Choose where it belongs. The files are moved into the library and renamed like an automatic import; an existing file is replaced
           even when it is better.
         </p>
 
-        <div className={mm.segmented} role="group" aria-label="Type">
+        <div className={`${ui.seg} ${styles.segStart}`} role="group" aria-label="Type">
           {(['Movie', 'Series'] as const).map((t) => (
             <button key={t} type="button" aria-pressed={type === t} onClick={() => setType(t)}>
               {t === 'Movie' ? 'Movie' : 'Series'}
@@ -116,14 +116,14 @@ export default function ManualImportDialog({
         <label className={ui.field}>
           {type === 'Movie' ? 'Movie' : 'Series'}
           <input className={ui.input} placeholder="Filter the library…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-          <div className={mm.pickList} role="listbox" aria-label={type === 'Movie' ? 'Movie' : 'Series'}>
+          <div className={styles.pickList} role="listbox" aria-label={type === 'Movie' ? 'Movie' : 'Series'}>
             {options.map((o) => (
               <button
                 key={o.id}
                 type="button"
                 role="option"
                 aria-selected={selected === o.id}
-                className={mm.pickItem}
+                className={styles.pickItem}
                 onClick={() => (type === 'Movie' ? setMovieId(o.id) : setSeriesId(o.id))}
               >
                 {o.label}
@@ -137,11 +137,11 @@ export default function ManualImportDialog({
         {candidates.length === 0 && files.isSuccess && <p className={ui.error}>No video file in this download.</p>}
 
         {type === 'Movie' && candidates.length > 0 && (
-          <div className={mm.fileTable} role="radiogroup" aria-label="Video file">
+          <div className={styles.fileTable} role="radiogroup" aria-label="Video file">
             {candidates.map((c) => (
-              <label key={c.relativePath} className={mm.fileRow}>
+              <label key={c.relativePath} className={styles.fileRow}>
                 <input type="radio" name="movie-file" checked={movieFile === c.relativePath} onChange={() => setChosenFile(c.relativePath)} />
-                <span className={mm.fileName}>
+                <span className={styles.fileName}>
                   {c.relativePath}
                   <small>{[formatBytes(c.size), c.quality, c.languages.join(', ')].filter(Boolean).join(' · ')}</small>
                 </span>
@@ -151,12 +151,12 @@ export default function ManualImportDialog({
         )}
 
         {type === 'Series' && seriesId != null && candidates.length > 0 && (
-          <div className={mm.fileTable}>
+          <div className={styles.fileTable}>
             {candidates.map((c) => {
               const ids = fileEpisodes(c)
               const off = skipped.has(c.relativePath)
               return (
-                <div key={c.relativePath} className={mm.fileRow}>
+                <div key={c.relativePath} className={styles.fileRow}>
                   <input
                     type="checkbox"
                     checked={!off}
@@ -170,16 +170,16 @@ export default function ManualImportDialog({
                       })
                     }
                   />
-                  <span className={mm.fileName}>
+                  <span className={styles.fileName}>
                     {c.relativePath}
-                    <small className={!off && ids == null ? mm.fileProblem : undefined}>
+                    <small className={!off && ids == null ? styles.fileProblem : undefined}>
                       {!off && ids == null
                         ? (c.problem ?? 'Enter the episodes, e.g. S01E02 or S01E02E03')
                         : [formatBytes(c.size), c.quality].filter(Boolean).join(' · ')}
                     </small>
                   </span>
                   <input
-                    className={`${ui.input} ${mm.episodeInput}`}
+                    className={`${ui.input} ${styles.episodeInput}`}
                     value={episodeText[c.relativePath] ?? label(c)}
                     placeholder="S01E01"
                     disabled={off}
@@ -198,7 +198,7 @@ export default function ManualImportDialog({
           </p>
         )}
       </div>
-      <div className={mm.dialogActions}>
+      <div className={styles.dialogActions}>
         <button type="button" className={ui.button} onClick={onClose}>
           Cancel
         </button>

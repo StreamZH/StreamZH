@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useToasts } from '../activity/hooks'
 import {
   genericDefinitionKey,
   indexerKeys,
@@ -9,7 +10,11 @@ import {
   type IndexerDefinition,
 } from '../api/indexers'
 import { useAuth } from '../auth/auth'
+import Icon from '../components/Icon'
+import { Skeleton } from '../components/Loader'
+import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
+import Toasts from '../indexerTools/Toast'
 import Catalog from '../indexers/Catalog'
 import { Pill, PrivacyChip, ProtocolChip } from '../indexers/Chips'
 import IndexerDetails from '../indexers/IndexerDetails'
@@ -17,7 +22,6 @@ import IndexerForm from '../indexers/IndexerForm'
 import { cloneOf, draftFromDefinition, formatUntil, grabUsage, hostOf, queryUsage, rowState, usesList, vipState, type Usage } from '../indexers/model'
 import ProwlarrImport from '../indexers/ProwlarrImport'
 import TestAll from '../indexers/TestAll'
-import page from './Page.module.css'
 import styles from './Indexers.module.css'
 
 type View =
@@ -36,28 +40,17 @@ type View =
 
 const schemaKey = ['indexer-schema'] as const
 
+/** Indexers (the hub tabs Indexers / Search / Stats / History come from the shell): the list, enable switches, tests and the dialogs. */
 export default function Indexers() {
   const { user } = useAuth()
   const canEdit = user?.role === 'Owner' || user?.role === 'Admin'
-
-  return (
-    <div className={page.page}>
-      <header>
-        <h1 className={page.title}>Indexers</h1>
-        <p className={page.lead}>Where StreamZH searches for releases. Failing indexers are skipped for a while and tried again later.</p>
-      </header>
-      <IndexerList canEdit={canEdit} />
-    </div>
-  )
-}
-
-function IndexerList({ canEdit }: { canEdit: boolean }) {
   const queryClient = useQueryClient()
   const indexers = useQuery({ queryKey: indexerKeys.list, queryFn: indexersApi.list, refetchInterval: 60_000 })
   // For protocol and privacy chips; the list still works when the catalog cannot be loaded.
   const definitions = useQuery({ queryKey: indexerKeys.definitions, queryFn: indexersApi.definitions, staleTime: 10 * 60_000, retry: 1 })
   const [view, setView] = useState<View>({ kind: 'none' })
   const close = () => setView({ kind: 'none' })
+  const { toasts, push, dismiss } = useToasts()
 
   const byKey = useMemo(() => new Map((definitions.data ?? []).map((d) => [d.key, d])), [definitions.data])
   const definitionOf = (i: Indexer) => byKey.get(i.definitionKey ?? genericDefinitionKey) ?? null
@@ -71,73 +64,138 @@ function IndexerList({ canEdit }: { canEdit: boolean }) {
       setView({ kind: 'form', indexer: draftFromDefinition(schema, definition), definition, fromCatalog: true }),
   })
 
+  // The enable switch saves the indexer as it is with the other value (the masked API key keeps the stored key).
+  const toggle = useMutation({
+    mutationFn: (i: Indexer) => indexersApi.update({ ...i, enable: !i.enable }),
+    onSuccess: (_, i) => push('ok', `${i.name} ${i.enable ? 'disabled' : 'enabled'}`),
+    onError: (e, i) => push('error', `Could not change ${i.name}`, e.message),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: indexerKeys.all }),
+  })
+  // One indexer's connection test (the stored API key is used).
+  const test = useMutation({
+    mutationFn: (i: Indexer) => indexersApi.test(i),
+    onSuccess: (caps, i) =>
+      push('ok', `${i.name} works`, caps.categories.length > 0 ? `${caps.categories.length} category groups loaded` : undefined),
+    onError: (e, i) => push('error', `${i.name} failed the test`, e.message),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: indexerKeys.all }),
+  })
+
   const list = indexers.data ?? []
   const enabled = list.filter((i) => i.enable).length
+  const failing = list.filter((i) => rowState(i) === 'error').length
 
-  const toolbar = canEdit && (
-    <div className={styles.toolbar}>
+  const actions = canEdit && (
+    <>
       <button className={ui.button} type="button" onClick={() => setView({ kind: 'import' })}>
-        Import from Prowlarr
+        <Icon name="download" size={15} /> Import from Prowlarr
       </button>
       {list.length > 0 && (
         <button className={ui.button} type="button" onClick={() => setView({ kind: 'testAll' })}>
-          Test all
+          <Icon name="zap" size={15} /> Test all
         </button>
       )}
       <button className={ui.primary} type="button" onClick={() => setView({ kind: 'catalog' })}>
-        Add indexer
+        <Icon name="plus" size={15} /> Add indexer
       </button>
-    </div>
+    </>
   )
 
+  const lead =
+    list.length > 0 ? (
+      <span className={styles.lead}>
+        <span>
+          <b>{list.length}</b> Newznab indexer{list.length === 1 ? '' : 's'}
+        </span>
+        <span>
+          <span className={ui.dotOk} /> <b>{enabled}</b> enabled
+        </span>
+        {failing > 0 && (
+          <span className={styles.leadErr}>
+            <span className={ui.dotErr} /> <b>{failing}</b> failing
+          </span>
+        )}
+      </span>
+    ) : (
+      'Where StreamZH searches for releases. Failing indexers are skipped for a while and tried again later.'
+    )
+
   return (
-    <section className={page.panel}>
-      <div className={styles.panelHead}>
-        <div>
-          <h2 className={page.panelTitle}>Newznab indexers</h2>
-          {list.length > 0 && (
-            <p className={styles.summary}>
-              {list.length} indexer{list.length === 1 ? '' : 's'} · {enabled} enabled
-            </p>
-          )}
+    <div className={styles.page}>
+      <PageHeader title="Indexers" lead={lead} actions={actions || undefined} />
+
+      {indexers.isError && <p className={ui.errBox}>{indexers.error.message}</p>}
+      {pick.error && <p className={ui.errBox}>{pick.error.message}</p>}
+
+      {indexers.isPending && (
+        <div className={ui.panel}>
+          <Skeleton rows={4} />
         </div>
-        {toolbar}
-      </div>
-      {indexers.isError && <p className={ui.error}>{indexers.error.message}</p>}
-      {pick.error && <p className={ui.error}>{pick.error.message}</p>}
+      )}
 
       {indexers.isSuccess && list.length === 0 && (
-        <div className={styles.empty}>
-          <p>
-            StreamZH searches Usenet indexers through <strong>Newznab</strong>, the API most Usenet indexers offer. Pick yours from the list of
-            known indexers, or bring them all over from Prowlarr in one go.
-          </p>
-          {!canEdit && <p className={ui.muted}>An admin can add indexers.</p>}
+        <div className={ui.panel}>
+          <div className={ui.empty}>
+            <span className={styles.emptyIcon}>
+              <Icon name="network" size={20} />
+            </span>
+            <h3>No indexers yet</h3>
+            <p className={styles.emptyText}>
+              StreamZH searches Usenet indexers through <strong>Newznab</strong>, the API most Usenet indexers offer. Pick yours from the list of
+              known indexers, or bring them all over from Prowlarr in one go.
+            </p>
+            {canEdit ? (
+              <div className={styles.emptyActions}>
+                <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => setView({ kind: 'import' })}>
+                  Import from Prowlarr
+                </button>
+                <button className={`${ui.primary} ${ui.sm}`} type="button" onClick={() => setView({ kind: 'catalog' })}>
+                  <Icon name="plus" size={14} /> Add indexer
+                </button>
+              </div>
+            ) : (
+              <p className={ui.muted}>An admin can add indexers.</p>
+            )}
+          </div>
         </div>
       )}
 
       {list.length > 0 && (
-        <div className={styles.table}>
-          <div className={styles.head} aria-hidden="true">
-            <span>Indexer</span>
-            <span>Priority</span>
-            <span>Used for</span>
-            <span>Queries</span>
-            <span>Grabs</span>
-            <span />
-          </div>
-          <ul className={styles.list}>
-            {list.map((i) => (
-              <IndexerRow
-                key={i.id}
-                indexer={i}
-                definition={definitionOf(i)}
-                canEdit={canEdit}
-                onOpen={() => setView({ kind: 'details', id: i.id })}
-                onEdit={() => setView({ kind: 'form', indexer: i, definition: definitionOf(i) })}
-              />
-            ))}
-          </ul>
+        <div className={`${ui.panel} ${styles.tablePanel}`}>
+          <table className={`${ui.table} ${styles.table}`}>
+            <thead>
+              <tr>
+                {canEdit && (
+                  <th className={styles.switchCol}>
+                    <span className={styles.srOnly}>Enabled</span>
+                  </th>
+                )}
+                <th>Indexer</th>
+                <th className={`${styles.r} ${styles.hideSm}`}>Priority</th>
+                <th className={styles.hideMd}>Used for</th>
+                <th className={styles.hideSm}>Queries</th>
+                <th className={styles.hideSm}>Grabs</th>
+                <th>
+                  <span className={styles.srOnly}>Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((i) => (
+                <IndexerRow
+                  key={i.id}
+                  indexer={i}
+                  definition={definitionOf(i)}
+                  canEdit={canEdit}
+                  toggling={toggle.isPending && toggle.variables?.id === i.id}
+                  testing={test.isPending && test.variables?.id === i.id}
+                  onToggle={() => toggle.mutate(i)}
+                  onTest={() => test.mutate(i)}
+                  onOpen={() => setView({ kind: 'details', id: i.id })}
+                  onEdit={() => setView({ kind: 'form', indexer: i, definition: definitionOf(i) })}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -167,10 +225,12 @@ function IndexerList({ canEdit }: { canEdit: boolean }) {
       )}
       {view.kind === 'testAll' && <TestAll onClose={close} onOpen={(id) => setView({ kind: 'details', id })} />}
       {view.kind === 'import' && <ProwlarrImport onClose={close} onTestAll={() => setView({ kind: 'testAll' })} />}
-    </section>
+      <Toasts toasts={toasts} onDismiss={dismiss} />
+    </div>
   )
 }
 
+/** Queries or grabs used in the current window; with a limit, a slim CloudZH .bar shows how full it is. */
 function Meter({ usage }: { usage: Usage }) {
   if (usage.ratio == null) return <span className={styles.usage}>{usage.text}</span>
   const tone = usage.ratio >= 1 ? styles.full : usage.ratio >= 0.8 ? styles.high : ''
@@ -178,7 +238,7 @@ function Meter({ usage }: { usage: Usage }) {
     <span className={`${styles.usage} ${tone}`}>
       {usage.text}
       <span className={styles.meter} aria-hidden="true">
-        <span style={{ width: `${Math.round(usage.ratio * 100)}%` }} />
+        <i style={{ width: `${Math.max(2, Math.round(usage.ratio * 100))}%` }} />
       </span>
     </span>
   )
@@ -188,12 +248,20 @@ function IndexerRow({
   indexer: i,
   definition,
   canEdit,
+  toggling,
+  testing,
+  onToggle,
+  onTest,
   onOpen,
   onEdit,
 }: {
   indexer: Indexer
   definition: IndexerDefinition | null
   canEdit: boolean
+  toggling: boolean
+  testing: boolean
+  onToggle: () => void
+  onTest: () => void
   onOpen: () => void
   onEdit: () => void
 }) {
@@ -201,15 +269,25 @@ function IndexerRow({
   const status = i.status
   const vip = vipState(status)
   const uses = usesList(i)
+  const dot = state === 'enabled' ? ui.dotOk : state === 'error' ? ui.dotErr : ui.dot
+  const stateText = state === 'enabled' ? 'Working' : state === 'disabled' ? 'Disabled' : 'Failing'
 
   return (
-    <li className={`${styles.row} ${styles[state]}`} onClick={onOpen}>
-      <div className={styles.main}>
+    <tr className={`${styles.row} ${state === 'disabled' ? styles.disabled : ''}`} onClick={onOpen}>
+      {canEdit && (
+        <td className={styles.switchCol} onClick={(e) => e.stopPropagation()}>
+          <label className={ui.switch} title={i.enable ? 'Enabled' : 'Disabled'}>
+            <input type="checkbox" role="switch" checked={i.enable} disabled={toggling} onChange={onToggle} aria-label={`${i.name} enabled`} />
+            <span />
+          </label>
+        </td>
+      )}
+      <td className={styles.main}>
         <div className={styles.nameLine}>
+          <span className={dot} title={stateText} aria-label={stateText} role="img" />
           <button
             type="button"
             className={styles.name}
-            title={state === 'enabled' ? 'Enabled' : state === 'disabled' ? 'Disabled' : 'Failing'}
             onClick={(e) => {
               e.stopPropagation()
               onOpen()
@@ -222,49 +300,58 @@ function IndexerRow({
         </div>
         <div className={styles.badges}>
           <span className={styles.host}>{hostOf(i.baseUrl)}</span>
-          {!i.enable && <Pill tone="off">Disabled</Pill>}
-          {i.enable && status && !status.healthy && status.disabledTill && (
-            <Pill tone="error">Skipped until {formatUntil(status.disabledTill)}</Pill>
-          )}
+          <span className={styles.showSm}>Priority {i.priority}</span>
+          {i.enable && status && !status.healthy && status.disabledTill && <Pill tone="error">Skipped until {formatUntil(status.disabledTill)}</Pill>}
           {status?.limitReached && <Pill tone="error">{status.limitReached === 'query' ? 'Query limit reached' : 'Grab limit reached'}</Pill>}
           {vip && <Pill tone={vip.tone}>{vip.text}</Pill>}
         </div>
-      </div>
-      <div className={styles.cell}>
-        <span className={styles.cellLabel}>Priority</span>
-        <span className={styles.priority}>{i.priority}</span>
-      </div>
-      <div className={styles.cell}>
-        <span className={styles.cellLabel}>Used for</span>
-        <span className={styles.uses}>{!i.enable ? '–' : uses.length > 0 ? uses.join(' · ') : 'Nothing'}</span>
-      </div>
-      <div className={styles.cell}>
-        <span className={styles.cellLabel}>Queries</span>
-        <Meter usage={queryUsage(i)} />
-      </div>
-      <div className={styles.cell}>
-        <span className={styles.cellLabel}>Grabs</span>
-        <Meter usage={grabUsage(i)} />
-      </div>
-      <div className={styles.actions}>
-        {canEdit && (
-          <button
-            className={ui.button}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit()
-            }}
-          >
-            Edit
-          </button>
+        {status?.lastError && (
+          <p className={status.healthy ? styles.lastWarn : styles.lastError}>
+            <Icon name="alert" size={13} />
+            <span>
+              {status.healthy ? 'Last error' : 'Error'}: {status.lastError}
+            </span>
+          </p>
         )}
-      </div>
-      {status?.lastError && (
-        <p className={styles.lastError}>
-          {status.healthy ? 'Last error' : 'Error'}: {status.lastError}
-        </p>
-      )}
-    </li>
+      </td>
+      <td className={`${styles.r} ${styles.hideSm}`}>
+        <span className={styles.priority}>{i.priority}</span>
+      </td>
+      <td className={`${styles.hideMd} ${styles.uses}`}>
+        {!i.enable ? (
+          <span className={ui.muted}>–</span>
+        ) : uses.length > 0 ? (
+          <span className={styles.useTags}>
+            {uses.map((u) => (
+              <span key={u} className={ui.tag}>
+                {u}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className={ui.muted}>Nothing</span>
+        )}
+      </td>
+      <td className={styles.hideSm}>
+        <Meter usage={queryUsage(i)} />
+      </td>
+      <td className={styles.hideSm}>
+        <Meter usage={grabUsage(i)} />
+      </td>
+      <td className={styles.actions} onClick={(e) => e.stopPropagation()}>
+        {canEdit && (
+          <>
+            <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={onTest} disabled={testing} title={`Test ${i.name}`}>
+              <Icon name="zap" size={14} className={testing ? styles.spin : undefined} />
+              <span className={styles.btnText}>{testing ? 'Testing…' : 'Test'}</span>
+            </button>
+            <button className={`${ui.ghost} ${ui.sm}`} type="button" onClick={onEdit} title={`Edit ${i.name}`}>
+              <Icon name="edit" size={14} />
+              <span className={styles.btnText}>Edit</span>
+            </button>
+          </>
+        )}
+      </td>
+    </tr>
   )
 }

@@ -27,7 +27,7 @@ export function RemoveDialog({
         <button type="button" className={ui.button} onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className={ui.danger} onClick={() => onConfirm(deleteFiles)} disabled={busy}>
+        <button type="button" className={ui.dangerSolid} onClick={() => onConfirm(deleteFiles)} disabled={busy}>
           {busy ? 'Removing…' : 'Remove'}
         </button>
       </div>
@@ -68,7 +68,7 @@ export function UploadDialog({ onClose, onUploaded }: { onClose: () => void; onU
         <label className={ui.field}>
           NZB file
           <input
-            className={ui.input}
+            className={`${ui.input} ${styles.fileInput}`}
             type="file"
             accept=".nzb,application/x-nzb"
             onChange={(e) => {

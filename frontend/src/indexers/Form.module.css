@@ -8,10 +8,10 @@
   margin: 0;
   padding: 10px 12px;
   font-size: 13px;
-  color: #ef6b6b;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-small);
-  background: var(--bg);
+  color: var(--err);
+  border: 0;
+  border-radius: 10px;
+  background: var(--err-soft);
   overflow-wrap: anywhere;
 }
 
@@ -42,7 +42,7 @@
   padding-top: 9px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--fg);
 }
 
 .control {
@@ -60,33 +60,33 @@
 .help {
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .help code {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .help a {
-  color: var(--text-muted);
+  color: var(--fg-2);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .invalid input:not([type='checkbox']),
 .invalid select {
-  border-color: #ef6b6b;
+  border-color: var(--err);
 }
 
 .fieldError {
   font-size: 12.5px;
-  color: #ef6b6b;
+  color: var(--err);
 }
 
 .presetValue {
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .number {
@@ -108,7 +108,7 @@
 .inlineLink {
   font: inherit;
   font-size: 12.5px;
-  color: var(--text-muted);
+  color: var(--fg-2);
   background: none;
   border: none;
   padding: 0;
@@ -118,7 +118,7 @@
 }
 
 .inlineLink:hover {
-  color: var(--text);
+  color: var(--fg);
 }
 
 /* Toggle switch on a real checkbox. */
@@ -129,7 +129,7 @@
   gap: 10px;
   padding-top: 6px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
   cursor: pointer;
   align-self: flex-start;
 }
@@ -160,7 +160,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--text-muted);
+  background: var(--fg-2);
   transition: transform 0.15s, background 0.15s;
 }
 
@@ -196,20 +196,20 @@
   padding: 10px 12px 12px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius-small);
+  border-radius: var(--r-sm);
   background: var(--bg);
 }
 
 .categories legend {
   padding: 0 6px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .catCount {
   margin-left: 4px;
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .categoryGroup {
@@ -232,7 +232,7 @@
 .catId {
   font-family: var(--font-mono);
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .testResult {
@@ -248,14 +248,19 @@
   overflow-wrap: anywhere;
 }
 
+.delete {
+  color: var(--err);
+}
+
 .delete:hover:not(:disabled) {
-  color: #ef6b6b;
-  border-color: color-mix(in srgb, #ef6b6b 50%, var(--line));
+  background: var(--err-soft);
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 50%, var(--line));
 }
 
 .confirm {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--fg-2);
 }
 
 .spacer {

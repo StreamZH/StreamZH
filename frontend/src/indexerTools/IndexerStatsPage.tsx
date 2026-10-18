@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { indexerActivityApi, indexerActivityKeys, type IndexerStats, type IndexerStatsRow } from '../api/indexerActivity'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
 import { formatDayMonth } from '../lib/format'
-import page from '../pages/Page.module.css'
 import styles from './IndexerTools.module.css'
 
 const ranges = [7, 30, 90] as const
@@ -71,52 +73,56 @@ export default function IndexerStatsPage() {
   const daily = useMemo(() => (data ? fillDays(data, days) : []), [data, days])
 
   return (
-    <div className={`${page.page} ${styles.wide}`}>
-      <header className={styles.pageHeader}>
-        <div>
-          <p className={styles.eyebrow}>Indexers</p>
-          <h1 className={page.title}>Stats</h1>
-          <p className={page.lead}>How often StreamZH asked each indexer, what it grabbed and how fast the indexers answer.</p>
-        </div>
-        <div className={styles.segmented} role="radiogroup" aria-label="Time range">
-          {ranges.map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="radio"
-              aria-checked={days === r}
-              className={days === r ? styles.segmentActive : styles.segment}
-              onClick={() => setUrl(r === 30 ? {} : { days: String(r) }, { replace: true })}
-            >
-              {r} days
-            </button>
-          ))}
-        </div>
-      </header>
+    <div className={styles.page}>
+      <PageHeader
+        title="Stats"
+        lead="How often StreamZH asked each indexer, what it grabbed and how fast the indexers answer."
+        actions={
+          <div className={ui.seg} role="radiogroup" aria-label="Time range">
+            {ranges.map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="radio"
+                aria-checked={days === r}
+                className={days === r ? ui.segOn : undefined}
+                onClick={() => setUrl(r === 30 ? {} : { days: String(r) }, { replace: true })}
+              >
+                {r} days
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {stats.isError ? (
-        <div className={styles.state}>
-          <p className={ui.error}>{stats.error.message}</p>
-          <button className={ui.button} type="button" onClick={() => void stats.refetch()}>
-            Try again
-          </button>
+        <div className={ui.panel}>
+          <div className={ui.empty}>
+            <h3>The stats could not be loaded</h3>
+            <p className={ui.error}>{stats.error.message}</p>
+            <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => void stats.refetch()}>
+              Try again
+            </button>
+          </div>
         </div>
       ) : !data ? (
-        <div className={styles.state} role="status">
-          <span className={styles.spinner} aria-hidden="true" />
-          <span>Loading stats…</span>
-        </div>
+        <Loader text="Loading the stats" />
       ) : rows.length === 0 ? (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No indexer activity yet</p>
-          <p className={ui.muted}>Stats appear once StreamZH has searched or grabbed something. Add an indexer, or run a search.</p>
-          <div className={styles.emptyActions}>
-            <Link className={ui.primary} to="/indexers">
-              Indexers
-            </Link>
-            <Link className={ui.button} to="/indexers/search">
-              Search
-            </Link>
+        <div className={ui.panel}>
+          <div className={ui.empty}>
+            <span className={styles.emptyIcon}>
+              <Icon name="gauge" size={20} />
+            </span>
+            <h3>No indexer activity yet</h3>
+            <p>Stats appear once StreamZH has searched or grabbed something. Add an indexer, or run a search.</p>
+            <div className={styles.emptyActions}>
+              <Link className={`${ui.primary} ${ui.sm}`} to="/indexers">
+                Indexers
+              </Link>
+              <Link className={`${ui.button} ${ui.sm}`} to="/indexers/search">
+                Search
+              </Link>
+            </div>
           </div>
         </div>
       ) : (
@@ -146,10 +152,12 @@ export default function IndexerStatsPage() {
             <DailyBars title="Grabs per day" days={daily} value={(d) => d.grabs} unit="grabs" tone="grabs" />
           </div>
 
-          <section className={page.panel}>
-            <h2 className={page.panelTitle}>Indexers</h2>
+          <section className={ui.panel}>
+            <div className={ui.panelHead}>
+              <h2>Indexers</h2>
+            </div>
             <div className={styles.tableScroll}>
-              <table className={styles.statsTable}>
+              <table className={`${ui.table} ${styles.statsTable}`}>
                 <thead>
                   <tr>
                     <th scope="col">Indexer</th>
@@ -193,10 +201,10 @@ export default function IndexerStatsPage() {
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: 'warn' }) {
   return (
-    <div className={page.card}>
-      <div className={page.label}>{label}</div>
-      <div className={`${page.value} ${tone === 'warn' ? styles.warnValue : ''}`}>{value}</div>
-      <div className={page.sub}>{sub}</div>
+    <div className={`${ui.panel} ${styles.metric}`}>
+      <div className={styles.metricLabel}>{label}</div>
+      <div className={`${styles.metricValue} ${tone === 'warn' ? styles.warnValue : ''}`}>{value}</div>
+      <div className={styles.metricSub}>{sub}</div>
     </div>
   )
 }
@@ -218,7 +226,7 @@ function BarList({
   const sorted = [...rows].sort((a, b) => value(b) - value(a) || a.indexer.localeCompare(b.indexer))
   const max = Math.max(1, ...sorted.map(value))
   return (
-    <section className={`${page.panel} ${styles.chart}`}>
+    <section className={`${ui.panel} ${styles.chart}`}>
       <h2 className={styles.chartTitle}>{title}</h2>
       <ul className={styles.barList}>
         {sorted.map((row) => {
@@ -262,7 +270,7 @@ function DailyBars({
   const shown = active != null ? days[active] : null
 
   return (
-    <section className={`${page.panel} ${styles.chart}`}>
+    <section className={`${ui.panel} ${styles.chart}`}>
       <div className={styles.chartHead}>
         <h2 className={styles.chartTitle}>{title}</h2>
         <span className={styles.readout} aria-live="polite">

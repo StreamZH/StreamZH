@@ -1,3 +1,4 @@
+/* Protocol, privacy and category tags and the small status pill, in the CloudZH .tag / .pill look (tokens only). */
 .chips {
   display: inline-flex;
   flex-wrap: wrap;
@@ -5,30 +6,30 @@
 }
 
 .chip {
-  --tone: var(--text-muted);
+  --tone: var(--fg-2);
   display: inline-flex;
   align-items: center;
-  font-size: 11.5px;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
   font-weight: 500;
   line-height: 1;
-  padding: 4px 7px;
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--tone);
-  background: color-mix(in srgb, var(--tone) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+  background: color-mix(in srgb, var(--tone) 11%, transparent);
   white-space: nowrap;
 }
 
 .usenet {
-  --tone: #8fb4e3;
+  --tone: var(--info);
 }
 
 .torrent {
-  --tone: #9cc2a0;
+  --tone: var(--ok);
 }
 
 .private {
-  --tone: #e2646b;
+  --tone: var(--accent);
 }
 
 .semiPrivate {
@@ -40,7 +41,7 @@
 }
 
 .category {
-  --tone: var(--text-muted);
+  --tone: var(--fg-2);
 }
 
 .movies {
@@ -60,21 +61,23 @@
 }
 
 .none {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 .pill {
-  --tone: var(--text-muted);
+  --tone: var(--fg-2);
+  --tone-bg: var(--sunk);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  height: 22px;
+  padding: 0 9px 0 8px;
+  font-size: 11.5px;
   font-weight: 500;
   line-height: 1;
-  padding: 4px 9px 4px 8px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--line));
   color: var(--tone);
+  background: var(--tone-bg);
   white-space: nowrap;
 }
 
@@ -88,20 +91,25 @@
 
 .ok {
   --tone: var(--ok);
+  --tone-bg: var(--ok-soft);
 }
 
 .warn {
   --tone: var(--warn);
+  --tone-bg: var(--warn-soft);
 }
 
 .error {
-  --tone: #ef6b6b;
+  --tone: var(--err);
+  --tone-bg: var(--err-soft);
 }
 
 .off {
-  --tone: var(--text-faint);
+  --tone: var(--muted);
+  --tone-bg: var(--sunk);
 }
 
 .info {
-  --tone: #8fb4e3;
+  --tone: var(--info);
+  --tone-bg: var(--info-soft);
 }

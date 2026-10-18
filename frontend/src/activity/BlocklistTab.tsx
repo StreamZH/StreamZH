@@ -2,20 +2,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { mediaManagementApi, mediaManagementKeys, type BlocklistFilter } from '../api/mediaManagement'
+import Icon from '../components/Icon'
+import Loader from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
 import { formatBytes } from '../lib/format'
 import { joinParts, relativeTime } from '../status/format'
-import StatusIcon from '../status/icons'
 import { useIsAdmin } from '../status/useOngoing'
 import { mediaTypeOptions, pick } from './filterOptions'
-import { FilterBar, FilterSelect, NoMatches, SearchBox } from './Filters'
+import { FilterBar, FilterSeg, NoMatches, SearchBox } from './Filters'
 import { useMediaLinks, useToasts } from './hooks'
 import { useClampPage, useListParams } from './listParams'
 import Pager from './Pager'
 import { usePageSize } from './paging'
-import { Empty } from './QueueTab'
+import { Empty } from './Empty'
 import styles from './Activity.module.css'
 
 const filterKeys = ['q', 'type'] as const
@@ -64,21 +65,14 @@ export default function BlocklistTab() {
       </Empty>
     )
   }
-  if (!list.data) {
-    return (
-      <div className={styles.loading} role="status">
-        <span className={styles.bigSpinner} aria-hidden="true" />
-        Loading the blocklist…
-      </div>
-    )
-  }
+  if (!list.data) return <Loader text="Loading the blocklist" />
   const total = list.data.totalRecords
   if (total === 0 && !active) {
     return (
       <Empty icon="check" title="The blocklist is empty">
         <p>When a download of a movie or episode fails, its release lands here and is not grabbed again. StreamZH searches for another one.</p>
         <div className={styles.emptyActions}>
-          <Link className={ui.button} to="/settings/media-management#download-handling">
+          <Link className={`${ui.button} ${ui.sm}`} to="/settings/media-management#download-handling">
             Failed download handling
           </Link>
         </div>
@@ -88,59 +82,83 @@ export default function BlocklistTab() {
 
   return (
     <>
-      <div className={styles.filterHead}>
-        <FilterBar label="Filter the blocklist" active={active} matches={settled} noun="releases" onClear={clearFilters}>
-          <SearchBox value={get('q')} onChange={setSearch} placeholder="Search release titles" label="Search the blocklist" />
-          <FilterSelect label="Type" value={type} onChange={(v) => setFilters({ type: v })} options={mediaTypeOptions} />
-        </FilterBar>
+      <FilterBar label="Filter the blocklist" active={active} matches={settled} noun="releases" onClear={clearFilters}>
+        <FilterSeg label="Type" all="All" value={type} onChange={(v) => setFilters({ type: v })} options={mediaTypeOptions} />
+        <SearchBox value={get('q')} onChange={setSearch} placeholder="Search release titles" label="Search the blocklist" />
         {admin && (
-          <button type="button" className={ui.button} onClick={() => setConfirmClear(true)}>
-            <StatusIcon name="trash" size={14} /> Clear all
+          <button type="button" className={`${ui.danger} ${ui.sm} ${styles.toolbarEnd}`} onClick={() => setConfirmClear(true)}>
+            <Icon name="trash" size={14} /> Clear all
           </button>
         )}
-      </div>
+      </FilterBar>
       {records.length === 0 ? (
         <NoMatches noun="releases" onClear={clearFilters} />
       ) : (
-      <ul className={`${styles.historyList} ${list.isPlaceholderData ? styles.stale : ''}`} aria-label="Blocklist">
-        {records.map((item) => {
-          const link = media(item)
-          return (
-            <li key={item.id} className={`${styles.historyItem} ${styles.historyFailed}`}>
-              <span className={styles.historyIcon} title="Blocklisted">
-                <StatusIcon name="x" size={16} />
-              </span>
-              <div className={styles.historyMain}>
-                <span className={styles.dlTitle}>{item.sourceTitle}</span>
-                <span className={styles.meta}>
-                  {item.quality !== 'Unknown' && <span className={styles.quality}>{item.quality}</span>}
-                  {link && (
-                    <Link className={styles.mediaLink} to={link.to}>
-                      {link.label}
-                    </Link>
-                  )}
-                  <span>{joinParts(item.size > 0 ? formatBytes(item.size) : null, item.indexer, item.languages.join(', '), `blocked ${relativeTime(item.date)}`)}</span>
-                </span>
-                {item.message && <span className={styles.historyError}>{item.message}</span>}
-              </div>
-              {admin && (
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={`${styles.iconAction} ${styles.iconDanger}`}
-                    onClick={() => remove.mutate(item.id)}
-                    disabled={remove.isPending}
-                    title="Remove from the blocklist"
-                    aria-label={`Remove ${item.sourceTitle} from the blocklist`}
-                  >
-                    <StatusIcon name="trash" />
-                  </button>
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
+        <div className={`${ui.panel} ${styles.tablePanel} ${list.isPlaceholderData ? styles.stale : ''}`}>
+          <table className={`${ui.table} ${styles.table}`} aria-label="Blocklist">
+            <thead>
+              <tr>
+                <th>Release</th>
+                <th className={styles.hideSm}>Quality</th>
+                <th className={`${styles.r} ${styles.hideSm}`}>Size</th>
+                <th className={styles.hideMd}>Indexer</th>
+                <th className={styles.hideSm}>Blocked</th>
+                {admin && (
+                  <th>
+                    <span className={styles.srOnly}>Actions</span>
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((item) => {
+                const link = media(item)
+                const quality = item.quality !== 'Unknown' ? item.quality : null
+                const when = relativeTime(item.date)
+                return (
+                  <tr key={item.id}>
+                    <td className={styles.release}>
+                      <span className={styles.relTitle} title={item.sourceTitle}>
+                        <Icon name="ban" size={14} className={styles.banIcon} />
+                        {item.sourceTitle}
+                      </span>
+                      <span className={styles.sub}>
+                        {link && (
+                          <Link className={styles.mediaLink} to={link.to}>
+                            {link.label}
+                          </Link>
+                        )}
+                        {item.languages.length > 0 && <span>{item.languages.join(', ')}</span>}
+                        <span className={styles.showSm}>{joinParts(quality, item.size > 0 ? formatBytes(item.size) : null, `blocked ${when}`)}</span>
+                      </span>
+                      {item.message && <span className={styles.historyError}>{item.message}</span>}
+                    </td>
+                    <td className={styles.hideSm}>{quality ? <span className={ui.tag}>{quality}</span> : <span className={styles.dim}>–</span>}</td>
+                    <td className={`${styles.r} ${ui.num} ${styles.hideSm} ${styles.nowrap}`}>{item.size > 0 ? formatBytes(item.size) : '–'}</td>
+                    <td className={`${styles.hideMd} ${styles.dim}`}>{item.indexer || '–'}</td>
+                    <td className={`${styles.hideSm} ${styles.dim} ${styles.nowrap}`}>{when}</td>
+                    {admin && (
+                      <td className={styles.actionsCell}>
+                        <div className={styles.actions}>
+                          <button
+                            type="button"
+                            className={`${ui.ghost} ${ui.icon} ${ui.sm} ${styles.dangerIcon}`}
+                            onClick={() => remove.mutate(item.id)}
+                            disabled={remove.isPending}
+                            title="Remove from the blocklist"
+                            aria-label={`Remove ${item.sourceTitle} from the blocklist`}
+                          >
+                            <Icon name="trash" size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
       <Pager page={page} pageSize={pageSize} total={total} noun="blocklisted releases" one="blocklisted release" onPage={setPage} onPageSize={setPageSize} />
       {confirmClear && (
@@ -150,7 +168,7 @@ export default function BlocklistTab() {
             <button type="button" className={ui.button} onClick={() => setConfirmClear(false)}>
               Cancel
             </button>
-            <button type="button" className={ui.danger} onClick={() => clear.mutate()} disabled={clear.isPending}>
+            <button type="button" className={ui.dangerSolid} onClick={() => clear.mutate()} disabled={clear.isPending}>
               {clear.isPending ? 'Clearing…' : 'Clear all'}
             </button>
           </div>

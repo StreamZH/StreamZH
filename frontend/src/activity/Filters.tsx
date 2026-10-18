@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
-import StatusIcon from '../status/icons'
-import activity from './Activity.module.css'
+import { Empty } from './Empty'
 import styles from './Filters.module.css'
 
 const numberFormat = new Intl.NumberFormat()
 
-/** The filters above a list: search, selects, the number of matches and "Clear filters" while a filter is set. */
+/** A toolbar row above a list (CloudZH .toolbar): segments and selects left, the search on the right. */
+export function Toolbar({ children }: { children: ReactNode }) {
+  return <div className={`${styles.bar} ${styles.solo}`}>{children}</div>
+}
+
+/** The filters above a list: segments, selects and search in one row, plus "N matching · Clear filters" while a filter is set. */
 export function FilterBar({
   label,
   active,
@@ -25,15 +30,17 @@ export function FilterBar({
   children: ReactNode
 }) {
   return (
-    <div className={styles.bar} role="search" aria-label={label}>
-      <div className={styles.controls}>{children}</div>
+    <div className={styles.wrap}>
+      <div className={styles.bar} role="search" aria-label={label}>
+        {children}
+      </div>
       {active && (
         <div className={styles.status}>
           <span className={styles.matches} aria-live="polite">
             {matches == null ? 'Filtering…' : `${numberFormat.format(matches)} matching ${matches === 1 ? noun.replace(/s$/, '') : noun}`}
           </span>
           <button type="button" className={styles.clear} onClick={onClear}>
-            <StatusIcon name="x" size={13} /> Clear filters
+            <Icon name="x" size={13} /> Clear filters
           </button>
         </div>
       )}
@@ -70,13 +77,10 @@ export function SearchBox({ value, onChange, placeholder, label }: { value: stri
 
   return (
     <div className={styles.search}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="6.5" />
-        <path d="m16 16 4.5 4.5" />
-      </svg>
+      <Icon name="search" size={15} />
       <input
         type="search"
-        className={styles.searchInput}
+        className={`${ui.input} ${styles.searchInput}`}
         value={typed}
         placeholder={placeholder}
         aria-label={label}
@@ -95,24 +99,46 @@ export function SearchBox({ value, onChange, placeholder, label }: { value: stri
 /** The filtered list is empty. */
 export function NoMatches({ noun, onClear }: { noun: string; onClear: () => void }) {
   return (
-    <div className={activity.empty}>
-      <span className={activity.emptyIcon}>
-        <StatusIcon name="info" size={22} />
-      </span>
-      <p className={activity.emptyTitle}>No {noun} match these filters</p>
+    <Empty icon="info" title={`No ${noun} match these filters`}>
       <p>Change the search or the filters, or clear them to see everything.</p>
-      <div className={activity.emptyActions}>
-        <button type="button" className={ui.button} onClick={onClear}>
+      <div className={styles.emptyActions}>
+        <button type="button" className={`${ui.button} ${ui.sm}`} onClick={onClear}>
           Clear filters
         </button>
       </div>
-    </div>
+    </Empty>
   )
 }
 
 export interface FilterOption {
   value: string
   label: string
+}
+
+/** A filter with a few options as a segmented control (CloudZH .seg); the first option (value '') means "all". */
+export function FilterSeg({
+  label,
+  value,
+  onChange,
+  options,
+  all,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: FilterOption[]
+  /** Shorter label for the first ("all") option. */
+  all?: string
+}) {
+  return (
+    <div className={ui.seg} role="group" aria-label={label}>
+      {options.map((o, i) => (
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => value !== o.value && onChange(o.value)}>
+          {i === 0 && all ? all : o.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 /** A filter select; the first option (value '') means "all". Highlighted while it filters. */
@@ -135,7 +161,7 @@ export function FilterSelect({
   const known = options.some((o) => o.value === value) || groups?.some((g) => g.options.some((o) => o.value === value))
   return (
     <select
-      className={`${styles.select} ${value ? styles.selectActive : ''}`}
+      className={`${ui.select} ${styles.select} ${value ? styles.selectActive : ''}`}
       value={value}
       aria-label={label}
       title={label}

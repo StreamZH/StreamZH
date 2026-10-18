@@ -896,11 +896,16 @@ public sealed class DownloadImportService(
             : $"The title of {Label([missing])} is not known yet. StreamZH tries again until 48 hours after the air date (Settings → Media Management → Episode title required).";
     }
 
-    private void SaveDetails(string path, NamingFileInfo info) =>
+    /// <summary>The media info of the downloaded file belongs to the placed copy now (same content, maybe another time stamp).</summary>
+    private void SaveDetails(string path, NamingFileInfo info)
+    {
+        var placed = new FileInfo(path);
+        var media = info.MediaInfo is { } probed && placed.Exists ? probed with { FileSize = placed.Length, FileModified = placed.LastWriteTimeUtc } : info.MediaInfo;
         fileDetails.Save(new MediaFileDetails(
             path, info.Quality.Quality.Id, info.Quality.Revision.Version, info.Quality.Revision.Real, info.Quality.Revision.IsRepack,
             [.. info.Languages.Select(l => l.Id)], info.ReleaseGroup, info.SceneName, info.Edition, info.VideoCodec, info.AudioCodec, Now,
-            info.MediaInfo, info.MediaInfo is null ? null : Now));
+            media, media is null ? null : Now));
+    }
 
     /// <summary>Cleanup, download list, events. Problems here no longer make the import fail.</summary>
     private async Task AfterImportAsync(DownloadItem item, Outcome outcome, CancellationToken cancellationToken)

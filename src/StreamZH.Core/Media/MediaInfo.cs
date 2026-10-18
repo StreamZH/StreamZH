@@ -49,6 +49,9 @@ public sealed record MediaInfo
     /// <summary>Size of the file when it was analysed (a different size means it changed).</summary>
     public long? FileSize { get; init; }
 
+    /// <summary>Last write time (UTC) of the file when it was analysed (a different time means it changed).</summary>
+    public DateTime? FileModified { get; init; }
+
     public MediaVideoInfo? Video { get; init; }
 
     public IReadOnlyList<MediaAudioTrack> AudioTracks { get; init; } = [];

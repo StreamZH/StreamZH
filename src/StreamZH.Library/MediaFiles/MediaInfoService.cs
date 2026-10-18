@@ -75,7 +75,7 @@ public sealed class MediaInfoService(
             throw new MediaInfoException("ffprobe was not found. Install it in Settings → Downloads → Tools.");
         }
 
-        var size = SafeSize(path);
+        var (size, modified) = SafeStat(path);
         var streams = await RunAsync(ffprobe, ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-probesize", "50M", path], path, cancellationToken)
             .ConfigureAwait(false);
         string? frames = null;
@@ -96,7 +96,7 @@ public sealed class MediaInfoService(
             }
         }
 
-        return FfprobeParser.Parse(streams, frames, sceneName ?? Path.GetFileName(path), size);
+        return FfprobeParser.Parse(streams, frames, sceneName ?? Path.GetFileName(path), size) with { FileModified = modified };
     }
 
     private async Task<string> RunAsync(string ffprobe, IReadOnlyList<string> arguments, string path, CancellationToken cancellationToken)
@@ -143,9 +143,15 @@ public sealed class MediaInfoService(
             return true;
         }
 
-        return info.Revision < MediaInfo.CurrentRevision
-               || (info.FileSize is { } size && size != file.Length)
-               || file.LastWriteTimeUtc > updated.AddMinutes(1);
+        if (info.Revision < MediaInfo.CurrentRevision || (info.FileSize is { } size && size != file.Length))
+        {
+            return true;
+        }
+
+        // Written since the analysis (copies may round the time a little).
+        return info.FileModified is { } modified
+            ? Math.Abs((file.LastWriteTimeUtc - modified).TotalSeconds) > 2
+            : file.LastWriteTimeUtc > updated.AddMinutes(1);
     }
 
     /// <summary>
@@ -327,15 +333,16 @@ public sealed class MediaInfoService(
     private static bool IsVideo(MediaFile file) => DiskScanner.VideoExtensions.Contains(Path.GetExtension(file.RelativePath))
                                                    && !Path.GetExtension(file.RelativePath).Equals(".iso", StringComparison.OrdinalIgnoreCase);
 
-    private static long? SafeSize(string path)
+    private static (long? Size, DateTime? Modified) SafeStat(string path)
     {
         try
         {
-            return new FileInfo(path).Length;
+            var file = new FileInfo(path);
+            return file.Exists ? (file.Length, file.LastWriteTimeUtc) : (null, null);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            return null;
+            return (null, null);
         }
     }
 }

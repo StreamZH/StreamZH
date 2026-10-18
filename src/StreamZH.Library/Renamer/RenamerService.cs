@@ -570,6 +570,11 @@ public sealed partial class RenamerService(
         {
             failed++;
             repository.SetItemState(runId, op.Order, RunItemState.Failed, message);
+            if (!undo)
+            {
+                repository.CountItem(runId, success: false);
+            }
+
             logger.LogWarning("Rename of {From} failed: {Message}", op.From, message);
             await progress.AdvanceAsync();
         }
@@ -578,6 +583,11 @@ public sealed partial class RenamerService(
         {
             done.Add(op);
             repository.SetItemState(runId, op.Order, undo ? RunItemState.Undone : RunItemState.Done, null);
+            if (!undo)
+            {
+                repository.CountItem(runId, success: true);
+            }
+
             await progress.AdvanceAsync();
         }
 

@@ -473,7 +473,8 @@ public sealed partial class MediaNamer(MediaManagementValues settings, RenamerCa
             return NamingFileInfo.From(stored, original);
         }
 
-        var parsed = ReleaseParser.Parse(item.Name);
+        // Without the extension: a quality guessed from ".mkv" alone would invent "WEBDL-720p" for names without one.
+        var parsed = ReleaseParser.Parse(original);
         return NamingFileInfo.From(parsed, null, original);
     }
 

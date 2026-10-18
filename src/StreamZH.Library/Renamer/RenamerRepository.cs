@@ -73,6 +73,15 @@ public sealed class RenamerRepository(Database database)
             new { runId, order, state = (int)state, error });
     }
 
+    /// <summary>One more item done or failed, for the progress while the run is going.</summary>
+    public void CountItem(int runId, bool success)
+    {
+        using var connection = database.Open();
+        connection.Execute(
+            "UPDATE RenamerRuns SET Done = Done + @done, Failed = Failed + @failed WHERE Id = @runId",
+            new { runId, done = success ? 1 : 0, failed = success ? 0 : 1 });
+    }
+
     public void UpdateRun(int id, RunState state, int done, int failed, string? error, DateTime? finished, DateTime? undoneAt = null)
     {
         using var connection = database.Open();

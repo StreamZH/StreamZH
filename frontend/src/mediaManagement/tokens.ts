@@ -66,6 +66,9 @@ const release = (edition: boolean): TokenGroup => ({
           { token: '{edition-{Edition Tags}}', example: '{edition-IMAX}' },
         ]
       : []),
+    // Custom formats marked "Include in file names" (Settings → Custom formats), like Radarr and Sonarr.
+    { token: '{Custom Formats}', example: 'German DL' },
+    { token: '{[Custom Formats]}', example: '[German DL]' },
     { token: '{Release Group}', example: 'RlsGrp' },
     { token: '{-Release Group}', example: '-RlsGrp' },
     { token: '{Original Title}', example: 'The.Movie.Title.2010.1080p.BluRay-RlsGrp' },

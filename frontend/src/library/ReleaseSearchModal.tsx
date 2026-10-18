@@ -9,10 +9,11 @@ import Icon from '../components/Icon'
 import Loader from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
+import { FormatTags, ScorePill } from '../customFormats/FormatTags'
 import { formatBytes, formatDateTime } from '../lib/format'
 import styles from './ReleaseSearch.module.css'
 
-type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'grabs' | 'score'
+type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'grabs' | 'score' | 'formats'
 
 const sortLabels: Record<SortKey, string> = {
   rank: 'Best match',
@@ -22,10 +23,11 @@ const sortLabels: Record<SortKey, string> = {
   size: 'Size',
   grabs: 'Grabs',
   score: 'Score',
+  formats: 'Formats',
 }
 
 /** Direction a column sorts in on the first click: newest, largest, most grabbed and best scored first. */
-const firstDescending: Record<SortKey, boolean> = { rank: false, title: false, indexer: false, age: false, size: true, grabs: true, score: true }
+const firstDescending: Record<SortKey, boolean> = { rank: false, title: false, indexer: false, age: false, size: true, grabs: true, score: true, formats: true }
 
 function compare(a: Release, b: Release, key: SortKey): number {
   switch (key) {
@@ -43,6 +45,8 @@ function compare(a: Release, b: Release, key: SortKey): number {
       return (a.grabs ?? -1) - (b.grabs ?? -1)
     case 'score':
       return a.preferredScore - b.preferredScore || a.rank - b.rank
+    case 'formats':
+      return (a.customFormatScore ?? 0) - (b.customFormatScore ?? 0) || a.rank - b.rank
   }
 }
 
@@ -74,6 +78,8 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
   const indexerCount = indexers.data?.interactiveSearch
   // The score column only shows when release profiles gave any release a score.
   const hasScores = data?.releases.some((r) => r.preferredScore !== 0) ?? false
+  // The custom format column shows when any release matched a format or got a format score.
+  const hasFormats = data?.releases.some((r) => (r.customFormats?.length ?? 0) > 0 || (r.customFormatScore ?? 0) !== 0) ?? false
 
   // Portal: the dialog must not inherit styles of the place it is opened from (hero actions, episode table).
   return createPortal(
@@ -138,6 +144,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   <option value="size:desc">Largest</option>
                   <option value="size:asc">Smallest</option>
                   <option value="grabs:desc">Most grabbed</option>
+                  {hasFormats && <option value="formats:desc">Format score</option>}
                   {hasScores && <option value="score:desc">Preferred score</option>}
                   <option value="indexer:asc">Indexer</option>
                   <option value="title:asc">Title</option>
@@ -173,7 +180,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                 </p>
               </div>
             ) : (
-              <div className={`${styles.table} ${hasScores ? styles.withScore : ''}`} role="table" aria-label="Releases">
+              <div className={`${styles.table} ${hasScores ? styles.withScore : ''} ${hasFormats ? styles.withFormats : ''}`} role="table" aria-label="Releases">
                 <div className={styles.head} role="row">
                   <span role="columnheader">Verdict</span>
                   {(['title', 'indexer', 'age', 'size'] as SortKey[]).map((key) => (
@@ -181,6 +188,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   ))}
                   <span role="columnheader">Quality</span>
                   <span role="columnheader">Languages</span>
+                  {hasFormats && <SortHeader sortKey="formats" sort={sort} onSort={sortBy} />}
                   {hasScores && <SortHeader sortKey="score" sort={sort} onSort={sortBy} />}
                   <SortHeader sortKey="grabs" sort={sort} onSort={sortBy} />
                   <span role="columnheader" className={styles.headAction}>
@@ -192,7 +200,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   </span>
                 </div>
                 {releases.map((release) => (
-                  <ReleaseRow key={`${release.indexerId}:${release.guid}`} release={release} showScore={hasScores} />
+                  <ReleaseRow key={`${release.indexerId}:${release.guid}`} release={release} showScore={hasScores} showFormats={hasFormats} />
                 ))}
               </div>
             )}
@@ -216,7 +224,7 @@ function SortHeader({ sortKey, sort, onSort }: { sortKey: SortKey; sort: { key: 
   )
 }
 
-function ReleaseRow({ release, showScore }: { release: Release; showScore: boolean }) {
+function ReleaseRow({ release, showScore, showFormats }: { release: Release; showScore: boolean; showFormats: boolean }) {
   const queryClient = useQueryClient()
   const [reasonsOpen, setReasonsOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -259,6 +267,11 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
         ) : (
           release.title
         )}
+        {showFormats && (release.customFormats?.length ?? 0) > 0 && (
+          <span className={styles.formatTags}>
+            <FormatTags formats={release.customFormats} max={5} />
+          </span>
+        )}
       </span>
 
       <span className={styles.meta}>
@@ -278,6 +291,12 @@ function ReleaseRow({ release, showScore }: { release: Release; showScore: boole
         <span role="cell" className={styles.cell}>
           {release.languages.length > 0 ? release.languages.join(', ') : <span className={ui.muted}>–</span>}
         </span>
+        {showFormats && (
+          <span role="cell" className={`${styles.cell} ${styles.num}`} title="Custom format score in this item's profile">
+            <span className={styles.mobileLabel}>Formats </span>
+            <ScorePill score={release.customFormatScore ?? 0} />
+          </span>
+        )}
         {showScore && (
           <span
             role="cell"

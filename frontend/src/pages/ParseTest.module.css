@@ -213,6 +213,13 @@
   align-items: start;
 }
 
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
 @media (max-width: 1100px) {
   .results {
     grid-template-columns: minmax(0, 1fr);

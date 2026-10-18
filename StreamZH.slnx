@@ -7,6 +7,8 @@
     <Project Path="src/StreamZH.Library/StreamZH.Library.csproj" />
     <Project Path="src/StreamZH.Metadata/StreamZH.Metadata.csproj" />
     <Project Path="src/StreamZH.Parsing/StreamZH.Parsing.csproj" />
+    <Project Path="src/StreamZH.Tray.Core/StreamZH.Tray.Core.csproj" />
+    <Project Path="src/StreamZH.Tray/StreamZH.Tray.csproj" />
     <Project Path="src/StreamZH.Usenet/StreamZH.Usenet.csproj" />
   </Folder>
   <Folder Name="/tests/">

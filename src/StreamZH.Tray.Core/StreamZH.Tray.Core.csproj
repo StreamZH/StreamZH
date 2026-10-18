@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The tray icon's logic without UI (status text, files, HTTP client), so it builds and is tested on every OS. -->
+  <PropertyGroup>
+    <RootNamespace>StreamZH.Tray.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../StreamZH.Core/StreamZH.Core.csproj" />
+  </ItemGroup>
+</Project>

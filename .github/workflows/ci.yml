@@ -104,6 +104,13 @@ jobs:
           -p:EnableCompressionInSingleFile=true -p:DebugType=none
           -o out/StreamZH
 
+      # Windows package: the tray icon next to StreamZH.exe (framework-dependent, needs the .NET 10 Desktop Runtime).
+      - name: Tray icon
+        if: matrix.rid == 'win-x64'
+        run: >
+          dotnet publish src/StreamZH.Tray -c Release -r win-x64 --self-contained false
+          -p:PublishSingleFile=true -p:DebugType=none -o out/StreamZH
+
       - uses: actions/upload-artifact@v4
         with:
           name: StreamZH-${{ matrix.rid }}

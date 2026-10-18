@@ -13,6 +13,11 @@
         C:\Repos\StreamZH\tools\Install-Service.ps1
     Back to the console window: C:\Repos\StreamZH\tools\Uninstall-Service.ps1
 
+    Tray icon: also builds StreamZH.Tray.exe (StreamZH in the notification area, bottom right, with a menu to open the
+    dashboard, pause downloads, restart, stop and start StreamZH), registers it to start with Windows for your user
+    (HKCU ... Run, "StreamZH Tray") and starts it. -NoTray leaves it out (and removes the entry). It needs the .NET 10
+    Windows Desktop Runtime, which the .NET SDK on Windows includes.
+
     Needs once: Git, .NET 10 SDK and Node.js (LTS). The script tells you how to install what is missing.
 
     par2 and 7-Zip are not handled here: StreamZH installs them itself (par2cmdline-turbo and 7-Zip, pinned
@@ -24,12 +29,16 @@
 
 .EXAMPLE
     C:\Repos\StreamZH\tools\Update-Local.ps1 -NoPull -NoStart
+
+.EXAMPLE
+    C:\Repos\StreamZH\tools\Update-Local.ps1 -NoTray
 #>
 [CmdletBinding()]
 param(
     [string]$InstallDir = 'C:\Tools\StreamZH',
     [switch]$NoPull,
-    [switch]$NoStart
+    [switch]$NoStart,
+    [switch]$NoTray
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,7 +96,23 @@ try {
         -p:EnableCompressionInSingleFile=true -p:DebugType=none -o $out --nologo -v q
     if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 
+    $tray = -not $NoTray
+    if ($tray -and -not ((& dotnet --list-runtimes) -match '^Microsoft\.WindowsDesktop\.App 10\.')) {
+        Write-Host '.NET 10 Windows Desktop Runtime fehlt, das Tray-Symbol wird nicht gebaut. Installieren mit:' -ForegroundColor Yellow
+        Write-Host '    winget install --id Microsoft.DotNet.DesktopRuntime.10 -e' -ForegroundColor Yellow
+        $tray = $false
+    }
+    if ($tray) {
+        Step 'Build StreamZH.Tray.exe'
+        # Framework-dependent: one small file instead of a second copy of .NET.
+        dotnet publish (Join-Path $repo 'src\StreamZH.Tray') -c Release -r win-x64 --self-contained false `
+            -p:PublishSingleFile=true -p:DebugType=none -o $out --nologo -v q
+        if ($LASTEXITCODE -ne 0) { throw 'dotnet publish StreamZH.Tray failed' }
+    }
+
     Step 'Stop running StreamZH'
+    # The tray icon holds StreamZH.Tray.exe; it starts again below.
+    if (Stop-StreamZhTray) { Write-Host 'tray icon closed' }
     $service = Get-StreamZhService
     if ($service) {
         try {
@@ -132,6 +157,16 @@ try {
         Write-Host "`nStreamZH läuft im Konsolenfenster und stoppt bei der Abmeldung. Als Windows-Dienst läuft es"
         Write-Host 'auch ohne Anmeldung weiter. Einmalig in einer PowerShell als Administrator:'
         Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'"
+    }
+
+    $dataDir = ''
+    if ($service) { $dataDir = Get-StreamZhServiceDataDir }
+    if ($tray) {
+        if (Register-StreamZhTray $InstallDir $dataDir) { Write-Host "`ntray icon: starts with Windows (HKCU Run '$StreamZhTrayRunValue')" }
+        if (-not $NoStart -and (Start-StreamZhTray $InstallDir $dataDir)) { Write-Host 'tray icon started (notification area, bottom right)' }
+    }
+    elseif ($NoTray -and (Unregister-StreamZhTray)) {
+        Write-Host "`ntray icon: start with Windows removed"
     }
 
     $version = (Get-Item (Join-Path $InstallDir 'StreamZH.exe')).VersionInfo.ProductVersion

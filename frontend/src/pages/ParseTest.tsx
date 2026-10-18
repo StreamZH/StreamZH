@@ -8,6 +8,8 @@ import { parseRelease, type ParsedRelease, type ParseResult } from '../api/parse
 import Icon from '../components/Icon'
 import Loader from '../components/Loader'
 import ui from '../components/ui.module.css'
+import { ScorePill } from '../customFormats/FormatTags'
+import ParseFormatsPanel from '../customFormats/ParseFormatsPanel'
 import { SettingsPage } from '../settings/SettingsKit'
 import styles from './ParseTest.module.css'
 
@@ -149,6 +151,9 @@ export default function ParseTest() {
                   <Icon name="star" size={12} />
                   {decision.profile}
                 </span>
+                {decision.customFormatScore !== undefined && (
+                  <ScorePill score={decision.customFormatScore} label="Format score" title="Custom format score in this profile" />
+                )}
                 {result.data!.releaseProfiles.length > 0 && (
                   <span className={`${ui.pill} ${decision.preferredScore > 0 ? ui.pillOk : decision.preferredScore < 0 ? ui.pillErr : ''}`}>
                     Preferred score {formatScore(decision.preferredScore)}
@@ -173,7 +178,10 @@ export default function ParseTest() {
       {result.data?.parsed && (
         <div className={styles.results}>
           <ParsedTable parsed={result.data.parsed} hardcodedSubs={result.data.hardcodedSubs} />
-          <ReleaseProfiles result={result.data} />
+          <div className={styles.side}>
+            <ParseFormatsPanel title={submitted!.title} parsed={result.data.parsed} decision={decision ?? null} sizeMb={submitted!.size} />
+            <ReleaseProfiles result={result.data} />
+          </div>
         </div>
       )}
     </SettingsPage>

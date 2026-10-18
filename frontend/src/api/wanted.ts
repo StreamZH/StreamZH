@@ -11,7 +11,7 @@ export type SortDirection = 'ascending' | 'descending'
 export type QueueState = 'downloading' | 'waitingForImport' | 'grabbed'
 
 /** Why a file is below the profile (Cutoff unmet). */
-export type CutoffReason = 'quality' | 'language' | 'dualLanguage'
+export type CutoffReason = 'quality' | 'language' | 'dualLanguage' | 'formatScore'
 
 /** One row of Wanted. Movies fill the movie fields, episodes the series and episode fields; dates are yyyy-MM-dd. */
 export interface WantedRecord {

@@ -59,7 +59,7 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
 
     public async Task<TmdbMovie> GetMovieAsync(int tmdbId, CancellationToken cancellationToken = default)
     {
-        var m = await GetAsync<MovieDto>($"movie/{tmdbId}", null, cancellationToken);
+        var m = await GetAsync<MovieDto>($"movie/{tmdbId}?append_to_response=release_dates", null, cancellationToken);
         return new TmdbMovie(
             m.Id,
             Blank(m.ImdbId),
@@ -73,7 +73,9 @@ public sealed partial class TmdbClient(HttpClient http, ITmdbSettings settings) 
             m.PosterPath,
             m.BackdropPath,
             m.OriginalLanguage,
-            Blank(m.ReleaseDate));
+            Blank(m.ReleaseDate),
+            EarliestRelease(m.ReleaseDates, DigitalReleaseType),
+            EarliestRelease(m.ReleaseDates, PhysicalReleaseType));
     }
 
     public async Task<TmdbSeries> GetSeriesAsync(int tmdbId, CancellationToken cancellationToken = default)

@@ -21,6 +21,9 @@ public sealed class UiSettings(SettingsCache cache)
 
     public static readonly string[] TimeFormats = [Locale, "HH:mm", "h:mm a"];
 
+    /// <summary>First day of the week in the calendar; Monday by default (Radarr's default is Sunday).</summary>
+    public static readonly string[] FirstDaysOfWeek = ["monday", "sunday"];
+
     public string ShortDateFormat => Pick(ConfigKeys.UiShortDateFormat, ShortDateFormats);
 
     public string LongDateFormat => Pick(ConfigKeys.UiLongDateFormat, LongDateFormats);
@@ -30,8 +33,15 @@ public sealed class UiSettings(SettingsCache cache)
     /// <summary>"3 min ago" instead of the date and time, for recent events.</summary>
     public bool ShowRelativeDates => cache.GetBool(ConfigKeys.UiShowRelativeDates, true);
 
-    public void Update(string? shortDate, string? longDate, string? time, bool? relative)
+    public string FirstDayOfWeek => cache.Get(ConfigKeys.UiFirstDayOfWeek) is { } value && FirstDaysOfWeek.Contains(value) ? value : FirstDaysOfWeek[0];
+
+    public void Update(string? shortDate, string? longDate, string? time, bool? relative, string? firstDayOfWeek = null)
     {
+        if (firstDayOfWeek is not null)
+        {
+            cache.Set(ConfigKeys.UiFirstDayOfWeek, firstDayOfWeek);
+        }
+
         if (shortDate is not null)
         {
             cache.Set(ConfigKeys.UiShortDateFormat, shortDate);

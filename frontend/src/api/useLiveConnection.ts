@@ -9,6 +9,7 @@ import { queryKeys, type JobStatus } from './library'
 import { releaseKeys, type SearchFinished } from './releases'
 import { statusKeys } from './status'
 import { toolKeys } from './tools'
+import { invalidateWanted } from './wanted'
 
 /**
  * Keeps one SignalR connection to /hub open, refreshes cached library data when the
@@ -28,6 +29,7 @@ export function useLiveConnection(): boolean {
     connection.on('libraryChanged', (event: { mediaType: 'Movie' | 'Series'; id: number | null }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.stats })
       void queryClient.invalidateQueries({ queryKey: queryKeys.rootFolders })
+      invalidateWanted(queryClient)
       if (event.mediaType === 'Movie') {
         void queryClient.invalidateQueries({ queryKey: queryKeys.movies })
         if (event.id) void queryClient.invalidateQueries({ queryKey: queryKeys.movie(event.id) })
@@ -60,6 +62,7 @@ export function useLiveConnection(): boolean {
     connection.on('downloadChanged', () => {
       void queryClient.invalidateQueries({ queryKey: downloadKeys.all })
       void queryClient.invalidateQueries({ queryKey: ['imports'] })
+      invalidateWanted(queryClient)
       refetchOngoingSoon()
     })
 
@@ -76,6 +79,7 @@ export function useLiveConnection(): boolean {
     })
     connection.on('searchFinished', (event: SearchFinished) => {
       queryClient.setQueryData(releaseKeys.searchFinished(event.mediaType, event.id), { ...event, at: Date.now() })
+      invalidateWanted(queryClient)
     })
 
     connection.on('indexersChanged', () => {

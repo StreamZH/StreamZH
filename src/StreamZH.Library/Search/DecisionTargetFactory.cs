@@ -91,7 +91,7 @@ public sealed class DecisionTargetFactory(
     private ProperHandling Propers => mediaManagement?.Current.PropersAndRepacks ?? ProperHandling.PreferAndUpgrade;
 
     /// <summary>The stored details of an imported file (quality survives renaming), else <see cref="Existing"/>.</summary>
-    private (QualityModel? Quality, IReadOnlyList<Language> Languages) ExistingFile(MediaFile? file, string folderPath)
+    public (QualityModel? Quality, IReadOnlyList<Language> Languages) ExistingFile(MediaFile? file, string folderPath)
     {
         if (file is not null && fileDetails?.Find(Path.Combine(folderPath, file.RelativePath)) is { } stored)
         {

@@ -22,12 +22,13 @@ public static class UiSettingsEndpoints
             Check(request.ShortDateFormat, UiSettings.ShortDateFormats, "shortDateFormat", errors);
             Check(request.LongDateFormat, UiSettings.LongDateFormats, "longDateFormat", errors);
             Check(request.TimeFormat, UiSettings.TimeFormats, "timeFormat", errors);
+            Check(request.FirstDayOfWeek, UiSettings.FirstDaysOfWeek, "firstDayOfWeek", errors);
             if (errors.Count > 0)
             {
                 return Results.ValidationProblem(errors);
             }
 
-            ui.Update(request.ShortDateFormat, request.LongDateFormat, request.TimeFormat, request.ShowRelativeDates);
+            ui.Update(request.ShortDateFormat, request.LongDateFormat, request.TimeFormat, request.ShowRelativeDates, request.FirstDayOfWeek);
             return Results.Ok(UiSettingsResource.From(ui));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
@@ -51,15 +52,19 @@ public sealed record UiSettingsResource(
     bool ShowRelativeDates,
     IReadOnlyList<string> ShortDateFormats,
     IReadOnlyList<string> LongDateFormats,
-    IReadOnlyList<string> TimeFormats)
+    IReadOnlyList<string> TimeFormats,
+    string FirstDayOfWeek,
+    IReadOnlyList<string> FirstDaysOfWeek)
 {
     public static UiSettingsResource From(UiSettings ui)
     {
         ArgumentNullException.ThrowIfNull(ui);
         return new UiSettingsResource(
-            ui.ShortDateFormat, ui.LongDateFormat, ui.TimeFormat, ui.ShowRelativeDates, UiSettings.ShortDateFormats, UiSettings.LongDateFormats, UiSettings.TimeFormats);
+            ui.ShortDateFormat, ui.LongDateFormat, ui.TimeFormat, ui.ShowRelativeDates, UiSettings.ShortDateFormats, UiSettings.LongDateFormats, UiSettings.TimeFormats,
+            ui.FirstDayOfWeek, UiSettings.FirstDaysOfWeek);
     }
 }
 
 /// <summary>Null fields keep their value.</summary>
-public sealed record UpdateUiSettings(string? ShortDateFormat = null, string? LongDateFormat = null, string? TimeFormat = null, bool? ShowRelativeDates = null);
+public sealed record UpdateUiSettings(
+    string? ShortDateFormat = null, string? LongDateFormat = null, string? TimeFormat = null, bool? ShowRelativeDates = null, string? FirstDayOfWeek = null);

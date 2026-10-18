@@ -93,6 +93,22 @@ public sealed partial class TmdbClient : ITmdbDetailsClient
                 [.. (e.Crew ?? []).Where(c => c.Job is "Writer" or "Screenplay" or "Teleplay").Select(c => c.Name).OfType<string>().Distinct()]))]);
     }
 
+    /// <summary>TMDB release types (release_dates): 4 = digital, 5 = physical (DVD/Blu-ray).</summary>
+    private const int DigitalReleaseType = 4;
+    private const int PhysicalReleaseType = 5;
+
+    /// <summary>
+    /// The earliest release of a type in any country as yyyy-MM-dd (like Radarr's digital and physical release); null when none.
+    /// </summary>
+    internal static string? EarliestRelease(ReleaseDatesDto? releaseDates, int type) =>
+        (releaseDates?.Results ?? [])
+            .SelectMany(r => r.ReleaseDates ?? [])
+            .Where(d => d.Type == type && d.ReleaseDate is { Length: >= 10 })
+            .Select(d => d.ReleaseDate![..10])
+            .Where(d => DateOnly.TryParseExact(d, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _))
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault();
+
     /// <summary>
     /// The certification of the country: theatrical release first (type 3), then any release with one.
     /// </summary>
@@ -226,6 +242,9 @@ internal sealed class ReleaseDateDto
 {
     public string? Certification { get; set; }
     public int Type { get; set; }
+
+    /// <summary>ISO date and time, e.g. "2021-10-22T00:00:00.000Z".</summary>
+    public string? ReleaseDate { get; set; }
 }
 
 internal sealed class ContentRatingsDto

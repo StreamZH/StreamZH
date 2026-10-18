@@ -43,6 +43,12 @@ public sealed class Movie
 
     /// <summary>TMDB release date (yyyy-MM-dd, usually the cinema release), for the minimum availability; null when unknown.</summary>
     public string? InCinemas { get; set; }
+
+    /// <summary>Earliest digital release (yyyy-MM-dd) TMDB knows in any country; null when unknown.</summary>
+    public string? DigitalRelease { get; set; }
+
+    /// <summary>Earliest physical release (yyyy-MM-dd, DVD/Blu-ray) TMDB knows in any country; null when unknown.</summary>
+    public string? PhysicalRelease { get; set; }
 }
 
 public sealed class Series

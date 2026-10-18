@@ -240,7 +240,11 @@ function HistoryRow({ record }: { record: IndexerHistoryRecord }) {
       <td className={`${styles.sourceCell} ${styles.hideMd}`}>{sourceLabels[record.source] ?? record.source}</td>
       <td className={styles.queryCell}>
         <span className={styles.showSm}>
-          <b>{record.indexer}</b> · <EventIcon type={record.eventType} /> {eventLabels[record.eventType] ?? record.eventType}
+          <b>{record.indexer}</b>
+          <span className={styles.event}>
+            <EventIcon type={record.eventType} />
+            {eventLabels[record.eventType] ?? record.eventType}
+          </span>
         </span>
         {text ?<span className={styles.queryText}>{text}</span> : <span className={ui.muted}>–</span>}
         {!record.successful && record.error && <span className={styles.errorText}>{record.error}</span>}

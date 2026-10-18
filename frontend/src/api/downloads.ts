@@ -38,6 +38,8 @@ export interface DownloadItem {
   outputPath: string | null
   added: string
   completed: string | null
+  /** The download category by name (the default ones: movies, series, other). */
+  categoryName?: string
 }
 
 export interface DownloadFile {
@@ -60,6 +62,18 @@ export interface DownloadQueue {
   freeSpaceBytes: number | null
   /** 0 = unlimited. */
   speedLimitKBps: number
+}
+
+/** Filters of the download history (GET /download/history); empty fields do not filter. */
+export interface DownloadHistoryFilter {
+  status?: 'completed' | 'failed'
+  import?: 'imported' | 'notImported' | 'importFailed'
+  /** movie, series, other (the kind) or a category name. */
+  category?: string
+  /** Words that must all appear in the title. */
+  search?: string
+  /** ISO time: finished at or after. */
+  since?: string
 }
 
 export interface DownloadHistoryPage {
@@ -107,7 +121,7 @@ export const activeStatuses: DownloadStatus[] = ['queued', 'downloading', 'pause
 export const downloadKeys = {
   all: ['downloads'] as const,
   queue: ['downloads', 'queue'] as const,
-  history: (page: number, pageSize: number) => ['downloads', 'history', page, pageSize] as const,
+  history: (page: number, pageSize: number, filter: DownloadHistoryFilter = {}) => ['downloads', 'history', page, pageSize, filter] as const,
   /** Not fetched: filled by the hub's "downloadProgress". Outside "downloads" so invalidating the queue keeps it. */
   live: ['download-progress'] as const,
   settings: ['download-settings'] as const,
@@ -135,8 +149,11 @@ async function upload(file: File, title?: string, category?: string): Promise<Do
 
 export const downloadsApi = {
   queue: () => request<DownloadQueue>('GET', '/download'),
-  history: (page: number, pageSize: number) =>
-    request<DownloadHistoryPage>('GET', `/download/history?page=${page}&pageSize=${pageSize}`),
+  history: (page: number, pageSize: number, filter: DownloadHistoryFilter = {}) => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value)
+    return request<DownloadHistoryPage>('GET', `/download/history?${params}`)
+  },
   detail: (id: number) => request<DownloadDetail>('GET', `/download/${id}`),
   upload,
   pause: (id: number) => request<void>('POST', `/download/${id}/pause`),

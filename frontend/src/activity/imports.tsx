@@ -142,9 +142,12 @@ export function ImportCard({
 export function PendingImports({
   admin,
   onToast,
+  match,
 }: {
   admin: boolean
   onToast: (tone: 'ok' | 'error', title: string, detail?: string) => void
+  /** Only the downloads this returns true for (the queue filters). */
+  match?: (download: DownloadItem) => boolean
 }) {
   const pending = useQuery({
     queryKey: mediaManagementKeys.pending,
@@ -156,7 +159,7 @@ export function PendingImports({
     (title, message) => onToast('error', title, message),
     (title) => onToast('ok', title),
   )
-  const list = pending.data ?? []
+  const list = (pending.data ?? []).filter((p) => !match || match(p.download))
   const media = useMediaLinks(list.map((p) => p.download))
   if (list.length === 0) return null
 

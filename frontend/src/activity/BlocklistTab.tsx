@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { mediaManagementApi, mediaManagementKeys } from '../api/mediaManagement'
+import { Link } from 'react-router'
+import { mediaManagementApi, mediaManagementKeys, type BlocklistFilter } from '../api/mediaManagement'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import Toasts from '../indexerTools/Toast'
@@ -9,23 +9,32 @@ import { formatBytes } from '../lib/format'
 import { joinParts, relativeTime } from '../status/format'
 import StatusIcon from '../status/icons'
 import { useIsAdmin } from '../status/useOngoing'
+import { mediaTypeOptions, pick } from './filterOptions'
+import { FilterBar, FilterSelect, NoMatches, SearchBox } from './Filters'
 import { useMediaLinks, useToasts } from './hooks'
+import { useClampPage, useListParams } from './listParams'
+import Pager from './Pager'
+import { usePageSize } from './paging'
 import { Empty } from './QueueTab'
 import styles from './Activity.module.css'
 
-const pageSize = 25
+const filterKeys = ['q', 'type'] as const
 
 /** Releases that failed and are not grabbed again for the same movie or episodes (Radarr/Sonarr "Blocklist"). */
 export default function BlocklistTab() {
   const admin = useIsAdmin()
   const queryClient = useQueryClient()
-  const [url, setUrl] = useSearchParams()
-  const page = Math.max(1, Number(url.get('page')) || 1)
+  const { page, get, setFilters, setSearch, setPage, clear: clearFilters, active } = useListParams(filterKeys)
+  const [pageSize, setPageSize] = usePageSize('activity-blocklist')
+  const type = pick<NonNullable<BlocklistFilter['mediaType']>>(get('type'), mediaTypeOptions)
+  const filter: BlocklistFilter = { search: get('q') || undefined, mediaType: type || undefined }
   const list = useQuery({
-    queryKey: mediaManagementKeys.blocklist(page, pageSize),
-    queryFn: () => mediaManagementApi.blocklist(page, pageSize),
+    queryKey: mediaManagementKeys.blocklist(page, pageSize, filter),
+    queryFn: () => mediaManagementApi.blocklist(page, pageSize, filter),
     placeholderData: (previous) => previous,
   })
+  const settled = list.data && !list.isPlaceholderData ? list.data.totalRecords : undefined
+  useClampPage(page, settled, pageSize, setPage)
   const records = list.data?.records ?? []
   const media = useMediaLinks(records)
   const { toasts, push, dismiss } = useToasts()
@@ -48,13 +57,6 @@ export default function BlocklistTab() {
     onSettled: refresh,
   })
 
-  const onPage = (p: number) => {
-    const next = new URLSearchParams(url)
-    if (p > 1) next.set('page', String(p))
-    else next.delete('page')
-    setUrl(next)
-  }
-
   if (list.isError) {
     return (
       <Empty icon="error" title="The blocklist could not be loaded">
@@ -70,7 +72,8 @@ export default function BlocklistTab() {
       </div>
     )
   }
-  if (records.length === 0) {
+  const total = list.data.totalRecords
+  if (total === 0 && !active) {
     return (
       <Empty icon="check" title="The blocklist is empty">
         <p>When a download of a movie or episode fails, its release lands here and is not grabbed again. StreamZH searches for another one.</p>
@@ -83,19 +86,22 @@ export default function BlocklistTab() {
     )
   }
 
-  const pages = Math.max(1, Math.ceil(list.data.totalRecords / list.data.pageSize))
   return (
     <>
-      <div className={styles.listHead}>
-        <span className={styles.pagerText}>
-          {new Intl.NumberFormat().format(list.data.totalRecords)} blocklisted release{list.data.totalRecords === 1 ? '' : 's'}
-        </span>
+      <div className={styles.filterHead}>
+        <FilterBar label="Filter the blocklist" active={active} matches={settled} noun="releases" onClear={clearFilters}>
+          <SearchBox value={get('q')} onChange={setSearch} placeholder="Search release titles" label="Search the blocklist" />
+          <FilterSelect label="Type" value={type} onChange={(v) => setFilters({ type: v })} options={mediaTypeOptions} />
+        </FilterBar>
         {admin && (
           <button type="button" className={ui.button} onClick={() => setConfirmClear(true)}>
             <StatusIcon name="trash" size={14} /> Clear all
           </button>
         )}
       </div>
+      {records.length === 0 ? (
+        <NoMatches noun="releases" onClear={clearFilters} />
+      ) : (
       <ul className={`${styles.historyList} ${list.isPlaceholderData ? styles.stale : ''}`} aria-label="Blocklist">
         {records.map((item) => {
           const link = media(item)
@@ -135,19 +141,8 @@ export default function BlocklistTab() {
           )
         })}
       </ul>
-      {list.data.totalRecords > list.data.pageSize && (
-        <nav className={styles.pager} aria-label="Pages">
-          <button className={ui.button} type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-            Previous
-          </button>
-          <span className={styles.pagerText}>
-            Page <strong>{page}</strong> of {pages}
-          </span>
-          <button className={ui.button} type="button" disabled={page >= pages} onClick={() => onPage(page + 1)}>
-            Next
-          </button>
-        </nav>
       )}
+      <Pager page={page} pageSize={pageSize} total={total} noun="blocklisted releases" one="blocklisted release" onPage={setPage} onPageSize={setPageSize} />
       {confirmClear && (
         <Modal title="Clear the blocklist" onClose={() => setConfirmClear(false)}>
           <p className={styles.dialogText}>All blocklisted releases can be grabbed again, also by automatic searches.</p>

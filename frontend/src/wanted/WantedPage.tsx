@@ -29,7 +29,7 @@ const directions: SortDirection[] = ['ascending', 'descending']
 
 const queueLabels = { downloading: 'Downloading', waitingForImport: 'Waiting for import', grabbed: 'Grabbed' } as const
 
-const reasonLabels = { quality: 'Below cutoff', language: 'Wrong language', dualLanguage: 'Not dual language' } as const
+const reasonLabels = { quality: 'Below cutoff', language: 'Wrong language', dualLanguage: 'Not dual language', formatScore: 'Below format score' } as const
 
 const texts = {
   missing: {

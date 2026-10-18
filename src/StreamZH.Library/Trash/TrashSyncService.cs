@@ -112,7 +112,7 @@ public sealed class TrashSyncService(
 
 /// <summary>
 /// "TRaSH Guides sync" in System → Tasks, every N hours (default 24). It only runs once the guides were used (a local
-/// copy exists), so installations that never use TRaSH do not download anything.
+/// copy or a profile that follows a template exists), so installations that never use TRaSH do not download anything.
 /// </summary>
 public sealed class TrashSyncTask(TrashSettings settings) : IScheduledTask
 {
@@ -126,7 +126,9 @@ public sealed class TrashSyncTask(TrashSettings settings) : IScheduledTask
 
     public Task RunAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
-        var store = services.GetRequiredService<TrashGuideStore>();
-        return store.HasCopy ? services.GetRequiredService<TrashSyncService>().SyncAsync(cancellationToken) : Task.CompletedTask;
+        // A restored backup has template profiles but no copy (backups hold the database only): download again.
+        var used = services.GetRequiredService<TrashGuideStore>().HasCopy
+                   || services.GetRequiredService<QualityProfileRepository>().All().Any(p => p.TrashMovieTemplate is not null || p.TrashSeriesTemplate is not null);
+        return used ? services.GetRequiredService<TrashSyncService>().SyncAsync(cancellationToken) : Task.CompletedTask;
     }
 }

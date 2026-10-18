@@ -7,6 +7,7 @@ using StreamZH.Core.Media;
 using StreamZH.Core.Profiles;
 using StreamZH.Core.Quality;
 using StreamZH.Library;
+using StreamZH.Library.Import;
 using StreamZH.Library.Trash;
 
 namespace StreamZH.Tests.Trash;
@@ -304,15 +305,18 @@ public sealed class TrashApplyTests : IDisposable
     }
 
     [Fact]
-    public void Naming_variant_with_tokens_streamzh_lacks_is_a_field_error()
+    public void Naming_variant_with_tokens_streamzh_lacks_is_skipped_with_a_warning()
     {
-        var error = Assert.Throws<ValidationFailedException>(() => _bed.Apply.ApplyWithExtras(
+        var result = _bed.Apply.ApplyWithExtras(
             new TrashApplyRequest { MovieTemplate = TrashTestBed.MovieGerman },
             applyQualitySizes: false,
-            new TrashNaming(SeriesFolder: "default"),
-            TrashTestBed.Guides));
+            new TrashNaming(MovieFolder: "plex-imdb", SeriesFolder: "default"),
+            TrashTestBed.Guides);
 
-        Assert.StartsWith("StreamZH cannot use this variant: Unknown token", error.Errors["naming.seriesFolder"][0], StringComparison.Ordinal);
+        var warning = Assert.Single(result.Warnings, w => w.StartsWith("Naming seriesFolder 'default' not applied: Unknown token", StringComparison.Ordinal));
+        Assert.NotNull(warning);
+        Assert.Equal(MediaManagementValues.DefaultSeriesFolderFormat, _bed.Media.Current.SeriesFolderFormat);
+        Assert.Equal("{Movie CleanTitle} ({Release Year}) {imdb-{ImdbId}}", _bed.Media.Current.MovieFolderFormat);
     }
 
     [Fact]

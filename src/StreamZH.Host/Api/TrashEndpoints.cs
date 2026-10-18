@@ -62,7 +62,7 @@ public static class TrashEndpoints
         });
 
         group.MapGet("/groups", (string? mediaType, TrashGuideStore store) =>
-            Guides(mediaType, store, (guide, _) => guide.Groups.Select(g => TrashGroupResource.From(g, guide.MediaType))));
+            Guides(mediaType, store, (guide, _) => guide.Groups.Select(g => TrashGroupResource.From(g, guide))));
 
         group.MapPost("/apply", async (
             TrashApplyBody body, TrashGuideStore store, TrashApplyService apply, TrashRepository trash, CancellationToken ct) =>
@@ -192,7 +192,9 @@ public sealed record TrashProfileSummary(
         new(p.TrashId, TrashEndpoints.Label(mediaType), p.Name, p.Slug, p.Group, p.Description, p.Url, p.Language);
 }
 
-public sealed record TrashQualityItemResource(string Name, bool Allowed, IReadOnlyList<string> Qualities, IReadOnlyList<int> QualityIds);
+/// <param name="Items">Qualities of a group (empty for a single quality).</param>
+/// <param name="QualityIds">StreamZH quality ids of the item (one for a single quality).</param>
+public sealed record TrashQualityItemResource(string Name, bool Allowed, IReadOnlyList<string> Items, IReadOnlyList<int> QualityIds);
 
 /// <param name="Source">"profile" (the template's formats) or "group" (a default CF group of the template).</param>
 public sealed record TrashProfileFormatResource(string TrashId, string Name, int Score, string Source, string? Group, bool Installed);
@@ -215,7 +217,7 @@ public sealed record TrashProfileDetail(
     int MinFormatScore,
     int CutoffFormatScore,
     int MinUpgradeFormatScore,
-    IReadOnlyList<TrashQualityItemResource> Qualities,
+    IReadOnlyList<TrashQualityItemResource> Items,
     IReadOnlyList<TrashProfileFormatResource> Formats,
     IReadOnlyList<TrashProfileGroupResource> Groups)
 {
@@ -299,19 +301,21 @@ public sealed record TrashFormatResource(
 
 public sealed record TrashGroupFormatResource(string TrashId, string Name, bool Required, bool Default);
 
-/// <param name="Default">Added automatically to the profiles in <see cref="Include"/> (all but <see cref="Exclude"/> when empty).</param>
+/// <param name="Default">Added automatically to the templates in <see cref="Profiles"/>.</param>
+/// <param name="Profiles">Templates (trash ids) the group is meant for (quality_profiles include, or all but exclude); null = every template.</param>
 public sealed record TrashGroupResource(
-    string TrashId, string MediaType, string Name, string? Description, bool Default, IReadOnlyList<string> Include, IReadOnlyList<string> Exclude,
+    string TrashId, string MediaType, string Name, string? Description, bool Default, IReadOnlyList<string>? Profiles,
     IReadOnlyList<TrashGroupFormatResource> Formats)
 {
-    public static TrashGroupResource From(TrashCustomFormatGroup g, MediaType mediaType) => new(
+    public static TrashGroupResource From(TrashCustomFormatGroup g, TrashGuide guide) => new(
         g.TrashId,
-        TrashEndpoints.Label(mediaType),
+        TrashEndpoints.Label(guide.MediaType),
         g.Name,
         g.Description,
         g.Default,
-        g.Include,
-        g.Exclude,
+        g.Include.Count > 0 ? g.Include
+        : g.Exclude.Count > 0 ? [.. guide.Profiles.Where(p => g.AppliesTo(p.TrashId)).Select(p => p.TrashId)]
+        : null,
         [.. g.Formats.Select(f => new TrashGroupFormatResource(f.TrashId, f.Name, f.Required, f.Default))]);
 }
 

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using StreamZH.Data;
 using StreamZH.Library.Trash;
 
@@ -153,6 +154,28 @@ public sealed class TrashGuideStoreTests : IDisposable
         Assert.Empty(_bed.Http.Requests);
         Assert.Equal(2, _bed.Store.Current.Movie.Profiles.Count);
         Assert.False(File.Exists(Path.Combine(_bed.Store.CurrentFolder!, "LICENSE")));
+    }
+
+    [Fact]
+    public async Task Scheduled_sync_downloads_only_once_the_guides_are_used()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(_bed.Store).AddSingleton(_bed.Profiles).AddSingleton(_bed.Sync)
+            .BuildServiceProvider();
+        var task = new TrashSyncTask(_bed.Settings);
+        _bed.Http.Archive = TrashTestBed.ArchiveOfFixture(Commit1);
+
+        await task.RunAsync(services, CancellationToken.None);
+        Assert.Empty(_bed.Http.Requests);
+        Assert.Equal(TimeSpan.FromHours(24), task.Interval);
+
+        // A profile that follows a template (e.g. from a restored backup without the copy) makes the sync download.
+        _bed.ApplyGerman();
+        await task.RunAsync(services, CancellationToken.None);
+        Assert.True(_bed.Store.HasCopy);
+
+        _bed.Settings.Save(TrashSettings.Defaults with { Enabled = false });
+        Assert.Null(task.Interval);
     }
 
     [Theory]

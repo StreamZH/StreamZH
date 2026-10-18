@@ -141,25 +141,40 @@ public sealed class TrashApplyService(
 
     /// <summary>
     /// POST /trash/apply: the profile, then (optionally) the quality sizes of its templates and naming variants. Naming
-    /// variants are checked first, so an invalid request changes nothing.
+    /// variants are checked first: an unknown variant is an error and changes nothing; a variant that uses tokens
+    /// StreamZH's renamer does not have yet is skipped with a warning, so the other choices still apply.
     /// </summary>
     public TrashApplyResult ApplyWithExtras(TrashApplyRequest request, bool applyQualitySizes, TrashNaming? naming, TrashGuides guides)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(guides);
         MediaManagementValues? namingValues = null;
+        var namingWarnings = new List<string>();
         if (naming is not null && new[] { naming.MovieFolder, naming.MovieFile, naming.SeriesFolder, naming.SeriesFile }.Any(v => !string.IsNullOrWhiteSpace(v)))
         {
             var errors = new Dictionary<string, string[]>();
             namingValues = NamingValues(naming, guides, errors);
-            if (errors.Count > 0)
+            var unsupported = errors.Where(e => e.Value.All(m => m.StartsWith(UnsupportedVariant, StringComparison.Ordinal))).Select(e => e.Key).ToList();
+            if (errors.Count > unsupported.Count)
             {
-                throw new ValidationFailedException(errors);
+                throw new ValidationFailedException(errors.Where(e => !unsupported.Contains(e.Key)).ToDictionary());
+            }
+
+            if (unsupported.Count > 0)
+            {
+                namingWarnings.AddRange(unsupported.Select(k => $"Naming {k[7..]} '{Field(naming, k)}' not applied: {errors[k][0][UnsupportedVariant.Length..]}"));
+                naming = new TrashNaming(
+                    unsupported.Contains("naming.movieFolder") ? null : naming.MovieFolder,
+                    unsupported.Contains("naming.movieFile") ? null : naming.MovieFile,
+                    unsupported.Contains("naming.seriesFolder") ? null : naming.SeriesFolder,
+                    unsupported.Contains("naming.seriesFile") ? null : naming.SeriesFile);
+                errors.Clear();
+                namingValues = NamingValues(naming, guides, errors);
             }
         }
 
         var result = Apply(request, guides);
-        var warnings = result.Warnings.ToList();
+        var warnings = result.Warnings.Concat(namingWarnings).ToList();
         if (applyQualitySizes)
         {
             var choices = new List<TrashSizeChoice>();
@@ -698,7 +713,7 @@ public sealed class TrashApplyService(
         {
             if (fields.TryGetValue(field, out var target))
             {
-                errors.TryAdd($"naming.{target}", [.. messages.Select(m => $"StreamZH cannot use this variant: {m}")]);
+                errors.TryAdd($"naming.{target}", [.. messages.Select(m => UnsupportedVariant + m)]);
             }
         }
 
@@ -706,6 +721,17 @@ public sealed class TrashApplyService(
     }
 
     public void SaveNaming(MediaManagementValues values) => mediaManagement.Update(values);
+
+    /// <summary>Start of the naming error for a variant whose tokens StreamZH's renamer does not support.</summary>
+    public const string UnsupportedVariant = "StreamZH cannot use this variant: ";
+
+    private static string? Field(TrashNaming naming, string key) => key switch
+    {
+        "naming.movieFolder" => naming.MovieFolder,
+        "naming.movieFile" => naming.MovieFile,
+        "naming.seriesFolder" => naming.SeriesFolder,
+        _ => naming.SeriesFile,
+    };
 
     private static string Label(MediaType mediaType) => mediaType == MediaType.Series ? "series" : "movie";
 }

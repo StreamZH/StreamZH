@@ -101,7 +101,9 @@ public sealed class TrashApiTests : IDisposable
         var detail = await client.GetFromJsonAsync<JsonElement>($"/api/v1/trash/profiles/{TrashTestBed.SeriesGerman}?mediaType=series");
         Assert.Equal("german", detail.GetProperty("scoreSet").GetString());
         Assert.Equal("Merged QPs", detail.GetProperty("cutoff").GetString());
-        var merged = detail.GetProperty("qualities")[0];
+        var merged = detail.GetProperty("items")[0];
+        Assert.Equal("Merged QPs", merged.GetProperty("name").GetString());
+        Assert.Equal(6, merged.GetProperty("items").GetArrayLength());
         Assert.Equal(6, merged.GetProperty("qualityIds").GetArrayLength());
         var formats = detail.GetProperty("formats").EnumerateArray().ToList();
         Assert.Contains(formats, f => f.GetProperty("name").GetString() == "German DL" && f.GetProperty("score").GetInt32() == 11000);
@@ -121,6 +123,7 @@ public sealed class TrashApiTests : IDisposable
         var groups = await client.GetFromJsonAsync<JsonElement[]>("/api/v1/trash/groups?mediaType=series");
         var unwanted = groups!.Single(g => g.GetProperty("trashId").GetString() == "6f0872eebfc95b1f93474b7ac866ced0");
         Assert.True(unwanted.GetProperty("default").GetBoolean());
+        Assert.Contains(unwanted.GetProperty("profiles").EnumerateArray(), p => p.GetString() == TrashTestBed.SeriesGerman);
         Assert.Contains(unwanted.GetProperty("formats").EnumerateArray(), f => f.GetProperty("default").GetBoolean());
 
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/v1/trash/formats?mediaType=music")).StatusCode);

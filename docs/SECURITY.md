@@ -41,6 +41,8 @@ some things would let an Admin take over the owner's account or run programs on 
 |---|---|
 | See the API key, create a new one | The key is a login that never expires |
 | Security settings: authentication method, "Authentication required", certificate validation (and the reverse-proxy trust settings) | They decide who gets in and whether StreamZH trusts certificates |
+| Host settings: bind address, port, URL base, application URL, HTTPS (port, certificate and its password) | They decide who can reach StreamZH and which address counts as its own (DNS rebinding and cross-site checks trust the application URL). Admins can still rename the instance |
+| Client IP header | It decides which address counts as the client behind a reverse proxy |
 | Outgoing proxy | The proxy sees every web request, with indexer keys and passwords |
 | Backups: create, list, download, restore, delete, and the backup folder, interval and retention | A backup holds every secret and the key ring; a restore replaces the accounts |
 | Tool paths (par2, 7-Zip, ffprobe) and the extra par2/7-Zip parameters | StreamZH runs these programs with its own rights |
@@ -87,7 +89,8 @@ A new installation has no account. The first person to open the setup page creat
 makes sure that is you:
 
 - **On the computer StreamZH runs on** (loopback or the computer's own address, no reverse proxy in between) the setup
-  page works as it is.
+  page works as it is, as long as the address in the browser is `localhost`, an IP address or the computer's own name.
+  Any other name (for example a web page that points its own name at `127.0.0.1`, DNS rebinding) needs the code too.
 - **From any other device** the setup page asks for the **setup code**. StreamZH creates it at start and shows it
   - in the console and the log (`docker logs streamzh` in Docker),
   - in the file `setup-code` in the data folder (readable by StreamZH's own account only),
@@ -95,6 +98,13 @@ makes sure that is you:
 
 The code is no longer needed (and the file is deleted) once the owner account exists. In Docker your browser always
 counts as another device.
+
+**Tunnels and proxies on the same computer.** A tunnel or proxy that ends on the StreamZH computer and does not add
+`X-Forwarded-For` (SSH `-R`, frp or ngrok in TCP mode, nginx with a bare `proxy_pass`) makes internet visitors look like
+this computer. StreamZH still asks them for the setup code when they use any other name than `localhost`, an IP
+address or the computer's name, but the safest order is: finish setup first, then open the tunnel. For the same
+reason do not combine such a tunnel with "Disabled for local addresses": visitors through it count as local. Let the
+proxy send `X-Forwarded-For` (nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`).
 
 ## Authentication modes and their risks
 
@@ -115,6 +125,12 @@ Hardening for the sign-in-free modes (Settings → General → Security, Advance
   any local address may, which is how 0.11 and earlier behaved for the local network). Their `X-Forwarded-For` and
   `X-Forwarded-Proto` headers are believed, so sign-in limits count the real client and the cookie is marked Secure
   behind HTTPS. Headers from anybody else change nothing.
+- **Client IP header** (shown when trusted proxies are set): which header your proxy sets with the visitor's address:
+  `X-Forwarded-For` (read from the right, past your trusted proxies), `X-Real-IP` or `CF-Connecting-IP` (Cloudflare).
+  **Auto** (default) takes whichever of X-Forwarded-For and X-Real-IP is there. When both are there and name different
+  clients, one of them was written by the visitor and nothing tells which, so StreamZH counts the request as coming from
+  the proxy and logs a warning: choose the header your proxy sets. A proxy that sets only `X-Real-IP` and passes the
+  visitor's `X-Forwarded-For` on needs `X-Real-IP` here.
 - **User header** (External): the header your proxy sets with the signed-in user, e.g. `Remote-User`. Requests without
   it get the normal sign-in page.
 - **Allowed host names**: see DNS rebinding below.
@@ -133,13 +149,18 @@ client addresses.
   other web pages start. StreamZH therefore refuses every changing request (POST, PUT, PATCH, DELETE) unless it shows
   that it comes from StreamZH's own pages: the browser reports it as same-origin (`Sec-Fetch-Site`), its `Origin` is
   StreamZH's own address, or it carries the `X-StreamZH-Request` header that StreamZH's web app sends and other sites
-  cannot add. Requests with the API key (`X-Api-Key`) are not affected. The live connection (`/hub`) refuses a foreign
-  `Origin`. Backup restores only accept `Content-Type: application/zip`.
+  cannot add. A browser that sends `Sec-Fetch-Site` has the last word: `same-site`, `cross-site` or anything else than
+  `same-origin`/`none` is refused even when the `Origin` matches (the `Origin` only counts for browsers without
+  `Sec-Fetch-Site`). Requests with the API key (`X-Api-Key`) are not affected. The live connection (`/hub`) refuses a
+  foreign `Origin`. Backup restores only accept `Content-Type: application/zip`.
 - **DNS rebinding.** A web page can make its own host name point at your StreamZH and then talk to it as if it were the
   same site. The sign-in-free modes are therefore given only to requests for host names an attacker cannot control: IP
-  addresses, `localhost`, local names (`nas`, `*.local`, `*.lan`, `*.home.arpa`), this computer's own names, the host of
-  the application URL and the names under **Allowed host names**. Other names get the normal sign-in page; the log
-  says which name to add.
+  addresses, `localhost` (and `*.localhost`), this computer's own names (including `<name>.local`), the host of the
+  application URL and the names under **Allowed host names**. Since 0.12 other local names (`nas`, `*.local`, `*.lan`,
+  `*.home.arpa`) are not trusted by default: any device on your network can answer for them (mDNS, LLMNR, the
+  router's DNS). If you open StreamZH by such a name, add it under **Allowed host names**. Other names get the normal
+  sign-in page; the log says which name to add. A `Host` header ASP.NET cannot read (e.g. a broken punycode name) is
+  answered with 400.
 - **Clickjacking and injected content.** Every response carries a Content Security Policy (scripts, styles and
   connections only from StreamZH itself, no framing), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
   `Referrer-Policy: same-origin`. TMDB images in SVG format are served with `Content-Security-Policy: sandbox`.
@@ -147,15 +168,25 @@ client addresses.
   (also behind a trusted proxy that reports HTTPS). Without **Remember me** it ends with the browser session (and after
   24 hours without use); with it, it lasts 30 days while used. Signing out ends the session on the server too, so a
   copy of the cookie stops working. Password changes, role changes, disabling a user and "Sign out everywhere" end all
-  of the user's sessions, including open live connections.
+  of the user's sessions, including open live connections. A cookie from before 0.12 (without a server session) is
+  replaced on its first use by one with a session, so nobody has to sign in again after the update; the old cookie
+  itself keeps working for one more minute (requests already on their way) and is then refused, so a copy of it is
+  worthless.
 
 ## Sign-in limits
 
 - 10 sign-in attempts per minute per client (IPv6: per /64 network), counted separately for the sign-in page, the setup
   page, invitations and password changes.
-- 10 failed sign-ins for one account within 15 minutes (from any address) pause sign-in for that account until the
-  oldest failure is 15 minutes old; 30 failures from one client pause that client. This applies to the sign-in page and
-  to Basic authentication; a browser that already signed in keeps working.
+- 10 failed sign-ins for one account within 15 minutes **from one network** (IPv4 /24, IPv6 /64) pause sign-in for that
+  account from that network until the oldest failure is 15 minutes old. Somebody guessing your password locks you out
+  of their network, not out of yours.
+- 100 failed sign-ins for one account within 15 minutes from all networks together pause it everywhere except on the
+  networks the account signed in from before (since StreamZH started), against guessing from many networks.
+- 30 failures from one client (any account) pause that client.
+- These apply to the sign-in page and to Basic authentication. A browser that already signed in keeps working, and a
+  browser with a valid session of the same account may sign in again (its typos are not counted).
+- The counters use bounded memory: they expire after 15 minutes and, when very many are kept, the least recently used
+  go first. An account under attack is counted with every attempt, so its counter is never the one dropped.
 - Behind a reverse proxy all clients share the proxy's address unless the proxy is listed under **Trusted proxies**.
 
 ## API access
@@ -189,7 +220,12 @@ The API never returns a stored secret: it shows `********`. Sending `********` b
 while the destination is unchanged** (URL, host, port, SSL, URL base, API path, server). If you change the address,
 type the secret again ("Enter the password again to test a changed address."). This applies to saving and to every
 Test button (Connect, import lists, Usenet servers, download clients, indexers including "Clone"), so nobody who can
-edit settings can send a stored secret to an address of their choice.
+edit settings can send a stored secret to an address of their choice. Leaving the secret field out of the request is
+treated the same way as `********` (0.12, V-01).
+
+A value that looks like a stored secret (`enc:v1:…`) is refused as input ("Enter the secret itself, not a value copied
+from the database."), and the store encrypts every value it is given, so a ciphertext copied from a database can never
+be turned back into somebody's secret by saving it as a webhook password.
 
 ## Secrets in links
 
@@ -212,6 +248,23 @@ refused, also when it was stored by an earlier version. Extra parameters are lim
 (par2: `-t`, `-T`, `-m`, `-N`, `-S`, `-q`, `-v`; 7-Zip: `-mmt`, `-bb`, `-bd`, `-bt`, `-bs*`, `-scc*`, `-mcp=`, `-ssc`,
 `-ao*`); output folder, password and file selection are always set by StreamZH. Arguments go to the program as a
 list, never through a shell.
+
+Tools StreamZH installs itself go to `<data>/tools/<tool>`. At installation StreamZH records the SHA-256 of every file
+in that folder (in the database). Before each run the folder must hold exactly these files with these hashes; a
+program placed there in any other way, a changed file or an extra file next to it (a DLL Windows would load) is
+ignored and the next source is used (configured path, `<app>/tools`, `PATH`, Program Files). Tools installed by
+versions before 0.12 have no record and are installed again automatically at the next start (Settings → Tools shows
+them as not installed when automatic installation is off).
+
+## Folders StreamZH writes to
+
+No folder that StreamZH writes downloads, imports, renames or backups to may be inside the data folder, except its own
+`downloads/` folder (and `Backups/` for backups), and none may contain the data folder. This covers the completed,
+incomplete, NZB, NZB backup and watch folders, category folders, torrent save paths, root folders, the recycle bin,
+the backup folder, the Renamer and Organize targets and every import. Such a folder is refused when it is saved, and
+if an older version or a restored database still has one, it is not used (downloads go to the default folder, imports
+and renames fail with a message). Symbolic links and junctions on the way are followed. This keeps downloads away from
+the database, the sign-in keys (`keys/`) and the tools StreamZH runs (`tools/`).
 
 ## Safe deployment
 
@@ -277,10 +330,14 @@ runs in a console window). On Linux and macOS the file is `0600`.
 - **Indexer links:** download links in Newznab/Torznab feeds and the redirects of an indexer may not lead to this
   computer (loopback), link-local addresses (`169.254.0.0/16`, `fe80::/10`, including `169.254.169.254`), unspecified
   or multicast addresses, or known cloud metadata addresses, unless they stay on the indexer's own host (Prowlarr or
-  Jackett on the same machine keep working). Addresses on your LAN are allowed. The check runs on the resolved IP
-  addresses before the request and again when the connection opens, so a DNS answer that changes in between (DNS
-  rebinding) does not get through. When a proxy is configured, the proxy resolves the name; StreamZH checks its own
-  resolution before sending.
+  Jackett on the same machine keep working). Since 0.12 the same holds for your LAN (`10/8`, `172.16/12`,
+  `192.168/16`, `100.64/10`, `fc00::/7`): a link to another host than the indexer may only go there when that host is
+  another configured indexer or download client. The indexer's own host may be anywhere. The check runs on the
+  resolved IP addresses before the request and again when the connection opens, so a DNS answer that changes in
+  between (DNS rebinding) does not get through. **Through an outgoing proxy** (Settings → General, or `HTTP(S)_PROXY`)
+  only the check before sending runs, and a name StreamZH cannot resolve itself is refused. The proxy then resolves the
+  name again on its own; a name whose DNS answer changes between StreamZH's check and the proxy's lookup can still get
+  through. Use an outgoing proxy that refuses private addresses itself if that matters to you.
 - **Size limits:** answers from servers an admin configures are limited: import lists, connections and the
   Prowlarr import 20 MB, the Radarr/Sonarr migration 256 MB, the SABnzbd migration 64 MB, the TRaSH Guides archive
   256 MB (16 MB per file inside). NZB files are limited to 50 MB, .torrent files and indexer API answers as before.

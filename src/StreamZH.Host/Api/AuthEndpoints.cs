@@ -3,16 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
+using StreamZH.Host.Users;
 
 namespace StreamZH.Host.Api;
 
-public static partial class AuthEndpoints
+public static class AuthEndpoints
 {
-    public const int MinPasswordLength = 8;
+    public const int MinPasswordLength = UserRules.MinPasswordLength;
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
@@ -32,7 +32,7 @@ public static partial class AuthEndpoints
 
         group.MapPost("/setup", async (SetupRequest request, HttpContext http, UserRepository users, PasswordService passwords) =>
         {
-            var errors = Validate(request.Username, request.Password);
+            var errors = UserRules.ValidateCredentials(request.Username, request.Password);
             if (errors.Count > 0)
             {
                 return Results.ValidationProblem(errors);
@@ -46,11 +46,13 @@ public static partial class AuthEndpoints
 
             var user = users.FindById(id.Value)!;
             await SignInAsync(http, user, persistent: true);
+            users.SetLastLogin(user.Id, DateTime.UtcNow);
             return Results.Ok(UserInfo.From(user));
         }).RequireRateLimiting(AuthServiceExtensions.LoginRateLimit);
 
-        group.MapPost("/login", async (LoginRequest request, HttpContext http, PasswordService passwords, ILogger<LoginRequest> logger) =>
+        group.MapPost("/login", async (LoginRequest request, HttpContext http, PasswordService passwords, UserRepository users, ILogger<LoginRequest> logger) =>
         {
+            // Disabled accounts get the same answer as a wrong password.
             var user = passwords.Verify(request.Username?.Trim() ?? string.Empty, request.Password ?? string.Empty);
             if (user is null)
             {
@@ -59,6 +61,7 @@ public static partial class AuthEndpoints
             }
 
             await SignInAsync(http, user, request.RememberMe);
+            users.SetLastLogin(user.Id, DateTime.UtcNow);
             logger.LogInformation("User '{Username}' logged in", user.Username);
             return Results.Ok(UserInfo.From(user));
         }).RequireRateLimiting(AuthServiceExtensions.LoginRateLimit);
@@ -91,38 +94,9 @@ public static partial class AuthEndpoints
             : null;
     }
 
-    private static Task SignInAsync(HttpContext http, User user, bool persistent)
-    {
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.ToString()),
-            ],
-            AuthSchemes.Cookie);
-
-        return http.SignInAsync(AuthSchemes.Cookie, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = persistent });
-    }
-
-    private static Dictionary<string, string[]> Validate(string? username, string? password)
-    {
-        var errors = new Dictionary<string, string[]>();
-
-        if (string.IsNullOrWhiteSpace(username) || !UsernameRegex().IsMatch(username.Trim()))
-        {
-            errors["username"] = ["Use 3 to 50 characters: letters, numbers, dot, dash or underscore."];
-        }
-
-        if (string.IsNullOrEmpty(password) || password.Length < MinPasswordLength)
-        {
-            errors["password"] = [$"Use at least {MinPasswordLength} characters."];
-        }
-
-        return errors;
-    }
-
-    [GeneratedRegex("^[A-Za-z0-9._-]{3,50}$")]
-    private static partial Regex UsernameRegex();
+    /// <summary>Issues the sign-in cookie with the account's current session version.</summary>
+    internal static Task SignInAsync(HttpContext http, User user, bool persistent) =>
+        http.SignInAsync(AuthSchemes.Cookie, UserClaims.Principal(user, AuthSchemes.Cookie), new AuthenticationProperties { IsPersistent = persistent });
 }
 
 public sealed record SetupRequest(string Username, string Password);

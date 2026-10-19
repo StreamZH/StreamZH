@@ -7,6 +7,7 @@ import { historyKeys } from './history'
 import { indexerKeys } from './indexers'
 import { queryKeys, type JobStatus } from './library'
 import { releaseKeys, type SearchFinished } from './releases'
+import { requestKeys } from './requests'
 import { statusKeys } from './status'
 import { toolKeys } from './tools'
 import { invalidateWanted } from './wanted'
@@ -15,11 +16,13 @@ import { invalidateWanted } from './wanted'
  * Keeps one SignalR connection to /hub open, refreshes cached library data when the
  * server reports changes, and reports whether live updates are flowing.
  */
-export function useLiveConnection(): boolean {
+export function useLiveConnection(enabled = true): boolean {
   const queryClient = useQueryClient()
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
+    // Requesters (0.10) connect too; the server sends them only "requestChanged" of their own requests.
+    if (!enabled) return
     const connection = new HubConnectionBuilder()
       .withUrl(withBase('/hub'))
       .withAutomaticReconnect()
@@ -86,6 +89,12 @@ export function useLiveConnection(): boolean {
       void queryClient.invalidateQueries({ queryKey: indexerKeys.all })
     })
 
+    // 0.10: a request was created, decided or became available: lists, the nav badge and Discover's badges.
+    connection.on('requestChanged', () => {
+      void queryClient.invalidateQueries({ queryKey: requestKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['discover'] })
+    })
+
     connection.onreconnecting(() => setConnected(false))
     connection.onreconnected(() => {
       setConnected(true)
@@ -102,7 +111,7 @@ export function useLiveConnection(): boolean {
       window.clearTimeout(ongoingTimer)
       void connection.stop()
     }
-  }, [queryClient])
+  }, [queryClient, enabled])
 
   return connected
 }

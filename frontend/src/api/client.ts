@@ -13,7 +13,7 @@ export interface SystemStatus {
 export interface UserInfo {
   id: number
   username: string
-  role: 'Owner' | 'Admin' | 'Friend'
+  role: 'Owner' | 'Admin' | 'Friend' | 'Requester'
 }
 
 export interface AuthState {

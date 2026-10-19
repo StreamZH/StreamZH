@@ -9,7 +9,7 @@ Fields without a value are `null` or left out.
 
 | Field | Type | Notes |
 |---|---|---|
-| `eventType` | string | `Grab`, `Download` (import and upgrade), `Rename`, `DownloadFailure`, `Health`, `HealthRestored`, `Test` |
+| `eventType` | string | `Grab`, `Download` (import and upgrade), `Rename`, `DownloadFailure`, `Health`, `HealthRestored`, `Test`; requests: `RequestCreated`, `RequestApproved`, `RequestDeclined`, `RequestAvailable` |
 | `instanceName` | string | Settings → General → instance name |
 | `applicationName` | string | `StreamZH` |
 | `applicationVersion` | string | e.g. `0.6.0` |
@@ -54,6 +54,7 @@ Fields without a value are `null` or left out.
 | `DownloadFailure` | media when known, `episodes`, `release`, `downloadId`, `message` (the error) |
 | `Health`, `HealthRestored` | `level` (`warning` or `error`), `message`, `type` (the notice key, e.g. `no-indexer`), `wikiUrl` (`null`) |
 | `Test` | a sample movie (Big Buck Bunny) with a sample release |
+| `RequestCreated`, `RequestApproved`, `RequestDeclined`, `RequestAvailable` | media (the library item once it was added, else `id` is `null`), `request`: `id`, `status` (`pending`, `approved`, `declined`, `processing`, `partiallyAvailable`, `available`, `failed`), `requestedBy` (display name; a Discord guest as "name (Discord)"), `source` (`web`, `discord`, `api`), `seasons` (numbers, `null` = all seasons or a movie), `note`, `reason` (why it was declined), `automatic` (approved at once when it was created) |
 
 A failing webhook (network error, timeout, HTTP 429 or 5xx) is retried up to three times within about six minutes;
 other errors are not retried. The last error shows in Settings → Connect and in the status window.

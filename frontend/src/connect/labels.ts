@@ -8,6 +8,10 @@ export const triggerLabels: Record<ConnectTrigger, string> = {
   downloadFailure: 'On Download Failure',
   healthIssue: 'On Health Issue',
   healthRestored: 'On Health Restored',
+  requestCreated: 'On Request',
+  requestApproved: 'On Request Approved',
+  requestDeclined: 'On Request Declined',
+  requestAvailable: 'On Request Available',
 }
 
 export const triggerHelp: Record<ConnectTrigger, string> = {
@@ -18,6 +22,10 @@ export const triggerHelp: Record<ConnectTrigger, string> = {
   downloadFailure: 'A download failed (missing articles, repair or unpacking failed).',
   healthIssue: 'A warning or error appeared in the status window.',
   healthRestored: 'That warning or error went away again.',
+  requestCreated: 'Somebody requested a movie or series.',
+  requestApproved: 'An admin approved a request.',
+  requestDeclined: 'An admin declined a request.',
+  requestAvailable: 'Everything a request asked for is in the library.',
 }
 
 export const kindLabels: Record<ConnectKind, string> = {

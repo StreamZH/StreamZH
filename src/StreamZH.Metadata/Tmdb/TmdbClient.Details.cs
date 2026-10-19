@@ -69,7 +69,7 @@ public sealed partial class TmdbClient : ITmdbDetailsClient
             Blank(rating),
             [.. (t.Networks ?? []).Select(n => n.Name).OfType<string>()],
             Cast(t.Credits),
-            [.. (t.Seasons ?? []).OrderBy(s => s.SeasonNumber).Select(s => new TmdbSeasonSummary(s.SeasonNumber, Blank(s.Name), s.PosterPath))]);
+            [.. (t.Seasons ?? []).OrderBy(s => s.SeasonNumber).Select(s => new TmdbSeasonSummary(s.SeasonNumber, Blank(s.Name), s.PosterPath, s.EpisodeCount ?? 0, Blank(s.AirDate)))]);
     }
 
     public async Task<TmdbSeasonDetails> GetSeasonDetailsAsync(int tmdbId, int seasonNumber, CancellationToken cancellationToken = default)
@@ -182,6 +182,8 @@ internal sealed class SeasonInfoDto
     public int SeasonNumber { get; set; }
     public string? Name { get; set; }
     public string? PosterPath { get; set; }
+    public int? EpisodeCount { get; set; }
+    public string? AirDate { get; set; }
 }
 
 internal sealed class SeasonDetailsDto

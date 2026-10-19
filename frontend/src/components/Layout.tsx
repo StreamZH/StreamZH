@@ -1,12 +1,14 @@
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { api, ApiError } from '../api/client'
 import { downloadKeys, downloadsApi } from '../api/downloads'
 import { libraryApi, queryKeys } from '../api/library'
 import { useLiveConnection } from '../api/useLiveConnection'
 import { authQueryKey, useAuth } from '../auth/auth'
 import { SideBySidePill } from '../migration/SideBySide'
+import { requesterMayOpen, useRole } from '../requests/roles'
+import { usePendingCount } from '../requests/usePendingCount'
 import { formatSpeed } from '../status/format'
 import StatusWindow from '../status/StatusWindow'
 import { useIsAdmin, useLiveProgress, useOngoing } from '../status/useOngoing'
@@ -15,7 +17,7 @@ import { toggleTheme, useTheme } from '../lib/theme'
 import Icon from './Icon'
 import Logo from './Logo'
 import CommandPalette from './shell/CommandPalette'
-import { groups, hubs, isActive, overview, titleFor, type NavGroup, type NavPage } from './shell/nav'
+import { groups, hubs, isActive, overview, requesterGroups, titleFor, type NavGroup, type NavPage } from './shell/nav'
 import styles from './shell/Shell.module.css'
 import ui from './ui.module.css'
 
@@ -38,7 +40,7 @@ function shortEta(seconds: number): string {
   return `${Math.floor(seconds / 3600)} h ${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')} min`
 }
 
-const roleLabel = { Owner: 'Owner', Admin: 'Administrator', Friend: 'Friend' } as const
+const roleLabel = { Owner: 'Owner', Admin: 'Administrator', Friend: 'Friend', Requester: 'Requester' } as const
 
 /**
  * The StreamZH shell in the CloudZH style: sidebar with groups (red icons, guide line, foldable), the search (Ctrl K),
@@ -46,7 +48,10 @@ const roleLabel = { Owner: 'Owner', Admin: 'Administrator', Friend: 'Friend' } a
  * pages with sub-pages, and the page itself, which fades in after every page change.
  */
 export default function Layout() {
+  // A requester (0.10) gets a reduced shell: Discover, Requests and the profile; no library, downloads or server state.
+  const { requester } = useRole()
   const live = useLiveConnection()
+  const pendingRequests = usePendingCount()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { user, canSignOut } = useAuth()
@@ -63,14 +68,15 @@ export default function Layout() {
   const setMenu = (open: boolean) => setMenuOn(open ? pathname : null)
   const [folded, setFolded] = useState<string[]>(readFolded)
 
-  const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats })
-  const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs })
-  const status = useQuery({ queryKey: ['system-status'], queryFn: api.systemStatus, staleTime: 5 * 60_000 })
+  const stats = useQuery({ queryKey: queryKeys.stats, queryFn: libraryApi.stats, enabled: !requester })
+  const jobs = useQuery({ queryKey: queryKeys.jobs, queryFn: libraryApi.jobs, enabled: !requester })
+  const status = useQuery({ queryKey: ['system-status'], queryFn: api.systemStatus, staleTime: 5 * 60_000, enabled: !requester })
   const { data: ongoing } = useOngoing()
   // Same query as the Activity page; the hub ("downloadChanged") refreshes it, the interval is a safety net.
   const downloads = useQuery({
     queryKey: downloadKeys.queue,
     queryFn: downloadsApi.queue,
+    enabled: !requester,
     refetchInterval: (q) => (q.state.data?.items.length ? 10_000 : 60_000),
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   })
@@ -164,6 +170,11 @@ export default function Layout() {
         <Icon name={page.icon} size={18} />
         <span className={styles.label}>{page.label}</span>
         {count != null && <span className={styles.count}>{count}</span>}
+        {page.badge === 'requests' && pendingRequests > 0 && (
+          <span className={`${styles.badge} ${styles.badgeLive}`} aria-label={`${pendingRequests} pending`}>
+            {pendingRequests}
+          </span>
+        )}
         {page.badge === 'downloads' && dl.count > 0 && (
           <span className={`${styles.badge} ${dl.active > 0 ? styles.badgeLive : ''}`} aria-label={`${dl.count} in the queue`}>
             {dl.count}
@@ -205,7 +216,7 @@ export default function Layout() {
     <div className={`${styles.shell} ${navOpen ? styles.navOpen : ''}`}>
       <aside className={styles.side}>
         <div className={styles.sideIn}>
-          <Link to="/" className={styles.brand} aria-label="StreamZH, back to the overview">
+          <Link to={requester ? '/discover' : '/'} className={styles.brand} aria-label={requester ? 'StreamZH, back to Discover' : 'StreamZH, back to the overview'}>
             <Logo size={36} />
           </Link>
           <button type="button" className={styles.search} onClick={() => setPalette(true)}>
@@ -214,8 +225,8 @@ export default function Layout() {
             <kbd className={styles.kbd}>{navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'} K</kbd>
           </button>
           <nav className={styles.nav} aria-label="Main">
-            <div className={styles.group}>{item(overview)}</div>
-            {groups.map(group)}
+            {!requester && <div className={styles.group}>{item(overview)}</div>}
+            {(requester ? requesterGroups : groups).map(group)}
           </nav>
           <div className={styles.foot}>
             {busy && !admin && (
@@ -256,7 +267,9 @@ export default function Layout() {
             <Icon name="menu" />
           </button>
           <div className={styles.topTitle}>{title}</div>
-          <span className={live ? styles.liveDot : styles.liveDotOff} role="status" title={live ? 'Live: pages update by themselves' : 'Offline: reconnecting …'} />
+          {!requester && (
+            <span className={live ? styles.liveDot : styles.liveDotOff} role="status" title={live ? 'Live: pages update by themselves' : 'Offline: reconnecting …'} />
+          )}
           <div className={styles.spacer} />
 
           {admin && <SideBySidePill />}
@@ -274,29 +287,31 @@ export default function Layout() {
             </NavLink>
           )}
 
-          <div className={`${styles.srvbar} ${level === 'warn' ? styles.srvWarn : level === 'err' ? styles.srvErr : ''}`}>
-            <button
-              type="button"
-              className={styles.srvMain}
-              onClick={() => void navigate(admin ? '/system/status' : '/')}
-              title={warnings.map((w) => w.title).join('\n') || undefined}
-            >
-              <span className={styles.srvDot} aria-hidden="true" />
-              <b>StreamZH</b>
-              <span className={styles.srvState}>
-                {!live ? 'offline' : warnings.length > 0 ? `${warnings.length} ${warnings.length === 1 ? 'warning' : 'warnings'}` : 'online'}
-              </span>
-              {stats.data && (
-                <span className={styles.srvSeg}>
-                  <Icon name="film" size={13} />
-                  {stats.data.movies}
-                  <Icon name="tv" size={13} />
-                  {stats.data.series}
+          {!requester && (
+            <div className={`${styles.srvbar} ${level === 'warn' ? styles.srvWarn : level === 'err' ? styles.srvErr : ''}`}>
+              <button
+                type="button"
+                className={styles.srvMain}
+                onClick={() => void navigate(admin ? '/system/status' : '/')}
+                title={warnings.map((w) => w.title).join('\n') || undefined}
+              >
+                <span className={styles.srvDot} aria-hidden="true" />
+                <b>StreamZH</b>
+                <span className={styles.srvState}>
+                  {!live ? 'offline' : warnings.length > 0 ? `${warnings.length} ${warnings.length === 1 ? 'warning' : 'warnings'}` : 'online'}
                 </span>
-              )}
-            </button>
-            {status.data && <span className={styles.srvVer}>v{status.data.version.split('+')[0]}</span>}
-          </div>
+                {stats.data && (
+                  <span className={styles.srvSeg}>
+                    <Icon name="film" size={13} />
+                    {stats.data.movies}
+                    <Icon name="tv" size={13} />
+                    {stats.data.series}
+                  </span>
+                )}
+              </button>
+              {status.data && <span className={styles.srvVer}>v{status.data.version.split('+')[0]}</span>}
+            </div>
+          )}
 
           <button type="button" className={`${ui.ghost} ${ui.icon}`} onClick={toggleTheme} aria-label="Switch colour scheme" title="Light or dark">
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
@@ -327,11 +342,11 @@ export default function Layout() {
         )}
 
         <div key={pathname} className="v-in">
-          <Outlet />
+          {requester && !requesterMayOpen(pathname) ? <Navigate to="/discover" replace /> : <Outlet />}
         </div>
       </div>
 
-      {palette && <CommandPalette onClose={() => setPalette(false)} />}
+      {palette && <CommandPalette requester={requester} onClose={() => setPalette(false)} />}
       <StatusWindow />
     </div>
   )
@@ -397,6 +412,10 @@ function ProfileMenu({
             </div>
           </div>
           <div className={styles.pmSep} />
+          <button type="button" role="menuitem" className={styles.pmItem} onClick={() => go('/profile')}>
+            <Icon name="user" />
+            Profile
+          </button>
           <button type="button" role="menuitem" className={styles.pmItem} onClick={() => (setOpen(false), onSearch())}>
             <Icon name="search" />
             Search or jump to

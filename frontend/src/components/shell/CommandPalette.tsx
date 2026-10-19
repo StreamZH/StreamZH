@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { alternativeTitlesApi } from '../../api/alternativeTitles'
 import { libraryApi, queryKeys } from '../../api/library'
 import { tmdbImage } from '../../lib/format'
+import { requesterMayOpen } from '../../requests/roles'
 import { toggleTheme } from '../../lib/theme'
 import Icon, { type IconName } from '../Icon'
 import { paletteTargets } from './nav'
@@ -38,15 +39,16 @@ function score(entry: Entry, words: string[]): number | null {
  * «Search or jump to» (Ctrl K / ⌘ K), like CloudZH: every page, every movie and series of the library and a few
  * actions, filtered while typing; arrow keys and Enter.
  */
-export default function CommandPalette({ onClose }: { onClose: () => void }) {
+export default function CommandPalette({ onClose, requester = false }: { onClose: () => void; requester?: boolean }) {
   const navigate = useNavigate()
   const [text, setText] = useState('')
   const [selected, setSelected] = useState(0)
   const input = useRef<HTMLInputElement>(null)
   const list = useRef<HTMLDivElement>(null)
-  const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies })
-  const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series })
-  const titles = useQuery({ queryKey: ['library-titles'], queryFn: alternativeTitlesApi.all, staleTime: 60_000 })
+  // A requester (0.10) jumps only to their pages and has no library to search.
+  const movies = useQuery({ queryKey: queryKeys.movies, queryFn: libraryApi.movies, enabled: !requester })
+  const series = useQuery({ queryKey: queryKeys.series, queryFn: libraryApi.series, enabled: !requester })
+  const titles = useQuery({ queryKey: ['library-titles'], queryFn: alternativeTitlesApi.all, staleTime: 60_000, enabled: !requester })
 
   useEffect(() => input.current?.focus(), [])
 
@@ -60,7 +62,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       void navigate(to)
     }
     return [
-      ...paletteTargets.map((t) => ({
+      ...paletteTargets.filter((t) => !requester || requesterMayOpen(t.to)).map((t) => ({
         key: `page:${t.to}`,
         label: t.label,
         hint: t.group,
@@ -100,18 +102,34 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
         words: 'theme dark light appearance colour color',
       },
     ]
-  }, [movies.data, series.data, titles.data, navigate, onClose])
+  }, [movies.data, series.data, titles.data, navigate, onClose, requester])
 
   const results = useMemo(() => {
     const words = text.trim().toLowerCase().split(/\s+/).filter(Boolean)
     if (words.length === 0) return entries.filter((e) => e.group !== 'Library').slice(0, 40)
-    return entries
-      .map((e) => ({ e, s: score(e, words) }))
-      .filter((x): x is { e: Entry; s: number } => x.s != null)
-      .sort((a, b) => a.s - b.s || a.e.label.localeCompare(b.e.label))
-      .slice(0, 50)
-      .map((x) => x.e)
-  }, [entries, text])
+    // Last: look the words up on Discover (TMDB), to request something that is not in the library yet.
+    const discover: Entry = {
+      key: 'act:discover',
+      label: `Search Discover for “${text.trim()}”`,
+      hint: 'Movies and series to request',
+      group: 'Discover',
+      icon: 'compass',
+      run: () => {
+        onClose()
+        void navigate(`/discover?q=${encodeURIComponent(text.trim())}`)
+      },
+      words: '',
+    }
+    return [
+      ...entries
+        .map((e) => ({ e, s: score(e, words) }))
+        .filter((x): x is { e: Entry; s: number } => x.s != null)
+        .sort((a, b) => a.s - b.s || a.e.label.localeCompare(b.e.label))
+        .slice(0, 49)
+        .map((x) => x.e),
+      discover,
+    ]
+  }, [entries, text, navigate, onClose])
 
   useEffect(() => {
     list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: 'nearest' })
@@ -146,7 +164,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
               setText(e.target.value)
               setSelected(0)
             }}
-            placeholder="Search pages, movies and series …"
+            placeholder={requester ? 'Search pages or titles to request …' : 'Search pages, movies and series …'}
             aria-label="Search"
             aria-controls="palette-list"
             aria-activedescendant={results[selected] ? `palette-${selected}` : undefined}

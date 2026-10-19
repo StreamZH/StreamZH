@@ -35,7 +35,15 @@ public static class ConnectTriggers
     public const string HealthIssue = "healthIssue";
     public const string HealthRestored = "healthRestored";
 
-    public static readonly IReadOnlyList<string> All = [Grab, Import, Upgrade, Rename, DownloadFailure, HealthIssue, HealthRestored];
+    // Requests (0.10): notification services only, all off by default.
+    public const string RequestCreated = "requestCreated";
+    public const string RequestApproved = "requestApproved";
+    public const string RequestDeclined = "requestDeclined";
+    public const string RequestAvailable = "requestAvailable";
+
+    public static readonly IReadOnlyList<string> Requests = [RequestCreated, RequestApproved, RequestDeclined, RequestAvailable];
+
+    public static readonly IReadOnlyList<string> All = [Grab, Import, Upgrade, Rename, DownloadFailure, HealthIssue, HealthRestored, .. Requests];
 
     public static string? For(ConnectEventType type) => type switch
     {
@@ -46,6 +54,10 @@ public static class ConnectTriggers
         ConnectEventType.DownloadFailure => DownloadFailure,
         ConnectEventType.HealthIssue => HealthIssue,
         ConnectEventType.HealthRestored => HealthRestored,
+        ConnectEventType.RequestCreated => RequestCreated,
+        ConnectEventType.RequestApproved => RequestApproved,
+        ConnectEventType.RequestDeclined => RequestDeclined,
+        ConnectEventType.RequestAvailable => RequestAvailable,
         _ => null,
     };
 
@@ -61,6 +73,10 @@ public static class ConnectTriggers
             DownloadFailure => triggers.OnDownloadFailure,
             HealthIssue => triggers.OnHealthIssue,
             HealthRestored => triggers.OnHealthRestored,
+            RequestCreated => triggers.OnRequestCreated,
+            RequestApproved => triggers.OnRequestApproved,
+            RequestDeclined => triggers.OnRequestDeclined,
+            RequestAvailable => triggers.OnRequestAvailable,
             _ => false,
         };
     }

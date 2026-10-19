@@ -6,6 +6,7 @@ import ActivityPage from './activity/ActivityPage'
 import AuthGate from './auth/AuthGate'
 import Layout from './components/Layout'
 import CustomFormatsPage from './customFormats/CustomFormatsPage'
+import DiscoverPage, { DiscoverListPage } from './discover/DiscoverPage'
 import ImportPage from './library/ImportPage'
 import LibraryPage from './library/LibraryPage'
 import MovieDetail from './library/MovieDetail'
@@ -19,11 +20,14 @@ import Placeholder from './pages/Placeholder'
 import Profiles from './pages/Profiles'
 import ParseTest from './pages/ParseTest'
 import UsenetServers from './pages/UsenetServers'
+import RequestSettingsPage from './requests/RequestSettingsPage'
+import RequestsPage from './requests/RequestsPage'
 import DownloadsPage from './settings/DownloadsPage'
 import GeneralPage from './settings/GeneralPage'
 import MediaManagementPage from './settings/MediaManagementPage'
 import MetadataPage from './settings/MetadataPage'
 import ConnectPage from './settings/ConnectPage'
+import DiscordPage from './settings/DiscordPage'
 import IndexerOptionsPage from './settings/IndexerOptionsPage'
 import UiPage from './settings/UiPage'
 import QualityPage from './settings/QualityPage'
@@ -40,7 +44,14 @@ import TasksPage from './system/TasksPage'
 import UiSettingsSync from './lib/UiSettingsSync'
 import { RestartOverlay } from './system/Restart'
 import { urlBase } from './lib/urlBase'
+import InvitePage from './users/InvitePage'
+import { inviteToken } from './users/inviteToken'
+import ProfilePage from './users/ProfilePage'
+import UsersPage from './users/UsersPage'
 import './index.css'
+
+// An invite link (/invite/<token>) opens its own page without sign-in or app shell.
+const invite = inviteToken()
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
@@ -50,6 +61,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RestartOverlay />
+      {invite ? (
+        <InvitePage token={invite} />
+      ) : (
       <AuthGate>
         <UiSettingsSync />
         <BrowserRouter basename={urlBase || undefined}>
@@ -62,6 +76,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="library/series/:id" element={<SeriesDetail />} />
             <Route path="library/import" element={<ImportPage />} />
             <Route path="calendar" element={<CalendarPage />} />
+            <Route path="discover" element={<DiscoverPage />} />
+            <Route path="discover/:type/:list" element={<DiscoverListPage />} />
+            <Route path="requests" element={<RequestsPage />} />
             <Route path="wanted" element={<Navigate to="/wanted/missing" replace />} />
             <Route path="wanted/missing" element={<WantedPage key="missing" />} />
             <Route path="wanted/cutoff" element={<WantedPage key="cutoff" />} />
@@ -82,11 +99,15 @@ createRoot(document.getElementById('root')!).render(
             <Route path="settings/downloads" element={<DownloadsPage />} />
             <Route path="settings/usenet" element={<UsenetServers />} />
             <Route path="settings/connect" element={<ConnectPage />} />
+            <Route path="settings/requests" element={<RequestSettingsPage />} />
+            <Route path="settings/discord" element={<DiscordPage />} />
             <Route path="settings/metadata" element={<MetadataPage />} />
             <Route path="settings/general" element={<GeneralPage />} />
             <Route path="settings/ui" element={<UiPage />} />
             <Route path="settings/release-test" element={<ParseTest />} />
             <Route path="settings/migration" element={<MigrationPage />} />
+            <Route path="settings/users" element={<UsersPage />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="system" element={<Navigate to="/system/status" replace />} />
             <Route path="system/status" element={<StatusPage />} />
             <Route path="system/tasks" element={<TasksPage />} />
@@ -97,6 +118,7 @@ createRoot(document.getElementById('root')!).render(
           </Routes>
         </BrowserRouter>
       </AuthGate>
+      )}
     </QueryClientProvider>
   </StrictMode>,
 )

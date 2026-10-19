@@ -97,7 +97,11 @@ public sealed record ConnectionResource(
     bool OnHealthRestored,
     bool IncludeHealthWarnings,
     IReadOnlyDictionary<string, object?> Settings,
-    ConnectionStatusResource Status)
+    ConnectionStatusResource Status,
+    bool OnRequestCreated = false,
+    bool OnRequestApproved = false,
+    bool OnRequestDeclined = false,
+    bool OnRequestAvailable = false)
 {
     public static ConnectionResource From(ConnectionDefinition c)
     {
@@ -120,7 +124,11 @@ public sealed record ConnectionResource(
             t.OnHealthRestored,
             t.IncludeHealthWarnings,
             type is null ? new Dictionary<string, object?>() : ConnectionSettings.ToResource(type, c.Settings),
-            new ConnectionStatusResource(c.Status.Failing, c.Status.LastSuccess, c.Status.LastFailure, c.Status.LastError));
+            new ConnectionStatusResource(c.Status.Failing, c.Status.LastSuccess, c.Status.LastFailure, c.Status.LastError),
+            t.OnRequestCreated,
+            t.OnRequestApproved,
+            t.OnRequestDeclined,
+            t.OnRequestAvailable);
     }
 }
 
@@ -138,13 +146,19 @@ public sealed record ConnectionRequest(
     bool OnHealthIssue = false,
     bool OnHealthRestored = false,
     bool IncludeHealthWarnings = false,
-    Dictionary<string, JsonElement>? Settings = null)
+    Dictionary<string, JsonElement>? Settings = null,
+    bool OnRequestCreated = false,
+    bool OnRequestApproved = false,
+    bool OnRequestDeclined = false,
+    bool OnRequestAvailable = false)
 {
     public ConnectionInput ToInput() => new(
         Name,
         Implementation,
         Enable,
-        new ConnectionTriggers(OnGrab, OnImport, OnUpgrade, OnRename, OnDownloadFailure, OnHealthIssue, OnHealthRestored, IncludeHealthWarnings),
+        new ConnectionTriggers(
+            OnGrab, OnImport, OnUpgrade, OnRename, OnDownloadFailure, OnHealthIssue, OnHealthRestored, IncludeHealthWarnings,
+            OnRequestCreated, OnRequestApproved, OnRequestDeclined, OnRequestAvailable),
         Settings);
 }
 

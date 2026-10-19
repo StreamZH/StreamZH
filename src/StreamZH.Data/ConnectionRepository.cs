@@ -13,6 +13,10 @@ namespace StreamZH.Data;
 /// <param name="OnHealthIssue">A notice appeared in the status window.</param>
 /// <param name="OnHealthRestored">A notice disappeared again.</param>
 /// <param name="IncludeHealthWarnings">Health triggers also fire for warnings, not only for errors.</param>
+/// <param name="OnRequestCreated">A movie or series was requested (0.10).</param>
+/// <param name="OnRequestApproved">An admin approved a request (0.10).</param>
+/// <param name="OnRequestDeclined">An admin declined a request (0.10).</param>
+/// <param name="OnRequestAvailable">Everything a request asked for has files (0.10).</param>
 public sealed record ConnectionTriggers(
     bool OnGrab = false,
     bool OnImport = false,
@@ -21,7 +25,11 @@ public sealed record ConnectionTriggers(
     bool OnDownloadFailure = false,
     bool OnHealthIssue = false,
     bool OnHealthRestored = false,
-    bool IncludeHealthWarnings = false);
+    bool IncludeHealthWarnings = false,
+    bool OnRequestCreated = false,
+    bool OnRequestApproved = false,
+    bool OnRequestDeclined = false,
+    bool OnRequestAvailable = false);
 
 /// <summary>Result of the last delivery; times are UTC. Failing while <see cref="LastFailure"/> is newer than <see cref="LastSuccess"/>.</summary>
 public sealed record ConnectionStatus(DateTime? LastSuccess, DateTime? LastFailure, string? LastError)
@@ -49,7 +57,7 @@ public sealed class ConnectionRepository(Database database)
 {
     private const string Columns = """
         Id, Name, Implementation, Enable, OnGrab, OnImport, OnUpgrade, OnRename, OnDownloadFailure, OnHealthIssue, OnHealthRestored,
-        IncludeHealthWarnings, Settings, LastSuccess, LastFailure, LastError
+        IncludeHealthWarnings, OnRequestCreated, OnRequestApproved, OnRequestDeclined, OnRequestAvailable, Settings, LastSuccess, LastFailure, LastError
         """;
 
     public IReadOnlyList<ConnectionDefinition> All()
@@ -76,9 +84,11 @@ public sealed class ConnectionRepository(Database database)
         return connection.ExecuteScalar<int>(
             """
             INSERT INTO Connections (Name, Implementation, Enable, OnGrab, OnImport, OnUpgrade, OnRename, OnDownloadFailure,
-                OnHealthIssue, OnHealthRestored, IncludeHealthWarnings, Settings, Added)
+                OnHealthIssue, OnHealthRestored, IncludeHealthWarnings, OnRequestCreated, OnRequestApproved, OnRequestDeclined, OnRequestAvailable,
+                Settings, Added)
             VALUES (@Name, @Implementation, @Enable, @OnGrab, @OnImport, @OnUpgrade, @OnRename, @OnDownloadFailure,
-                @OnHealthIssue, @OnHealthRestored, @IncludeHealthWarnings, @Settings, @Added);
+                @OnHealthIssue, @OnHealthRestored, @IncludeHealthWarnings, @OnRequestCreated, @OnRequestApproved, @OnRequestDeclined, @OnRequestAvailable,
+                @Settings, @Added);
             SELECT last_insert_rowid();
             """,
             Parameters(definition, added));
@@ -92,7 +102,8 @@ public sealed class ConnectionRepository(Database database)
             """
             UPDATE Connections SET Name = @Name, Implementation = @Implementation, Enable = @Enable, OnGrab = @OnGrab, OnImport = @OnImport,
                 OnUpgrade = @OnUpgrade, OnRename = @OnRename, OnDownloadFailure = @OnDownloadFailure, OnHealthIssue = @OnHealthIssue,
-                OnHealthRestored = @OnHealthRestored, IncludeHealthWarnings = @IncludeHealthWarnings, Settings = @Settings,
+                OnHealthRestored = @OnHealthRestored, IncludeHealthWarnings = @IncludeHealthWarnings, OnRequestCreated = @OnRequestCreated,
+                OnRequestApproved = @OnRequestApproved, OnRequestDeclined = @OnRequestDeclined, OnRequestAvailable = @OnRequestAvailable, Settings = @Settings,
                 LastSuccess = NULL, LastFailure = NULL, LastError = NULL
             WHERE Id = @Id
             """,
@@ -153,6 +164,10 @@ public sealed class ConnectionRepository(Database database)
         d.Triggers.OnHealthIssue,
         d.Triggers.OnHealthRestored,
         d.Triggers.IncludeHealthWarnings,
+        d.Triggers.OnRequestCreated,
+        d.Triggers.OnRequestApproved,
+        d.Triggers.OnRequestDeclined,
+        d.Triggers.OnRequestAvailable,
         Settings = SerializeSettings(d.Settings),
         Added = added,
     };
@@ -171,6 +186,10 @@ public sealed class ConnectionRepository(Database database)
         public bool OnHealthIssue { get; init; }
         public bool OnHealthRestored { get; init; }
         public bool IncludeHealthWarnings { get; init; }
+        public bool OnRequestCreated { get; init; }
+        public bool OnRequestApproved { get; init; }
+        public bool OnRequestDeclined { get; init; }
+        public bool OnRequestAvailable { get; init; }
         public string Settings { get; init; } = "{}";
         public DateTime? LastSuccess { get; init; }
         public DateTime? LastFailure { get; init; }
@@ -181,7 +200,9 @@ public sealed class ConnectionRepository(Database database)
             Name,
             Implementation,
             Enable,
-            new ConnectionTriggers(OnGrab, OnImport, OnUpgrade, OnRename, OnDownloadFailure, OnHealthIssue, OnHealthRestored, IncludeHealthWarnings),
+            new ConnectionTriggers(
+                OnGrab, OnImport, OnUpgrade, OnRename, OnDownloadFailure, OnHealthIssue, OnHealthRestored, IncludeHealthWarnings,
+                OnRequestCreated, OnRequestApproved, OnRequestDeclined, OnRequestAvailable),
             DeserializeSettings(Settings))
         {
             Status = new ConnectionStatus(Utc(LastSuccess), Utc(LastFailure), LastError),

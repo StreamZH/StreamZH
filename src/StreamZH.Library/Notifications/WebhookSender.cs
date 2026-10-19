@@ -24,7 +24,10 @@ public sealed class WebhookSender(IHttpClientFactory httpFactory) : IConnectionS
         return "Test event sent to the webhook.";
     }
 
-    /// <summary>"Grab", "Download" (import and upgrade), "Rename", "DownloadFailure", "Health", "HealthRestored", "Test".</summary>
+    /// <summary>
+    /// "Grab", "Download" (import and upgrade), "Rename", "DownloadFailure", "Health", "HealthRestored", "Test"; requests
+    /// (0.10): "RequestCreated", "RequestApproved", "RequestDeclined", "RequestAvailable".
+    /// </summary>
     public static string EventType(ConnectEventType type) => type switch
     {
         ConnectEventType.Grab => "Grab",
@@ -33,6 +36,10 @@ public sealed class WebhookSender(IHttpClientFactory httpFactory) : IConnectionS
         ConnectEventType.DownloadFailure => "DownloadFailure",
         ConnectEventType.HealthIssue => "Health",
         ConnectEventType.HealthRestored => "HealthRestored",
+        ConnectEventType.RequestCreated => "RequestCreated",
+        ConnectEventType.RequestApproved => "RequestApproved",
+        ConnectEventType.RequestDeclined => "RequestDeclined",
+        ConnectEventType.RequestAvailable => "RequestAvailable",
         _ => "Test",
     };
 
@@ -140,6 +147,21 @@ public sealed class WebhookSender(IHttpClientFactory httpFactory) : IConnectionS
         if (e.Type == ConnectEventType.DownloadFailure)
         {
             payload["message"] = e.Message;
+        }
+
+        if (e.Request is { } request)
+        {
+            payload["request"] = new JsonObject
+            {
+                ["id"] = request.Id,
+                ["status"] = request.Status,
+                ["requestedBy"] = request.RequestedBy,
+                ["source"] = request.Source,
+                ["seasons"] = request.Seasons is null ? null : new JsonArray([.. request.Seasons.Select(n => (JsonNode?)JsonValue.Create(n))]),
+                ["note"] = request.Note,
+                ["reason"] = request.Reason,
+                ["automatic"] = request.Automatic,
+            };
         }
 
         if (e.Health is { } health)

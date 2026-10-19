@@ -1,0 +1,14 @@
+/* Settings → Requests: only the side-by-side note; everything else comes from SettingsKit. */
+.hold {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.hold > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}

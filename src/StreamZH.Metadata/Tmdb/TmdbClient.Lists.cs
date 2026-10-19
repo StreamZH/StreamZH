@@ -96,6 +96,8 @@ public sealed partial class TmdbClient : ITmdbListClient
             i.PosterPath,
             i.VoteCount > 0 ? i.VoteAverage : null,
             i.VoteCount ?? 0,
-            Blank(i.OriginalLanguage));
+            Blank(i.OriginalLanguage),
+            Blank(i.Overview),
+            Blank(i.BackdropPath));
     }
 }

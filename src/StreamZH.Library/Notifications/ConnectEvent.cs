@@ -20,6 +20,12 @@ public enum ConnectEventType
     HealthIssue,
     HealthRestored,
     Test,
+
+    // Requests (0.10)
+    RequestCreated,
+    RequestApproved,
+    RequestDeclined,
+    RequestAvailable,
 }
 
 /// <summary>The movie or series an event is about.</summary>
@@ -51,6 +57,27 @@ public sealed record ConnectEpisode(int Id, int SeasonNumber, int EpisodeNumber,
 public sealed record ConnectRelease(string Title, string? Quality, string? ReleaseGroup, string? Indexer, long? Size);
 
 public sealed record ConnectFile(string Path, string RelativePath, long Size);
+
+/// <summary>A movie or series request (0.10).</summary>
+/// <param name="Status">API name of the status, e.g. "pending" or "available".</param>
+/// <param name="RequestedBy">Display name of the user, the Discord name of a guest, or null (API).</param>
+/// <param name="Seasons">Requested seasons; null = all seasons or a movie.</param>
+/// <param name="Reason">Why it was declined.</param>
+/// <param name="Automatic">Approved at once (the user approves themselves).</param>
+public sealed record ConnectRequest(
+    int Id,
+    string Status,
+    string? RequestedBy,
+    IReadOnlyList<int>? Seasons,
+    string? Note,
+    string? Reason,
+    bool Automatic,
+    string? Source)
+{
+    /// <summary>"Seasons 1, 2" / "All seasons"; null for movies.</summary>
+    public string? SeasonText(bool isSeries) =>
+        !isSeries ? null : Seasons is { Count: > 0 } list ? $"{(list.Count == 1 ? "Season" : "Seasons")} {string.Join(", ", list)}" : "All seasons";
+}
 
 /// <param name="Level">"warn" or "error" (status window levels).</param>
 public sealed record ConnectHealth(string Key, string Level, string Title, string? Message, string? Link);
@@ -85,6 +112,11 @@ public sealed record ConnectEvent
 
     public ConnectHealth? Health { get; init; }
 
+    /// <summary>The request of a request event (0.10).</summary>
+    public ConnectRequest? Request { get; init; }
+
+    public bool IsRequest => Type is ConnectEventType.RequestCreated or ConnectEventType.RequestApproved or ConnectEventType.RequestDeclined or ConnectEventType.RequestAvailable;
+
     public DateTimeOffset Time { get; init; } = DateTimeOffset.UtcNow;
 
     public bool IsSeries => MediaType == Core.Media.MediaType.Series;
@@ -98,6 +130,12 @@ public sealed record ConnectEvent
         ConnectEventType.DownloadFailure => "Download Failed",
         ConnectEventType.HealthIssue => Health?.Level == "error" ? "Health Error" : "Health Warning",
         ConnectEventType.HealthRestored => "Health Restored",
+        ConnectEventType.RequestCreated => Request?.Automatic == true
+            ? (IsSeries ? "Series Request Automatically Approved" : "Movie Request Automatically Approved")
+            : (IsSeries ? "New Series Request" : "New Movie Request"),
+        ConnectEventType.RequestApproved => IsSeries ? "Series Request Approved" : "Movie Request Approved",
+        ConnectEventType.RequestDeclined => IsSeries ? "Series Request Declined" : "Movie Request Declined",
+        ConnectEventType.RequestAvailable => IsSeries ? "Series Now Available" : "Movie Now Available",
         _ => "Test Notification",
     };
 
@@ -112,6 +150,11 @@ public sealed record ConnectEvent
                 ConnectEventType.Test => "This is a test message from StreamZH.",
                 ConnectEventType.DownloadFailure => Join(Media?.Display ?? Release?.Title, EpisodeText, Message ?? "Download failed"),
                 ConnectEventType.Rename => Media?.Display ?? Folder ?? string.Empty,
+                _ when IsRequest => Join(
+                    Media?.Display,
+                    Request?.SeasonText(IsSeries),
+                    Request?.RequestedBy is { } by ? $"requested by {by}" : null,
+                    Type == ConnectEventType.RequestDeclined ? Request?.Reason : null),
                 _ => Join(Media?.Display ?? Release?.Title, EpisodeText, Release?.Quality, Release?.ReleaseGroup),
             };
         }

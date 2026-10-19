@@ -20,6 +20,8 @@ public enum TmdbExternalSource
 
 /// <summary>One movie or show as TMDB lists, discover and credits return it.</summary>
 /// <param name="ReleaseDate">Movies: release date; series: first air date (yyyy-MM-dd); null when unknown.</param>
+/// <param name="Overview">Plot summary (0.10, for Discover).</param>
+/// <param name="BackdropPath">Background image (0.10, for Discover).</param>
 public sealed record TmdbListEntry(
     TmdbMediaKind Kind,
     int TmdbId,
@@ -29,7 +31,9 @@ public sealed record TmdbListEntry(
     string? PosterPath = null,
     double? VoteAverage = null,
     int VoteCount = 0,
-    string? OriginalLanguage = null);
+    string? OriginalLanguage = null,
+    string? Overview = null,
+    string? BackdropPath = null);
 
 /// <summary>One page of results.</summary>
 /// <param name="Name">Name of the list, collection or person when TMDB returns one.</param>
@@ -83,6 +87,8 @@ internal sealed class ListEntryDto
     public string? ReleaseDate { get; set; }
     public string? FirstAirDate { get; set; }
     public string? PosterPath { get; set; }
+    public string? BackdropPath { get; set; }
+    public string? Overview { get; set; }
     public double? VoteAverage { get; set; }
     public int? VoteCount { get; set; }
     public string? OriginalLanguage { get; set; }

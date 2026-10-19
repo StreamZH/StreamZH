@@ -81,7 +81,7 @@ public static class MetadataEndpoints
             return Results.Accepted(value: jobs.Status);
         }).WithTags("Settings").RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        // Every signed-in user sees posters. Path: /api/v1/mediacover/w342/abc.jpg (TMDB size and file name).
+        // Every signed-in user sees posters, requesters too (Discover, 0.10). Path: /api/v1/mediacover/w342/abc.jpg (TMDB size and file name).
         app.MapGet("/api/v1/mediacover/{size}/{file}", async (string size, string file, MetadataConfig metadata, MetadataImageStore store, HttpContext http, CancellationToken ct) =>
         {
             var path = "/" + file;
@@ -111,7 +111,7 @@ public static class MetadataEndpoints
                 http.Response.Headers.CacheControl = "no-store";
                 return Results.Redirect(TmdbImages.Url(path, size)!);
             }
-        }).WithTags("Library").RequireAuthorization();
+        }).WithTags("Library").RequireAuthorization(AuthSchemes.AnyUserPolicy);
 
         return app;
     }

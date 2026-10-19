@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.SignalR;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
 using StreamZH.Core.Jobs;
+using StreamZH.Core.Requests;
+using StreamZH.Data;
 using StreamZH.Host.Api;
 using StreamZH.Library;
 using StreamZH.Library.Indexers;
@@ -14,29 +16,38 @@ using StreamZH.Library.Search;
 namespace StreamZH.Host.Hubs;
 
 /// <summary>Forwards in-process events to the browsers connected to /hub.</summary>
-public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub) : IHostedService
+public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub, RequestRepository requests) : IHostedService
 {
     private readonly List<IDisposable> _subscriptions = [];
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
         Track(events.Subscribe<LibraryChanged>((e, ct) =>
-            new ValueTask(hub.Clients.All.SendAsync("libraryChanged", new { mediaType = e.MediaType.ToString(), id = e.Id }, ct))));
+            new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("libraryChanged", new { mediaType = e.MediaType.ToString(), id = e.Id }, ct))));
 
         Track(events.Subscribe<JobsChanged>((e, ct) =>
-            new ValueTask(hub.Clients.All.SendAsync("jobs", e.Status, ct))));
+            new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("jobs", e.Status, ct))));
 
-        Track(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("releaseGrabbed", e, ct))));
-        Track(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.All.SendAsync("searchFinished", e, ct))));
-        Track(events.Subscribe<IndexersChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("indexersChanged", ct))));
+        Track(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("releaseGrabbed", e, ct))));
+        Track(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("searchFinished", e, ct))));
+        Track(events.Subscribe<IndexersChanged>((_, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("indexersChanged", ct))));
+
+        // Requests (0.10): lists, the admins' pending badge and Discover's badges refresh.
+        // Members get every request change; requesters (0.10) only the changes of their own requests.
+        Track(events.Subscribe<RequestChanged>((e, ct) =>
+        {
+            var message = new { requestId = e.RequestId, status = DownloadEndpoints.Camel(e.Status.ToString()) };
+            var groups = requests.Find(e.RequestId)?.RequestedBy is { } owner ? [EventsHub.Members, EventsHub.UserGroup(owner)] : new[] { EventsHub.Members };
+            return new ValueTask(hub.Clients.Groups(groups).SendAsync("requestChanged", message, ct));
+        }));
 
         // Status window: re-read /api/v1/status/ongoing.
-        Track(events.Subscribe<OngoingChanged>((_, ct) => new ValueTask(hub.Clients.All.SendAsync("ongoing", ct))));
+        Track(events.Subscribe<OngoingChanged>((_, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("ongoing", ct))));
 
         // Downloads: state changes (UI refetches) and throttled progress for live bars.
         Track(events.Subscribe<DownloadChanged>((e, ct) =>
-            new ValueTask(hub.Clients.All.SendAsync("downloadChanged", new { downloadId = e.DownloadId }, ct))));
-        Track(events.Subscribe<DownloadProgress>((e, ct) => new ValueTask(hub.Clients.All.SendAsync(
+            new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("downloadChanged", new { downloadId = e.DownloadId }, ct))));
+        Track(events.Subscribe<DownloadProgress>((e, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync(
             "downloadProgress",
             new
             {

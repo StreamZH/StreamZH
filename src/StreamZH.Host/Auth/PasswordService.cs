@@ -22,7 +22,8 @@ public sealed class PasswordService(UserRepository users)
         var user = users.FindByUsername(username);
         var result = _hasher.VerifyHashedPassword(user!, user?.PasswordHash ?? DummyHash, password);
 
-        if (user is null || result == PasswordVerificationResult.Failed)
+        // A disabled account gets the same answer as a wrong password (0.10).
+        if (user is null || result == PasswordVerificationResult.Failed || !user.Enabled)
         {
             return null;
         }

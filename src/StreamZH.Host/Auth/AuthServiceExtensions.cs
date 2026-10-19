@@ -26,6 +26,7 @@ public static class AuthServiceExtensions
 
         // Smart picks the API key, the cookie (Forms) or Basic per request; see SmartAuthenticationHandler.
         services.AddSingleton<BasicCredentialCache>();
+        services.AddSingleton<UserSessionCache>();
         services.AddAuthentication(AuthSchemes.Smart)
             .AddScheme<AuthenticationSchemeOptions, SmartAuthenticationHandler>(AuthSchemes.Smart, null)
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(AuthSchemes.ApiKey, null)
@@ -38,6 +39,9 @@ public static class AuthServiceExtensions
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
+
+                // 0.10: the account must still exist, be enabled and have the same session version and role.
+                options.Events.OnValidatePrincipal = UserSessionCache.ValidateCookieAsync;
 
                 // The API answers with status codes, the React app shows the login page.
                 options.Events.OnRedirectToLogin = context =>

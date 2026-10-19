@@ -89,6 +89,26 @@ public sealed class RequestRepository(Database database)
             new { userId, type = (int)mediaType, since });
     }
 
+    /// <summary>
+    /// The newest requests of one person for the Discord /requests command: those of the StreamZH user (any source) and
+    /// those made from the Discord account (also as a guest before the account was linked). Additive (0.10, Discord bot).
+    /// </summary>
+    public IReadOnlyList<MediaRequest> ForRequester(int? userId, string? discordUserId, int limit)
+    {
+        if (userId is null && string.IsNullOrEmpty(discordUserId))
+        {
+            return [];
+        }
+
+        using var connection = database.Open();
+        return
+        [
+            .. connection.Query<Row>(
+                $"SELECT {Columns} FROM Requests WHERE (RequestedBy = @userId OR DiscordUserId = @discordUserId) ORDER BY Created DESC, Id DESC LIMIT @limit",
+                new { userId, discordUserId, limit = Math.Clamp(limit, 1, 100) }).Select(r => r.ToRequest()),
+        ];
+    }
+
     public int Count(RequestStatus status)
     {
         using var connection = database.Open();

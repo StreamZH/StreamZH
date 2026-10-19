@@ -13,6 +13,7 @@ import { useIsAdmin } from '../status/useOngoing'
 import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import HistoryPanel from './HistoryPanel'
+import RequestsPanel from '../requests/RequestsPanel'
 import MediaInfoPanel from './MediaInfoPanel'
 import MoreMenu, { type MoreItem } from './MoreMenu'
 import OrganizeDialog from './OrganizeDialog'
@@ -139,6 +140,7 @@ export default function MovieDetail() {
 
       {m.file && <MediaInfoPanel movieId={m.id} />}
       <AlternativeTitles type="Movie" id={m.id} />
+      <RequestsPanel mediaType="movie" tmdbId={m.tmdbId} />
       <HistoryPanel movieId={m.id} />
 
       {organizing && <OrganizeDialog type="Movie" ids={[m.id]} onClose={() => setOrganizing(false)} />}

@@ -14,6 +14,7 @@ import DetailHeader from './DetailHeader'
 import styles from './Detail.module.css'
 import { AbsCell, AbsHeader, SceneTag } from './EpisodeNumbering'
 import HistoryPanel from './HistoryPanel'
+import RequestsPanel from '../requests/RequestsPanel'
 import { EpisodeMediaInfo } from './MediaInfoPanel'
 import MoreMenu, { type MoreItem } from './MoreMenu'
 import OrganizeDialog from './OrganizeDialog'
@@ -120,6 +121,7 @@ export default function SeriesDetail() {
         />
       )}
       <AlternativeTitles type="Series" id={s.id} seasons={seasons.map((x) => x.seasonNumber)} />
+      <RequestsPanel mediaType="series" tmdbId={s.tmdbId} />
       <HistoryPanel seriesId={s.id} />
     </div>
   )

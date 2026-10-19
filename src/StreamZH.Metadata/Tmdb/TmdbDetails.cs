@@ -37,7 +37,9 @@ public sealed record TmdbMovieDetails(
     IReadOnlyList<string> Directors,
     IReadOnlyList<string> Writers);
 
-public sealed record TmdbSeasonSummary(int SeasonNumber, string? Name, string? PosterPath);
+/// <param name="EpisodeCount">Episodes TMDB lists for the season (0.10, aired and announced).</param>
+/// <param name="AirDate">First air date of the season (yyyy-MM-dd), null when unknown (0.10).</param>
+public sealed record TmdbSeasonSummary(int SeasonNumber, string? Name, string? PosterPath, int EpisodeCount = 0, string? AirDate = null);
 
 public sealed record TmdbSeriesDetails(
     TmdbSeries Series,

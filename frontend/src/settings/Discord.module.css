@@ -1,0 +1,298 @@
+/* Settings → Discord: status strip, token line, id pickers (chips), the bot guide and the Requestrr import dialog. */
+
+/* ---- Status ---- */
+.statusPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.statusTitle {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.statusDetail {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dotOff {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--line-strong);
+}
+
+.problem {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.problem svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}
+
+/* ---- Token ---- */
+.token {
+  width: 100%;
+  max-width: 460px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.actions a {
+  text-decoration: none;
+}
+
+.testResult {
+  margin: 8px 0 0;
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.idInput {
+  width: 100%;
+  max-width: 320px;
+}
+
+/* ---- Id picker ---- */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 26px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: global(pop) 0.18s var(--ease);
+}
+
+.chipGroup {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.chipEmpty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chipRemove {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  background: var(--sunk);
+  color: var(--fg);
+}
+
+.chipRemove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pickerAdd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pickerSelect {
+  flex: 1 1 200px;
+  max-width: 320px;
+  min-width: 0;
+}
+
+.pickerInput {
+  flex: 1 1 180px;
+  max-width: 240px;
+  min-width: 0;
+}
+
+/* ---- Guide ---- */
+.guide {
+  padding-bottom: 16px;
+}
+
+.guideTitle {
+  margin: 0 0 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--fg-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.steps code,
+.importLead code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+/* ---- Import dialog ---- */
+.importBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(640px, 100%);
+  min-width: 0;
+}
+
+.importLead {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.importText {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.importFile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.hiddenFile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.importTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.importValue {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.importWarnings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-2);
+  line-height: 1.45;
+}
+
+.importWarnings li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  animation: global(rise) 0.25s var(--ease) both;
+}
+
+.importWarnings svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--info);
+}
+
+.importDone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.importActions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}

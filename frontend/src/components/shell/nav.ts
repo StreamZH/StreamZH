@@ -9,7 +9,7 @@ export interface NavPage {
   icon: IconName
   /** Count next to the label (library size) or a red badge (active downloads). */
   count?: 'movies' | 'series'
-  badge?: 'downloads'
+  badge?: 'downloads' | 'requests'
   /** Also active for these path prefixes. */
   match?: string[]
   /** Words the command palette finds this page by. */
@@ -38,9 +38,11 @@ const settingsIcons: Record<string, IconName> = {
   '/settings/downloads': 'download',
   '/settings/usenet': 'server',
   '/settings/connect': 'plug',
+  '/settings/requests': 'inbox',
   '/settings/metadata': 'filetext',
   '/settings/general': 'gear',
   '/settings/ui': 'palette',
+  '/settings/users': 'users',
 }
 
 const systemIcons: Record<string, IconName> = {
@@ -49,6 +51,22 @@ const systemIcons: Record<string, IconName> = {
   '/system/backup': 'archive',
   '/system/logs': 'logs',
 }
+
+// 0.10: Discover and Requests, for every role. Requesters see only this group (plus their profile).
+const discoverPage: NavPage = { to: '/discover', label: 'Discover', icon: 'compass', keywords: 'request trending popular upcoming find tmdb' }
+const requestsPage: NavPage = { to: '/requests', label: 'Requests', icon: 'inbox', badge: 'requests', keywords: 'approve decline pending requested' }
+
+const requestsGroup: NavGroup = { key: 'requests', title: 'Requests', icon: 'compass', pages: [discoverPage, requestsPage] }
+
+/** The whole navigation of a requester: Discover, Requests and the profile. */
+export const requesterGroups: NavGroup[] = [
+  {
+    key: 'requests',
+    title: 'Requests',
+    icon: 'compass',
+    pages: [discoverPage, requestsPage, { to: '/profile', label: 'Profile', icon: 'user', keywords: 'account password discord' }],
+  },
+]
 
 export const groups: NavGroup[] = [
   {
@@ -62,6 +80,7 @@ export const groups: NavGroup[] = [
       { to: '/wanted/missing', label: 'Wanted', icon: 'target', match: ['/wanted'], keywords: 'missing cutoff' },
     ],
   },
+  requestsGroup,
   {
     key: 'downloads',
     title: 'Downloads',
@@ -131,6 +150,8 @@ export function titleFor(pathname: string): string {
   if (pathname === '/library/import') return 'Import library'
   if (pathname.startsWith('/library/movies/')) return 'Movies'
   if (pathname.startsWith('/library/series/')) return 'Series'
+  if (pathname.startsWith('/discover/')) return 'Discover'
+  if (pathname === '/profile') return 'Profile'
   for (const hub of hubs) {
     const tab = hub.tabs.find((t) => t.to === pathname)
     if (tab && hub.prefix !== tab.to) return `${allPages.find((p) => isActive(p, pathname))?.label ?? ''} · ${tab.label}`
@@ -144,5 +165,6 @@ export const paletteTargets = [
     h.tabs.filter((t) => !allPages.some((p) => p.to === t.to)).map((t) => ({ to: t.to, label: t.label, icon: t.icon, keywords: '', group: titleFor(h.prefix) })),
   ),
   { to: '/settings', label: 'All settings', icon: 'sliders' as IconName, keywords: 'overview', group: 'Settings' },
+  { to: '/profile', label: 'Profile', icon: 'user' as IconName, keywords: 'account password discord link', group: '' },
   { to: '/library/import', label: 'Import existing library', icon: 'folderplus' as IconName, keywords: 'add folder scan', group: 'Library' },
 ]

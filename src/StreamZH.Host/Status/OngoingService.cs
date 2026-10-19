@@ -84,6 +84,7 @@ public sealed class OngoingService(
         ImportListNotices.Add(notices, services.GetService<ImportListRepository>(), time);
         TrashNotices.Add(notices, services);
         AutomationNotices.Add(notices, services);
+        DiscordNotices.Add(notices, services);
 
         return new OngoingResource(running, notices, AutomationNotices.IsOn(services));
     }

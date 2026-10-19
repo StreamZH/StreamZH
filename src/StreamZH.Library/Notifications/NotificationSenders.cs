@@ -42,6 +42,18 @@ public static class ConnectText
         {
             lines.Add($"Release: {failed}");
         }
+        else if (e.IsRequest && e.Request is { } request)
+        {
+            if (request.Note is { } note && e.Type == ConnectEventType.RequestCreated)
+            {
+                lines.Add($"Note: {Truncate(note, 300)}");
+            }
+
+            if (e.Type == ConnectEventType.RequestCreated && !request.Automatic)
+            {
+                lines.Add("Waiting for approval.");
+            }
+        }
 
         if (withLinks && Links(e) is { Count: > 0 } links)
         {
@@ -115,6 +127,25 @@ public sealed class DiscordSender(IHttpClientFactory httpFactory) : IConnectionS
             embed["title"] = ConnectText.Truncate(e.Health?.Title, 256);
             embed["description"] = ConnectText.Truncate(e.Health?.Message, 4096);
         }
+        else if (e.IsRequest)
+        {
+            embed["title"] = ConnectText.Truncate(e.Media?.Display, 256);
+            if (e.TmdbUrl is { } requestUrl)
+            {
+                embed["url"] = requestUrl;
+            }
+
+            var text = e.Type switch
+            {
+                ConnectEventType.RequestCreated => e.Request?.Note,
+                ConnectEventType.RequestDeclined => e.Request?.Reason,
+                _ => null,
+            } ?? ConnectText.Truncate(e.Media?.Overview, 300);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                embed["description"] = ConnectText.Truncate(text, 4096);
+            }
+        }
         else
         {
             embed["title"] = ConnectText.Truncate(Join(e.Media?.Display ?? e.Release?.Title ?? e.Folder, e.EpisodeText), 256);
@@ -175,6 +206,13 @@ public sealed class DiscordSender(IHttpClientFactory httpFactory) : IConnectionS
             Add("Release", e.Release?.Title, inline: false);
         }
 
+        if (e.IsRequest && e.Request is { } request)
+        {
+            Add("Requested by", request.RequestedBy);
+            Add("Seasons", request.SeasonText(e.IsSeries));
+            Add("Status", request.Status);
+        }
+
         if (fields.Contains("links") && ConnectText.Links(e) is { Count: > 0 } links)
         {
             Add("Links", string.Join(" / ", links.Select(l => $"[{l.Name}]({l.Url})")), inline: false);
@@ -185,7 +223,7 @@ public sealed class DiscordSender(IHttpClientFactory httpFactory) : IConnectionS
             embed["fields"] = list;
         }
 
-        if (fields.Contains("poster") && e.Media?.PosterUrl is { } poster)
+        if ((fields.Contains("poster") || e.IsRequest) && e.Media?.PosterUrl is { } poster)
         {
             embed["thumbnail"] = new JsonObject { ["url"] = poster };
         }
@@ -217,6 +255,10 @@ public sealed class DiscordSender(IHttpClientFactory httpFactory) : IConnectionS
         ConnectEventType.DownloadFailure => 0xF05050,
         ConnectEventType.HealthIssue => e.Health?.Level == "error" ? 0xF05050 : 0xFFA500,
         ConnectEventType.HealthRestored => 0x27C24C,
+        ConnectEventType.RequestCreated => 0xFFA500,
+        ConnectEventType.RequestApproved => 0x3A80D2,
+        ConnectEventType.RequestDeclined => 0xF05050,
+        ConnectEventType.RequestAvailable => 0x27C24C,
         _ => 0xC0202A,
     };
 

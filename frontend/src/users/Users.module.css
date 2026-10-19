@@ -1,0 +1,643 @@
+/* Settings → Users, invites and the profile page in the CloudZH style (.utable, .cell-user, .avatar, .tabs, .seg). */
+
+/* ---------- Tabs (CloudZH .tabs/.tab/.tcount) ---------- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--fg);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.tab[aria-selected='true'] svg {
+  color: var(--accent);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+
+.tcount {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--sunk);
+  border-radius: 99px;
+}
+
+/* ---------- Toolbar: search left, filter right (CloudZH .ulist-bar) ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.search {
+  position: relative;
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+.search svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.search input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.toolbar .seg {
+  margin-left: auto;
+}
+
+/* ---------- Table (CloudZH .utable) ---------- */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.table th {
+  padding-top: 12px;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: 16px;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 14px;
+}
+
+.row {
+  cursor: pointer;
+  transition: background 0.12s;
+  animation: global(rise) 0.3s var(--ease) backwards;
+}
+
+.row:hover td {
+  background: var(--sunk);
+}
+
+.dim .cellUser b,
+.dim .avatar {
+  opacity: 0.55;
+}
+
+.cellUser {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.cellUser b {
+  font-weight: 600;
+}
+
+.cellUser small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.avatarLg {
+  width: 56px;
+  height: 56px;
+  font-size: 19px;
+}
+
+.you {
+  margin-left: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.role {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 99px;
+  white-space: nowrap;
+  color: var(--fg-2);
+  background: var(--sunk);
+}
+
+.role_owner {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.role_admin {
+  color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.role_friend {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.role_requester {
+  color: var(--info);
+  background: var(--info-soft);
+}
+
+.stateLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.usage {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.usage span {
+  color: var(--muted);
+}
+
+.discord {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.discord svg {
+  color: var(--info);
+}
+
+.actionsCell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.when {
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--fg-2);
+}
+
+.empty {
+  padding: 36px 20px;
+}
+
+/* ---------- Dialogs ---------- */
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.form input,
+.form select {
+  width: 100%;
+}
+
+.form small {
+  color: var(--muted);
+}
+
+.fieldError {
+  color: var(--err) !important;
+}
+
+.group {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+}
+
+.groupHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.groupHead b {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.groupHead small {
+  display: block;
+  font-size: 12.5px;
+}
+
+.dialogExtra {
+  display: flex;
+  gap: 2px;
+  margin-right: auto;
+}
+
+.showSm {
+  display: none;
+}
+
+.note small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dialogText {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.switchRow small {
+  display: block;
+}
+
+/* ---------- The invite link, shown once ---------- */
+.linkBox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.linkBox input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.warnLine {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 13px;
+  color: var(--warn);
+}
+
+.warnLine svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.state {
+  white-space: nowrap;
+}
+
+.note {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Profile ---------- */
+.profile {
+  display: grid;
+  gap: 18px;
+  max-width: 1180px;
+}
+
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.profileCol {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .profileGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.who b {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.who small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.panelBody {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.panelLead {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.panelFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ok);
+  animation: global(fade) 0.2s ease;
+}
+
+.meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.meter {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.meterHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--fg-2);
+}
+
+.meterValue {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.meterValue span {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.4s var(--ease);
+}
+
+.barFull > span {
+  background: var(--err);
+}
+
+.code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.codeValue {
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--fg);
+  background: var(--sunk);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
+  animation: global(pop) 0.2s var(--ease);
+}
+
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  font-size: 13.5px;
+  color: var(--fg-2);
+}
+
+.steps code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--code-bg);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+/* ---------- Public invite page ---------- */
+.inviteRole {
+  display: inline-flex;
+  width: fit-content;
+}
+
+@media (max-width: 860px) {
+  .hideMd {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .hideSm {
+    display: none;
+  }
+
+  .showSm {
+    display: block;
+  }
+
+  .toolbar .seg {
+    margin-left: 0;
+  }
+
+  .search {
+    max-width: none;
+  }
+
+  .grid2,
+  .meters {
+    grid-template-columns: 1fr;
+  }
+
+  .grid3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .panelBody {
+    padding: 16px;
+  }
+}

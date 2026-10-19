@@ -150,7 +150,11 @@ public sealed class ConnectionService(
             On(t.OnDownloadFailure, ConnectTriggers.DownloadFailure),
             On(t.OnHealthIssue, ConnectTriggers.HealthIssue),
             On(t.OnHealthRestored, ConnectTriggers.HealthRestored),
-            t.IncludeHealthWarnings && (type.Triggers.Contains(ConnectTriggers.HealthIssue) || type.Triggers.Contains(ConnectTriggers.HealthRestored)));
+            t.IncludeHealthWarnings && (type.Triggers.Contains(ConnectTriggers.HealthIssue) || type.Triggers.Contains(ConnectTriggers.HealthRestored)),
+            On(t.OnRequestCreated, ConnectTriggers.RequestCreated),
+            On(t.OnRequestApproved, ConnectTriggers.RequestApproved),
+            On(t.OnRequestDeclined, ConnectTriggers.RequestDeclined),
+            On(t.OnRequestAvailable, ConnectTriggers.RequestAvailable));
 
         return new ConnectionDefinition(stored?.Id ?? 0, name, type.Key, input.Enable, triggers, settings);
     }

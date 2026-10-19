@@ -1,0 +1,484 @@
+/* Requests in the CloudZH style: .tabs with a red underline and .tcount chips, a toolbar (seg + status select), a
+   CloudZH table on wide screens and cards on phones; the request panel on the library detail pages; dialogs. */
+
+.page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- Tabs (CloudZH .tabs/.tab/.tcount) ---- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--fg);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.tab[aria-selected='true'] svg {
+  color: var(--accent);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+
+.tcount {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--sunk);
+  border-radius: 99px;
+}
+
+.tcountHot {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+/* ---- Toolbar ---- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusSelect {
+  height: 34px;
+  font-size: 13.5px;
+}
+
+/* ---- Table ---- */
+.tablePanel {
+  padding: 4px 0 0;
+  overflow-x: auto;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: 18px;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 18px;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  animation: global(rise) 0.3s var(--ease) both;
+}
+
+.actionsHead {
+  width: 1%;
+}
+
+.actionsCell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* One line of buttons in the table; the phone cards may wrap. */
+.actionsCell .actions {
+  flex-wrap: nowrap;
+}
+
+.titleCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.thumb {
+  flex: none;
+  width: 40px;
+}
+
+.thumb > img,
+.thumb > span {
+  border-radius: 6px;
+}
+
+/* No room for the title in the fallback of a thumbnail. */
+.thumb > span {
+  font-size: 0;
+  padding: 0;
+}
+
+.titleText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.title:hover {
+  color: var(--accent);
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  font-size: 12.5px;
+  color: var(--fg-2);
+  font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.whoText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.whoText b {
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.you {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.when {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.source {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.state {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.reason {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 260px;
+}
+
+.chip {
+  white-space: nowrap;
+}
+
+.chipBusy {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: global(pulse) 1.4s ease-in-out infinite;
+}
+
+.pillInfo {
+  background: var(--info-soft);
+  color: var(--info);
+  border-color: transparent;
+}
+
+.pillMuted {
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ---- Cards (phone) ---- */
+.cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 10px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  animation: global(rise) 0.3s var(--ease) both;
+}
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card .titleCell {
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.card .thumb {
+  width: 48px;
+}
+
+.card .state {
+  justify-items: end;
+}
+
+.card .actions {
+  justify-content: flex-start;
+}
+
+.card .actions:empty {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .tablePanel {
+    display: none;
+  }
+
+  .cards {
+    display: grid;
+  }
+}
+
+@media (max-width: 520px) {
+  .toolbar > :first-child {
+    flex: 1 1 100%;
+  }
+
+  .toolbar > :first-child > button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .statusSelect {
+    flex: 1;
+  }
+}
+
+/* ---- Panel on the movie/series detail page ---- */
+.panelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.panelTitle svg {
+  color: var(--muted);
+}
+
+.panelCount {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.panelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.panelList > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 10px 0;
+}
+
+.panelList > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.panelList .who {
+  flex: 1 1 220px;
+}
+
+.panelSeasons {
+  font-size: 12.5px;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.panelLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.panelLink:hover {
+  text-decoration: underline;
+}
+
+/* ---- Dialogs ---- */
+.dialog {
+  display: grid;
+  gap: 14px;
+  /* Fills the shared Modal (760 px), so fields and buttons line up with its header. */
+  width: 100%;
+}
+
+.dialogLead {
+  font-size: 14px;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+
+.dialogLead b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.dialogFields {
+  display: grid;
+  gap: 12px;
+}
+
+.dialogHelp {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+/* Side-by-side mode (AutomationHold): approvals add and monitor, but nothing is grabbed. */
+.hold {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.hold > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}

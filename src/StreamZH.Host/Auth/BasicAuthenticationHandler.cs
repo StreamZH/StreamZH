@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -25,6 +24,8 @@ public sealed class BasicAuthenticationHandler(
     UrlEncoder encoder,
     PasswordService passwords,
     BasicCredentialCache cache,
+    UserSessionCache sessions,
+    StreamZH.Data.UserRepository users,
     TimeProvider time)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
@@ -41,9 +42,15 @@ public sealed class BasicAuthenticationHandler(
 
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.Parameter)));
         var now = time.GetUtcNow();
+        // A remembered sign-in still has to match the account (disabled, role changed, sessions ended: check again).
         if (cache.TryGet(key, now) is { } remembered)
         {
-            return Task.FromResult(Success(remembered));
+            if (sessions.Check(remembered, out _) == SessionCheck.Valid)
+            {
+                return Task.FromResult(Success(remembered));
+            }
+
+            cache.Forget(key);
         }
 
         string decoded;
@@ -66,15 +73,9 @@ public sealed class BasicAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.Fail("Username or password is wrong."));
         }
 
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.ToString()),
-            ],
-            Scheme.Name);
-        var principal = new ClaimsPrincipal(identity);
+        var principal = UserClaims.Principal(user, Scheme.Name);
         cache.Remember(key, principal, now);
+        users.SetLastLogin(user.Id, now.UtcDateTime);
         return Task.FromResult(Success(principal));
     }
 
@@ -120,6 +121,8 @@ public sealed class BasicCredentialCache
 
         _entries[key] = (principal, now + Lifetime);
     }
+
+    public void Forget(string key) => _entries.TryRemove(key, out _);
 
     public void Clear() => _entries.Clear();
 }

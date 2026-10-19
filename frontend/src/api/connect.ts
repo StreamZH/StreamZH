@@ -1,7 +1,18 @@
 import { request } from './client'
 
 export type ConnectKind = 'mediaServer' | 'notification'
-export type ConnectTrigger = 'grab' | 'import' | 'upgrade' | 'rename' | 'downloadFailure' | 'healthIssue' | 'healthRestored'
+export type ConnectTrigger =
+  | 'grab'
+  | 'import'
+  | 'upgrade'
+  | 'rename'
+  | 'downloadFailure'
+  | 'healthIssue'
+  | 'healthRestored'
+  | 'requestCreated'
+  | 'requestApproved'
+  | 'requestDeclined'
+  | 'requestAvailable'
 export type ConnectFieldType = 'text' | 'url' | 'password' | 'number' | 'bool' | 'select' | 'multiSelect' | 'list' | 'textArea'
 export type SettingValue = string | number | boolean | string[] | null
 
@@ -32,6 +43,10 @@ export interface ConnectionTriggers {
   onHealthRestored: boolean
   /** Health triggers also fire for warnings, not only errors. */
   includeHealthWarnings: boolean
+  onRequestCreated: boolean
+  onRequestApproved: boolean
+  onRequestDeclined: boolean
+  onRequestAvailable: boolean
 }
 
 /** One entry of the catalog (GET /connection/schema). */
@@ -78,6 +93,10 @@ export const triggerKeys: Record<ConnectTrigger, keyof ConnectionTriggers> = {
   downloadFailure: 'onDownloadFailure',
   healthIssue: 'onHealthIssue',
   healthRestored: 'onHealthRestored',
+  requestCreated: 'onRequestCreated',
+  requestApproved: 'onRequestApproved',
+  requestDeclined: 'onRequestDeclined',
+  requestAvailable: 'onRequestAvailable',
 }
 
 export const connectKeys = {

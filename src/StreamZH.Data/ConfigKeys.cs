@@ -187,4 +187,35 @@ public static class ConfigKeys
     // Migration (0.9): side-by-side mode — StreamZH grabs nothing automatically while Sonarr/Radarr still run.
     public const string AutomationHold = "AutomationHold";
     public const string AutomationHoldSince = "AutomationHoldSince";
+
+    // Requests (0.10): Settings → Requests.
+    public const string RequestsEnabled = "RequestsEnabled";
+    public const string RequestsMovieProfileId = "RequestsMovieProfileId";
+    public const string RequestsSeriesProfileId = "RequestsSeriesProfileId";
+    public const string RequestsMovieRootFolderId = "RequestsMovieRootFolderId";
+    public const string RequestsSeriesRootFolderId = "RequestsSeriesRootFolderId";
+    public const string RequestsAutoApproveFriends = "RequestsAutoApproveFriends";
+    public const string RequestsAutoApproveRequesters = "RequestsAutoApproveRequesters";
+    public const string RequestsMovieLimit = "RequestsMovieLimit";
+    public const string RequestsSeriesLimit = "RequestsSeriesLimit";
+    public const string RequestsLimitDays = "RequestsLimitDays";
+    public const string RequestsSearchOnApprove = "RequestsSearchOnApprove";
+    public const string RequestsSeriesMonitor = "RequestsSeriesMonitor";
+    public const string RequestsNotifyOnAvailable = "RequestsNotifyOnAvailable";
+
+    // Discord bot (0.10): Settings → Discord; the token is a secret (masked in the API, never logged).
+    public const string DiscordEnabled = "DiscordEnabled";
+    public const string DiscordBotToken = "DiscordBotToken";
+    public const string DiscordApplicationId = "DiscordApplicationId";
+    public const string DiscordGuildIds = "DiscordGuildIds";
+    public const string DiscordChannelIds = "DiscordChannelIds";
+    public const string DiscordAllowGuests = "DiscordAllowGuests";
+    public const string DiscordGuestRoleIds = "DiscordGuestRoleIds";
+    public const string DiscordNotifyChannelId = "DiscordNotifyChannelId";
+    public const string DiscordDmRequesters = "DiscordDmRequesters";
+    public const string DiscordAllowDirectMessages = "DiscordAllowDirectMessages";
+    public const string DiscordMovieCommand = "DiscordMovieCommand";
+    public const string DiscordTvCommand = "DiscordTvCommand";
+    public const string DiscordSeriesSeasons = "DiscordSeriesSeasons";
+    public const string DiscordStatusText = "DiscordStatusText";
 }

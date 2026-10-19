@@ -58,6 +58,7 @@ public static class AuthServiceExtensions
 
         services.AddAuthorizationBuilder()
             .AddPolicy(AuthSchemes.AdminPolicy, policy => policy.RequireRole(nameof(UserRole.Owner), nameof(UserRole.Admin)))
+            .AddPolicy(AuthSchemes.OwnerPolicy, policy => policy.RequireRole(nameof(UserRole.Owner)))
             .AddPolicy(AuthSchemes.AnyUserPolicy, policy => policy.RequireAuthenticatedUser())
             // Plain RequireAuthorization(): members only. Requesters (0.10) are kept out of everything that does not
             // opt in with AnyUserPolicy.

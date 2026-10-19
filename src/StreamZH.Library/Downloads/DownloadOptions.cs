@@ -119,11 +119,18 @@ public static partial class ExtensionList
 /// <summary>
 /// Extra command-line parameters for par2 and 7-Zip. They are split into single arguments (quotes group words) and
 /// passed as an argument list, never through a shell; each must look like an option ("-t4"), and options that would
-/// change where files go or what password is used are refused.
+/// change where files go or what password is used are refused. Since 0.12 only an allow-list of switches is accepted
+/// (threads, memory, output detail, character sets): anything that could make the tools read or write elsewhere
+/// (-spf, -i, -B, …) is out, also when it was stored by an earlier version (<see cref="IsAllowed"/>).
 /// </summary>
 public static partial class ToolArguments
 {
     public const int MaxArguments = 10;
+
+    /// <summary>What the help texts list as allowed.</summary>
+    public const string Par2Allowed = "-t<threads>, -T<file threads>, -m<memory MB>, -N, -S<n>, -q, -qq, -v, -vv";
+
+    public const string SevenZipAllowed = "-mmt, -mmt<threads>, -mmt=on|off|<threads>, -bb0..3, -bd, -bt, -bso/-bse/-bsp0..2, -scc<charset>, -mcp=<code page>, -ssc, -ssc-, -aoa, -aos, -aot, -aou";
 
     private static readonly string[] Par2Refused = ["-B"];
 
@@ -155,10 +162,20 @@ public static partial class ToolArguments
                 problem = $"{refused} cannot be set here; StreamZH sets it itself.";
                 return null;
             }
+
+            if (!IsAllowed(argument, sevenZip))
+            {
+                problem = $"\"{argument}\" is not allowed here. Use {(sevenZip ? SevenZipAllowed : Par2Allowed)}.";
+                return null;
+            }
         }
 
         return arguments;
     }
+
+    /// <summary>An argument from the allow-list of the tool (also used to drop disallowed values stored before 0.12).</summary>
+    public static bool IsAllowed(string argument, bool sevenZip) =>
+        argument is not null && (sevenZip ? SevenZipAllowedRegex() : Par2AllowedRegex()).IsMatch(argument);
 
     private static List<string> Split(string text)
     {
@@ -197,4 +214,14 @@ public static partial class ToolArguments
 
     [GeneratedRegex(@"^-{1,2}[A-Za-z0-9][A-Za-z0-9=._:+-]{0,40}$")]
     private static partial Regex OptionRegex();
+
+    // par2cmdline (and -turbo) repair switches: threads, file threads, memory, no data skipping, skip leeway, quiet, verbose.
+    [GeneratedRegex(@"^(-t[0-9]{1,3}|-T[0-9]{1,3}|-m[0-9]{1,6}|-N|-S[0-9]{1,6}|-qq?|-vv?)$", RegexOptions.CultureInvariant)]
+    private static partial Regex Par2AllowedRegex();
+
+    // 7-Zip extract switches: threads, output detail, file name character sets, case sensitivity, overwrite mode.
+    [GeneratedRegex(
+        @"^(-mmt|-mmt[0-9]{1,3}|-mmt=(on|off|[0-9]{1,3})|-bb[0-3]|-bd|-bt|-bs[oep][0-2]|-scc(utf-8|win|dos)|-mcp=[0-9]{1,5}|-ssc-?|-ao[asut])$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SevenZipAllowedRegex();
 }

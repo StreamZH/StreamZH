@@ -55,7 +55,10 @@ public sealed class SmartAuthenticationHandler(
 
     protected override Task HandleForbiddenAsync(AuthenticationProperties properties) => Context.ForbidAsync(AuthSchemes.Cookie, properties);
 
-    /// <summary>The owner without an account (id 0), like the API key.</summary>
+    /// <summary>
+    /// The owner without an account (id 0). The local network bypass and External authentication stay the owner: they are
+    /// the owner's own way in (no account to pick a role from), and turning them on is itself owner-only.
+    /// </summary>
     private static AuthenticateResult Bypass(string scheme, string name)
     {
         var identity = new ClaimsIdentity(

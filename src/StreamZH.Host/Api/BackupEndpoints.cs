@@ -19,7 +19,8 @@ public static class BackupEndpoints
 
     public static IEndpointRouteBuilder MapBackupEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/system/backup").WithTags("System").RequireAuthorization(AuthSchemes.AdminPolicy);
+        // 0.12: owner only. A backup holds the database with every secret and the key ring; a restore replaces the accounts.
+        var group = app.MapGroup("/api/v1/system/backup").WithTags("System").RequireAuthorization(AuthSchemes.OwnerPolicy);
 
         group.MapGet("/", (BackupService backups, BackupSettings settings) =>
             new BackupList(backups.List(), backups.Pending(), settings.Folder, settings.IntervalDays, settings.RetentionDays));

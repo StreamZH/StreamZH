@@ -13,7 +13,11 @@ using StreamZH.Data;
 
 namespace StreamZH.Host.Auth;
 
-/// <summary>Authenticates scripts and CloudZH via the X-Api-Key header (or ?apikey= for websockets).</summary>
+/// <summary>
+/// Authenticates scripts and CloudZH via the X-Api-Key header (or ?apikey= for websockets). Since 0.12 the key acts as an
+/// Admin, not as the owner: it can do everything an Admin can (library, downloads, indexers, settings), but not the
+/// owner-only things (<see cref="AuthSchemes.OwnerPolicy"/>), so a leaked key or an Admin who reads it cannot become the owner.
+/// </summary>
 public sealed class ApiKeyAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
@@ -41,7 +45,7 @@ public sealed class ApiKeyAuthenticationHandler(
             [
                 new Claim(ClaimTypes.NameIdentifier, "0"),
                 new Claim(ClaimTypes.Name, "api"),
-                new Claim(ClaimTypes.Role, nameof(UserRole.Owner)),
+                new Claim(ClaimTypes.Role, nameof(UserRole.Admin)),
             ],
             Scheme.Name);
 

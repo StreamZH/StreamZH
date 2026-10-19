@@ -13,6 +13,15 @@ namespace StreamZH.Host.Api;
 /// <summary>Settings → Downloads → Tools: where par2, 7-Zip and ffprobe are, whether they were found, and installing them.</summary>
 public static class ToolSettingsEndpoints
 {
+    /// <summary>Why a configured path is not used: missing, or (0.12) a file that is not named like the tool.</summary>
+    internal static string NotFoundMessage(PostProcessTool tool, string configured)
+    {
+        var name = PostProcessTools.DisplayName(tool);
+        return File.Exists(configured)
+            ? $"This file is not {name}. For safety StreamZH only runs a file named {PostProcessTools.FileNameHint(tool)}."
+            : $"{name} was not found there. Enter the path of {PostProcessTools.FileNameHint(tool)} or its folder, or leave it empty to search automatically.";
+    }
+
     public static IEndpointRouteBuilder MapToolSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/settings/tools").WithTags("Settings").RequireAuthorization(AuthSchemes.AdminPolicy);
@@ -35,19 +44,12 @@ public static class ToolSettingsEndpoints
             var sevenZip = request.SevenZipPath?.Trim();
             var ffprobe = request.FfprobePath?.Trim();
 
-            if (!string.IsNullOrEmpty(par2) && tools.ResolveConfigured(PostProcessTool.Par2, par2) is null)
+            foreach (var (tool, field, value) in new[] { (PostProcessTool.Par2, "par2Path", par2), (PostProcessTool.SevenZip, "sevenZipPath", sevenZip), (PostProcessTool.FFprobe, "ffprobePath", ffprobe) })
             {
-                errors["par2Path"] = ["par2 was not found there. Enter the path of par2 (par2.exe on Windows) or its folder, or leave it empty to search automatically."];
-            }
-
-            if (!string.IsNullOrEmpty(sevenZip) && tools.ResolveConfigured(PostProcessTool.SevenZip, sevenZip) is null)
-            {
-                errors["sevenZipPath"] = ["7-Zip was not found there. Enter the path of 7z (7z.exe on Windows) or its folder, or leave it empty to search automatically."];
-            }
-
-            if (!string.IsNullOrEmpty(ffprobe) && tools.ResolveConfigured(PostProcessTool.FFprobe, ffprobe) is null)
-            {
-                errors["ffprobePath"] = ["ffprobe was not found there. Enter the path of ffprobe (ffprobe.exe on Windows) or its folder, or leave it empty to search automatically."];
+                if (!string.IsNullOrEmpty(value) && tools.ResolveConfigured(tool, value) is null)
+                {
+                    errors[field] = [NotFoundMessage(tool, value)];
+                }
             }
 
             if (errors.Count > 0)
@@ -96,7 +98,7 @@ public static class ToolSettingsEndpoints
                 resource.FfprobeResolvedPath ?? "not found",
                 resource.AutoInstall);
             return Results.Ok(resource);
-        });
+        }).RequireAuthorization(AuthSchemes.OwnerPolicy); // 0.12: StreamZH runs what is configured here.
 
         // Starts the installation (or joins the one already running) and answers when it has finished, a few seconds later.
         group.MapPost("/{tool}/install", async (

@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Security;
 
 namespace StreamZH.Indexers.Newznab;
 
@@ -146,10 +147,11 @@ public static partial class NewznabRssParser
 
         return new ReleaseInfo
         {
-            Guid = string.IsNullOrEmpty(guid) ? downloadUrl : guid,
+            // 0.12: the guid is shown and stored (history); without keys (it is often the download link itself).
+            Guid = SecretUrls.Redact(string.IsNullOrEmpty(guid) ? downloadUrl : guid),
             Title = title,
             DownloadUrl = downloadUrl,
-            InfoUrl = infoUrl,
+            InfoUrl = SecretUrls.RedactOrNull(infoUrl),
             Size = size is > 0 ? size.Value : 0,
             PublishDate = ParseDate(Attribute(item, "usenetdate")) ?? ParseDate(item.Element("pubDate")?.Value) ?? default,
             Categories = [.. Attributes(item, "category").Select(ParseInt).OfType<int>().Distinct()],

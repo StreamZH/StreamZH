@@ -125,7 +125,7 @@ public sealed class ConnectionRepository(Database database)
     public void SetFailure(int id, DateTime at, string error)
     {
         using var connection = database.Open();
-        connection.Execute("UPDATE Connections SET LastFailure = @at, LastError = @error WHERE Id = @id", new { id, at, error });
+        connection.Execute("UPDATE Connections SET LastFailure = @at, LastError = @error WHERE Id = @id", new { id, at, error = Core.Security.SecretUrls.Redact(error) });
     }
 
     public static string SerializeSettings(IReadOnlyDictionary<string, JsonElement> settings) => JsonSerializer.Serialize(settings);

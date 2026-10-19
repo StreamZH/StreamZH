@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Security;
 using StreamZH.Indexers.Newznab;
 
 namespace StreamZH.Indexers.Torznab;
@@ -104,10 +105,11 @@ public static class TorznabRssParser
 
         return new ReleaseInfo
         {
-            Guid = string.IsNullOrEmpty(guid) ? infoHash ?? downloadUrl : guid,
+            // 0.12: the guid is shown and stored (history); without keys (it is often the download link itself).
+            Guid = SecretUrls.Redact(string.IsNullOrEmpty(guid) ? infoHash ?? downloadUrl : guid),
             Title = title,
             DownloadUrl = downloadUrl,
-            InfoUrl = infoUrl,
+            InfoUrl = SecretUrls.RedactOrNull(infoUrl),
             Size = Size(item),
             PublishDate = NewznabRssParser.ParseDate(item.Element("pubDate")?.Value) ?? default,
             Categories = [.. Attributes(item, "category").Concat(item.Elements("category").Select(c => c.Value)).Select(ParseInt).OfType<int>().Distinct()],

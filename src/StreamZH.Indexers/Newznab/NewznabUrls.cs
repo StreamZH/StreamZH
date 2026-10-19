@@ -7,13 +7,14 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Security;
 
 namespace StreamZH.Indexers.Newznab;
 
 /// <summary>Builds Newznab API URLs and keeps API keys out of anything that is shown or logged.</summary>
 public static partial class NewznabUrls
 {
-    public const string Redacted = "(removed)";
+    public const string Redacted = SecretUrls.Redacted;
 
     /// <summary>"https://indexer.example" + "/api" (trailing slashes removed, a leading slash added to the path).</summary>
     public static string ApiEndpoint(IndexerDefinition indexer)
@@ -121,7 +122,8 @@ public static partial class NewznabUrls
             return text ?? string.Empty;
         }
 
-        var result = SecretParameterRegex().Replace(text, Redacted);
+        // 0.12: the shared list of secret parameters (also used for the history and release links).
+        var result = SecretUrls.Redact(text);
 
         var key = apiKey?.Trim();
         if (!string.IsNullOrEmpty(key))
@@ -141,8 +143,4 @@ public static partial class NewznabUrls
 
     [GeneratedRegex(@"(?:^|[?&])apikey=", RegexOptions.IgnoreCase)]
     private static partial Regex ApiKeyParameterRegex();
-
-    // apikey/api_key are API keys; Newznab download links carry the key as "r=", some sites use passkey/token.
-    [GeneratedRegex(@"(?<=[?&;](?:apikey|api_key|r|passkey|token)=)[^&#\s""'<>]+", RegexOptions.IgnoreCase)]
-    private static partial Regex SecretParameterRegex();
 }

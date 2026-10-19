@@ -140,7 +140,7 @@ public sealed class ImportListRepository(Database database)
         using var connection = database.Open();
         connection.Execute(
             "UPDATE ImportLists SET LastSync = @at, LastError = @error, Failures = Failures + 1 WHERE Id = @id",
-            new { id, at, error });
+            new { id, at, error = Core.Security.SecretUrls.Redact(error) });
     }
 
     // ---- Exclusions ----

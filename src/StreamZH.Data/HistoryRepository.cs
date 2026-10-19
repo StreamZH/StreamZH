@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Dapper;
 using StreamZH.Core.Media;
+using StreamZH.Core.Security;
 
 namespace StreamZH.Data;
 
@@ -73,6 +74,16 @@ public sealed record HistoryFilter(
 
 public sealed class HistoryRepository(Database database)
 {
+    /// <summary>The download link of a grab. Only Owner and Admin see it, without its keys (0.12).</summary>
+    public const string DownloadUrlKey = "downloadUrl";
+
+    /// <summary>0.12: links in the details (download URL, guid) lose their API keys and passwords before they are stored or shown.</summary>
+    public static Dictionary<string, string?> RedactData(IReadOnlyDictionary<string, string?> data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return data.ToDictionary(p => p.Key, p => SecretUrls.RedactOrNull(p.Value), StringComparer.Ordinal);
+    }
+
     private const string Columns = """
         Id, Date, EventType, MediaType, MovieId, SeriesId, EpisodeIds, SourceTitle, QualityId, Languages, ReleaseGroup, Indexer, IndexerId, Size, Data
         """;
@@ -101,7 +112,7 @@ public sealed class HistoryRepository(Database database)
                 item.Indexer,
                 item.IndexerId,
                 item.Size,
-                Data = JsonSerializer.Serialize(item.Data),
+                Data = JsonSerializer.Serialize(RedactData(item.Data)),
             });
     }
 
@@ -208,7 +219,7 @@ public sealed class HistoryRepository(Database database)
             Indexer = Indexer,
             IndexerId = IndexerId is { } i ? (int)i : null,
             Size = Size,
-            Data = JsonSerializer.Deserialize<Dictionary<string, string?>>(Data) ?? [],
+            Data = RedactData(JsonSerializer.Deserialize<Dictionary<string, string?>>(Data) ?? []),
         };
     }
 }

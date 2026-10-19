@@ -2,7 +2,9 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Collections.Concurrent;
 using System.Net;
+using System.Reflection;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using MonoTorrent;
@@ -60,6 +62,9 @@ public sealed class TorrentEngine : IAsyncDisposable
     private readonly TorrentStateStore _store;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    // Magnet links: the metadata is fetched alone first and checked (TorrentPathSafety) before any file is written.
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _metadataFetches = new(StringComparer.Ordinal);
+
     // Set once disposed: the host may still call StopAsync afterwards (a test host stopped after its services were disposed).
     private volatile bool _disposed;
     private readonly Dictionary<string, TorrentEntry> _entries = new(StringComparer.Ordinal);
@@ -87,7 +92,9 @@ public sealed class TorrentEngine : IAsyncDisposable
     public bool IsRunning => Volatile.Read(ref _engine) is not null;
 
     /// <summary>The MonoTorrent version, for the client test and System → Status.</summary>
-    public static string EngineVersion { get; } = typeof(ClientEngine).Assembly.GetName().Version?.ToString(3) ?? "3";
+    public static string EngineVersion { get; } =
+        typeof(ClientEngine).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+        ?? typeof(ClientEngine).Assembly.GetName().Version?.ToString(3) ?? "3";
 
     public string DataFolder => _store.Folder;
 
@@ -208,6 +215,14 @@ public sealed class TorrentEngine : IAsyncDisposable
         if (engine is null)
         {
             return;
+        }
+
+        foreach (var hash in _metadataFetches.Keys.ToList())
+        {
+            if (_metadataFetches.TryRemove(hash, out var fetch))
+            {
+                fetch.Cancel();
+            }
         }
 
         var now = _time.GetUtcNow();
@@ -415,6 +430,11 @@ public sealed class TorrentEngine : IAsyncDisposable
             if (!_entries.TryGetValue(hash, out var entry))
             {
                 return false;
+            }
+
+            if (_metadataFetches.TryRemove(hash, out var fetch))
+            {
+                fetch.Cancel();
             }
 
             if (_live.Remove(hash, out var live))
@@ -701,17 +721,31 @@ public sealed class TorrentEngine : IAsyncDisposable
             if (entry.HasTorrentFile && File.Exists(file))
             {
                 var torrent = await MtTorrent.LoadAsync(file);
+                if (TorrentPathSafety.Problem(torrent) is { } problem)
+                {
+                    entry.Error = $"Not downloaded: {problem}";
+                    _dirty = true;
+                    _logger.LogWarning("Torrent '{Name}' was not started: {Problem}", entry.Name, problem);
+                    return;
+                }
+
                 manager = await engine.AddAsync(torrent, entry.SavePath, BuildTorrentSettings(options, torrent.IsPrivate));
+
+                // Second line of defence: every file MonoTorrent will write must stay inside the save folder.
+                if (TorrentPathSafety.OutsideFolder(entry.SavePath, manager) is not null)
+                {
+                    await engine.RemoveAsync(manager, RemoveMode.CacheDataOnly);
+                    entry.Error = "Not downloaded: a file of this torrent would be written outside the download folder.";
+                    _dirty = true;
+                    _logger.LogWarning("Torrent '{Name}' was not started: a file would be written outside {Folder}", entry.Name, entry.SavePath);
+                    return;
+                }
             }
             else if (entry.MagnetUri is { } uri && MagnetLink.TryParse(uri, out var magnet))
             {
-                // Metadata fetched earlier is loaded from the cache (AutoSaveLoadMagnetLinkMetadata).
-                manager = await engine.AddAsync(magnet, entry.SavePath, BuildTorrentSettings(options, isPrivate: false));
-                if (manager.Torrent is { IsPrivate: true } fetched)
-                {
-                    await manager.UpdateSettingsAsync(BuildTorrentSettings(options, isPrivate: true));
-                    FillMetadata(entry, fetched);
-                }
+                // Only the metadata first; the torrent is added from it once its file names are checked.
+                StartMetadataFetch(engine, entry, magnet);
+                return;
             }
             else
             {
@@ -738,6 +772,82 @@ public sealed class TorrentEngine : IAsyncDisposable
             entry.Error = ex.Message;
             _dirty = true;
             _logger.LogWarning("Torrent '{Name}' could not be loaded: {Error}", entry.Name, ex.Message);
+        }
+    }
+
+    private void StartMetadataFetch(ClientEngine engine, TorrentEntry entry, MagnetLink magnet)
+    {
+        var cts = new CancellationTokenSource();
+        if (!_metadataFetches.TryAdd(entry.Hash, cts))
+        {
+            cts.Dispose();
+            return;
+        }
+
+        var hash = entry.Hash;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var data = await engine.DownloadMetadataAsync(magnet, cts.Token);
+                await OnMetadataAsync(engine, hash, data.ToArray());
+            }
+            catch (OperationCanceledException)
+            {
+                // Removed or the engine stopped; the next start fetches again.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("The metadata of torrent {Hash} could not be fetched: {Error}", hash, ex.Message);
+            }
+            finally
+            {
+                if (_metadataFetches.TryGetValue(hash, out var current) && ReferenceEquals(current, cts))
+                {
+                    _metadataFetches.TryRemove(hash, out _);
+                }
+
+                cts.Dispose();
+            }
+        });
+    }
+
+    private async Task OnMetadataAsync(ClientEngine engine, string hash, byte[] metadata)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (!_entries.TryGetValue(hash, out var entry) || !ReferenceEquals(_engine, engine) || _runningOptions is not { } options)
+            {
+                return;
+            }
+
+            if (metadata.Length > MaxTorrentFileBytes || !MtTorrent.TryLoad(metadata, out var torrent))
+            {
+                entry.Error = "The torrent's metadata is not valid.";
+                _dirty = true;
+                return;
+            }
+
+            if (TorrentPathSafety.Problem(torrent) is { } problem)
+            {
+                entry.Error = $"Not downloaded: {problem}";
+                _dirty = true;
+                _logger.LogWarning("Torrent '{Name}' was not started: {Problem}", torrent.Name, problem);
+                return;
+            }
+
+            Directory.CreateDirectory(_store.FilesFolder);
+            await File.WriteAllBytesAsync(_store.TorrentFile(hash), metadata);
+            entry.HasTorrentFile = true;
+            FillMetadata(entry, torrent);
+            _dirty = true;
+            SaveState();
+            await AttachAsync(engine, entry, options);
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
@@ -1083,6 +1193,11 @@ public sealed class TorrentEngine : IAsyncDisposable
             if (!MtTorrent.TryLoad(bytes, out var torrent))
             {
                 throw new DownloadClientException("The torrent file is not valid.");
+            }
+
+            if (TorrentPathSafety.Problem(torrent) is { } problem)
+            {
+                throw new DownloadClientException($"The torrent was not added: {problem}");
             }
 
             return (torrent, null);

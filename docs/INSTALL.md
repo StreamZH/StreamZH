@@ -17,7 +17,7 @@ files only; the data folder stays.
 - [Moving the data folder](#moving-the-data-folder)
 - [Command line and environment](#command-line-and-environment)
 
-Downloads: the [releases page](https://github.com/cloudzh/streamzh/releases) on GitHub. Every release lists a
+Downloads: the [releases page](https://github.com/streamzh/streamzh/releases) on GitHub. Every release lists a
 `SHA256SUMS` file to check the downloads against.
 
 ## Before you start
@@ -244,9 +244,9 @@ sudo systemctl edit streamzh        # your own changes to the unit (kept on upda
 
 ## Docker
 
-The image `ghcr.io/cloudzh/streamzh` is built for amd64 and arm64 and contains par2, 7-Zip and ffprobe. Tags: the
+The image `ghcr.io/streamzh/streamzh` is built for amd64 and arm64 and contains par2, 7-Zip and ffprobe. Tags: the
 version (`1.0.0`), the minor version (`1.0`) and `latest` for the newest release. Release candidates are only
-available by their version tag, e.g. `ghcr.io/cloudzh/streamzh:1.0.0-rc.1`; they never move `1.0` or `latest`.
+available by their version tag, e.g. `ghcr.io/streamzh/streamzh:1.0.0-rc.1`; they never move `1.0` or `latest`.
 
 ### docker run
 
@@ -256,7 +256,7 @@ docker run -d --name streamzh --restart unless-stopped \
   -e PUID=1000 -e PGID=1000 -e UMASK=027 -e TZ=Etc/UTC \
   -v /opt/streamzh/config:/config \
   -v /data/media:/data/media -v /data/downloads:/data/downloads \
-  ghcr.io/cloudzh/streamzh:latest
+  ghcr.io/streamzh/streamzh:latest
 ```
 
 ### Docker Compose
@@ -264,7 +264,7 @@ docker run -d --name streamzh --restart unless-stopped \
 ```yaml
 services:
   streamzh:
-    image: ghcr.io/cloudzh/streamzh:latest
+    image: ghcr.io/streamzh/streamzh:latest
     container_name: streamzh
     restart: unless-stopped
     environment:
@@ -386,7 +386,7 @@ Caddy sends `X-Forwarded-For` and `X-Forwarded-Proto` and handles WebSockets by 
 ```yaml
 services:
   streamzh:
-    image: ghcr.io/cloudzh/streamzh:latest
+    image: ghcr.io/streamzh/streamzh:latest
     labels:
       - traefik.enable=true
       - traefik.http.routers.streamzh.rule=Host(`media.example.com`) && PathPrefix(`/streamzh`)
@@ -418,7 +418,7 @@ Backup now), then:
 | .deb | `sudo apt install ./streamzh_<new version>_amd64.deb` |
 | .rpm | `sudo dnf install ./streamzh-<new version>.x86_64.rpm` |
 | tar.gz | `sudo bash /opt/streamzh/install-linux.sh --from StreamZH-<new version>-linux-x64.tar.gz` (or unpack the new file and run its `install-linux.sh`) |
-| Docker | `docker pull ghcr.io/cloudzh/streamzh:latest`, then recreate the container (`docker compose pull && docker compose up -d`) |
+| Docker | `docker pull ghcr.io/streamzh/streamzh:latest`, then recreate the container (`docker compose pull && docker compose up -d`) |
 | macOS | Stop StreamZH, replace the `StreamZH` folder, remove the quarantine flag again, start it |
 
 The database is upgraded at the first start of the new version. Going back to an older version needs the backup you

@@ -1,7 +1,7 @@
 # StreamZH with Docker Compose - an example to copy and adapt.
 #
 #   mkdir -p /srv/streamzh && cd /srv/streamzh
-#   curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/cloudzh/streamzh/main/docker/docker-compose.example.yml
+#   curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/streamzh/streamzh/main/docker/docker-compose.example.yml
 #   (adapt the paths below)
 #   docker compose up -d
 #
@@ -19,7 +19,7 @@
 services:
   streamzh:
     # Released image: ":latest" (newest release), ":1.0" (newest 1.0.x) or an exact version like ":1.0.0".
-    image: ghcr.io/cloudzh/streamzh:latest
+    image: ghcr.io/streamzh/streamzh:latest
     # To build from a checkout instead, remove "image" above and use (paths relative to this file):
     # build:
     #   context: ..

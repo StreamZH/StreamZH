@@ -1,7 +1,7 @@
 # StreamZH Roadmap
 
 StreamZH replaces Radarr, Sonarr, Prowlarr, SABnzbd, a torrent client, Recyclarr and Requestrr with one application.
-This page shows where it stands and what comes next. Plans change; the [issues](https://github.com/cloudzh/streamzh/issues)
+This page shows where it stands and what comes next. Plans change; the [issues](https://github.com/streamzh/streamzh/issues)
 are the place to discuss them. What changed in each version is in the [changelog](../CHANGELOG.md).
 
 ## Where StreamZH stands: 1.0 release candidate
@@ -60,4 +60,4 @@ Not promised, roughly in order:
 - [ ] Community channel (GitHub Discussions and/or Discord)
 - [ ] Domain and website
 - [x] CI builds and publishes the image and the packages on tag (`release.yml`; first real run with `v1.0.0-rc.1`)
-- [ ] Repository owner decided (docs and CI use `cloudzh/streamzh` until then)
+- [x] Repository owner decided: the GitHub organization StreamZH (`streamzh/streamzh`)

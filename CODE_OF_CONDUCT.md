@@ -10,6 +10,6 @@ personal attacks are not tolerated.
 ## Reporting
 
 If you experience or witness unacceptable behaviour, report it privately to the maintainers through GitHub's
-[private vulnerability reporting](https://github.com/cloudzh/streamzh/security/advisories/new) form (choose a short
+[private vulnerability reporting](https://github.com/streamzh/streamzh/security/advisories/new) form (choose a short
 title starting with "Conduct:"), or contact a maintainer directly. Reports are handled confidentially. The maintainers
 decide on consequences as described in the Contributor Covenant's enforcement guidelines.

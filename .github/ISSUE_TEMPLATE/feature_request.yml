@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the idea! Please check the [roadmap](https://github.com/cloudzh/streamzh/blob/main/docs/ROADMAP.md)
-        and the [existing issues](https://github.com/cloudzh/streamzh/issues) first.
+        Thanks for the idea! Please check the [roadmap](https://github.com/streamzh/streamzh/blob/main/docs/ROADMAP.md)
+        and the [existing issues](https://github.com/streamzh/streamzh/issues) first.
   - type: textarea
     id: problem
     attributes:

@@ -21,7 +21,7 @@ The first public release candidate: download, install, configure, use.
 - **Linux packages**: `.deb` and `.rpm` for x64 and arm64. They install to `/opt/streamzh`, create the user
   `streamzh` and `/var/lib/streamzh`, enable and start `streamzh.service`, restart it on upgrade and keep your data on
   removal (`apt purge` deletes it). The `.tar.gz` with `install-linux.sh` stays for other distributions.
-- **Docker image on GHCR** (`ghcr.io/cloudzh/streamzh`) for amd64 and arm64, tagged with the version, the minor
+- **Docker image on GHCR** (`ghcr.io/streamzh/streamzh`) for amd64 and arm64, tagged with the version, the minor
   version and `latest` (release candidates only by their version), with the torrent port 51414 exposed.
 - **macOS** zips for Apple silicon and Intel (not notarized: remove the quarantine flag once).
 - **Releases** with checksums (`SHA256SUMS`) and these notes, built from a version tag.

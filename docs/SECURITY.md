@@ -12,7 +12,7 @@ you for, and how to run it safely. Short version:
 ## Reporting a vulnerability
 
 Please report security problems privately through GitHub's private vulnerability reporting on
-<https://github.com/cloudzh/streamzh> (Security → Report a vulnerability), not as a public issue; see
+<https://github.com/streamzh/streamzh> (Security → Report a vulnerability), not as a public issue; see
 [SECURITY.md](../SECURITY.md). Include the version
 (System → Status), how StreamZH is installed (Windows service, Linux, Docker) and the steps to reproduce. Fixes are
 released as soon as they are ready and credited in the release notes unless you prefer otherwise.

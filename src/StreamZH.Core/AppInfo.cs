@@ -14,7 +14,7 @@ public static class AppInfo
     /// The GitHub repository (owner/name): releases for the update check and links to the documentation. The one place
     /// to change when the repository moves (the release workflow derives the image name from the repository owner).
     /// </summary>
-    public const string Repository = "cloudzh/streamzh";
+    public const string Repository = "streamzh/streamzh";
 
     public const string RepositoryUrl = "https://github.com/" + Repository;
 

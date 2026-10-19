@@ -7,7 +7,7 @@
 
 <p align="center">One app for your whole media pipeline.</p>
 
-> **Status:** 1.0 release candidate. Feedback welcome in the [issues](https://github.com/cloudzh/streamzh/issues).
+> **Status:** 1.0 release candidate. Feedback welcome in the [issues](https://github.com/streamzh/streamzh/issues).
 
 StreamZH finds, downloads, repairs, unpacks, renames and files your movies and series, and lets friends request
 what they want to watch. It does in **one application** what usually takes six:
@@ -66,7 +66,7 @@ StreamZH ships no list of indexers and no content. Add only sources you are perm
 
 ## Quick start
 
-Downloads are on the [releases page](https://github.com/cloudzh/streamzh/releases). After installing, open
+Downloads are on the [releases page](https://github.com/streamzh/streamzh/releases). After installing, open
 **http://localhost:9797** (or `http://<server>:9797` from another device) and create the owner account.
 [docs/INSTALL.md](docs/INSTALL.md) covers every platform in detail.
 
@@ -100,10 +100,10 @@ docker run -d --name streamzh --restart unless-stopped \
   -p 9797:9797 -p 51414:51414 -p 51414:51414/udp \
   -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC \
   -v /opt/streamzh/config:/config -v /data:/data \
-  ghcr.io/cloudzh/streamzh:latest
+  ghcr.io/streamzh/streamzh:latest
 ```
 
-Release candidates are tagged by version only (e.g. `ghcr.io/cloudzh/streamzh:1.0.0-rc.1`). `docker logs streamzh`
+Release candidates are tagged by version only (e.g. `ghcr.io/streamzh/streamzh:1.0.0-rc.1`). `docker logs streamzh`
 shows the one-time setup code the first page asks for. A compose file, `UMASK` and reverse proxies:
 [INSTALL.md → Docker](docs/INSTALL.md#docker).
 

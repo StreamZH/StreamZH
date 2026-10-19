@@ -150,17 +150,17 @@ public sealed class GeneralSettingsApiTests : IDisposable
         Assert.False(info.LastCheck.UpdateAvailable);
         Assert.Contains("No update information yet", info.LastCheck.Message, StringComparison.Ordinal);
 
-        Assert.Equal("https://api.github.com/repos/cloudzh/streamzh/releases/latest", github.LastUrl);
+        Assert.Equal("https://api.github.com/repos/streamzh/streamzh/releases/latest", github.LastUrl);
         // Tests run from the build output (an archive install), or in a container (Docker: no file, pull the image).
         Assert.Contains(info.Package, new[] { ReleaseAssets.Archive, ReleaseAssets.Docker });
         var fits = ReleaseAssets.Suffix(ReleaseAssets.CurrentOs(), System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture, info.Package);
 
         // The file for this platform is offered; links that leave github.com are not.
         var suffix = fits ?? "-linux-x64.tar.gz";
-        var download = $"https://github.com/cloudzh/streamzh/releases/download/v99.1.0/StreamZH-99.1.0{suffix}";
+        var download = $"https://github.com/streamzh/streamzh/releases/download/v99.1.0/StreamZH-99.1.0{suffix}";
         github.Release = $$"""
-            {"tag_name":"v99.1.0","html_url":"https://github.com/cloudzh/streamzh/releases/tag/v99.1.0","published_at":"2027-01-01T00:00:00Z",
-             "assets":[{"name":"SHA256SUMS","browser_download_url":"https://github.com/cloudzh/streamzh/releases/download/v99.1.0/SHA256SUMS"},
+            {"tag_name":"v99.1.0","html_url":"https://github.com/streamzh/streamzh/releases/tag/v99.1.0","published_at":"2027-01-01T00:00:00Z",
+             "assets":[{"name":"SHA256SUMS","browser_download_url":"https://github.com/streamzh/streamzh/releases/download/v99.1.0/SHA256SUMS"},
                        {"name":"StreamZH-99.1.0{{suffix}}","browser_download_url":"{{download}}"}]}
             """;
         info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;
@@ -171,7 +171,7 @@ public sealed class GeneralSettingsApiTests : IDisposable
         Assert.Equal(fits is null ? null : download, info.LastCheck.AssetUrl);
 
         github.Release = $$"""
-            {"tag_name":"v99.1.0","html_url":"https://github.com/cloudzh/streamzh/releases/tag/v99.1.0",
+            {"tag_name":"v99.1.0","html_url":"https://github.com/streamzh/streamzh/releases/tag/v99.1.0",
              "assets":[{"name":"StreamZH-99.1.0{{suffix}}","browser_download_url":"https://evil.example/StreamZH-99.1.0{{suffix}}"}]}
             """;
         info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;
@@ -180,7 +180,7 @@ public sealed class GeneralSettingsApiTests : IDisposable
         Assert.Null(info.LastCheck.AssetUrl);
 
         // A release whose link leaves github.com is not offered (the link becomes the "Download" button).
-        foreach (var link in new[] { "https://github.com.evil.example/x", "http://github.com/cloudzh/streamzh/releases/tag/v99.2.0", "https://evil.example/StreamZH.exe", "https://github.com/attacker/streamzh/releases/tag/v99.2.0" })
+        foreach (var link in new[] { "https://github.com.evil.example/x", "http://github.com/streamzh/streamzh/releases/tag/v99.2.0", "https://evil.example/StreamZH.exe", "https://github.com/attacker/streamzh/releases/tag/v99.2.0" })
         {
             github.Release = $$"""{"tag_name":"v99.2.0","html_url":"{{link}}","published_at":"2027-01-01T00:00:00Z"}""";
             info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;

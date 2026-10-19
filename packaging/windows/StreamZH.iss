@@ -68,7 +68,7 @@
   #define NumericVersion AppVersion
 #endif
 
-#define AppUrl "https://github.com/cloudzh/streamzh"
+#define AppUrl "https://github.com/streamzh/streamzh"
 #define WebUi "http://localhost:9797"
 
 [Setup]

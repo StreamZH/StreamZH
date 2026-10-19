@@ -157,7 +157,7 @@ Install with the installer (Program Files is protected), or run `tools\Install-S
 
 ## Reporting a bug
 
-Open an issue on [GitHub](https://github.com/cloudzh/streamzh/issues) with the version (System → Status), how
+Open an issue on [GitHub](https://github.com/streamzh/streamzh/issues) with the version (System → Status), how
 StreamZH is installed, what you did and what happened, and the relevant log lines (Debug level helps: Settings →
 General → Logging). **Remove API keys, passwords, host names and anything personal** from logs and screenshots first,
 and never attach a backup or the database. Security problems go privately to the maintainers: see

@@ -17,9 +17,9 @@ version_schema: semver
 release: "1"
 section: video
 priority: optional
-maintainer: StreamZH contributors <https://github.com/cloudzh/streamzh>
+maintainer: StreamZH contributors <https://github.com/streamzh/streamzh>
 vendor: StreamZH
-homepage: https://github.com/cloudzh/streamzh
+homepage: https://github.com/streamzh/streamzh
 license: GPL-3.0-only
 description: |-
   One app for your whole media pipeline.
@@ -97,7 +97,7 @@ scripts:
 
 deb:
   fields:
-    Bugs: https://github.com/cloudzh/streamzh/issues
+    Bugs: https://github.com/streamzh/streamzh/issues
 
 rpm:
   summary: One app for your whole media pipeline

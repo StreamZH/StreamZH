@@ -14,15 +14,15 @@ install StreamZH with [INSTALL.md](INSTALL.md).
 | `StreamZH-<version>-linux-x64.tar.gz`, `-linux-arm64.tar.gz` | any Linux with systemd (`install-linux.sh`) | `packaging/linux/build.sh` |
 | `StreamZH-<version>-osx-arm64.zip`, `-osx-x64.zip` | macOS (not notarized) | release workflow |
 | `SHA256SUMS` | checksums of all of the above | release workflow |
-| `ghcr.io/cloudzh/streamzh:<version>` | Docker, linux/amd64 and linux/arm64 | `docker/Dockerfile` |
+| `ghcr.io/streamzh/streamzh:<version>` | Docker, linux/amd64 and linux/arm64 | `docker/Dockerfile` |
 
 Every release file and the image also get a build provenance attestation: proof that the release workflow of
-`cloudzh/streamzh` built them from the tagged commit (`SHA256SUMS` alone only proves a download is complete). Check
+`streamzh/streamzh` built them from the tagged commit (`SHA256SUMS` alone only proves a download is complete). Check
 one with the GitHub CLI:
 
 ```sh
-gh attestation verify StreamZH-<version>-win-x64-setup.exe --repo cloudzh/streamzh
-gh attestation verify oci://ghcr.io/cloudzh/streamzh:<version> --repo cloudzh/streamzh
+gh attestation verify StreamZH-<version>-win-x64-setup.exe --repo streamzh/streamzh
+gh attestation verify oci://ghcr.io/streamzh/streamzh:<version> --repo streamzh/streamzh
 ```
 
 `<version>` is `<Version>` in `Directory.Build.props` (for example `1.0.0` or `1.0.0-rc.1`). The packages contain
@@ -38,12 +38,12 @@ and how StreamZH was installed. The setup and the Linux packages write a marker 
 (`windows-installer`, `deb`, `rpm`); without it StreamZH offers the `.zip`/`.tar.gz`. Keep the file names above when
 changing the workflow: `src/StreamZH.Host/General/ReleaseAssets.cs` matches on their endings.
 
-## The repository: cloudzh/streamzh
+## The repository: streamzh/streamzh
 
-StreamZH lives in the GitHub organization **CloudZH**: <https://github.com/cloudzh/streamzh>, image
-`ghcr.io/cloudzh/streamzh`. The organization must keep both the repository and its GHCR namespace: every StreamZH
+StreamZH lives in the GitHub organization **StreamZH** (a CloudZH product; the GitHub name "cloudzh" belongs to an unrelated account and must never be used): <https://github.com/streamzh/streamzh>, image
+`ghcr.io/streamzh/streamzh`. The organization must keep both the repository and its GHCR namespace: every StreamZH
 installation's update check trusts the releases of this repository (and only those: release and download links must
-start with `https://github.com/cloudzh/streamzh/releases/`), and the compose example and the docs run this image.
+start with `https://github.com/streamzh/streamzh/releases/`), and the compose example and the docs run this image.
 
 The repository is written in:
 
@@ -51,7 +51,7 @@ The repository is written in:
 - `packaging/windows/StreamZH.iss` (`AppUrl`: publisher, support and update links in Windows' app list)
 - `packaging/linux/nfpm.yaml` (`maintainer`, `homepage`, `Bugs`)
 - `docker/Dockerfile` (OCI labels; the release workflow overrides `source` with the real repository)
-- `docker/docker-compose.example.yml` (`image: ghcr.io/cloudzh/streamzh:latest` and the download link)
+- `docker/docker-compose.example.yml` (`image: ghcr.io/streamzh/streamzh:latest` and the download link)
 - the documentation (`README.md`, `SECURITY.md`, `docs/*.md`)
 
 `packaging/check-repository.sh` checks that they agree with `AppInfo.Repository` (CI runs it on every push). The
@@ -212,13 +212,13 @@ the OCI keys (`source`, `licenses`, `version`, ...).
 2. Add the `## [1.0.0-rc.1] - <date>` section to `CHANGELOG.md`; it becomes the release notes.
 3. Commit, then tag and push: `git tag v1.0.0-rc.1 && git push origin v1.0.0-rc.1`.
 4. `.github/workflows/release.yml` runs:
-   - checks that it runs in `cloudzh/streamzh` and that the docs agree (`packaging/check-repository.sh`), and that the
+   - checks that it runs in `streamzh/streamzh` and that the docs agree (`packaging/check-repository.sh`), and that the
      tag equals `v<Version>` (fails otherwise),
    - builds the web UI and runs all tests,
    - builds every package (Linux on Ubuntu with the pinned nfpm, Windows on `windows-latest` with the pinned Inno
      Setup, macOS on `macos-latest`),
    - builds the Docker image and runs the smoke test (`/health`, `/api/v1/auth/state`, `/`),
-   - in the environment `release`: pushes `ghcr.io/cloudzh/streamzh` for amd64 and arm64 with the tags `<version>`,
+   - in the environment `release`: pushes `ghcr.io/streamzh/streamzh` for amd64 and arm64 with the tags `<version>`,
      `<major>.<minor>` and `latest` (`<major>.<minor>` and `latest` only for versions without a suffix) and attests
      the image,
    - in the environment `release`: writes `SHA256SUMS`, attests every file and creates a **draft** GitHub release

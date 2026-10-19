@@ -3,7 +3,7 @@
 Thanks for helping. Bug reports, ideas, documentation fixes and code are all welcome. By taking part you agree to the
 [code of conduct](CODE_OF_CONDUCT.md).
 
-- **Bugs and ideas**: open an [issue](https://github.com/cloudzh/streamzh/issues) with the bug report or feature
+- **Bugs and ideas**: open an [issue](https://github.com/streamzh/streamzh/issues) with the bug report or feature
   request form. Search first; maybe it is already there.
 - **Security problems**: never in a public issue. See [SECURITY.md](SECURITY.md).
 - **Bigger changes**: open an issue first and describe what you want to change, so we can agree on the approach before
@@ -15,7 +15,7 @@ Requirements: [.NET 10 SDK](https://dotnet.microsoft.com/download), [Node.js](ht
 Git. Optional for downloads during development: `par2` and `7z` on `PATH` (StreamZH installs them itself otherwise).
 
 ```bash
-git clone https://github.com/cloudzh/streamzh.git
+git clone https://github.com/streamzh/streamzh.git
 cd streamzh
 
 # Web interface (builds into src/StreamZH.Host/wwwroot)

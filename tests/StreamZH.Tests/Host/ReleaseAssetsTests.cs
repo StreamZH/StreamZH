@@ -89,31 +89,32 @@ public sealed class ReleaseAssetsTests
     [Fact]
     public void The_repository_is_one_constant()
     {
-        Assert.Equal("cloudzh/streamzh", AppInfo.Repository);
-        Assert.Equal("https://github.com/cloudzh/streamzh", AppInfo.RepositoryUrl);
+        Assert.Equal("streamzh/streamzh", AppInfo.Repository);
+        Assert.Equal("https://github.com/streamzh/streamzh", AppInfo.RepositoryUrl);
         Assert.Equal($"https://api.github.com/repos/{AppInfo.Repository}/releases/latest", UpdateChecker.LatestReleaseUrl);
     }
 
     /// <summary>SV4 X-01: only release links of StreamZH's own repository become the "Download" button.</summary>
     [Theory]
-    [InlineData("https://github.com/cloudzh/streamzh/releases/tag/v1.0.0", true)]
-    [InlineData("https://github.com/cloudzh/streamzh/releases/download/v1.0.0/StreamZH-1.0.0-win-x64-setup.exe", true)]
-    [InlineData("https://github.com/CloudZH/StreamZH/releases/tag/v1.0.0", true)]
-    [InlineData("https://GITHUB.com/cloudzh/streamzh/releases/tag/v1.0.0", true)]
+    [InlineData("https://github.com/streamzh/streamzh/releases/tag/v1.0.0", true)]
+    [InlineData("https://github.com/streamzh/streamzh/releases/download/v1.0.0/StreamZH-1.0.0-win-x64-setup.exe", true)]
+    [InlineData("https://github.com/StreamZH/StreamZH/releases/tag/v1.0.0", true)]
+    [InlineData("https://github.com/StreamZH/streamzh/releases/tag/v1.0.0", true)]
+    [InlineData("https://github.com/cloudzh/streamzh/releases/tag/v1.0.0", false)]
     [InlineData("https://github.com/attacker/streamzh/releases/tag/v99.0.0", false)]
     [InlineData("https://github.com/attacker/streamzh/releases/download/v99.0.0/StreamZH-99.0.0-win-x64-setup.exe", false)]
-    [InlineData("https://github.com/cloudzh/streamzh-fork/releases/tag/v1.0.0", false)]
-    [InlineData("https://github.com/cloudzh/streamzh/issues/1", false)]
-    [InlineData("https://github.com/cloudzh/streamzh/releases", false)]
-    [InlineData("https://github.com/cloudzh/streamzh/releases/../../../attacker/x/releases/download/a.exe", false)]
-    [InlineData("https://github.com/cloudzh/streamzh/releases/%2e%2e/%2e%2e/%2e%2e/attacker/x/releases/download/a.exe", false)]
-    [InlineData("https://github.com/cloudzh/streamzh/releases/%2E%2E/a.exe", false)]
-    [InlineData("http://github.com/cloudzh/streamzh/releases/tag/v1.0.0", false)]
-    [InlineData("https://github.com:8443/cloudzh/streamzh/releases/tag/v1.0.0", false)]
-    [InlineData("https://user@github.com/cloudzh/streamzh/releases/tag/v1.0.0", false)]
-    [InlineData("https://github.com.evil.example/cloudzh/streamzh/releases/tag/v1.0.0", false)]
-    [InlineData("https://evil.example/cloudzh/streamzh/releases/tag/v1.0.0", false)]
-    [InlineData("/cloudzh/streamzh/releases/tag/v1.0.0", false)]
+    [InlineData("https://github.com/streamzh/streamzh-fork/releases/tag/v1.0.0", false)]
+    [InlineData("https://github.com/streamzh/streamzh/issues/1", false)]
+    [InlineData("https://github.com/streamzh/streamzh/releases", false)]
+    [InlineData("https://github.com/streamzh/streamzh/releases/../../../attacker/x/releases/download/a.exe", false)]
+    [InlineData("https://github.com/streamzh/streamzh/releases/%2e%2e/%2e%2e/%2e%2e/attacker/x/releases/download/a.exe", false)]
+    [InlineData("https://github.com/streamzh/streamzh/releases/%2E%2E/a.exe", false)]
+    [InlineData("http://github.com/streamzh/streamzh/releases/tag/v1.0.0", false)]
+    [InlineData("https://github.com:8443/streamzh/streamzh/releases/tag/v1.0.0", false)]
+    [InlineData("https://user@github.com/streamzh/streamzh/releases/tag/v1.0.0", false)]
+    [InlineData("https://github.com.evil.example/streamzh/streamzh/releases/tag/v1.0.0", false)]
+    [InlineData("https://evil.example/streamzh/streamzh/releases/tag/v1.0.0", false)]
+    [InlineData("/streamzh/streamzh/releases/tag/v1.0.0", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void Release_links_must_belong_to_the_repository(string? url, bool expected) =>

@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security problems **privately** through GitHub's private vulnerability reporting:
-[Security → Report a vulnerability](https://github.com/cloudzh/streamzh/security/advisories/new). Do not open a public
+[Security → Report a vulnerability](https://github.com/streamzh/streamzh/security/advisories/new). Do not open a public
 issue, discussion or pull request for them.
 
 Include:

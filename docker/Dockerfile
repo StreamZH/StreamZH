@@ -1,7 +1,7 @@
 # StreamZH container image (linux/amd64 and linux/arm64)
 # Build from the repository root:  docker build -f docker/Dockerfile -t streamzh:dev .
 # Run:  docker run -d --name streamzh -p 9797:9797 -e PUID=1000 -e PGID=1000 -v /srv/streamzh:/config streamzh:dev
-# Released images: ghcr.io/cloudzh/streamzh (see docs/PACKAGING.md).
+# Released images: ghcr.io/streamzh/streamzh (see docs/PACKAGING.md).
 
 # The web UI and the .NET build run on the build machine's platform; their output is the same for every target
 # (the backend is published framework-dependent and portable: managed code plus native SQLite for each platform).
@@ -23,9 +23,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="StreamZH" \
       org.opencontainers.image.description="One app for your whole media pipeline: library, indexers, downloads, requests." \
-      org.opencontainers.image.source="https://github.com/cloudzh/streamzh" \
-      org.opencontainers.image.url="https://github.com/cloudzh/streamzh" \
-      org.opencontainers.image.documentation="https://github.com/cloudzh/streamzh/blob/main/docs/INSTALL.md" \
+      org.opencontainers.image.source="https://github.com/streamzh/streamzh" \
+      org.opencontainers.image.url="https://github.com/streamzh/streamzh" \
+      org.opencontainers.image.documentation="https://github.com/streamzh/streamzh/blob/main/docs/INSTALL.md" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.vendor="StreamZH contributors" \
       org.opencontainers.image.version="$VERSION"

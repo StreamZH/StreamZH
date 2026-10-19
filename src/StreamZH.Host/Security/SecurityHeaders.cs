@@ -18,7 +18,7 @@ public static partial class SecurityHeaders
     public const string SandboxPolicy = "sandbox";
 
     private const string Policy =
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://image.tmdb.org; " +
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://image.tmdb.org; " +
         "font-src 'self' data:; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
     public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app) => app.Use((context, next) =>

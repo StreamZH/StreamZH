@@ -87,6 +87,7 @@ public sealed class OngoingService(
         TrashNotices.Add(notices, services);
         AutomationNotices.Add(notices, services);
         DiscordNotices.Add(notices, services);
+        SecretNotices.Add(notices, services);
 
         return new OngoingResource(running, notices, AutomationNotices.IsOn(services));
     }

@@ -44,20 +44,35 @@ public sealed class IndexerRepository(Database database)
     public IReadOnlyList<IndexerDefinition> All()
     {
         using var connection = database.Open();
-        return [.. connection.Query<IndexerRow>($"SELECT {Columns} FROM Indexers ORDER BY Priority, Name COLLATE NOCASE").Select(r => r.ToDefinition())];
+        return [.. connection.Query<IndexerRow>($"SELECT {Columns} FROM Indexers ORDER BY Priority, Name COLLATE NOCASE").Select(Read)];
     }
 
     public IndexerDefinition? Find(int id)
     {
         using var connection = database.Open();
-        return connection.QuerySingleOrDefault<IndexerRow>($"SELECT {Columns} FROM Indexers WHERE Id = @id", new { id })?.ToDefinition();
+        return connection.QuerySingleOrDefault<IndexerRow>($"SELECT {Columns} FROM Indexers WHERE Id = @id", new { id }) is { } row ? Read(row) : null;
+    }
+
+    public const string SecretKind = "Indexer";
+
+    // 0.12: the API key is stored encrypted; an unreadable one reads as empty (the indexer asks for it again).
+    private IndexerDefinition Read(IndexerRow row)
+    {
+        var definition = row.ToDefinition();
+        return definition with { ApiKey = database.Secrets.Decrypt(definition.ApiKey, new SecretLocation(SecretKind, definition.Name, "API key")) ?? string.Empty };
+    }
+
+    private IndexerRow Write(IndexerDefinition indexer, DateTime added)
+    {
+        database.Secrets.Forget(SecretKind, indexer.Name);
+        return IndexerRow.From(indexer with { ApiKey = database.Secrets.Encrypt(indexer.ApiKey) ?? string.Empty }, added);
     }
 
     /// <summary>Case-insensitive lookup by name.</summary>
     public IndexerDefinition? FindByName(string name)
     {
         using var connection = database.Open();
-        return connection.QueryFirstOrDefault<IndexerRow>($"SELECT {Columns} FROM Indexers WHERE Name = @name COLLATE NOCASE", new { name })?.ToDefinition();
+        return connection.QueryFirstOrDefault<IndexerRow>($"SELECT {Columns} FROM Indexers WHERE Name = @name COLLATE NOCASE", new { name }) is { } row ? Read(row) : null;
     }
 
     public int Add(IndexerDefinition indexer, DateTime added)
@@ -75,7 +90,7 @@ public sealed class IndexerRepository(Database database)
                 @MinimumSeeders, @SeedRatio, @SeedTimeMinutes, @SeasonPackSeedTimeMinutes);
             SELECT last_insert_rowid();
             """,
-            IndexerRow.From(indexer, added));
+            Write(indexer, added));
     }
 
     public void Update(IndexerDefinition indexer)
@@ -92,7 +107,7 @@ public sealed class IndexerRepository(Database database)
                 SeasonPackSeedTimeMinutes = @SeasonPackSeedTimeMinutes
             WHERE Id = @Id
             """,
-            IndexerRow.From(indexer, default));
+            Write(indexer, default));
     }
 
     /// <summary>Stores the capabilities (JSON) read from the indexer and when they were read; nulls clear them.</summary>

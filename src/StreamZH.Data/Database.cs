@@ -25,6 +25,16 @@ public sealed class Database
         }.ToString();
     }
 
+    /// <summary>0.12: encryption of stored secrets (passwords, API keys, tokens); see <see cref="SecretCodec"/>.</summary>
+    public SecretCodec Secrets { get; } = new();
+
+    /// <summary>Encrypt secrets from now on (the app calls this at start, before anything reads a secret).</summary>
+    public void UseSecretProtector(ISecretProtector protector)
+    {
+        ArgumentNullException.ThrowIfNull(protector);
+        Secrets.Use(protector);
+    }
+
     public IDbConnection Open()
     {
         var connection = new SqliteConnection(_connectionString);

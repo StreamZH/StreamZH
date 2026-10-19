@@ -7,7 +7,7 @@ using StreamZH.Core.Downloads;
 
 namespace StreamZH.Data;
 
-/// <summary>The UsenetServers table. Passwords are stored as entered (same policy as indexer API keys).</summary>
+/// <summary>The UsenetServers table. Passwords are stored encrypted since 0.12 (<see cref="SecretCodec"/>).</summary>
 public sealed class UsenetServerRepository(Database database)
 {
     private const string Columns =
@@ -18,20 +18,35 @@ public sealed class UsenetServerRepository(Database database)
     public IReadOnlyList<UsenetServer> All()
     {
         using var connection = database.Open();
-        return [.. connection.Query<Row>($"SELECT {Columns} FROM UsenetServers ORDER BY Priority, Name COLLATE NOCASE").Select(r => r.ToServer())];
+        return [.. connection.Query<Row>($"SELECT {Columns} FROM UsenetServers ORDER BY Priority, Name COLLATE NOCASE").Select(Read)];
     }
 
     public UsenetServer? Find(int id)
     {
         using var connection = database.Open();
-        return connection.QuerySingleOrDefault<Row>($"SELECT {Columns} FROM UsenetServers WHERE Id = @id", new { id })?.ToServer();
+        return connection.QuerySingleOrDefault<Row>($"SELECT {Columns} FROM UsenetServers WHERE Id = @id", new { id }) is { } row ? Read(row) : null;
+    }
+
+    public const string SecretKind = "Usenet server";
+
+    // 0.12: the password is stored encrypted; an unreadable one reads as empty (the server asks for it again).
+    private UsenetServer Read(Row row)
+    {
+        var server = row.ToServer();
+        return server with { Password = database.Secrets.Decrypt(server.Password, new SecretLocation(SecretKind, server.Name, "Password")) ?? string.Empty };
+    }
+
+    private string Protect(UsenetServer server)
+    {
+        database.Secrets.Forget(SecretKind, server.Name);
+        return database.Secrets.Encrypt(server.Password) ?? string.Empty;
     }
 
     /// <summary>Case-insensitive lookup by name.</summary>
     public UsenetServer? FindByName(string name)
     {
         using var connection = database.Open();
-        return connection.QueryFirstOrDefault<Row>($"SELECT {Columns} FROM UsenetServers WHERE Name = @name COLLATE NOCASE", new { name })?.ToServer();
+        return connection.QueryFirstOrDefault<Row>($"SELECT {Columns} FROM UsenetServers WHERE Name = @name COLLATE NOCASE", new { name }) is { } row ? Read(row) : null;
     }
 
     /// <summary>Adds the server; its quota counter (if a quota is set) starts at zero from <paramref name="added"/>.</summary>
@@ -53,7 +68,7 @@ public sealed class UsenetServerRepository(Database database)
                 server.Port,
                 server.UseSsl,
                 server.Username,
-                server.Password,
+                Password = Protect(server),
                 server.Connections,
                 server.Priority,
                 server.Enabled,
@@ -90,7 +105,7 @@ public sealed class UsenetServerRepository(Database database)
                 server.Port,
                 server.UseSsl,
                 server.Username,
-                server.Password,
+                Password = Protect(server),
                 server.Connections,
                 server.Priority,
                 server.Enabled,

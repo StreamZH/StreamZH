@@ -59,7 +59,6 @@ var database = new Database(paths.DatabaseFile);
 database.Migrate();
 
 var config = new ConfigRepository(database);
-config.GetOrCreate(ConfigKeys.ApiKey, GeneralSettingsEndpoints.NewApiKey);
 var fileLogger = builder.AddStreamZhLogging(paths, config);
 var runningHost = builder.UseStreamZhHost(config, restart);
 builder.UseStreamZhService(service);
@@ -140,6 +139,9 @@ builder.Services.AddSignalR();
 builder.Services.AddOpenApi("v1");
 
 var app = builder.Build();
+
+// 0.12: secrets are stored encrypted; also creates the API key at the first start.
+app.UseStreamZhSecrets(database, config);
 
 app.UseStreamZhUrlBase();
 app.UseExceptionHandler();

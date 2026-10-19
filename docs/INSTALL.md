@@ -123,7 +123,7 @@ folder and the folders it is given.
 
 - It can change folders that every user may change (most folders on other drives, e.g. `D:\Media`).
 - Folders of your user (Videos, Downloads, Desktop) and other restricted folders must be given to it: on the
-  installer's media folders page, or later with the service script (below).
+  installer's page "Where are your movies and series?", or later with the service script (below).
 - **Network shares:** a service does not see mapped drives (`Z:`). Use UNC paths such as `\\nas\media\movies` for
   root folders and download folders. The virtual account logs on to other computers as the computer account
   (`DOMAIN\PC$`); when your NAS wants a user name and password, run the service as a user account instead

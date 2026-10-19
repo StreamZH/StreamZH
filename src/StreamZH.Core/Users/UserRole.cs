@@ -13,6 +13,12 @@ public enum UserRole
     /// <summary>Full configuration access.</summary>
     Admin = 2,
 
-    /// <summary>May add and delete media, no configuration.</summary>
+    /// <summary>May add and delete media, no configuration. Requests are approved automatically by default.</summary>
     Friend = 3,
+
+    /// <summary>
+    /// 0.10: may only discover and request movies and series and see their own requests; no library changes, no
+    /// configuration. Reaches only endpoints with <c>AnyUserPolicy</c>.
+    /// </summary>
+    Requester = 4,
 }

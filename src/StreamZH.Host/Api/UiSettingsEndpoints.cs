@@ -14,7 +14,7 @@ public static class UiSettingsEndpoints
     {
         var group = app.MapGroup("/api/v1/settings/ui").WithTags("Settings");
 
-        group.MapGet("/", (UiSettings ui) => UiSettingsResource.From(ui)).RequireAuthorization();
+        group.MapGet("/", (UiSettings ui) => UiSettingsResource.From(ui)).RequireAuthorization(AuthSchemes.AnyUserPolicy);
 
         group.MapPut("/", (UpdateUiSettings request, UiSettings ui) =>
         {

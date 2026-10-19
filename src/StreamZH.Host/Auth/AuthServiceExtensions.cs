@@ -53,7 +53,14 @@ public static class AuthServiceExtensions
             });
 
         services.AddAuthorizationBuilder()
-            .AddPolicy(AuthSchemes.AdminPolicy, policy => policy.RequireRole(nameof(UserRole.Owner), nameof(UserRole.Admin)));
+            .AddPolicy(AuthSchemes.AdminPolicy, policy => policy.RequireRole(nameof(UserRole.Owner), nameof(UserRole.Admin)))
+            .AddPolicy(AuthSchemes.AnyUserPolicy, policy => policy.RequireAuthenticatedUser())
+            // Plain RequireAuthorization(): members only. Requesters (0.10) are kept out of everything that does not
+            // opt in with AnyUserPolicy.
+            .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireRole(nameof(UserRole.Owner), nameof(UserRole.Admin), nameof(UserRole.Friend))
+                .Build());
 
         services.AddRateLimiter(options =>
         {

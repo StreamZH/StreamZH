@@ -22,4 +22,11 @@ public static class AuthSchemes
 
     /// <summary>Policy for configuration access: Owner and Admin.</summary>
     public const string AdminPolicy = "Admin";
+
+    /// <summary>
+    /// 0.10: every signed-in user incl. Requester (discover, requests, own profile). The default policy
+    /// (plain <c>RequireAuthorization()</c>) admits only Owner, Admin and Friend, so a Requester never reaches the
+    /// library, downloads or anything else unless an endpoint opts in with this policy.
+    /// </summary>
+    public const string AnyUserPolicy = "AnyUser";
 }

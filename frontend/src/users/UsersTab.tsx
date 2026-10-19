@@ -187,15 +187,18 @@ export default function UsersTab({
                             <button type="button" className={`${ui.ghost} ${ui.icon} ${ui.sm}`} title="Edit" aria-label={`Edit ${u.username}`} onClick={() => setOpen({ kind: 'edit', user: u })}>
                               <Icon name="edit" size={15} />
                             </button>
-                            <button
-                              type="button"
-                              className={`${ui.ghost} ${ui.icon} ${ui.sm}`}
-                              title="Reset password"
-                              aria-label={`Reset the password of ${u.username}`}
-                              onClick={() => setOpen({ kind: 'password', user: u })}
-                            >
-                              <Icon name="key" size={15} />
-                            </button>
+                            {/* Your own password: under Profile, with the current one (0.12). */}
+                            {!self && (
+                              <button
+                                type="button"
+                                className={`${ui.ghost} ${ui.icon} ${ui.sm}`}
+                                title="Reset password"
+                                aria-label={`Reset the password of ${u.username}`}
+                                onClick={() => setOpen({ kind: 'password', user: u })}
+                              >
+                                <Icon name="key" size={15} />
+                              </button>
+                            )}
                             <button
                               type="button"
                               className={`${ui.ghost} ${ui.icon} ${ui.sm}`}
@@ -317,9 +320,11 @@ export default function UsersTab({
 function EditActions({ user, self, onOpen }: { user: UserAccount; self: boolean; onOpen: (open: Open) => void }) {
   return (
     <>
-      <button type="button" className={`${ui.ghost} ${ui.icon}`} title="Reset password" aria-label="Reset password" onClick={() => onOpen({ kind: 'password', user })}>
-        <Icon name="key" size={16} />
-      </button>
+      {!self && (
+        <button type="button" className={`${ui.ghost} ${ui.icon}`} title="Reset password" aria-label="Reset password" onClick={() => onOpen({ kind: 'password', user })}>
+          <Icon name="key" size={16} />
+        </button>
+      )}
       <button type="button" className={`${ui.ghost} ${ui.icon}`} title="Sign out everywhere" aria-label="Sign out everywhere" onClick={() => onOpen({ kind: 'sessions', user })}>
         <Icon name="logout" size={16} />
       </button>

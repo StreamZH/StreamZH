@@ -41,7 +41,9 @@ Replace these with your own values.
 
 Install StreamZH on a machine that can see the same media and download folders as the old apps — usually the same
 server. StreamZH listens on port **9797**; open `http://192.168.1.10:9797` afterwards and create the first user (it
-becomes the owner).
+becomes the owner). From another device than the server (and always with Docker) the setup page asks for the one-time
+setup code that StreamZH prints in its console and log at start (`docker logs streamzh`; also in the file `setup-code`
+in the data folder, and under "Show setup code" in the Windows tray icon).
 
 ### Docker (Docker Compose)
 

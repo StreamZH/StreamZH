@@ -158,7 +158,13 @@ User ── Owner, Admin, Friend (same roles as CloudZH)
 
 ## Security
 
-- First start: create the Owner account, no default password.
+- First start: create the Owner account, no default password. From another device than this computer the setup
+  page needs the one-time setup code from the console/log, `<data>/setup-code` or the tray icon (0.12).
+- 0.12 hardening (see docs/SECURITY.md): cross-site request protection (`Security/CrossSiteProtection`), DNS
+  rebinding protection for the sign-in-free modes (`Security/HostAccess`), trusted proxies and local networks
+  (`Security/AccessSettings`, `Security/ProxyForwarding`), server-side sessions (`Sessions` table,
+  `Auth/SessionStore`), sign-in throttling (`Security/LoginThrottle`), live connections that close when their
+  sign-in ends (`Hubs/HubConnections`), security headers and CSP (`Security/SecurityHeaders`).
 - Passwords hashed with PBKDF2 (ASP.NET Core Identity hasher).
 - Secrets (indexer keys, Usenet passwords) never returned by the API in clear text,
   masked in the UI and in logs.

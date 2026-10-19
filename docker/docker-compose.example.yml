@@ -5,7 +5,9 @@
 #
 # Elsewhere (e.g. /opt/streamzh/docker-compose.yml): set build.context to your StreamZH checkout.
 #
-# Then open http://<your server>:9797 and create the first user. See docs/MIGRATION.md for moving over from
+# Then open http://<your server>:9797 and create the first user. Seen from inside the container your browser is
+# "another device", so the setup page asks for the one-time setup code: `docker logs streamzh` shows it (also in
+# ./config/setup-code). See docs/SECURITY.md for safe deployment and docs/MIGRATION.md for moving over from
 # Sonarr, Radarr, Prowlarr and SABnzbd.
 #
 # Paths: mount your media and download folders at the SAME paths inside the container as the old apps use (e.g.

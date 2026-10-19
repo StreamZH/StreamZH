@@ -331,8 +331,10 @@ public sealed class TrayApiTests : IDisposable
 
     private async Task<HttpClient> SetupAsync()
     {
+        // The test server's default remote address is not this computer: setup needs the setup code (0.12).
         var client = _app.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/v1/auth/setup", new { username = StreamZhFactory.OwnerName, password = StreamZhFactory.OwnerPassword });
+        var code = _app.Services.GetRequiredService<StreamZH.Host.Security.SetupCode>().Current;
+        var response = await client.PostAsJsonAsync("/api/v1/auth/setup", new { username = StreamZhFactory.OwnerName, password = StreamZhFactory.OwnerPassword, setupCode = code });
         response.EnsureSuccessStatusCode();
         return client;
     }

@@ -159,9 +159,10 @@ public sealed class WantedApiTests : IDisposable
     }
 
     [Fact]
-    public async Task The_ical_feed_signs_in_with_the_api_key()
+    public async Task The_ical_feed_signs_in_with_its_own_read_only_token()
     {
-        var (_, duneId, _) = await SetupAsync();
+        var (owner, duneId, _) = await SetupAsync();
+        var token = (await owner.GetFromJsonAsync<JsonElement>("/api/v1/calendar/feed-token")).GetProperty("token").GetString();
         var movies = _factory.Services.GetRequiredService<MovieRepository>();
         var dune = movies.Find(duneId)!;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -172,7 +173,11 @@ public sealed class WantedApiTests : IDisposable
         var anonymous = _factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/calendar/feed.ics")).StatusCode);
 
-        var response = await anonymous.GetAsync($"/api/v1/calendar/feed.ics?apikey={_factory.ApiKey}");
+        // 0.12 (security review S1-04): the API key in the address no longer opens the feed (nor anything else).
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?apikey={_factory.ApiKey}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/system/status?apikey={_factory.ApiKey}")).StatusCode);
+
+        var response = await anonymous.GetAsync($"/api/v1/calendar/feed.ics?token={token}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/calendar", response.Content.Headers.ContentType!.MediaType);
         var text = await response.Content.ReadAsStringAsync();
@@ -180,14 +185,30 @@ public sealed class WantedApiTests : IDisposable
         Assert.Contains("SUMMARY:Dune (In cinemas)", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Physical release", text, StringComparison.Ordinal);
 
-        var longer = await anonymous.GetStringAsync($"/api/v1/calendar/feed.ics?apikey={_factory.ApiKey}&futureDays=90&tags=movies");
+        var longer = await anonymous.GetStringAsync($"/api/v1/calendar/feed.ics?token={token}&futureDays=90&tags=movies");
         Assert.Contains("SUMMARY:Dune (Physical release)", longer, StringComparison.Ordinal);
-        var seriesOnly = await anonymous.GetStringAsync($"/api/v1/calendar/feed.ics?apikey={_factory.ApiKey}&futureDays=90&tags=series");
+        var seriesOnly = await anonymous.GetStringAsync($"/api/v1/calendar/feed.ics?token={token}&futureDays=90&tags=series");
         Assert.DoesNotContain("Dune", seriesOnly, StringComparison.Ordinal);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?apikey={_factory.ApiKey}&pastDays=-1")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?apikey={_factory.ApiKey}&tags=books")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/calendar/feed.ics?apikey=wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?token={token}&pastDays=-1")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?token={token}&tags=books")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/calendar/feed.ics?token=wrong")).StatusCode);
+
+        // The token opens the feed only, not the API.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/calendar?token={token}")).StatusCode);
+        var withTokenHeader = _factory.CreateClient();
+        withTokenHeader.DefaultRequestHeaders.Add("X-Api-Key", token);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await withTokenHeader.GetAsync("/api/v1/system/status")).StatusCode);
+
+        // Members signed in (or with the API key header) read it without the token.
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync("/api/v1/calendar/feed.ics")).StatusCode);
+
+        // A new token ends the old links.
+        var renewed = await owner.PostAsync("/api/v1/calendar/feed-token", null);
+        var newToken = (await renewed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
+        Assert.NotEqual(token, newToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?token={token}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync($"/api/v1/calendar/feed.ics?token={newToken}")).StatusCode);
     }
 
     [Fact]

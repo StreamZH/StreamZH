@@ -217,6 +217,8 @@ public sealed class HostStartupTests : IDisposable
 
         var setup = await client.PostAsJsonAsync("/streamzh/api/v1/auth/setup", new { username = StreamZhFactory.OwnerName, password = StreamZhFactory.OwnerPassword });
         Assert.Equal(HttpStatusCode.OK, setup.StatusCode);
+        // 0.12 (security review S1-10): the sign-in cookie belongs to the URL base only.
+        Assert.Contains("path=/streamzh", setup.Headers.GetValues("Set-Cookie").First(), StringComparison.OrdinalIgnoreCase);
         var cookie = setup.Headers.GetValues("Set-Cookie").First().Split(';')[0];
         client.DefaultRequestHeaders.Add("Cookie", cookie);
 

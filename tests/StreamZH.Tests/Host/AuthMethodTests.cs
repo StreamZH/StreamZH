@@ -102,14 +102,19 @@ public sealed class AuthMethodTests : IDisposable
         var owner = await SetupAsync();
         await SaveAsync(owner, new { authenticationMethod = "external" });
 
-        _remote.Address = IPAddress.Parse("203.0.113.9");
-        var anyone = _app.CreateClient();
-        Assert.Equal(HttpStatusCode.OK, (await anyone.GetAsync("/api/v1/settings/general")).StatusCode);
-        var state = await anyone.GetFromJsonAsync<AuthState>("/api/v1/auth/state");
+        // A reverse proxy in the local network (no trusted proxies set: local addresses count, 0.12).
+        _remote.Address = IPAddress.Parse("10.0.0.2");
+        var proxied = _app.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await proxied.GetAsync("/api/v1/settings/general")).StatusCode);
+        var state = await proxied.GetFromJsonAsync<AuthState>("/api/v1/auth/state");
         Assert.Equal("external", state!.User!.Username);
 
-        var ongoing = await anyone.GetStringAsync("/api/v1/status/ongoing");
+        var ongoing = await proxied.GetStringAsync("/api/v1/status/ongoing");
         Assert.Contains("auth-external", ongoing, StringComparison.Ordinal);
+
+        // 0.12 (security review S1-01): straight from the internet, past the proxy, nobody is let in.
+        _remote.Address = IPAddress.Parse("203.0.113.9");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _app.CreateClient().GetAsync("/api/v1/settings/general")).StatusCode);
     }
 
     [Fact]
@@ -175,8 +180,10 @@ public sealed class AuthMethodTests : IDisposable
 
     private async Task<HttpClient> SetupAsync()
     {
+        // The test server's default remote address is not this computer: setup needs the setup code (0.12).
         var client = _app.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/v1/auth/setup", new { username = StreamZhFactory.OwnerName, password = StreamZhFactory.OwnerPassword });
+        var code = _app.Services.GetRequiredService<StreamZH.Host.Security.SetupCode>().Current;
+        var response = await client.PostAsJsonAsync("/api/v1/auth/setup", new { username = StreamZhFactory.OwnerName, password = StreamZhFactory.OwnerPassword, setupCode = code });
         response.EnsureSuccessStatusCode();
         return client;
     }

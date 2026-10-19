@@ -65,6 +65,12 @@ public static class RenamerPaths
             return (null, "StreamZH's own data folder cannot be renamed in.");
         }
 
+        // 0.12 (V-02): nor a folder around it (a rename could move something into it).
+        if (dataDirectory is { Length: > 0 } && StreamZH.Core.DataFolderGuard.Problem(dataDirectory, full) is { } dataProblem)
+        {
+            return (null, dataProblem);
+        }
+
         if (!Directory.Exists(full))
         {
             return (null, "This folder does not exist.");

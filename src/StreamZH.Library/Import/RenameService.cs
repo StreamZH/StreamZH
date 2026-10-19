@@ -157,6 +157,11 @@ public sealed class RenameService(
             throw new LibraryException($"{item.ExistingPath} no longer exists. Refresh the item first.", LibraryError.Conflict);
         }
 
+        if (files.Problem(to) is { } dataProblem)
+        {
+            throw new LibraryException(dataProblem, LibraryError.Invalid);
+        }
+
         files.CreateFolder(Path.GetDirectoryName(to)!, options);
         if (File.Exists(to) && !string.Equals(Path.GetFullPath(from), Path.GetFullPath(to), StringComparison.OrdinalIgnoreCase))
         {

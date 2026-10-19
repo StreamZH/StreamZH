@@ -775,8 +775,14 @@ public sealed partial class RenamerService(
 
     private static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
 
-    private static string? Move(string from, string to, bool isFolder)
+    private string? Move(string from, string to, bool isFolder)
     {
+        // 0.12 (V-02): never into the data folder (a run saved earlier, or a folder that changed since the preview).
+        if (paths.FolderProblem(to) is { } problem)
+        {
+            return problem;
+        }
+
         try
         {
             if (isFolder)

@@ -246,4 +246,8 @@ public static class ConfigKeys
     public const string TrustedLocalNetworks = "TrustedLocalNetworks";
     public const string ExternalUserHeader = "ExternalUserHeader";
     public const string CalendarFeedToken = "CalendarFeedToken";
+
+    // Security (0.12, FX4): SHA-256 of the tools StreamZH installed into <data>/tools (JSON), and which header a trusted proxy sets for the client address.
+    public const string ToolManifest = "ToolManifest";
+    public const string ClientIpHeader = "ClientIpHeader";
 }

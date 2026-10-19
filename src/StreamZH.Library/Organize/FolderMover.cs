@@ -43,6 +43,15 @@ public sealed class FolderMover(ImportFileSystem files, ILogger<FolderMover> log
         return Encoding.UTF8.GetByteCount(path) > UnixMaxPath ? "The new path is too long. Shorten the naming format." : null;
     }
 
+    // 0.12 (V-02): nothing is moved into the data folder (database, keys, tools).
+    private void Guard(string target)
+    {
+        if (files.Problem(target) is { } problem)
+        {
+            throw new LibraryException(problem, LibraryError.Invalid);
+        }
+    }
+
     /// <summary>Only the letter case differs ("dune (2021)" → "Dune (2021)").</summary>
     public static bool IsCaseOnly(string a, string b) =>
         !string.Equals(a, b, StringComparison.Ordinal) && string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
@@ -84,6 +93,8 @@ public sealed class FolderMover(ImportFileSystem files, ILogger<FolderMover> log
             throw new LibraryException($"{target} already exists. Remove or rename it first.", LibraryError.Conflict);
         }
 
+        Guard(target);
+
         var folder = Path.GetDirectoryName(target)!;
         files.CreateFolder(folder, settings);
         try
@@ -122,6 +133,8 @@ public sealed class FolderMover(ImportFileSystem files, ILogger<FolderMover> log
         {
             throw new LibraryException($"The folder {target} already exists. Remove or rename it first.", LibraryError.Conflict);
         }
+
+        Guard(target);
 
         var parent = Path.GetDirectoryName(Path.GetFullPath(target))!;
         try

@@ -4,6 +4,7 @@
 
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using StreamZH.Core;
 using StreamZH.Core.Media;
 using StreamZH.Data;
 
@@ -12,8 +13,9 @@ namespace StreamZH.Library;
 public sealed record RootFolderInfo(
     int Id, string Path, MediaType MediaType, bool Accessible, bool Writable, string? WriteProblem, long? FreeSpace, long? TotalSpace, int UnmappedFolders);
 
+/// <param name="paths">0.12 (V-02): a root folder may not be inside the data folder (outside downloads/) or contain it.</param>
 public sealed class RootFolderService(
-    RootFolderRepository rootFolders, MovieRepository movies, SeriesRepository series, ILogger<RootFolderService> logger)
+    RootFolderRepository rootFolders, MovieRepository movies, SeriesRepository series, ILogger<RootFolderService> logger, AppPaths? paths = null)
 {
     // A write probe can trigger security tools (e.g. Windows "Controlled folder access"), so results are cached.
     private static readonly ConcurrentDictionary<string, (bool Writable, string? Problem, DateTime Checked)> WriteChecks = new(PathComparer.Instance);
@@ -34,6 +36,11 @@ public sealed class RootFolderService(
         }
 
         var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim()));
+        if (paths?.FolderProblem(full) is { } dataProblem)
+        {
+            throw new LibraryException(dataProblem, LibraryError.Invalid);
+        }
+
 
         if (!Directory.Exists(full))
         {

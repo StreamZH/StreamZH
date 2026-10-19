@@ -436,6 +436,27 @@ public sealed class ToolInstallerTests : IDisposable
         Assert.Null(installer.Installed(PostProcessTool.SevenZip));
     }
 
+    /// <summary>
+    /// V-02: a par2 that a download put into &lt;data&gt;/tools/par2 counted as "installed" and was run. Now it is not
+    /// found (no manifest entry), so the real one is installed over it and recorded.
+    /// </summary>
+    [Fact]
+    public async Task A_planted_tool_folder_is_not_used_and_is_replaced_by_the_verified_install()
+    {
+        var (package, data) = TestToolPackages.Par2();
+        _downloads.Add(package.Download, data);
+        var planted = Path.Combine(Directory.CreateDirectory(Path.Combine(ToolsFolder, "par2")).FullName, OperatingSystem.IsWindows() ? "par2.exe" : "par2");
+        File.WriteAllText(planted, "planted by a download");
+        var installer = Installer(LinuxX64, Catalog(par2: package), NoProcesses());
+        Assert.Null(installer.Installed(PostProcessTool.Par2));
+
+        await installer.InstallMissingAsync(CancellationToken.None);
+
+        Assert.Single(_downloads.Requests);
+        Assert.NotNull(installer.Installed(PostProcessTool.Par2));
+        Assert.DoesNotContain("planted", File.ReadAllText(Path.Combine(ToolsFolder, "par2", "par2")), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21\np7zip Version 16.02", true)]
     [InlineData("7-Zip (a) 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20", false)]

@@ -5,6 +5,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using StreamZH.Core;
 
 namespace StreamZH.Library.Import;
 
@@ -24,7 +25,8 @@ public enum TransferKind
 /// and readable errors (access denied, Windows "Controlled folder access", full disk). Never deletes a source file
 /// before its copy is complete.
 /// </summary>
-public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
+/// <param name="paths">0.12 (V-02): nothing is written into the data folder (database, keys, tools) outside downloads/.</param>
+public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger, AppPaths? paths = null)
 {
     private const int ErrorDiskFull = 0x70;
     private const int ErrorHandleDiskFull = 0x27;
@@ -33,6 +35,7 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
     /// <summary>Moves (or copies, hard-linking first when asked) <paramref name="source"/> to <paramref name="destination"/>, which must not exist.</summary>
     public TransferKind Transfer(string source, string destination, ImportMode mode, bool useHardlinks)
     {
+        Guard(destination);
         var folder = Path.GetDirectoryName(destination)!;
         try
         {
@@ -55,6 +58,20 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
             throw new ImportException(Describe(ex, folder), ex);
         }
     }
+
+    /// <summary>Refuses a target in the data folder outside downloads/ (or one that contains the data folder).</summary>
+    /// <exception cref="ImportException">The target is not allowed.</exception>
+    public void Guard(string target)
+    {
+        if (Problem(target) is { } problem)
+        {
+            throw new ImportException(problem);
+        }
+    }
+
+    /// <summary>Why StreamZH does not write to <paramref name="target"/>, null when it may.</summary>
+    public string? Problem(string target) =>
+        paths?.FolderProblem(target) is { } problem ? $"StreamZH does not write to {target}. {problem}" : null;
 
     /// <summary>Copies to a temporary name first, so an interrupted copy never looks like a finished file.</summary>
     public static void CopyCompletely(string source, string destination)
@@ -85,6 +102,7 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
     /// <summary>Creates a hard link; false when that is not possible (other drive, file system without links).</summary>
     public bool TryHardLink(string source, string destination)
     {
+        Guard(destination);
         try
         {
             var ok = OperatingSystem.IsWindows() ? CreateHardLinkW(destination, source, IntPtr.Zero) : link(source, destination) == 0;
@@ -117,6 +135,7 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
             }
 
             var folder = Path.Combine(recycleBin, Safe(itemFolderName));
+            Guard(folder);
             Directory.CreateDirectory(folder);
             var target = Unique(Path.Combine(folder, Path.GetFileName(path)));
             File.Move(path, target);
@@ -154,6 +173,7 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger)
     /// <summary>Creates the folder (and parents) with readable errors; applies the folder permissions to new folders.</summary>
     public void CreateFolder(string folder, MediaManagementValues settings)
     {
+        Guard(folder);
         try
         {
             var missing = new List<string>();

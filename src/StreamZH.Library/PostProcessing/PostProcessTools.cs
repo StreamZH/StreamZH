@@ -74,6 +74,12 @@ public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, 
     /// </summary>
     public string? InstalledDirectory { get; init; }
 
+    /// <summary>
+    /// 0.12 (V-02): true when a tool folder holds exactly the recorded files (<see cref="ToolFolderHashes.Matches"/>);
+    /// replaceable for tests that only pretend files exist.
+    /// </summary>
+    public Func<string, IReadOnlyDictionary<string, string>, bool> FolderMatches { get; init; } = ToolFolderHashes.Matches;
+
     /// <summary>Operating system and processor, for picking the download that StreamZH installs.</summary>
     public ToolPlatform Platform { get; init; } = ToolPlatform.Current;
 
@@ -106,11 +112,24 @@ public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, 
 /// then &lt;app&gt;/tools, then PATH, then the Windows default (C:\Program Files\7-Zip\7z.exe, 7-Zip only). Versions are read once
 /// per executable.
 /// </summary>
-public sealed partial class PostProcessTools(IPostProcessToolSettings settings, IToolProcessRunner runner, ToolEnvironment environment)
+/// <param name="manifest">What StreamZH installed into &lt;data&gt;/tools (0.12); only those copies are run. Default: kept in memory.</param>
+public sealed partial class PostProcessTools(IPostProcessToolSettings settings, IToolProcessRunner runner, ToolEnvironment environment, IToolManifest? manifest = null)
 {
     private readonly ConcurrentDictionary<string, string?> _versions = new(StringComparer.Ordinal);
 
     public ToolEnvironment Environment => environment;
+
+    /// <summary>The SHA-256 of the files StreamZH installed (<see cref="ToolInstaller"/> records them).</summary>
+    public IToolManifest Manifest { get; } = manifest ?? new MemoryToolManifest();
+
+    /// <summary>
+    /// 0.12 (V-02): the copy in &lt;data&gt;/tools/&lt;tool&gt; is used only when its folder holds exactly the files
+    /// StreamZH installed there, unchanged. Checked at every <see cref="Find"/>, i.e. before every run.
+    /// </summary>
+    public bool IsVerifiedInstall(PostProcessTool tool) =>
+        environment.InstalledToolDirectory(tool) is { } folder
+        && Manifest.Files(tool) is { Count: > 0 } files
+        && environment.FolderMatches(folder, files);
 
     public ToolLocation Find(PostProcessTool tool)
     {
@@ -139,10 +158,19 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
             foreach (var name in names)
             {
                 var installed = System.IO.Path.Combine(installedDirectory, name);
-                if (environment.FileExists(installed))
+                if (!environment.FileExists(installed))
+                {
+                    continue;
+                }
+
+                if (IsVerifiedInstall(tool))
                 {
                     return new ToolLocation(tool, installed, ToolSource.Installed, configured, problem);
                 }
+
+                // Not installed by StreamZH, or changed since: never run (0.12, V-02).
+                problem ??= $"{installed} was not installed by StreamZH or was changed since, so it is not used. Install {DisplayName(tool)} again on this page.";
+                break;
             }
         }
 

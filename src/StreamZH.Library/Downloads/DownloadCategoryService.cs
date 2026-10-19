@@ -65,18 +65,35 @@ public sealed partial class DownloadCategoryService(DownloadCategoryRepository r
     public DownloadCategoryDefinition Resolve(DownloadCategory category, string? name) =>
         Find(name) ?? Find(DefaultName(category)) ?? new DownloadCategoryDefinition(0, DefaultName(category), string.Empty, null, PostProcessLevel.Full);
 
-    /// <summary>The folder finished downloads of this category go to.</summary>
+    /// <summary>
+    /// The folder finished downloads of this category go to. A folder that is not allowed (inside the data folder outside
+    /// downloads/, e.g. saved by an older version) is replaced by the default one below the completed folder (0.12, V-02).
+    /// </summary>
     public string FolderOf(DownloadCategoryDefinition category)
     {
         ArgumentNullException.ThrowIfNull(category);
+        var fallback = Path.Combine(settings.CompleteFolder, SafeName(category.Name));
         var folder = category.Folder.Trim();
         if (folder.Length == 0)
         {
-            return Path.Combine(settings.CompleteFolder, category.Name);
+            return settings.FolderProblem(fallback) is null ? fallback : Path.Combine(settings.DefaultCompleteFolder, SafeName(category.Name));
         }
 
-        return Path.IsPathFullyQualified(folder) ? folder : Path.GetFullPath(Path.Combine(settings.CompleteFolder, folder));
+        var resolved = Path.IsPathFullyQualified(folder) ? folder : Path.GetFullPath(Path.Combine(settings.CompleteFolder, folder));
+        if (settings.FolderProblem(resolved) is { } problem)
+        {
+            logger.LogWarning("Download category '{Name}': {Folder} is not used. {Problem}", category.Name, resolved, problem);
+            return Path.Combine(settings.DefaultCompleteFolder, SafeName(category.Name));
+        }
+
+        return resolved;
     }
+
+    // Category names are checked on save (letters, digits, - and _); a name from elsewhere must not leave the folder.
+    private static string SafeName(string name) => name is "." or ".." || name.IndexOfAny(['/', '\\', ':']) >= 0 ? Other : name;
+
+    /// <summary>0.12 (V-02): why downloads may not go to <paramref name="folder"/>, null when they may.</summary>
+    public string? FolderProblem(string folder) => settings.FolderProblem(folder);
 
     /// <exception cref="ValidationFailedException">Invalid fields (name, folder, priority).</exception>
     public DownloadCategoryDefinition Create(DownloadCategoryDefinition category)
@@ -151,7 +168,11 @@ public sealed partial class DownloadCategoryService(DownloadCategoryRepository r
         {
             if (Path.IsPathFullyQualified(folder))
             {
-                if (DownloadSettings.CheckWritable(folder) is { } problem)
+                if (settings.FolderProblem(folder) is { } dataProblem)
+                {
+                    errors["folder"] = [dataProblem];
+                }
+                else if (DownloadSettings.CheckWritable(folder) is { } problem)
                 {
                     errors["folder"] = [problem];
                 }

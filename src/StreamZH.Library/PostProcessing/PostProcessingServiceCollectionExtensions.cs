@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Core;
 using StreamZH.Core.Downloads;
+using StreamZH.Data;
 using StreamZH.Library.PostProcessing;
 
 namespace StreamZH.Library;
@@ -25,6 +26,7 @@ public static class PostProcessingServiceCollectionExtensions
         services.TryAddSingleton<IPostProcessSwitches>(sp => sp.GetService<Search.DownloadSettings>() ?? (IPostProcessSwitches)FixedPostProcessSwitches.Default);
         services.TryAddSingleton<IToolProcessRunner, ToolProcessRunner>();
         services.TryAddSingleton<IPostProcessToolSettings, ConfigPostProcessToolSettings>();
+        services.TryAddSingleton<IToolManifest>(sp => sp.GetService<ConfigRepository>() is { } config ? new ConfigToolManifest(config) : new MemoryToolManifest());
         services.TryAddSingleton<PostProcessTools>();
         services.TryAddSingleton<IPostProcessor, PostProcessor>();
 

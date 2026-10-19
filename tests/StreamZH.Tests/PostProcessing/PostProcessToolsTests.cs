@@ -61,12 +61,18 @@ public sealed class PostProcessToolsTests
         {
             FileExists = existing.Contains,
             InstalledDirectory = installedDirectory,
+            FolderMatches = (_, _) => true,
         };
 
-        var configured = new PostProcessTools(new FixedToolSettings(par2: "/custom/par2"), new ToolProcessRunner(), Environment("/data/tools"));
+        // Installed by StreamZH: recorded in the manifest (0.12).
+        var manifest = new MemoryToolManifest();
+        manifest.Record(PostProcessTool.Par2, new Dictionary<string, string> { ["par2"] = "aa" });
+        manifest.Record(PostProcessTool.SevenZip, new Dictionary<string, string> { ["7zz"] = "bb" });
+
+        var configured = new PostProcessTools(new FixedToolSettings(par2: "/custom/par2"), new ToolProcessRunner(), Environment("/data/tools"), manifest);
         Assert.Equal(ToolSource.Configured, configured.Find(PostProcessTool.Par2).Source);
 
-        var automatic = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment("/data/tools"));
+        var automatic = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment("/data/tools"), manifest);
         var par2 = automatic.Find(PostProcessTool.Par2);
         Assert.Equal(installedPar2, par2.Path);
         Assert.Equal(ToolSource.Installed, par2.Source);
@@ -76,7 +82,7 @@ public sealed class PostProcessToolsTests
         Assert.Equal(installed7z, sevenZip.Path);
         Assert.Equal(ToolSource.Installed, sevenZip.Source);
 
-        var withoutInstallFolder = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment(null));
+        var withoutInstallFolder = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment(null), manifest);
         Assert.Equal(ToolSource.Bundled, withoutInstallFolder.Find(PostProcessTool.Par2).Source);
         Assert.Equal(ToolSource.Path, withoutInstallFolder.Find(PostProcessTool.SevenZip).Source);
     }
@@ -245,5 +251,57 @@ public sealed class PostProcessToolsTests
     public void Percentages_are_read_from_tool_output(string text, double? expected)
     {
         Assert.Equal(expected, ToolOutput.Percent(text));
+    }
+
+    /// <summary>
+    /// V-02: a program placed into &lt;data&gt;/tools/&lt;tool&gt; by anything but the installer (e.g. a download whose
+    /// category folder pointed there) was preferred over PATH and Program Files and run. Now only the files recorded at
+    /// installation, unchanged and without extra files next to them, are used.
+    /// </summary>
+    [Fact]
+    public void A_planted_or_changed_copy_in_the_tools_folder_is_never_used()
+    {
+        var root = Directory.CreateTempSubdirectory("streamzh-tools-").FullName;
+        try
+        {
+            var data = Path.Combine(root, "data", "tools");
+            var bin = Directory.CreateDirectory(Path.Combine(root, "bin")).FullName;
+            var name = OperatingSystem.IsWindows() ? "par2.exe" : "par2";
+            var onPath = Path.Combine(bin, name);
+            File.WriteAllText(onPath, "system par2");
+            var folder = Directory.CreateDirectory(Path.Combine(data, "par2")).FullName;
+            var planted = Path.Combine(folder, name);
+            File.WriteAllText(planted, "evil");
+            var environment = new ToolEnvironment(Path.Combine(root, "app"), bin, OperatingSystem.IsWindows(), []) { InstalledDirectory = data };
+            var manifest = new MemoryToolManifest();
+            var tools = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), environment, manifest);
+
+            // The exploit: a file in <data>/tools/par2 that StreamZH did not install.
+            var found = tools.Find(PostProcessTool.Par2);
+            Assert.Equal(onPath, found.Path);
+            Assert.Equal(ToolSource.Path, found.Source);
+            Assert.Contains("was not installed by StreamZH", found.Problem, StringComparison.Ordinal);
+
+            // What the installer recorded is used ...
+            File.WriteAllText(planted, "real par2");
+            manifest.Record(PostProcessTool.Par2, ToolFolderHashes.Compute(folder));
+            Assert.Equal(planted, tools.Find(PostProcessTool.Par2).Path);
+
+            // ... but not with an extra file next to it (a DLL a Windows program would load) ...
+            var extra = Path.Combine(folder, "version.dll");
+            File.WriteAllText(extra, "side-loaded");
+            Assert.Equal(onPath, tools.Find(PostProcessTool.Par2).Path);
+            File.Delete(extra);
+            Assert.Equal(planted, tools.Find(PostProcessTool.Par2).Path);
+
+            // ... and not once the file was replaced.
+            File.WriteAllText(planted, "evil par2");
+            File.SetLastWriteTimeUtc(planted, DateTime.UtcNow.AddMinutes(1));
+            Assert.Equal(onPath, tools.Find(PostProcessTool.Par2).Path);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 }

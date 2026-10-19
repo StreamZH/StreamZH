@@ -146,11 +146,23 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
     /// <summary>The engine keeps a copy of every queued NZB here as "{id}.nzb" (for resume and retry).</summary>
     public string NzbQueueFolder => Path.Combine(paths.DataDirectory, "downloads", "nzb-queue");
 
-    public string NzbFolder => config.Get(ConfigKeys.NzbFolder) is { Length: > 0 } folder ? folder : DefaultNzbFolder;
+    public string NzbFolder => Usable(config.Get(ConfigKeys.NzbFolder)) ?? DefaultNzbFolder;
 
-    public string IncompleteFolder => config.Get(ConfigKeys.IncompleteFolder) is { Length: > 0 } folder ? folder : DefaultIncompleteFolder;
+    public string IncompleteFolder => Usable(config.Get(ConfigKeys.IncompleteFolder)) ?? DefaultIncompleteFolder;
 
-    public string CompleteFolder => config.Get(ConfigKeys.CompleteFolder) is { Length: > 0 } folder ? folder : DefaultCompleteFolder;
+    public string CompleteFolder => Usable(config.Get(ConfigKeys.CompleteFolder)) ?? DefaultCompleteFolder;
+
+    /// <summary>
+    /// 0.12 (V-02): why a folder may not hold downloads (inside the data folder outside downloads/, or containing it), null
+    /// when it may. Used for every download, category, watch and torrent folder, on save and when it is used.
+    /// </summary>
+    public string? FolderProblem(string? folder) => paths.FolderProblem(folder);
+
+    /// <summary>The data folder (for the checks of other folder settings).</summary>
+    public AppPaths Paths => paths;
+
+    // A stored folder that is empty or not allowed (older version, restored database): the default is used instead.
+    private string? Usable(string? stored) => stored is { Length: > 0 } && FolderProblem(stored) is null ? stored : null;
 
     /// <summary>The built-in engine unless the blackhole folder was chosen.</summary>
     public DownloadClientKind Client =>
@@ -578,8 +590,8 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
             Flag(ConfigKeys.DownloadKeepFiles, false),
             Flag(ConfigKeys.DownloadAbortHopeless, true),
             Int(ConfigKeys.DownloadArticleTries, 1, MaxArticleTries, DefaultArticleTries),
-            config.Get(ConfigKeys.DownloadNzbBackupFolder) is { Length: > 0 } backup ? backup : null,
-            config.Get(ConfigKeys.DownloadWatchFolder) is { Length: > 0 } watch ? watch : null,
+            Usable(config.Get(ConfigKeys.DownloadNzbBackupFolder)),
+            Usable(config.Get(ConfigKeys.DownloadWatchFolder)),
             Int(ConfigKeys.DownloadWatchInterval, 1, MaxWatchIntervalSeconds, DefaultWatchIntervalSeconds),
             Flag(ConfigKeys.DownloadPauseOnStart, false),
             Flag(ConfigKeys.DownloadPreCheck, false),
@@ -624,7 +636,7 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
 
     private static string Quote(string argument) => argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
 
-    private static string ValidateFolder(string? path, string defaultFolder, string field, string example, Dictionary<string, string[]> errors)
+    private string ValidateFolder(string? path, string defaultFolder, string field, string example, Dictionary<string, string[]> errors)
     {
         var trimmed = path?.Trim() ?? string.Empty;
         if (trimmed.Length > 0 && !Path.IsPathFullyQualified(trimmed))
@@ -634,7 +646,11 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
         }
 
         var full = trimmed.Length == 0 ? defaultFolder : Path.TrimEndingDirectorySeparator(Path.GetFullPath(trimmed));
-        if (CheckWritable(full) is { } problem)
+        if (FolderProblem(full) is { } dataProblem)
+        {
+            errors[field] = [dataProblem];
+        }
+        else if (CheckWritable(full) is { } problem)
         {
             errors[field] = [problem];
         }
@@ -643,7 +659,7 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
     }
 
     /// <summary>"" (off) or a full, writable path.</summary>
-    private static string ValidateOptionalFolder(string path, string field, Dictionary<string, string[]> errors)
+    private string ValidateOptionalFolder(string path, string field, Dictionary<string, string[]> errors)
     {
         var trimmed = path.Trim();
         if (trimmed.Length == 0)
@@ -658,7 +674,11 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
         }
 
         var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(trimmed));
-        if (CheckWritable(full) is { } problem)
+        if (FolderProblem(full) is { } dataProblem)
+        {
+            errors[field] = [dataProblem];
+        }
+        else if (CheckWritable(full) is { } problem)
         {
             errors[field] = [problem];
         }

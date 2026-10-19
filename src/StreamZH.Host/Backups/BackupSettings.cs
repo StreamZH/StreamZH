@@ -18,8 +18,15 @@ public sealed class BackupSettings(SettingsCache cache, AppPaths paths)
 
     public string DefaultFolder => Path.Combine(paths.DataDirectory, "Backups");
 
-    /// <summary>Where backups go; relative paths are inside the data folder.</summary>
-    public string Folder => cache.Get(ConfigKeys.BackupFolder) is { } folder ? Path.GetFullPath(folder, paths.DataDirectory) : DefaultFolder;
+    /// <summary>
+    /// Where backups go; relative paths are inside the data folder. A folder in the data folder outside Backups/ (or one
+    /// that contains the data folder, e.g. from an older version or a restored database) is not used (0.12, V-02).
+    /// </summary>
+    public string Folder => cache.Get(ConfigKeys.BackupFolder) is { } folder
+        && Path.GetFullPath(folder, paths.DataDirectory) is var full
+        && paths.FolderProblem(full, DataFolderUse.Backups) is null
+            ? full
+            : DefaultFolder;
 
     /// <summary>Days between scheduled backups; 0 = no scheduled backups.</summary>
     public int IntervalDays => Math.Clamp(cache.GetInt(ConfigKeys.BackupIntervalDays, DefaultIntervalDays), 0, MaxIntervalDays);

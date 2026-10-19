@@ -180,6 +180,10 @@ public static class GeneralSettingsEndpoints
             {
                 Error("backupFolder", "Enter a full path, e.g. /backups/streamzh or D:\\Backups\\StreamZH.");
             }
+            else if (services.GetRequiredService<AppPaths>().FolderProblem(folder.Trim(), DataFolderUse.Backups) is { } dataProblem)
+            {
+                Error("backupFolder", dataProblem);
+            }
             else if (DownloadSettings.CheckWritable(folder.Trim()) is { } folderProblem)
             {
                 Error("backupFolder", folderProblem);

@@ -61,4 +61,6 @@ public sealed class CategoryTorrentSavePaths(DownloadCategoryService categories)
     }
 
     public IReadOnlyList<string> Categories() => [.. categories.All().Select(c => c.Name)];
+
+    public string? Problem(string folder) => categories.FolderProblem(folder);
 }

@@ -168,7 +168,8 @@ public record MediaManagementValues
 /// Settings → Media Management, stored in the Config table (one key per setting, empty = default) and cached; read by
 /// the import, the naming and the library. <see cref="Update"/> checks everything first and saves nothing when a value is invalid.
 /// </summary>
-public sealed partial class MediaManagementSettings(ConfigRepository config)
+/// <param name="paths">0.12 (V-02): the recycle bin may not be inside the data folder (outside downloads/) or contain it.</param>
+public sealed partial class MediaManagementSettings(ConfigRepository config, StreamZH.Core.AppPaths? paths = null)
 {
     public const int MaxMinimumFreeSpaceMb = 1_000_000;
     public const int MaxRecycleBinCleanupDays = 3650;
@@ -182,6 +183,11 @@ public sealed partial class MediaManagementSettings(ConfigRepository config)
     {
         ArgumentNullException.ThrowIfNull(values);
         var errors = Validate(values);
+        if (!errors.ContainsKey("recycleBin") && paths?.FolderProblem(values.RecycleBin.Trim()) is { } binProblem)
+        {
+            errors["recycleBin"] = [binProblem];
+        }
+
         if (errors.Count > 0)
         {
             throw new ValidationFailedException(errors);

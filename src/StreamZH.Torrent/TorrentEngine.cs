@@ -714,6 +714,15 @@ public sealed class TorrentEngine : IAsyncDisposable
             return;
         }
 
+        // 0.12 (V-02): never into the data folder (a torrent saved by an older version, or a changed category folder).
+        if (_savePaths.Problem(entry.SavePath) is { } folderProblem)
+        {
+            entry.Error = $"Not downloaded: {folderProblem}";
+            _dirty = true;
+            _logger.LogWarning("Torrent '{Name}' was not started: {Problem}", entry.Name, folderProblem);
+            return;
+        }
+
         try
         {
             TorrentManager manager;
@@ -1225,7 +1234,13 @@ public sealed class TorrentEngine : IAsyncDisposable
                 throw new DownloadClientException("The save path must be a full path.", "savePath");
             }
 
-            return Path.GetFullPath(explicitPath);
+            explicitPath = Path.GetFullPath(explicitPath);
+            if (_savePaths.Problem(explicitPath) is { } problem)
+            {
+                throw new DownloadClientException(problem, "savePath");
+            }
+
+            return explicitPath;
         }
 
         return Path.GetFullPath(_savePaths.FolderFor(request.Category));
@@ -1392,4 +1407,7 @@ public interface ITorrentSavePaths
 
     /// <summary>The category names (for the client test).</summary>
     IReadOnlyList<string> Categories();
+
+    /// <summary>0.12 (V-02): why torrents may not be saved in <paramref name="folder"/> (inside the data folder), null when they may.</summary>
+    string? Problem(string folder) => null;
 }

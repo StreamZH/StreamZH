@@ -71,7 +71,8 @@ public sealed class ToolInstaller(
     /// <summary>The version.json of the copy installed by StreamZH, or null when there is none.</summary>
     public InstalledToolInfo? Installed(PostProcessTool tool)
     {
-        if (environment.InstalledToolDirectory(tool) is not { } folder)
+        // 0.12 (V-02): a folder StreamZH did not install (or that changed since) counts as not installed.
+        if (environment.InstalledToolDirectory(tool) is not { } folder || !tools.IsVerifiedInstall(tool))
         {
             return null;
         }
@@ -243,7 +244,12 @@ public sealed class ToolInstaller(
             await ReportAsync(package.Tool, "Installing", 0.95).ConfigureAwait(false);
             var stage = Path.Combine(work, "stage");
             Stage(package, source, work, stage);
-            return Replace(package.Tool, stage, work);
+            var files = ToolFolderHashes.Compute(stage);
+            var folder = Replace(package.Tool, stage, work);
+
+            // 0.12 (V-02): only these files, unchanged, are ever run from <data>/tools.
+            tools.Manifest.Record(package.Tool, files);
+            return folder;
         }
         finally
         {

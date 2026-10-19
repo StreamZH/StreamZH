@@ -95,6 +95,13 @@ public static class DataFolderPermissions
             Narrow(Path.Combine(data, name), OwnerOnlyFile, changed, problems);
         }
 
+        // The sign-in keys are written later by ASP.NET Core; their folder is private from the start.
+        var keys = Path.Combine(data, SecretFolders[0]);
+        if (!Directory.Exists(keys))
+        {
+            Directory.CreateDirectory(keys, OwnerOnlyFolder);
+        }
+
         foreach (var folder in SecretFolders.Select(f => Path.Combine(data, f)))
         {
             NarrowTree(folder, OwnerOnlyFolder, OwnerOnlyFile, changed, problems);

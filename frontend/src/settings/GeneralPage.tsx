@@ -320,7 +320,7 @@ function SecuritySection() {
         htmlFor="certificateValidation"
         advanced={v.certificateValidation !== 'disabled'}
         error={form.error('certificateValidation')}
-        help="Checks HTTPS certificates of indexers, TMDB and other sites StreamZH calls. For your own servers with self-signed certificates choose “Disabled for local addresses”."
+        help="Checks HTTPS certificates of indexers, TMDB and other sites StreamZH calls. For your own servers with self-signed certificates choose “Disabled for local addresses”; “Disabled” lets anyone on the way read indexer API keys."
       >
         <Select
           id="certificateValidation"
@@ -328,13 +328,13 @@ function SecuritySection() {
           onChange={(certificateValidation) => form.set({ certificateValidation })}
           options={[
             { value: 'enabled', label: 'Enabled' },
-            { value: 'disabledForLocalAddresses', label: 'Disabled for local addresses (recommended for self-signed)' },
+            { value: 'disabledForLocalAddresses', label: 'Disabled for local addresses' },
             { value: 'disabled', label: 'Disabled' },
           ]}
         />
         {v.certificateValidation === 'disabled' && (
           <small className={styles.warn} role="alert">
-            Not recommended: anyone on the way to an indexer could read its API key. Prefer “Disabled for local addresses”.
+            Not recommended: API keys can be read.
           </small>
         )}
       </Row>

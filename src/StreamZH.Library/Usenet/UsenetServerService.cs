@@ -329,6 +329,10 @@ public sealed class UsenetServerService(
         {
             errors["password"] = ["Remove line breaks and other control characters."];
         }
+        else if (SecretReuse.StoredFormProblem(server.Password) is { } storedForm)
+        {
+            errors["password"] = [storedForm];
+        }
 
         if (server.TimeoutSeconds is < MinTimeoutSeconds or > MaxTimeoutSeconds)
         {

@@ -33,7 +33,7 @@ public static class SecretMigration
             var value = connection.QuerySingleOrDefault<string>("SELECT Value FROM Config WHERE Key = @key", new { key }, transaction);
             if (!string.IsNullOrEmpty(value) && !SecretCodec.IsEncrypted(value))
             {
-                connection.Execute("UPDATE Config SET Value = @value WHERE Key = @key", new { key, value = codec.Encrypt(value) }, transaction);
+                connection.Execute("UPDATE Config SET Value = @value WHERE Key = @key", new { key, value = codec.EncryptPlain(value) }, transaction);
                 count++;
             }
         }
@@ -107,7 +107,7 @@ public static class SecretMigration
         {
             if (!string.IsNullOrEmpty(value) && !SecretCodec.IsEncrypted(value))
             {
-                connection.Execute($"UPDATE {table} SET {column} = @value WHERE Id = @id", new { id, value = codec.Encrypt(value) }, transaction);
+                connection.Execute($"UPDATE {table} SET {column} = @value WHERE Id = @id", new { id, value = codec.EncryptPlain(value) }, transaction);
                 count++;
             }
         }
@@ -145,7 +145,7 @@ public static class SecretMigration
 
             connection.Execute(
                 $"UPDATE {table} SET Settings = @settings WHERE Id = @id",
-                new { id, settings = JsonSerializer.Serialize(codec.EncryptSettings(settings)) },
+                new { id, settings = JsonSerializer.Serialize(codec.EncryptSettings(settings, migration: true)) },
                 transaction);
             count += plain;
         }

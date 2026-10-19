@@ -80,6 +80,31 @@ public sealed class SecretStorageTests : IDisposable
         Assert.Equal("plex.local", plex.Settings["host"].GetString());
     }
 
+    /// <summary>
+    /// V-12: a ciphertext saved as a secret used to be stored unchanged and then decrypted on use, so whoever had a
+    /// ciphertext could have it sent out in plain text. Now it is encrypted again and reads back as the text it was.
+    /// </summary>
+    [Fact]
+    public void A_ciphertext_saved_as_a_secret_is_not_decrypted_on_use()
+    {
+        var database = Open(NewKeys());
+        var config = new ConfigRepository(database);
+        config.Set(ConfigKeys.ProxyPassword, "the-real-secret");
+        var cipher = Raw(database, "SELECT Value FROM Config WHERE Key = 'ProxyPassword'");
+        Assert.StartsWith(SecretCodec.Prefix, cipher, StringComparison.Ordinal);
+
+        var hook = new ConnectionRepository(database);
+        hook.Add(new ConnectionDefinition(0, "Hook", "webhook", true, new ConnectionTriggers(OnGrab: true), Settings(new { url = "https://attacker.example", password = cipher })), DateTime.UtcNow);
+        Assert.Equal(cipher, hook.All().Single().Settings["password"].GetString());
+        new IndexerRepository(database).Add(IndexerService.Schema() with { Name = "Indexer", BaseUrl = "https://attacker.example", ApiKey = cipher }, DateTime.UtcNow);
+        Assert.Equal(cipher, new IndexerRepository(database).All().Single().ApiKey);
+        Assert.NotEqual(cipher, Raw(database, "SELECT ApiKey FROM Indexers"));
+
+        // The migration still leaves values that are already encrypted alone.
+        Assert.Equal(0, SecretMigration.EncryptPlaintext(database));
+        Assert.Equal("the-real-secret", config.Get(ConfigKeys.ProxyPassword));
+    }
+
     [Fact]
     public void Secrets_are_stored_encrypted_and_read_back_in_plain_text()
     {

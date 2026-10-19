@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -9,6 +10,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using MimeKit;
 using StreamZH.Core.Indexers;
 using StreamZH.Library.ImportLists;
 using StreamZH.Library.Indexers;
@@ -33,6 +35,7 @@ public sealed class SecretReuseApiTests : IAsyncLifetime
     private readonly FakeHttp _connectHttp = new();
     private readonly StubIndexerClient _indexerClient = new();
     private readonly ListHttp _listHttp = new(_ => (HttpStatusCode.OK, "[]"));
+    private readonly RecordingMail _mail = new();
     private readonly string _media = Directory.CreateTempSubdirectory("streamzh-reuse-").FullName;
     private WebApplicationFactory<Program> _app = null!;
     private HttpClient _owner = null!;
@@ -45,6 +48,7 @@ public sealed class SecretReuseApiTests : IAsyncLifetime
             services.AddSingleton(new ConnectOptions([TimeSpan.FromMilliseconds(1)]));
             services.AddHttpClient(ImportListHttp.ClientName).ConfigurePrimaryHttpMessageHandler(() => _listHttp);
             services.AddSingleton<IIndexerClient>(_indexerClient);
+            services.AddSingleton<IEmailTransport>(_mail);
         }));
         _owner = _app.CreateClient();
         (await _owner.PostAsJsonAsync("/api/v1/auth/setup", new { username = StreamZhFactory.OwnerName, password = StreamZhFactory.OwnerPassword })).EnsureSuccessStatusCode();
@@ -214,5 +218,154 @@ public sealed class SecretReuseApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, (await _owner.PostAsJsonAsync("/api/v1/indexer/test", Indexer(id, "https://indexer.example", Mask))).StatusCode);
         Assert.Equal("stored-key", _indexerClient.LastIndexer!.ApiKey);
+    }
+
+    public static TheoryData<string, string, string, string, string> OmittedSecretCases => new()
+    {
+        // implementation, secret field, settings as created, another destination without the secret, the same destination without the secret
+        {
+            "webhook", "password",
+            """{"url":"https://hooks.example.com/streamzh","username":"u","password":"S3cretHookPw"}""",
+            """{"url":"https://attacker.example/steal","username":"u"}""",
+            """{"url":"https://hooks.example.com/streamzh","username":"u"}"""
+        },
+        {
+            "ntfy", "accessToken",
+            """{"serverUrl":"https://ntfy.example.com","topics":"t","accessToken":"ntfy-secret"}""",
+            """{"serverUrl":"https://attacker.example","topics":"t"}""",
+            """{"serverUrl":"https://ntfy.example.com","topics":"t"}"""
+        },
+        {
+            "gotify", "appToken",
+            """{"server":"https://gotify.example.com","appToken":"gotify-secret"}""",
+            """{"server":"https://attacker.example"}""",
+            """{"server":"https://gotify.example.com"}"""
+        },
+        {
+            "plex", "authToken",
+            """{"host":"plex.example.com","port":32400,"authToken":"plex-secret"}""",
+            """{"host":"attacker.example","port":32400}""",
+            """{"host":"plex.example.com","port":32400}"""
+        },
+        {
+            "email", "password",
+            """{"server":"smtp.example.com","port":587,"username":"me","password":"mail-secret","from":"s@example.com","to":"r@example.com"}""",
+            """{"server":"attacker.example","port":587,"username":"me","from":"s@example.com","to":"r@example.com"}""",
+            """{"server":"smtp.example.com","port":587,"username":"me","from":"s@example.com","to":"r@example.com"}"""
+        },
+    };
+
+    /// <summary>
+    /// V-01: leaving the secret field out (instead of sending "********") kept the stored secret without the destination
+    /// check, so a test or save with another address sent it there.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(OmittedSecretCases))]
+    public async Task Connect_secret_left_out_is_not_sent_to_a_changed_destination(string implementation, string field, string created, string attack, string same)
+    {
+        object Connection(int id, string settings) => new
+        {
+            id,
+            name = "Target " + implementation,
+            implementation,
+            onGrab = true,
+            onDownload = true,
+            settings = JsonSerializer.Deserialize<JsonElement>(settings),
+        };
+        var id = await IdAsync(await _owner.PostAsJsonAsync("/api/v1/connection", Connection(0, created)));
+
+        var test = await _owner.PostAsJsonAsync("/api/v1/connection/test", Connection(id, attack));
+        Assert.EndsWith("again to test a changed address.", await ErrorAsync(test, field), StringComparison.Ordinal);
+        var save = await _owner.PutAsJsonAsync($"/api/v1/connection/{id}", Connection(id, attack));
+        Assert.EndsWith("again to save a changed address.", await ErrorAsync(save, field), StringComparison.Ordinal);
+        Assert.DoesNotContain(_connectHttp.Requests, r => r.Uri.Host == "attacker.example");
+        Assert.DoesNotContain(_mail.Servers, s => s.Host == "attacker.example");
+
+        // Left out with the same destination still keeps the stored secret.
+        Assert.Equal(HttpStatusCode.OK, (await _owner.PutAsJsonAsync($"/api/v1/connection/{id}", Connection(id, same))).StatusCode);
+        Assert.Equal(Mask, (await _owner.GetFromJsonAsync<JsonElement>($"/api/v1/connection/{id}")).GetProperty("settings").GetProperty(field).GetString());
+    }
+
+    [Fact]
+    public async Task Import_list_api_key_left_out_is_not_sent_to_a_changed_url()
+    {
+        var path = Directory.CreateDirectory(Path.Combine(_media, "movies-omit")).FullName;
+        var root = await IdAsync(await _owner.PostAsJsonAsync("/api/v1/rootfolders", new { path, mediaType = "Movie" }));
+        object List(int id, object settings) => new
+        {
+            id,
+            name = "Other StreamZH",
+            implementation = ImportListCatalog.StreamZh,
+            mediaType = "Movie",
+            enabled = true,
+            enableAuto = false,
+            rootFolderId = root,
+            settings,
+        };
+        var id = await IdAsync(await _owner.PostAsJsonAsync("/api/v1/importlist", List(0, new { url = "http://streamzh.example:9797", apiKey = "other-key" })));
+
+        // V-01: no apiKey at all, another URL.
+        var attack = new { url = "http://attacker.example" };
+        Assert.Equal("Enter the API key again to test a changed address.", await ErrorAsync(await _owner.PostAsJsonAsync("/api/v1/importlist/test", List(id, attack)), "apiKey"));
+        Assert.Equal("Enter the API key again to test a changed address.", await ErrorAsync(await _owner.PostAsJsonAsync("/api/v1/importlist/preview", List(id, attack)), "apiKey"));
+        Assert.Equal("Enter the API key again to save a changed address.", await ErrorAsync(await _owner.PutAsJsonAsync($"/api/v1/importlist/{id}", List(id, attack)), "apiKey"));
+        Assert.DoesNotContain(_listHttp.Requests, r => r.Host == "attacker.example");
+        Assert.Equal(HttpStatusCode.OK, (await _owner.PutAsJsonAsync($"/api/v1/importlist/{id}", List(id, new { url = "http://streamzh.example:9797" }))).StatusCode);
+    }
+
+    /// <summary>Usenet servers and indexers: a left-out secret is empty, never the stored one.</summary>
+    [Fact]
+    public async Task Usenet_and_indexer_secrets_left_out_are_not_sent_anywhere()
+    {
+        await using var attacker = new FakeNntpServer();
+        var server = await IdAsync(await _owner.PostAsJsonAsync("/api/v1/usenet/server", new
+        {
+            name = "Provider", host = "news.example.com", port = 119, useSsl = false, username = "user", password = "provider-pass", connections = 2, priority = 0, enabled = true,
+        }));
+        await _owner.PostAsJsonAsync("/api/v1/usenet/server/test", new { id = server, name = "Provider", host = "127.0.0.1", port = attacker.Port, useSsl = false, username = "user", connections = 2, priority = 0, enabled = true });
+        Assert.DoesNotContain(attacker.Commands, c => c.Contains("provider-pass", StringComparison.Ordinal));
+
+        var indexer = await IdAsync(await _owner.PostAsJsonAsync("/api/v1/indexer", new
+        {
+            name = "Indexer", implementation = "Newznab", baseUrl = "https://indexer.example/", apiPath = "/api", apiKey = "stored-key", categories = new[] { 2000 }, tvCategories = new[] { 5040 }, priority = 25,
+        }));
+        await _owner.PostAsJsonAsync("/api/v1/indexer/test", new { id = indexer, name = "Indexer", implementation = "Newznab", baseUrl = "https://attacker.example/", apiPath = "/api", categories = new[] { 2000 }, priority = 25 });
+        Assert.NotEqual("stored-key", _indexerClient.LastIndexer?.ApiKey);
+    }
+
+    /// <summary>V-12: a stored (encrypted) value pasted into a secret field is refused, not decrypted and sent out.</summary>
+    [Fact]
+    public async Task Encrypted_looking_secrets_are_refused()
+    {
+        const string Cipher = "enc:v1:CfDJ8-copied-from-a-database";
+        var hook = await _owner.PostAsJsonAsync("/api/v1/connection", new
+        {
+            name = "Hook", implementation = "webhook", onGrab = true, settings = new { url = "https://hooks.example.com/x", username = "u", password = Cipher },
+        });
+        Assert.Equal("Enter the secret itself, not a value copied from the database.", await ErrorAsync(hook, "password"));
+        var usenet = await _owner.PostAsJsonAsync("/api/v1/usenet/server", new
+        {
+            name = "Provider", host = "news.example.com", port = 119, useSsl = false, username = "user", password = Cipher, connections = 2, priority = 0, enabled = true,
+        });
+        Assert.Equal("Enter the secret itself, not a value copied from the database.", await ErrorAsync(usenet, "password"));
+        var indexer = await _owner.PostAsJsonAsync("/api/v1/indexer", new
+        {
+            name = "Indexer", implementation = "Newznab", baseUrl = "https://indexer.example/", apiPath = "/api", apiKey = Cipher, categories = new[] { 2000 }, priority = 25,
+        });
+        Assert.Equal("Enter the secret itself, not a value copied from the database.", await ErrorAsync(indexer, "apiKey"));
+        Assert.Equal("Enter the secret itself, not a value copied from the database.", await ErrorAsync(await _owner.PutAsJsonAsync("/api/v1/settings/general", new { proxyPassword = Cipher }), "proxyPassword"));
+    }
+
+    private sealed class RecordingMail : IEmailTransport
+    {
+        private readonly ConcurrentQueue<EmailServer> _servers = new();
+
+        public IReadOnlyList<EmailServer> Servers => [.. _servers];
+
+        public Task SendAsync(EmailServer server, MimeMessage message, CancellationToken cancellationToken)
+        {
+            _servers.Enqueue(server);
+            return Task.CompletedTask;
+        }
     }
 }

@@ -183,6 +183,12 @@ public sealed partial class DownloadClientService(
                     }
                 }
 
+                if (field.Secret && value.ValueKind == JsonValueKind.String && SecretReuse.StoredFormProblem(value.GetString()) is { } storedForm)
+                {
+                    errors[field.Name] = [storedForm];
+                    continue;
+                }
+
                 if (Normalize(field, value, out var normalized) is { } problem)
                 {
                     errors[field.Name] = [problem];

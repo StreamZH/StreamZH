@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using StreamZH.Core;
+using StreamZH.Core.Security;
 using StreamZH.Core.Users;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
@@ -129,6 +130,17 @@ public static class GeneralSettingsEndpoints
         if (AccessSettings.ValidateHeaderName(request.ExternalUserHeader) is { } headerProblem)
         {
             Error("externalUserHeader", headerProblem);
+        }
+
+        // 0.12 (V-12): passwords are typed in, never copied out of the database.
+        if (SecretReuse.StoredFormProblem(request.ProxyPassword) is { } proxyStored)
+        {
+            Error("proxyPassword", proxyStored);
+        }
+
+        if (SecretReuse.StoredFormProblem(request.SslCertPassword) is { } sslStored)
+        {
+            Error("sslCertPassword", sslStored);
         }
 
         // Proxy

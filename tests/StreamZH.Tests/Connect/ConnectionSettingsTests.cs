@@ -58,12 +58,17 @@ public sealed class ConnectionSettingsTests
         var errors = new Dictionary<string, string[]>();
         var stored = ConnectionSettings.Normalize(type, Input(new { host = "plex", authToken = "t", port = 1234, updateLibrary = false }), null, errors);
 
-        var kept = new ConnectionSettings(ConnectionSettings.Normalize(type, Input(new { host = "other" }), stored, errors));
-        Assert.Equal(("other", 1234, false, "t"), (kept.Text("host"), kept.Int("port"), kept.Bool("updateLibrary"), kept.Text("authToken")));
+        var kept = new ConnectionSettings(ConnectionSettings.Normalize(type, Input(new { updateLibrary = true }), stored, errors));
+        Assert.Equal(("plex", 1234, true, "t"), (kept.Text("host"), kept.Int("port"), kept.Bool("updateLibrary"), kept.Text("authToken")));
 
         var cleared = new ConnectionSettings(ConnectionSettings.Normalize(type, Input(new { mapFrom = (string?)null }), stored, errors));
         Assert.Null(cleared.Text("mapFrom"));
         Assert.Empty(errors);
+
+        // V-01: a secret that is not sent is a reused one; it does not go to another host either.
+        var moved = new ConnectionSettings(ConnectionSettings.Normalize(type, Input(new { host = "other" }), stored, errors));
+        Assert.Null(moved.Text("authToken"));
+        Assert.Equal(["Enter the auth token again to save a changed address."], errors["authToken"]);
     }
 
     [Fact]

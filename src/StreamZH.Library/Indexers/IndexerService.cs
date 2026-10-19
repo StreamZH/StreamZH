@@ -643,6 +643,11 @@ public sealed class IndexerService(
             errors["baseUrl"] = ["Enter a full http:// or https:// address, e.g. https://indexer.example."];
         }
 
+        if (SecretReuse.StoredFormProblem(indexer.ApiKey) is { } storedForm)
+        {
+            errors["apiKey"] = [storedForm];
+        }
+
         if (indexer.ApiPath.Any(char.IsWhiteSpace) || indexer.ApiPath.Contains('?', StringComparison.Ordinal) || indexer.ApiPath.Contains('#', StringComparison.Ordinal))
         {
             errors["apiPath"] = ["Enter a path like /api, without spaces or query."];

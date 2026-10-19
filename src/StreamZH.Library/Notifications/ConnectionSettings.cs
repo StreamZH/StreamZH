@@ -96,7 +96,7 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
 
     /// <summary>
     /// Checks and converts the settings from the API. Fields that were not sent keep the value in <paramref name="stored"/>
-    /// (else their default), a masked secret keeps the stored one, but only while the destination
+    /// (else their default), a masked or omitted secret keeps the stored one, but only while the destination
     /// (<see cref="DestinationFields"/>) is the stored one; otherwise the secret must be entered again. Problems are added
     /// to <paramref name="errors"/> under the field name.
     /// </summary>
@@ -135,8 +135,13 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
             }
             else
             {
-                // Not sent: keep what is stored, else the default.
+                // Not sent: keep what is stored, else the default. A kept secret is a reused one, exactly like the mask
+                // (0.12, V-01): leaving the field out must not send it to a changed address either.
                 value = Stored(stored, field.Name) ?? Default(field);
+                if (field.Type == ConnectFieldTypes.Password && HasValue(Stored(stored, field.Name)))
+                {
+                    reused.Add(field);
+                }
             }
 
             if (value is { } v)
@@ -289,6 +294,11 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
                 if (text.Length > 4000)
                 {
                     return Invalid(field, errors, "Too long.");
+                }
+
+                if (field.Type == ConnectFieldTypes.Password && SecretReuse.StoredFormProblem(text) is { } stored)
+                {
+                    return Invalid(field, errors, stored);
                 }
 
                 return JsonSerializer.SerializeToElement(text);

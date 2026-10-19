@@ -44,16 +44,24 @@ public sealed class SecretCodec
 
     internal void Use(ISecretProtector protector) => _protector = protector;
 
-    /// <summary>The value as it is stored: encrypted when a protector is set; null and "" stay as they are.</summary>
+    /// <summary>
+    /// The value as it is stored: encrypted when a protector is set; null and "" stay as they are. Every other value is
+    /// encrypted, also one that already starts with <see cref="Prefix"/> (0.12, V-12): a ciphertext typed into a password
+    /// field is stored as text and comes back as that text, so nobody can have a stored secret decrypted and sent out by
+    /// pasting its ciphertext. Only <see cref="SecretMigration"/> leaves encrypted values alone (<see cref="EncryptPlain"/>).
+    /// </summary>
     public string? Encrypt(string? plaintext)
     {
-        if (string.IsNullOrEmpty(plaintext) || IsEncrypted(plaintext) || _protector is null)
+        if (string.IsNullOrEmpty(plaintext) || _protector is null)
         {
             return plaintext;
         }
 
         return Prefix + _protector.Protect(plaintext);
     }
+
+    /// <summary>For the migration of stored values only: plain text is encrypted, an encrypted value is kept as it is.</summary>
+    internal string? EncryptPlain(string? stored) => IsEncrypted(stored) ? stored : Encrypt(stored);
 
     /// <summary>
     /// The plain value of a stored one. Plain text (from before 0.12) passes through. Null when it cannot be decrypted;
@@ -97,15 +105,18 @@ public sealed class SecretCodec
     }
 
     /// <summary>JSON settings: the string values of <see cref="SecretFields.Names"/> encrypted.</summary>
-    public Dictionary<string, JsonElement> EncryptSettings(IReadOnlyDictionary<string, JsonElement> settings)
+    public Dictionary<string, JsonElement> EncryptSettings(IReadOnlyDictionary<string, JsonElement> settings) => EncryptSettings(settings, migration: false);
+
+    /// <param name="migration">Stored settings: values that are already encrypted are kept (<see cref="EncryptPlain"/>).</param>
+    internal Dictionary<string, JsonElement> EncryptSettings(IReadOnlyDictionary<string, JsonElement> settings, bool migration)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var result = new Dictionary<string, JsonElement>(settings.Count, StringComparer.Ordinal);
         foreach (var (key, value) in settings)
         {
-            result[key] = SecretFields.Names.Contains(key) && value.ValueKind == JsonValueKind.String && Encrypt(value.GetString()) is { } encrypted && encrypted != value.GetString()
-                ? JsonSerializer.SerializeToElement(encrypted)
-                : value;
+            var text = value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+            var encrypted = SecretFields.Names.Contains(key) && text is not null ? (migration ? EncryptPlain(text) : Encrypt(text)) : null;
+            result[key] = encrypted is not null && encrypted != text ? JsonSerializer.SerializeToElement(encrypted) : value;
         }
 
         return result;

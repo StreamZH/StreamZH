@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using StreamZH.Core.Jobs;
+using StreamZH.Core.Security;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Host.Settings;
@@ -34,6 +35,11 @@ public static class MetadataEndpoints
             if (!TmdbSettings.Languages.Contains(language))
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["language"] = [$"Use one of: {string.Join(", ", TmdbSettings.Languages)}."] });
+            }
+
+            if (SecretReuse.StoredFormProblem(request.TmdbToken) is { } stored)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["tmdbToken"] = [stored] });
             }
 
             metadata.Update(request.CertificationCountry, request.NfoOriginalTitle, request.ImageCache);

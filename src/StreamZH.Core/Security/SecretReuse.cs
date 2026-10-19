@@ -18,6 +18,18 @@ public static class SecretReuse
     public static string ChangedAddressMessage(string label, bool test) =>
         $"Enter the {Lower(label)} again to {(test ? "test" : "save")} a changed address.";
 
+    /// <summary>How encrypted secrets start in the database (the same text as <c>SecretCodec.Prefix</c> in StreamZH.Data).</summary>
+    public const string StoredFormPrefix = "enc:v1:";
+
+    /// <summary>
+    /// 0.12 (V-12): a secret from the API that looks like a stored (encrypted) value is refused. The store encrypts it
+    /// again anyway, so it could never be decrypted into someone else's secret; the error just says what went wrong.
+    /// </summary>
+    public static string? StoredFormProblem(string? value) =>
+        value is not null && value.Trim().StartsWith(StoredFormPrefix, StringComparison.OrdinalIgnoreCase)
+            ? "Enter the secret itself, not a value copied from the database."
+            : null;
+
     /// <summary>Both texts the same, ignoring surrounding white space; null and empty are equal.</summary>
     public static bool Same(string? a, string? b) => string.Equals((a ?? string.Empty).Trim(), (b ?? string.Empty).Trim(), StringComparison.Ordinal);
 

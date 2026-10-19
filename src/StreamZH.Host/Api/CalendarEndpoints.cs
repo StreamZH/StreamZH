@@ -86,8 +86,18 @@ public static class CalendarEndpoints
         }).AllowAnonymous();
 
         // The feed token for the iCal dialog; regenerating it ends every subscribed link.
-        calendar.MapGet("/feed-token", (ConfigRepository config) => new CalendarFeedToken(config.GetOrCreate(ConfigKeys.CalendarFeedToken, NewFeedToken)))
-            .RequireAuthorization(AuthSchemes.AdminPolicy);
+        // A stored token that cannot be decrypted any more (key folder lost) is replaced: the old links stop either way.
+        calendar.MapGet("/feed-token", (ConfigRepository config) =>
+        {
+            if (config.GetOrCreate(ConfigKeys.CalendarFeedToken, NewFeedToken) is { } token)
+            {
+                return new CalendarFeedToken(token);
+            }
+
+            var created = NewFeedToken();
+            config.Set(ConfigKeys.CalendarFeedToken, created);
+            return new CalendarFeedToken(created);
+        }).RequireAuthorization(AuthSchemes.AdminPolicy);
         calendar.MapPost("/feed-token", (ConfigRepository config, ILogger<CalendarFeedToken> logger) =>
         {
             var token = NewFeedToken();

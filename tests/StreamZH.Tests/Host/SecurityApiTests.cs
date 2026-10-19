@@ -196,6 +196,35 @@ public sealed class SecurityApiTests : IDisposable
         Assert.Equal("Remote-User", settings.ExternalUserHeader);
     }
 
+    [Fact]
+    public async Task Only_the_owner_changes_who_gets_in_without_signing_in()
+    {
+        var owner = await OwnerAsync();
+        await SaveAsync(owner, new { trustedProxies = "10.0.0.2" });
+        _app.Services.GetRequiredService<UserRepository>().Create("janedoe", _app.Services.GetRequiredService<PasswordService>().Hash("long enough password"), UserRole.Admin);
+        var admin = _app.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await Login(admin, "janedoe", "long enough password")).StatusCode);
+
+        foreach (var change in new object[]
+        {
+            new { allowedHostNames = "attacker.example" },
+            new { trustedProxies = "0.0.0.0/0" },
+            new { trustedLocalNetworks = "0.0.0.0/0" },
+            new { externalUserHeader = "X-User" },
+        })
+        {
+            var refused = await admin.PutAsJsonAsync("/api/v1/settings/general", change);
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        }
+
+        // Unchanged values (a whole section saved) are fine; the API key (an Admin since 0.12) is refused too.
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/v1/settings/general", new { trustedProxies = "10.0.0.2", allowedHostNames = "" })).StatusCode);
+        var script = _app.CreateClient();
+        script.DefaultRequestHeaders.Add("X-Api-Key", _factory.ApiKey);
+        Assert.Equal(HttpStatusCode.BadRequest, (await script.PutAsJsonAsync("/api/v1/settings/general", new { trustedLocalNetworks = "0.0.0.0/0" })).StatusCode);
+        Assert.Equal("10.0.0.2/32", (await owner.GetFromJsonAsync<GeneralSettingsResource>("/api/v1/settings/general"))!.TrustedProxies);
+    }
+
     // ---- S1-06: trusted local networks ----
 
     [Fact]

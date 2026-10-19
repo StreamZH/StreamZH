@@ -24,9 +24,9 @@ public sealed class M028_RedactHistoryLinks : Migration
         // The keys are gone for good; nothing to restore.
     }
 
-    internal static int Redact(System.Data.IDbConnection connection, System.Data.IDbTransaction? transaction)
+    public static int Redact(System.Data.IDbConnection connection, System.Data.IDbTransaction? transaction)
     {
-        var rows = connection.Query<(long Id, string Data)>("SELECT Id, Data FROM History WHERE Data LIKE '%=%' OR Data LIKE '%@%'", transaction: transaction).ToList();
+        var rows = connection.Query<(long Id, string Data)>("SELECT Id, Data FROM History", transaction: transaction).ToList();
         var changed = 0;
         foreach (var (id, data) in rows)
         {

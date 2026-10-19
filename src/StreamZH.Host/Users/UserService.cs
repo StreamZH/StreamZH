@@ -232,7 +232,13 @@ public sealed class UserService(
             return UserResult<User>.Fail(UserError.NotFound, "This user does not exist.");
         }
 
-        if (target.Role == UserRole.Owner && !actor.IsOwner && actor.Id != id)
+        // 0.12 (security review S1-12): a stolen session must not set a new password without knowing the current one.
+        if (actor.Id == id)
+        {
+            return UserResult<User>.Fail(UserError.Forbidden, "Change your own password under Profile; it asks for the current password.");
+        }
+
+        if (target.Role == UserRole.Owner && !actor.IsOwner)
         {
             return UserResult<User>.Fail(UserError.Forbidden, "Only an owner can reset an owner's password.");
         }

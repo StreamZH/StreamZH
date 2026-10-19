@@ -51,10 +51,14 @@ public static class LocalAddress
     /// The request comes from a local address. Behind a reverse proxy on the same computer every request looks local,
     /// so the forwarding headers (X-Forwarded-For, X-Real-IP, Forwarded) must name local addresses only as well.
     /// </summary>
-    public static bool IsLocalRequest(HttpContext context)
+    public static bool IsLocalRequest(HttpContext context) => IsLocalRequest(context, IsLocal);
+
+    /// <summary>Like <see cref="IsLocalRequest(HttpContext)"/> with the "Trusted local networks" (0.12) as the test.</summary>
+    public static bool IsLocalRequest(HttpContext context, Func<IPAddress?, bool> isLocal)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (!IsLocal(context.Connection.RemoteIpAddress))
+        ArgumentNullException.ThrowIfNull(isLocal);
+        if (!isLocal(context.Connection.RemoteIpAddress))
         {
             return false;
         }
@@ -76,7 +80,7 @@ public static class LocalAddress
                         candidate = part[4..].Trim('"');
                     }
 
-                    if (!IsLocal(ParseAddress(candidate)))
+                    if (!isLocal(ParseAddress(candidate)))
                     {
                         return false;
                     }

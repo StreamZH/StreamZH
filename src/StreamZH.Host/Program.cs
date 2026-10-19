@@ -13,6 +13,7 @@ using StreamZH.Host.General;
 using StreamZH.Host.Hubs;
 using StreamZH.Host.Jobs;
 using StreamZH.Host.Logging;
+using StreamZH.Host.Security;
 using StreamZH.Host.Service;
 using StreamZH.Host.Settings;
 using StreamZH.Host.Status;
@@ -142,11 +143,13 @@ builder.Services.AddOpenApi("v1");
 var app = builder.Build();
 
 app.UseStreamZhUrlBase();
+app.UseStreamZhSecurity();
 app.UseExceptionHandler();
 app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseBasicAuthenticationChallenge();
+app.UseCrossSiteProtection();
 app.UseAuthorization();
 
 app.MapOpenApi("/api/{documentName}/openapi.json");

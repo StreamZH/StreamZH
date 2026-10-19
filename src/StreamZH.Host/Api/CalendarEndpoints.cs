@@ -3,6 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using StreamZH.Core.Users;
+using StreamZH.Data;
+using StreamZH.Host.Auth;
 using StreamZH.Library.Wanted;
 
 namespace StreamZH.Host.Api;
@@ -45,9 +50,16 @@ public static class CalendarEndpoints
             return Results.Ok(service.Entries(new CalendarQuery(from, to, unmonitored ?? false, movies, series)));
         });
 
-        // The iCal feed for calendar apps: ?apikey=… signs it in like any API call (calendar apps cannot send a header).
-        calendar.MapGet("/feed.ics", (int? pastDays, int? futureDays, bool? unmonitored, string? tags, CalendarService service, TimeProvider time) =>
+        // The iCal feed for calendar apps, which cannot send a header or sign in: ?token=… is the read-only feed token
+        // (0.12, security review S1-04; before, the link carried the API key with full access). Signed-in members and
+        // API key clients (header) may read it too.
+        calendar.MapGet("/feed.ics", (string? token, int? pastDays, int? futureDays, bool? unmonitored, string? tags, HttpContext http, ConfigRepository config, CalendarService service, TimeProvider time) =>
         {
+            if (!FeedTokenMatches(config, token) && !IsMember(http))
+            {
+                return Results.Unauthorized();
+            }
+
             var errors = new Dictionary<string, string[]>();
             var past = pastDays ?? DefaultPastDays;
             var future = futureDays ?? DefaultFutureDays;
@@ -71,10 +83,32 @@ public static class CalendarEndpoints
             var today = DateOnly.FromDateTime(now.UtcDateTime);
             var entries = service.Entries(new CalendarQuery(today.AddDays(-past), today.AddDays(future), unmonitored ?? false, movies, series));
             return Results.Text(ICalendarWriter.Write(entries, now), ICalendarWriter.ContentType);
-        });
+        }).AllowAnonymous();
+
+        // The feed token for the iCal dialog; regenerating it ends every subscribed link.
+        calendar.MapGet("/feed-token", (ConfigRepository config) => new CalendarFeedToken(config.GetOrCreate(ConfigKeys.CalendarFeedToken, NewFeedToken)))
+            .RequireAuthorization(AuthSchemes.AdminPolicy);
+        calendar.MapPost("/feed-token", (ConfigRepository config, ILogger<CalendarFeedToken> logger) =>
+        {
+            var token = NewFeedToken();
+            config.Set(ConfigKeys.CalendarFeedToken, token);
+            logger.LogWarning("iCal feed token regenerated, subscribed calendar apps need the new link");
+            return new CalendarFeedToken(token);
+        }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
         return app;
     }
+
+    public static string NewFeedToken() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
+
+    private static bool FeedTokenMatches(ConfigRepository config, string? token) =>
+        !string.IsNullOrEmpty(token)
+        && config.Get(ConfigKeys.CalendarFeedToken) is { Length: > 0 } expected
+        && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(token), Encoding.UTF8.GetBytes(expected));
+
+    private static bool IsMember(HttpContext http) =>
+        http.User.Identity?.IsAuthenticated == true
+        && (http.User.IsInRole(nameof(UserRole.Owner)) || http.User.IsInRole(nameof(UserRole.Admin)) || http.User.IsInRole(nameof(UserRole.Friend)));
 
     private static DateOnly Day(string? value, DateOnly fallback, string field, Dictionary<string, string[]> errors)
     {
@@ -126,3 +160,6 @@ public static class CalendarEndpoints
         return (movies, series);
     }
 }
+
+/// <summary>The read-only token of the iCal feed link.</summary>
+public sealed record CalendarFeedToken(string Token);

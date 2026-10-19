@@ -239,4 +239,11 @@ public static class ConfigKeys
     public const string TorrentEnginePortForwarding = "TorrentEnginePortForwarding";
     public const string TorrentEngineSeedRatio = "TorrentEngineSeedRatio";
     public const string TorrentEngineSeedTimeMinutes = "TorrentEngineSeedTimeMinutes";
+
+    // Security (0.12, FX1): Settings → General → Security (advanced) and the read-only iCal feed token.
+    public const string AllowedHostNames = "AllowedHostNames";
+    public const string TrustedProxies = "TrustedProxies";
+    public const string TrustedLocalNetworks = "TrustedLocalNetworks";
+    public const string ExternalUserHeader = "ExternalUserHeader";
+    public const string CalendarFeedToken = "CalendarFeedToken";
 }

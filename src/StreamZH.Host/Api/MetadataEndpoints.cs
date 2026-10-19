@@ -91,6 +91,14 @@ public static class MetadataEndpoints
             }
 
             http.Response.Headers.CacheControl = $"private, max-age={(int)ImageMaxAge.TotalSeconds}";
+
+            // 0.12 (security review S1-11/S2-6): an SVG opened directly runs no script on StreamZH's origin.
+            if (path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+            {
+                http.Response.Headers.ContentSecurityPolicy = Security.SecurityHeaders.SandboxPolicy;
+                http.Response.Headers.XContentTypeOptions = "nosniff";
+            }
+
             if (!metadata.ImageCache)
             {
                 return Results.Redirect(TmdbImages.Url(path, size)!);

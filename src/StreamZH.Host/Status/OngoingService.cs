@@ -82,6 +82,7 @@ public sealed class OngoingService(
         ConnectNotices.Add(notices, services.GetService<ConnectionRepository>(), time);
         ImportNotices.Add(notices, services.GetService<DownloadImportRepository>(), time);
         GeneralNotices.Add(notices, services);
+        SecurityNotices.Add(notices, services);
         OrganizeNotices.Add(running, notices, services);
         ImportListNotices.Add(notices, services.GetService<ImportListRepository>(), time);
         TrashNotices.Add(notices, services);

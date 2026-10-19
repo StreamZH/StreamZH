@@ -37,7 +37,7 @@ public static class GeneralNotices
                 "auth-external",
                 NoticeLevels.Info,
                 "Sign-in is left to a reverse proxy",
-                "Authentication is External: anyone who reaches StreamZH directly has full access.",
+                "Authentication is External: requests from the trusted proxies (none set: from local addresses) get full access.",
                 "/settings/general#security",
                 true));
         }

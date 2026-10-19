@@ -60,7 +60,7 @@ public static class MeEndpoints
 
             await RenewOwnSessionAsync(http, UserActor.From(http.User), result.Value!, persistent);
             return Results.NoContent();
-        }).RequireRateLimiting(AuthServiceExtensions.LoginRateLimit);
+        }).RequireRateLimiting(AuthServiceExtensions.PasswordRateLimit);
 
         group.MapPost("/discord/link-code", (HttpContext http, UserRepository users, IDiscordLinkCodes codes) =>
         {

@@ -53,7 +53,7 @@ public static class InviteEndpoints
             return state == InviteState.Valid
                 ? new InviteCheck(true, null, UserRules.RoleName(invite!.Role), invite.Note, invite.Expires)
                 : new InviteCheck(false, InviteService.Message(state), null, null, null);
-        }).AllowAnonymous().RequireRateLimiting(AuthServiceExtensions.LoginRateLimit);
+        }).AllowAnonymous().RequireRateLimiting(AuthServiceExtensions.InviteRateLimit);
 
         group.MapPost("/{token}/accept", async (string token, AcceptInviteRequest request, HttpContext http, InviteService invites) =>
         {
@@ -65,7 +65,7 @@ public static class InviteEndpoints
 
             await AuthEndpoints.SignInAsync(http, result.Value!, persistent: true);
             return Results.Ok(UserInfo.From(result.Value!));
-        }).AllowAnonymous().RequireRateLimiting(AuthServiceExtensions.LoginRateLimit);
+        }).AllowAnonymous().RequireRateLimiting(AuthServiceExtensions.InviteRateLimit);
 
         return app;
     }

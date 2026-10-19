@@ -58,6 +58,13 @@ public static class BackupEndpoints
         // Restore an uploaded zip: the raw file as the request body (Content-Type application/zip), name in ?name=.
         group.MapPost("/restore", async (HttpContext http, BackupService backups, string? name, CancellationToken ct) =>
         {
+            // 0.12 (security review S1-01): only application/zip, a type other sites cannot send without CORS consent
+            // (text/plain bodies can come from any web page).
+            if (!string.Equals(http.Request.ContentType?.Split(';')[0].Trim(), "application/zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Problem("Send the backup as the request body with Content-Type: application/zip.", statusCode: StatusCodes.Status415UnsupportedMediaType);
+            }
+
             if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
             {
                 limit.MaxRequestBodySize = MaxUploadBytes;

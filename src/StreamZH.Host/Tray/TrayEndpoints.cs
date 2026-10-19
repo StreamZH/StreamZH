@@ -67,6 +67,7 @@ public static class TrayEndpoints
         var items = engine.Active();
         var notices = services.GetRequiredService<OngoingService>().Get().Notices;
         var (finished, last) = access.Finished(run, after);
+        var setupCode = services.GetRequiredService<Security.SetupCode>().Current;
         return Summarize(
             items,
             queue,
@@ -74,7 +75,7 @@ public static class TrayEndpoints
             services.GetRequiredService<HostSettings>().InstanceName,
             access.Run,
             finished,
-            last);
+            last) with { SetupCode = setupCode is null ? null : Security.SetupCode.Display(setupCode) };
     }
 
     /// <summary>The numbers of the tray status; ETA = bytes still to download over the current speed.</summary>

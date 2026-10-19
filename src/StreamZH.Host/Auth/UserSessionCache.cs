@@ -59,7 +59,14 @@ public sealed class UserSessionCache(UserRepository users, TimeProvider time)
         return state;
     }
 
-    public void Forget(int userId) => _entries.TryRemove(userId, out _);
+    /// <summary>Raised by <see cref="Forget"/>: the account changed (open live connections are checked again).</summary>
+    public event Action<int>? Changed;
+
+    public void Forget(int userId)
+    {
+        _entries.TryRemove(userId, out _);
+        Changed?.Invoke(userId);
+    }
 
     public void Clear() => _entries.Clear();
 
@@ -93,13 +100,30 @@ public sealed class UserSessionCache(UserRepository users, TimeProvider time)
             return;
         }
 
-        var cache = context.HttpContext.RequestServices.GetRequiredService<UserSessionCache>();
-        switch (cache.Check(principal, out var current))
+        var services = context.HttpContext.RequestServices;
+        var cache = services.GetRequiredService<UserSessionCache>();
+        var store = services.GetRequiredService<SessionStore>();
+        var check = cache.Check(principal, out var current);
+        var sessionId = UserClaims.Session(principal);
+
+        // 0.12: the cookie's session must still exist (signing out deletes it). Cookies from before 0.12 carry none:
+        // they get one now, so nobody has to sign in again after the update.
+        if (check != SessionCheck.Rejected && sessionId is null)
+        {
+            sessionId = store.Create(current!.Id, context.Properties.IsPersistent);
+            check = SessionCheck.Refresh;
+        }
+        else if (check != SessionCheck.Rejected && !store.IsActive(sessionId, current!.Id))
+        {
+            check = SessionCheck.Rejected;
+        }
+
+        switch (check)
         {
             case SessionCheck.Valid:
                 return;
             case SessionCheck.Refresh:
-                context.ReplacePrincipal(UserClaims.Principal(current!.Id, current.Username, current.Role, current.SessionVersion, AuthSchemes.Cookie));
+                context.ReplacePrincipal(UserClaims.Principal(current!.Id, current.Username, current.Role, current.SessionVersion, AuthSchemes.Cookie, sessionId));
                 context.ShouldRenew = true;
                 return;
             default:
@@ -107,5 +131,18 @@ public sealed class UserSessionCache(UserRepository users, TimeProvider time)
                 await context.HttpContext.SignOutAsync(AuthSchemes.Cookie);
                 return;
         }
+    }
+
+    /// <summary>The principal's sign-in is still good: the account check and, for cookies, the server-side session.</summary>
+    public bool IsStillValid(ClaimsPrincipal principal, SessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+        ArgumentNullException.ThrowIfNull(store);
+        if (Check(principal, out var current) != SessionCheck.Valid)
+        {
+            return false;
+        }
+
+        return principal.Identity?.AuthenticationType != AuthSchemes.Cookie || store.IsActive(UserClaims.Session(principal), current!.Id);
     }
 }

@@ -10,12 +10,24 @@ using StreamZH.Core;
 using StreamZH.Core.Users;
 using StreamZH.Data;
 using StreamZH.Host.General;
+using StreamZH.Host.Security;
 
 namespace StreamZH.Host.Auth;
 
 public static class AuthServiceExtensions
 {
     public const string LoginRateLimit = "login";
+
+    /// <summary>0.12: first-run setup (setup code attempts), invitation accept and own password change have their own buckets.</summary>
+    public const string SetupRateLimit = "setup";
+    public const string InviteRateLimit = "invite";
+    public const string PasswordRateLimit = "password";
+
+    /// <summary>A sign-in without "Remember me": the cookie ends with the browser session or after this time without use.</summary>
+    public static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(24);
+
+    /// <summary>"Remember me": 30 days, renewed while StreamZH is used.</summary>
+    public static readonly TimeSpan RememberLifetime = TimeSpan.FromDays(30);
 
     public static IServiceCollection AddStreamZhAuth(this IServiceCollection services, AppPaths paths)
     {
@@ -27,6 +39,9 @@ public static class AuthServiceExtensions
         // Smart picks the API key, the cookie (Forms) or Basic per request; see SmartAuthenticationHandler.
         services.AddSingleton<BasicCredentialCache>();
         services.AddSingleton<UserSessionCache>();
+        services.AddSingleton<SessionRepository>();
+        services.AddSingleton<SessionStore>();
+        services.AddStreamZhSecurity();
         services.AddAuthentication(AuthSchemes.Smart)
             .AddScheme<AuthenticationSchemeOptions, SmartAuthenticationHandler>(AuthSchemes.Smart, null)
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(AuthSchemes.ApiKey, null)
@@ -36,8 +51,10 @@ public static class AuthServiceExtensions
                 options.Cookie.Name = "StreamZH.Auth";
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SameSite = SameSiteMode.Strict;
+                // Secure when the request is HTTPS, also behind a trusted reverse proxy that says so (X-Forwarded-Proto,
+                // see ProxyForwarding). The path is the URL base (set below).
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.ExpireTimeSpan = TimeSpan.FromDays(30);
+                options.ExpireTimeSpan = RememberLifetime;
                 options.SlidingExpiration = true;
 
                 // 0.10: the account must still exist, be enabled and have the same session version and role.
@@ -56,6 +73,10 @@ public static class AuthServiceExtensions
                 };
             });
 
+        // 0.12 (S1-10): the cookie belongs to StreamZH's URL base only, not to other apps on the same host.
+        services.AddOptions<CookieAuthenticationOptions>(AuthSchemes.Cookie).Configure<RunningHost>((options, running) =>
+            options.Cookie.Path = running.Values.UrlBase.Length > 0 ? running.Values.UrlBase : "/");
+
         services.AddAuthorizationBuilder()
             .AddPolicy(AuthSchemes.AdminPolicy, policy => policy.RequireRole(nameof(UserRole.Owner), nameof(UserRole.Admin)))
             .AddPolicy(AuthSchemes.AnyUserPolicy, policy => policy.RequireAuthenticatedUser())
@@ -69,9 +90,19 @@ public static class AuthServiceExtensions
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.AddPolicy(LoginRateLimit, context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+            options.OnRejected = (context, _) =>
+            {
+                context.HttpContext.Response.Headers.RetryAfter = "60";
+                return ValueTask.CompletedTask;
+            };
+
+            // Per client (IPv6 per /64; behind a trusted proxy the forwarded client, see ProxyForwarding), one bucket each.
+            foreach (var name in new[] { LoginRateLimit, SetupRateLimit, InviteRateLimit, PasswordRateLimit })
+            {
+                options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
+                    ClientAddress.Partition(context),
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+            }
         });
 
         return services;
@@ -85,6 +116,14 @@ public static class AuthServiceExtensions
     {
         return app.Use(async (context, next) =>
         {
+            // Too many failed Basic sign-ins from this client or for this account (LoginThrottle).
+            if (context.User.Identity?.IsAuthenticated != true && context.Items[BasicAuthenticationHandler.ThrottledKey] is TimeSpan wait)
+            {
+                context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                context.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return;
+            }
+
             if (context.User.Identity?.IsAuthenticated != true
                 && !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
                 // The tray icon signs in with its own token on its endpoints (StreamZH.Host.Tray).

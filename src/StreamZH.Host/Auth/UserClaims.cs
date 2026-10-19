@@ -14,21 +14,34 @@ public static class UserClaims
 {
     public const string SessionVersion = "streamzh:sv";
 
-    public static ClaimsPrincipal Principal(User user, string scheme)
+    /// <summary>0.12: the server-side session of a sign-in cookie (see <see cref="SessionStore"/>).</summary>
+    public const string SessionId = "streamzh:sid";
+
+    public static ClaimsPrincipal Principal(User user, string scheme, string? sessionId = null)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return Principal(user.Id, user.Username, user.Role, user.SessionVersion, scheme);
+        return Principal(user.Id, user.Username, user.Role, user.SessionVersion, scheme, sessionId);
     }
 
-    public static ClaimsPrincipal Principal(int id, string username, UserRole role, int sessionVersion, string scheme) =>
-        new(new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, id.ToString(CultureInfo.InvariantCulture)),
-                new Claim(ClaimTypes.Name, username),
-                new Claim(ClaimTypes.Role, role.ToString()),
-                new Claim(SessionVersion, sessionVersion.ToString(CultureInfo.InvariantCulture)),
-            ],
-            scheme));
+    public static ClaimsPrincipal Principal(int id, string username, UserRole role, int sessionVersion, string scheme, string? sessionId = null)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, id.ToString(CultureInfo.InvariantCulture)),
+            new(ClaimTypes.Name, username),
+            new(ClaimTypes.Role, role.ToString()),
+            new(SessionVersion, sessionVersion.ToString(CultureInfo.InvariantCulture)),
+        };
+        if (sessionId is not null)
+        {
+            claims.Add(new Claim(SessionId, sessionId));
+        }
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, scheme));
+    }
+
+    /// <summary>The session id of a sign-in cookie; null for cookies from before 0.12 and other sign-ins.</summary>
+    public static string? Session(ClaimsPrincipal principal) => principal.FindFirstValue(SessionId) is { Length: > 0 } id ? id : null;
 
     /// <summary>The account id; 0 for the API key, the local network bypass and External authentication (owner without account).</summary>
     public static int UserId(ClaimsPrincipal principal) =>

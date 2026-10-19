@@ -12,9 +12,10 @@ namespace StreamZH.Host.Hubs;
 /// <summary>
 /// Pushes events to the web UI. Every signed-in user may connect (0.10); owners, admins and friends join
 /// <see cref="Members"/> and get every event, each user also joins their own group, through which requesters get only
-/// "requestChanged" of their own requests.
+/// "requestChanged" of their own requests. 0.12: open connections are tracked (<see cref="HubConnections"/>) and closed
+/// when the sign-in they were opened with ends.
 /// </summary>
-public sealed class EventsHub : Hub
+public sealed class EventsHub(HubConnections connections) : Hub
 {
     public const string Members = "members";
 
@@ -33,6 +34,13 @@ public sealed class EventsHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, UserGroup(id));
         }
 
+        connections.Add(Context);
         await base.OnConnectedAsync();
+    }
+
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        connections.Remove(Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
     }
 }

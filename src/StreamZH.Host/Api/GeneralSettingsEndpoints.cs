@@ -13,6 +13,7 @@ using StreamZH.Host.Auth;
 using StreamZH.Host.Backups;
 using StreamZH.Host.General;
 using StreamZH.Host.Logging;
+using StreamZH.Host.Security;
 using StreamZH.Library.Search;
 
 namespace StreamZH.Host.Api;
@@ -110,6 +111,25 @@ public static class GeneralSettingsEndpoints
         var method = ParseOrError<AuthenticationMethod>(request.AuthenticationMethod, "authenticationMethod", Error);
         var required = ParseOrError<AuthenticationRequired>(request.AuthenticationRequired, "authenticationRequired", Error);
         var validation = ParseOrError<CertificateValidation>(request.CertificateValidation, "certificateValidation", Error);
+        if (AccessSettings.ValidateHostNames(request.AllowedHostNames) is { } hostNamesProblem)
+        {
+            Error("allowedHostNames", hostNamesProblem);
+        }
+
+        if (AccessSettings.ValidateNetworks(request.TrustedProxies) is { } proxiesProblem)
+        {
+            Error("trustedProxies", proxiesProblem);
+        }
+
+        if (AccessSettings.ValidateNetworks(request.TrustedLocalNetworks) is { } localProblem)
+        {
+            Error("trustedLocalNetworks", localProblem);
+        }
+
+        if (AccessSettings.ValidateHeaderName(request.ExternalUserHeader) is { } headerProblem)
+        {
+            Error("externalUserHeader", headerProblem);
+        }
 
         // Proxy
         var proxyType = ParseOrError<ProxyType>(request.ProxyType, "proxyType", Error);
@@ -186,6 +206,7 @@ public static class GeneralSettingsEndpoints
 
         // Security: the Basic credential cache must not keep a sign-in across a method change.
         security.Update(method, required, validation);
+        services.GetRequiredService<AccessSettings>().Update(request.AllowedHostNames, request.TrustedProxies, request.TrustedLocalNetworks, request.ExternalUserHeader);
         if (method is not null)
         {
             services.GetRequiredService<BasicCredentialCache>().Clear();
@@ -351,7 +372,12 @@ public sealed record GeneralSettingsResource(
     bool RestartRequired,
     string? HostOverride,
     IReadOnlyList<string> Listening,
-    string? HostProblem)
+    string? HostProblem,
+    string AllowedHostNames = "",
+    string TrustedProxies = "",
+    string TrustedLocalNetworks = "",
+    string ExternalUserHeader = "",
+    bool RunningInContainer = false)
 {
     public static GeneralSettingsResource From(IServiceProvider services)
     {
@@ -366,6 +392,7 @@ public sealed record GeneralSettingsResource(
         var logFiles = services.GetRequiredService<LogFileOptions>();
         var stored = host.Current;
         var restart = running.Override is null ? stored != running.Values : stored.UrlBase != running.Values.UrlBase;
+        var access = services.GetRequiredService<AccessSettings>();
 
         return new GeneralSettingsResource(
             host.InstanceName,
@@ -403,7 +430,12 @@ public sealed record GeneralSettingsResource(
             restart,
             running.Override,
             GeneralSettingsEndpoints.Listening(services, running),
-            running.Problem);
+            running.Problem,
+            access.AllowedHostNamesText,
+            access.TrustedProxiesText,
+            access.TrustedLocalNetworksText,
+            access.ExternalUserHeader ?? string.Empty,
+            ContainerDetection.IsContainer);
     }
 }
 
@@ -435,7 +467,11 @@ public sealed record UpdateGeneralSettings(
     int? LogFileCount = null,
     string? BackupFolder = null,
     int? BackupInterval = null,
-    int? BackupRetention = null);
+    int? BackupRetention = null,
+    string? AllowedHostNames = null,
+    string? TrustedProxies = null,
+    string? TrustedLocalNetworks = null,
+    string? ExternalUserHeader = null);
 
 public sealed record ApiKeyResponse(string ApiKey);
 

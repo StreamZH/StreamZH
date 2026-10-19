@@ -30,6 +30,7 @@ internal sealed class TrayContext : ApplicationContext
     private readonly ContextMenuStrip _menu = new();
     private readonly ToolStripMenuItem _open = new("Open dashboard");
     private readonly ToolStripMenuItem _status = new("Not running") { Enabled = false };
+    private readonly ToolStripMenuItem _setupCode = new("Show setup code") { Visible = false };
     private readonly ToolStripMenuItem _pause = new("Pause downloads");
     private readonly ToolStripMenuItem _restart = new("Restart StreamZH");
     private readonly ToolStripMenuItem _stop = new("Stop StreamZH");
@@ -55,6 +56,7 @@ internal sealed class TrayContext : ApplicationContext
 
         _open.Font = new Font(_open.Font, FontStyle.Bold);
         _open.Click += (_, _) => OpenDashboard();
+        _setupCode.Click += (_, _) => ShowSetupCode();
         _pause.Click += (_, _) => Run(PauseOrResumeAsync);
         _restart.Click += (_, _) => Run(RestartAsync);
         _stop.Click += (_, _) => Run(StopAsync);
@@ -69,6 +71,7 @@ internal sealed class TrayContext : ApplicationContext
         [
             _open,
             _status,
+            _setupCode,
             new ToolStripSeparator(),
             _pause,
             _restart,
@@ -194,6 +197,32 @@ internal sealed class TrayContext : ApplicationContext
         _stop.Enabled = state.Kind != TrayStateKind.Stopping;
         _start.Visible = state.Kind == TrayStateKind.NotRunning;
         _start.Enabled = _process.CanStart;
+
+        // 0.12: until the owner account exists, setup from another device needs the one-time setup code.
+        _setupCode.Visible = state.IsUp && state.Status?.SetupCode is not null;
+    }
+
+    private void ShowSetupCode()
+    {
+        if (_state.Status?.SetupCode is not { } code)
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(code);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            // The clipboard is busy; the code is still shown.
+        }
+
+        MessageBox.Show(
+            $"Setup code: {code}\n\nOn this computer the setup page does not need it. When you create the owner account from another device (phone, other PC), the setup page asks for this code. It is copied to the clipboard.",
+            "StreamZH setup code",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
     }
 
     private async Task PauseOrResumeAsync()

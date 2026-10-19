@@ -32,6 +32,7 @@ public sealed record TrayEndpoint(string Url, string DashboardUrl, string Versio
 /// <param name="EtaSeconds">Time left for the queue at the current speed; null when nothing downloads.</param>
 /// <param name="Finished">Downloads finished since <c>after</c> (oldest first, at most 20).</param>
 /// <param name="LastFinished">Number of the last finished download in this run (0 = none yet).</param>
+/// <param name="SetupCode">0.12: the one-time setup code while no owner account exists ("Show setup code"); else null.</param>
 public sealed record TrayStatus(
     string Version,
     string RunningAs,
@@ -48,7 +49,8 @@ public sealed record TrayStatus(
     int Warnings,
     int Errors,
     IReadOnlyList<TrayFinishedDownload> Finished,
-    long LastFinished);
+    long LastFinished,
+    string? SetupCode = null);
 
 /// <summary>A download that completed or failed.</summary>
 public sealed record TrayFinishedDownload(long Number, int Id, string Title, bool Failed, string? Error, DateTimeOffset At);

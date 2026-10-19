@@ -18,7 +18,7 @@ public sealed class WatchedFolderTests : IDisposable
 
     public WatchedFolderTests()
     {
-        _watch = Path.Combine(_bed.DataDirectory, "watch");
+        _watch = Path.Combine(_bed.DataDirectory, "downloads", "watch");
         _bed.Options.Time = _clock;
         _bed.Settings.Update(new DownloadSettingsChange { WatchFolder = _watch });
     }

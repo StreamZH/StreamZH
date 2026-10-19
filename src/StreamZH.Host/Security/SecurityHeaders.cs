@@ -31,7 +31,7 @@ public static partial class SecurityHeaders
             headers["Referrer-Policy"] = "same-origin";
             if (!headers.ContainsKey("Content-Security-Policy"))
             {
-                headers.ContentSecurityPolicy = ContentSecurityPolicy(context.Request.Host.Host);
+                headers.ContentSecurityPolicy = ContentSecurityPolicy(HostAccess.HostName(context));
             }
 
             return Task.CompletedTask;

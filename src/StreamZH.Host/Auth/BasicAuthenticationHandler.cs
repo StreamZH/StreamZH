@@ -95,7 +95,7 @@ public sealed class BasicAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.Fail("Username or password is wrong."));
         }
 
-        throttle.Succeeded(username);
+        throttle.Succeeded(username, client);
 
         var principal = UserClaims.Principal(user, Scheme.Name);
         cache.Remember(key, principal, now);

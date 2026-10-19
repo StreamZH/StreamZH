@@ -24,6 +24,7 @@ public static class SecurityServiceExtensions
     /// <summary>Before rate limits and sign-in: security headers on every response, client address from trusted proxies.</summary>
     public static IApplicationBuilder UseStreamZhSecurity(this IApplicationBuilder app)
     {
+        HostAccess.UseHostHeaderCheck(app);
         app.UseSecurityHeaders();
         app.UseTrustedProxyForwarding();
         return app;

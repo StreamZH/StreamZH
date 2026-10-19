@@ -76,8 +76,12 @@ public static class AuthEndpoints
         group.MapPost("/login", async (LoginRequest request, HttpContext http, PasswordService passwords, UserRepository users, LoginThrottle throttle, ILogger<LoginRequest> logger) =>
         {
             // 0.12 (S1-09): too many failures for this account or from this client: wait, without checking the password.
+            // V-07: a browser that is already signed in to this account (valid session) is neither held back nor counted,
+            // so somebody guessing the owner's password elsewhere cannot keep the owner from signing in again here.
             var client = ClientAddress.Partition(http);
-            if (throttle.RetryAfter(request.Username, client) is { } wait)
+            var sameAccount = http.User.Identity?.AuthenticationType == AuthSchemes.Cookie
+                && string.Equals(http.User.Identity.Name, request.Username?.Trim(), StringComparison.OrdinalIgnoreCase);
+            if (!sameAccount && throttle.RetryAfter(request.Username, client) is { } wait)
             {
                 http.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
                 return Results.Problem("Too many failed sign-ins. Please wait a few minutes.", statusCode: StatusCodes.Status429TooManyRequests);
@@ -88,11 +92,15 @@ public static class AuthEndpoints
             if (user is null)
             {
                 logger.LogWarning("Failed login for '{Username}' from {Address}", request.Username, http.Connection.RemoteIpAddress);
-                throttle.Failed(request.Username, client);
+                if (!sameAccount)
+                {
+                    throttle.Failed(request.Username, client);
+                }
+
                 return Results.Problem("Username or password is wrong.", statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            throttle.Succeeded(request.Username);
+            throttle.Succeeded(request.Username, client);
             await SignInAsync(http, user, request.RememberMe);
             users.SetLastLogin(user.Id, DateTime.UtcNow);
             logger.LogInformation("User '{Username}' logged in", user.Username);

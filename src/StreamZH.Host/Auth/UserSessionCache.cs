@@ -107,11 +107,12 @@ public sealed class UserSessionCache(UserRepository users, TimeProvider time)
         var sessionId = UserClaims.Session(principal);
 
         // 0.12: the cookie's session must still exist (signing out deletes it). Cookies from before 0.12 carry none:
-        // they get one now, so nobody has to sign in again after the update.
+        // they get one now and are replaced, so nobody has to sign in again after the update; the old cookie itself
+        // stops working shortly after (V-09).
         if (check != SessionCheck.Rejected && sessionId is null)
         {
-            sessionId = store.Create(current!.Id, context.Properties.IsPersistent);
-            check = SessionCheck.Refresh;
+            sessionId = store.ReplaceLegacy(current!.Id, context.Properties.IssuedUtc, context.Properties.ExpiresUtc, current.SessionVersion, context.Properties.IsPersistent);
+            check = sessionId is null ? SessionCheck.Rejected : SessionCheck.Refresh;
         }
         else if (check != SessionCheck.Rejected && !store.IsActive(sessionId, current!.Id))
         {

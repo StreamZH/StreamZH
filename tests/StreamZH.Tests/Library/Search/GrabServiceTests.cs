@@ -113,7 +113,7 @@ public sealed class GrabServiceTests : IDisposable
 
         Assert.Throws<ValidationFailedException>(() => _bed.Downloads.SetNzbFolder("relative/nzb"));
 
-        var custom = Path.Combine(_bed.DataDirectory, "watch");
+        var custom = Path.Combine(_bed.DataDirectory, "downloads", "watch");
         Assert.Equal(custom, _bed.Downloads.SetNzbFolder(custom + Path.DirectorySeparatorChar));
         Assert.True(Directory.Exists(custom));
         Assert.Equal(custom, _bed.Downloads.NzbFolder);
@@ -220,8 +220,8 @@ public sealed class GrabServiceTests : IDisposable
         var same = Assert.Throws<ValidationFailedException>(() => downloads.Update(null, null, null, downloads.IncompleteFolder, null));
         Assert.Equal(["completeFolder"], same.Errors.Keys);
 
-        var incomplete = Path.Combine(_bed.DataDirectory, "work");
-        var complete = Path.Combine(_bed.DataDirectory, "done");
+        var incomplete = Path.Combine(_bed.DataDirectory, "downloads", "work");
+        var complete = Path.Combine(_bed.DataDirectory, "downloads", "done");
         downloads.Update("builtin", null, incomplete, complete + Path.DirectorySeparatorChar, 2500);
         Assert.Equal((DownloadClientKind.BuiltIn, incomplete, complete, 2500L), (downloads.Client, downloads.IncompleteFolder, downloads.CompleteFolder, downloads.SpeedLimitKBps));
         Assert.True(Directory.Exists(incomplete));

@@ -23,8 +23,55 @@ public sealed class SessionStore(SessionRepository sessions, TimeProvider time)
     private static readonly TimeSpan TouchEvery = TimeSpan.FromHours(1);
     private const int MaxEntries = 2000;
 
+    /// <summary>How long a cookie from before 0.12 keeps working after it was replaced (requests already on their way).</summary>
+    public static readonly TimeSpan LegacyGrace = TimeSpan.FromSeconds(60);
+
+    private const string LegacyPrefix = "legacy-";
+
     private readonly ConcurrentDictionary<string, (bool Active, int UserId, DateTimeOffset Until)> _entries = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (string SessionId, DateTimeOffset Until)> _legacy = new(StringComparer.Ordinal);
     private DateTimeOffset _nextCleanup;
+
+    /// <summary>
+    /// 0.12 (V-09): a cookie from before 0.12 has no session. The first time it is used it gets one and is replaced by a
+    /// cookie that names it; the old cookie is remembered (by a hash of its account, issue and expiry time) and works
+    /// only for <see cref="LegacyGrace"/> more, so a copy of it stops working like any signed-out cookie. Returns the
+    /// session to put into the new cookie, or null when this old cookie was already replaced.
+    /// </summary>
+    public string? ReplaceLegacy(int userId, DateTimeOffset? issued, DateTimeOffset? expires, int version, bool persistent)
+    {
+        var now = time.GetUtcNow();
+        var key = LegacyPrefix + Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+            $"{userId}|{issued?.UtcTicks}|{expires?.UtcTicks}|{version}")));
+        lock (_legacy)
+        {
+            if (_legacy.TryGetValue(key, out var replaced))
+            {
+                return replaced.Until > now ? replaced.SessionId : null;
+            }
+
+            if (sessions.Find(key) is not null)
+            {
+                // Replaced before (also before a restart): the old cookie is done.
+                return null;
+            }
+
+            var id = Create(userId, persistent);
+
+            // The marker is a session row nobody's cookie can name (it would need the sign-in keys), cleaned up like one.
+            sessions.Create(new UserSession(key, userId, now.UtcDateTime, now.UtcDateTime, false));
+            _legacy[key] = (id, now + LegacyGrace);
+            foreach (var (old, value) in _legacy)
+            {
+                if (value.Until <= now)
+                {
+                    _legacy.TryRemove(old, out _);
+                }
+            }
+
+            return id;
+        }
+    }
 
     /// <summary>Starts a session for the account and returns its id (256 random bits, hex).</summary>
     public string Create(int userId, bool persistent)

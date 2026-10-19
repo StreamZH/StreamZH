@@ -105,7 +105,7 @@ public sealed class SmartAuthenticationHandler(
             return true;
         }
 
-        var host = HostAccess.Normalize(Request.Host.Host);
+        var host = HostAccess.HostName(Context);
         if (WarnedHosts.Count < 100 && WarnedHosts.TryAdd(host, 0))
         {
             Logger.LogWarning(

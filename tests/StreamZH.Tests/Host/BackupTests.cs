@@ -241,7 +241,7 @@ public sealed class BackupTests : IDisposable
         Assert.Contains("backupInterval", text, StringComparison.Ordinal);
         Assert.Contains("backupRetention", text, StringComparison.Ordinal);
 
-        var folder = Path.Combine(factory.DataDirectory, "elsewhere");
+        var folder = Path.Combine(factory.DataDirectory, "Backups", "elsewhere");
         response = await owner.PutAsJsonAsync("/api/v1/settings/general", new { backupFolder = folder, backupInterval = 1, backupRetention = 14 });
         var saved = await response.Content.ReadFromJsonAsync<GeneralSettingsResource>();
         Assert.Equal(folder, saved!.BackupFolder);

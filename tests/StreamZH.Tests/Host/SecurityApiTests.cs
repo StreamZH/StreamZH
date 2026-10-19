@@ -143,7 +143,8 @@ public sealed class SecurityApiTests : IDisposable
         _remote.Address = IPAddress.Parse(Lan);
         var lan = _app.CreateClient();
 
-        foreach (var host in new[] { "localhost", "192.168.1.5:9797", "nas:9797", "nas.local", "[fd00::1]:9797", "203.0.113.7" })
+        // Local names like nas or nas.local are not trusted by default since 0.12 (V-05, SecurityVerificationTests).
+        foreach (var host in new[] { "localhost", "192.168.1.5:9797", "[fd00::1]:9797", "203.0.113.7" })
         {
             Assert.Equal(HttpStatusCode.OK, (await lan.GetAsync($"http://{host}/api/v1/system/status")).StatusCode);
         }
@@ -294,17 +295,18 @@ public sealed class SecurityApiTests : IDisposable
         Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
         Assert.NotNull(throttled.Headers.RetryAfter);
 
+        // The lock is for the guessing network only (0.12, V-07): from another network the account is not locked out.
         _remote.Address = IPAddress.Parse("198.51.100.7");
         var elsewhere = Browserless();
         elsewhere.DefaultRequestHeaders.Authorization = Basic(StreamZhFactory.OwnerName, "guess 100");
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await elsewhere.GetAsync("/api/v1/system/status")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await elsewhere.GetAsync("/api/v1/system/status")).StatusCode);
 
         // A browser that signed in before keeps working.
         Assert.Equal(HttpStatusCode.OK, (await good.GetAsync("/api/v1/system/status")).StatusCode);
     }
 
     [Fact]
-    public async Task Sign_in_page_counts_failures_per_account_across_addresses()
+    public async Task Sign_in_page_counts_failures_per_account_across_addresses_of_one_network()
     {
         await OwnerAsync();
         for (var i = 0; i < LoginThrottle.AccountLimit; i++)

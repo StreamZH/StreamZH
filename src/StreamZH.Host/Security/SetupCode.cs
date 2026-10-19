@@ -45,8 +45,12 @@ public sealed class SetupCode(AppPaths paths, UserRepository users, ILogger<Setu
         }
     }
 
-    /// <summary>This request needs the code: no owner yet and not from this computer.</summary>
-    public bool IsRequired(HttpContext context) => users.Count() == 0 && !TrayAuthenticationHandler.IsThisComputer(context);
+    /// <summary>
+    /// This request needs the code: no owner yet, and not from this computer by one of its own names. A connection from
+    /// this computer with another Host name (a web page that rebinds its own name to 127.0.0.1, 0.12 V-03) needs it too.
+    /// </summary>
+    public bool IsRequired(HttpContext context) =>
+        users.Count() == 0 && !(TrayAuthenticationHandler.IsThisComputer(context) && HostAccess.IsThisComputersName(HostAccess.HostName(context)));
 
     public bool Verify(string? code)
     {

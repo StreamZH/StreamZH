@@ -39,8 +39,12 @@ public static class IndexerServiceCollectionExtensions
             })
             // Redirects are followed by the client itself, so a redirect to a magnet link (Torznab) can be recognised.
             // The connect callback keeps feed links and redirects to other hosts away from loopback and metadata addresses.
-            .ConfigurePrimaryHttpMessageHandler(() => OutboundAddressGuard.Default.Apply(
+            .ConfigurePrimaryHttpMessageHandler(sp => sp.GetRequiredService<OutboundAddressGuard>().Apply(
                 new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All, AllowAutoRedirect = false }));
+
+        // 0.12 (V-10): one guard for the check before sending and the connect callback; it knows whether the outgoing
+        // proxy (Settings → General, or HTTP(S)_PROXY) carries a request, so a name only the proxy could resolve is refused.
+        services.TryAddSingleton(sp => new OutboundAddressGuard(usesProxy: uri => OutboundAddressGuard.ThroughProxy(sp.GetService<IWebProxy>() ?? HttpClient.DefaultProxy, uri)));
 
         return services;
     }

@@ -127,6 +127,11 @@ public static class GeneralSettingsEndpoints
             Error("trustedLocalNetworks", localProblem);
         }
 
+        if (AccessSettings.ValidateClientIpHeader(request.ClientIpHeader) is { } clientIpProblem)
+        {
+            Error("clientIpHeader", clientIpProblem);
+        }
+
         if (AccessSettings.ValidateHeaderName(request.ExternalUserHeader) is { } headerProblem)
         {
             Error("externalUserHeader", headerProblem);
@@ -197,7 +202,8 @@ public static class GeneralSettingsEndpoints
         // e.g. when a page saves a whole section, but not change them.
         if (!IsOwner(http.User))
         {
-            foreach (var field in OwnerOnlyChanges(request, security, proxy, backups, method, required, validation, proxyType, services.GetRequiredService<AccessSettings>()))
+            foreach (var field in OwnerOnlyChanges(request, security, proxy, backups, method, required, validation, proxyType, services.GetRequiredService<AccessSettings>())
+                .Concat(HostOwnerOnlyChanges(request, host)))
             {
                 Error(field, OwnerOnlyMessage);
             }
@@ -232,7 +238,7 @@ public static class GeneralSettingsEndpoints
 
         // Security: the Basic credential cache must not keep a sign-in across a method change.
         security.Update(method, required, validation);
-        services.GetRequiredService<AccessSettings>().Update(request.AllowedHostNames, request.TrustedProxies, request.TrustedLocalNetworks, request.ExternalUserHeader);
+        services.GetRequiredService<AccessSettings>().Update(request.AllowedHostNames, request.TrustedProxies, request.TrustedLocalNetworks, request.ExternalUserHeader, request.ClientIpHeader);
         if (method is not null)
         {
             services.GetRequiredService<BasicCredentialCache>().Clear();
@@ -341,6 +347,11 @@ public static class GeneralSettingsEndpoints
             yield return "trustedLocalNetworks";
         }
 
+        if (request.ClientIpHeader is { } clientIpHeader && !string.Equals(clientIpHeader.Trim(), access.ClientIpHeader, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "clientIpHeader";
+        }
+
         if (request.ExternalUserHeader is { } header && header.Trim() != (access.ExternalUserHeader ?? string.Empty))
         {
             yield return "externalUserHeader";
@@ -416,6 +427,56 @@ public static class GeneralSettingsEndpoints
         if (request.BackupRetention is { } retention && retention != backups.RetentionDays)
         {
             yield return "backupRetention";
+        }
+    }
+
+    /// <summary>
+    /// 0.12 (V-04, V-11): where and how StreamZH listens and which address it trusts as its own are the owner's too. The
+    /// application URL decides which Host and Origin count as StreamZH's own (DNS rebinding, cross-site checks); bind
+    /// address and port decide who can reach it; the certificate and URL base what the browser talks to. Only the instance
+    /// name stays open to Admins.
+    /// </summary>
+    internal static IEnumerable<string> HostOwnerOnlyChanges(UpdateGeneralSettings request, HostSettings host)
+    {
+        if (request.ApplicationUrl is { } applicationUrl
+            && !string.Equals(applicationUrl.Trim().TrimEnd('/'), host.ApplicationUrl ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "applicationUrl";
+        }
+
+        if (request.BindAddress is { } bind && !string.Equals(bind.Trim(), host.BindAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "bindAddress";
+        }
+
+        if (request.Port is { } port && port != host.Port)
+        {
+            yield return "port";
+        }
+
+        if (request.UrlBase is { } urlBase && HostSettings.ValidateUrlBase(urlBase) is null && HostSettings.NormalizeUrlBase(urlBase) != host.UrlBase)
+        {
+            yield return "urlBase";
+        }
+
+        if (request.EnableSsl is { } ssl && ssl != host.EnableSsl)
+        {
+            yield return "enableSsl";
+        }
+
+        if (request.SslPort is { } sslPort && sslPort != host.SslPort)
+        {
+            yield return "sslPort";
+        }
+
+        if (request.SslCertPath is { } certPath && !string.Equals(certPath.Trim(), host.SslCertPath ?? string.Empty, StringComparison.Ordinal))
+        {
+            yield return "sslCertPath";
+        }
+
+        if (request.SslCertPassword is { } certPassword && (certPassword.Length > 0 || host.SslCertPassword is not null))
+        {
+            yield return "sslCertPassword";
         }
     }
 
@@ -524,7 +585,8 @@ public sealed record GeneralSettingsResource(
     string TrustedProxies = "",
     string TrustedLocalNetworks = "",
     string ExternalUserHeader = "",
-    bool RunningInContainer = false)
+    bool RunningInContainer = false,
+    string ClientIpHeader = AccessSettings.ClientIpHeaderAuto)
 {
     /// <summary>Shown instead of the API key to everyone but the owner (0.12).</summary>
     public const string MaskedApiKey = "********";
@@ -586,7 +648,8 @@ public sealed record GeneralSettingsResource(
             access.TrustedProxiesText,
             access.TrustedLocalNetworksText,
             access.ExternalUserHeader ?? string.Empty,
-            ContainerDetection.IsContainer);
+            ContainerDetection.IsContainer,
+            access.ClientIpHeader);
     }
 }
 
@@ -622,7 +685,8 @@ public sealed record UpdateGeneralSettings(
     string? AllowedHostNames = null,
     string? TrustedProxies = null,
     string? TrustedLocalNetworks = null,
-    string? ExternalUserHeader = null);
+    string? ExternalUserHeader = null,
+    string? ClientIpHeader = null);
 
 public sealed record ApiKeyResponse(string ApiKey);
 

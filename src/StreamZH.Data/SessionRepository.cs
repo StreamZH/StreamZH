@@ -54,7 +54,8 @@ public sealed class SessionRepository(Database database)
     public int Count(int userId)
     {
         using var connection = database.Open();
-        return connection.ExecuteScalar<int>("SELECT COUNT(*) FROM Sessions WHERE UserId = @userId", new { userId });
+        // Markers of replaced pre-0.12 cookies (SessionStore.ReplaceLegacy) are no sign-ins.
+        return connection.ExecuteScalar<int>("SELECT COUNT(*) FROM Sessions WHERE UserId = @userId AND Id NOT LIKE 'legacy-%'", new { userId });
     }
 
     private sealed class SessionRow

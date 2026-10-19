@@ -33,6 +33,19 @@ public sealed partial class AccessSettings(SettingsCache cache)
     /// <summary>External authentication: the header the reverse proxy sets with the signed-in user; null = not required.</summary>
     public string? ExternalUserHeader => cache.Get(ConfigKeys.ExternalUserHeader);
 
+    public const string ClientIpHeaderAuto = "auto";
+    public const string ClientIpHeaderForwardedFor = "x-forwarded-for";
+    public const string ClientIpHeaderRealIp = "x-real-ip";
+    public const string ClientIpHeaderCloudflare = "cf-connecting-ip";
+
+    public static IReadOnlyList<string> ClientIpHeaders { get; } = [ClientIpHeaderAuto, ClientIpHeaderForwardedFor, ClientIpHeaderRealIp, ClientIpHeaderCloudflare];
+
+    /// <summary>Which header of a trusted proxy names the client (0.12, V-08; <see cref="ProxyForwarding"/>).</summary>
+    public string ClientIpHeader => cache.Get(ConfigKeys.ClientIpHeader) is { } stored && ClientIpHeaders.Contains(stored) ? stored : ClientIpHeaderAuto;
+
+    public static string? ValidateClientIpHeader(string? value) =>
+        value is null || ClientIpHeaders.Contains(value.Trim().ToLowerInvariant()) ? null : $"Use one of: {string.Join(", ", ClientIpHeaders)}.";
+
     public string AllowedHostNamesText => cache.Get(ConfigKeys.AllowedHostNames) ?? string.Empty;
 
     public string TrustedProxiesText => cache.Get(ConfigKeys.TrustedProxies) ?? string.Empty;
@@ -56,8 +69,13 @@ public sealed partial class AccessSettings(SettingsCache cache)
         return proxies.IsEmpty ? LocalAddress.IsLocal(address) : proxies.Contains(address);
     }
 
-    public void Update(string? allowedHostNames, string? trustedProxies, string? trustedLocalNetworks, string? externalUserHeader)
+    public void Update(string? allowedHostNames, string? trustedProxies, string? trustedLocalNetworks, string? externalUserHeader, string? clientIpHeader = null)
     {
+        if (clientIpHeader is not null && ValidateClientIpHeader(clientIpHeader) is null)
+        {
+            cache.Set(ConfigKeys.ClientIpHeader, clientIpHeader.Trim().ToLowerInvariant());
+        }
+
         if (allowedHostNames is not null)
         {
             cache.Set(ConfigKeys.AllowedHostNames, string.Join(", ", ParseHostNames(allowedHostNames)));

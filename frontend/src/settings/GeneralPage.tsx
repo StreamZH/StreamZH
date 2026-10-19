@@ -8,6 +8,7 @@ import {
   type AuthenticationMethod,
   type AuthenticationRequired,
   type CertificateValidation,
+  type ClientIpHeader,
   type GeneralSettings,
   type GeneralSettingsChange,
   type ProxyType,
@@ -165,6 +166,7 @@ function HostSection() {
     }),
   )
   const advanced = useAdvanced()
+  const owner = useIsOwner()
   const v = form.values
   if (!v) return <Section id="host" title="Host">{form.query.isError ? <p className={ui.error}>{form.query.error.message}</p> : null}</Section>
 
@@ -186,6 +188,11 @@ function HostSection() {
       footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
     >
       {v.hostProblem && <p className={ui.error}>{v.hostProblem}</p>}
+      {!owner && <OwnerOnlyNote>Only the owner can change the address, port, URL base, application URL and HTTPS.</OwnerOnlyNote>}
+      <Row label="Instance name" htmlFor="instanceName" error={form.error('instanceName')} help="Shown in the browser tab and on the sign-in page.">
+        <TextInput id="instanceName" value={v.instanceName} onChange={(instanceName) => form.set({ instanceName })} />
+      </Row>
+      <ReadOnly locked={!owner}>
       <Row label="Bind address" htmlFor="bindAddress" advanced error={form.error('bindAddress')} help="* for all network interfaces, or one IP address of this computer (127.0.0.1 = only this computer).">
         <TextInput id="bindAddress" value={v.bindAddress} onChange={(bindAddress) => form.set({ bindAddress })} mono />
       </Row>
@@ -205,14 +212,11 @@ function HostSection() {
       >
         <TextInput id="urlBase" value={v.urlBase} onChange={(urlBase) => form.set({ urlBase })} placeholder="/streamzh" mono />
       </Row>
-      <Row label="Instance name" htmlFor="instanceName" error={form.error('instanceName')} help="Shown in the browser tab and on the sign-in page.">
-        <TextInput id="instanceName" value={v.instanceName} onChange={(instanceName) => form.set({ instanceName })} />
-      </Row>
       <Row
         label="Application URL"
         htmlFor="applicationUrl"
         error={form.error('applicationUrl')}
-        help="The address you open StreamZH with from outside, including the URL base. Used for links in notifications."
+        help="The address you open StreamZH with from outside, including the URL base. Used for links in notifications and trusted as StreamZH’s own address."
       >
         <TextInput id="applicationUrl" value={v.applicationUrl} onChange={(applicationUrl) => form.set({ applicationUrl })} placeholder="https://streamzh.example.com" type="url" mono />
       </Row>
@@ -239,6 +243,7 @@ function HostSection() {
           </Row>
         </>
       )}
+      </ReadOnly>
     </Section>
   )
 }
@@ -255,6 +260,7 @@ interface SecurityDraft {
   trustedLocalNetworks: string
   externalUserHeader: string
   runningInContainer: boolean
+  clientIpHeader: ClientIpHeader
 }
 
 const methodOptions: { value: AuthenticationMethod; label: string }[] = [
@@ -283,6 +289,7 @@ function SecuritySection() {
       trustedLocalNetworks: s.trustedLocalNetworks,
       externalUserHeader: s.externalUserHeader,
       runningInContainer: s.runningInContainer,
+      clientIpHeader: s.clientIpHeader,
     }),
     (d) => ({
       authenticationMethod: d.authenticationMethod,
@@ -292,6 +299,7 @@ function SecuritySection() {
       trustedProxies: d.trustedProxies,
       trustedLocalNetworks: d.trustedLocalNetworks,
       externalUserHeader: d.externalUserHeader,
+      clientIpHeader: d.clientIpHeader,
     }),
   )
   const advanced = useAdvanced()
@@ -306,7 +314,7 @@ function SecuritySection() {
     <Section
       id="security"
       title="Security"
-      hiddenCount={advanced ? 0 : (v.certificateValidation === 'disabled' ? 0 : 1) + 1 + (localBypass ? 1 : 0) + (signInFree ? 1 : 0) + (external ? 1 : 0)}
+      hiddenCount={advanced ? 0 : (v.certificateValidation === 'disabled' ? 0 : 1) + 1 + (localBypass ? 1 : 0) + (signInFree ? 1 : 0) + (external ? 1 : 0) + (v.trustedProxies.trim() !== '' ? 1 : 0)}
       footer={owner ? <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} /> : <OwnerOnlyNote />}
     >
       <ReadOnly locked={!owner}>
@@ -372,7 +380,7 @@ function SecuritySection() {
           htmlFor="allowedHostNames"
           advanced
           error={form.error('allowedHostNames')}
-          help="Sign-in-free access is only given to IP addresses, local names (nas, *.local, *.lan), this computer's name and the application URL. Add other names you open StreamZH with, e.g. media.example.com or *.example.com."
+          help="Sign-in-free access is only given to IP addresses, localhost, this computer's own name and the application URL. Add every other name you open StreamZH with, e.g. nas, nas.lan or media.example.com (*.example.com for all names below it)."
         >
           <TextInput
             id="allowedHostNames"
@@ -396,6 +404,27 @@ function SecuritySection() {
       >
         <TextInput id="trustedProxies" value={v.trustedProxies} onChange={(trustedProxies) => form.set({ trustedProxies })} placeholder="172.18.0.2" mono />
       </Row>
+      {v.trustedProxies.trim() !== '' && (
+        <Row
+          label="Client IP header"
+          htmlFor="clientIpHeader"
+          advanced
+          error={form.error('clientIpHeader')}
+          help="The header your proxy sets with the visitor's address. Auto: X-Forwarded-For or X-Real-IP, whichever it sends; choose one if it sends only X-Real-IP and passes X-Forwarded-For through."
+        >
+          <Select
+            id="clientIpHeader"
+            value={v.clientIpHeader}
+            onChange={(clientIpHeader) => form.set({ clientIpHeader })}
+            options={[
+              { value: 'auto', label: 'Auto' },
+              { value: 'x-forwarded-for', label: 'X-Forwarded-For' },
+              { value: 'x-real-ip', label: 'X-Real-IP' },
+              { value: 'cf-connecting-ip', label: 'CF-Connecting-IP (Cloudflare)' },
+            ]}
+          />
+        </Row>
+      )}
       {external && (
         <Row
           label="User header"

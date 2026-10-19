@@ -67,7 +67,7 @@ public sealed class DownloadSwitchesTests : IDisposable
     [Fact]
     public async Task Paused_category_priority_and_absolute_folder()
     {
-        var folder = Path.Combine(_bed.DataDirectory, "elsewhere");
+        var folder = Path.Combine(_bed.DataDirectory, "downloads", "elsewhere");
         _bed.Categories.Create(new DownloadCategoryDefinition(0, "later", folder, DownloadCategoryService.PausedPriority, PostProcessLevel.Full));
         var engine = await _bed.StartAsync();
 
@@ -232,7 +232,7 @@ public sealed class DownloadSwitchesTests : IDisposable
     [Fact]
     public async Task Nzb_backup_folder_gets_a_copy_of_every_nzb()
     {
-        var backup = Path.Combine(_bed.DataDirectory, "nzb-backup");
+        var backup = Path.Combine(_bed.DataDirectory, "downloads", "nzb-backup");
         Set(new DownloadSettingsChange { NzbBackupFolder = backup });
         var engine = await _bed.StartAsync();
         var release = Simple("Backed.Up.2024-GRP");

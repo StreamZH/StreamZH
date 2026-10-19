@@ -8,13 +8,14 @@ using System.Net.Sockets;
 using System.Text;
 using StreamZH.Core.Indexers;
 using StreamZH.Core.Net;
+using StreamZH.Indexers.Newznab;
 using static StreamZH.Tests.Indexers.NewznabTestSupport;
 
 namespace StreamZH.Tests.Indexers;
 
 /// <summary>
 /// S2-3: links in indexer feeds and redirects may not reach this computer, link-local or cloud metadata addresses
-/// unless they stay on the indexer's own host. LAN addresses stay allowed (Prowlarr and Jackett live there).
+/// unless they stay on the indexer's own host; since 0.12 (V-10) not the LAN either, except configured indexers and download clients.
 /// </summary>
 public class OutboundAddressGuardTests
 {
@@ -119,16 +120,60 @@ public class OutboundAddressGuardTests
         Assert.DoesNotContain(handler.Requests, u => u.Host is "rebind.test" or "mixed.test");
     }
 
+    /// <summary>
+    /// V-10: a link or redirect to another host than the indexer may not reach the local network either (a blind GET to
+    /// the router or NAS admin page), unless that host is another configured indexer or download client.
+    /// </summary>
     [Fact]
-    public async Task Lan_addresses_and_public_hosts_stay_allowed()
+    public async Task Lan_addresses_only_for_configured_services_and_public_hosts_stay_allowed()
     {
         var handler = new StubIndexer { Respond = r => r.RequestUri!.Host == "indexer.test" ? Redirect("http://192.168.1.20:9117/dl/abc.nzb") : Nzb() };
         var client = Client(handler, guard: Rebinding);
 
-        await client.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://indexer.test/getnzb/abc.nzb"), CancellationToken.None);
+        await Assert.ThrowsAsync<IndexerException>(() => client.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://indexer.test/getnzb/abc.nzb"), CancellationToken.None));
+        await Assert.ThrowsAsync<IndexerException>(() => client.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://10.0.0.1/admin"), CancellationToken.None));
+        await Assert.ThrowsAsync<IndexerException>(() => client.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://[fd00::1]/admin"), CancellationToken.None));
         await client.DownloadNzbAsync(Indexer(IndexerUrl), Release("https://cdn.example/abc.nzb"), CancellationToken.None);
+        Assert.Equal(["indexer.test", "cdn.example"], handler.Requests.Select(u => u.Host));
 
-        Assert.Equal(["indexer.test", "192.168.1.20", "cdn.example"], handler.Requests.Select(u => u.Host));
+        // Jackett on 192.168.1.20 is a configured indexer: its links are fine.
+        var configured = new NewznabClient(new HttpClient(handler), new NewznabCapabilitiesCache(), guard: Rebinding, configuredHosts: new Hosts("192.168.1.20"));
+        await configured.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://indexer.test/getnzb/abc.nzb"), CancellationToken.None);
+        Assert.Contains(handler.Requests, u => u.Host == "192.168.1.20");
+    }
+
+    [Theory]
+    [InlineData("192.168.1.20", false)]
+    [InlineData("10.0.0.5", false)]
+    [InlineData("172.16.4.4", false)]
+    [InlineData("172.31.255.1", false)]
+    [InlineData("100.64.1.1", false)]
+    [InlineData("fd12:3456::1", false)]
+    [InlineData("::ffff:192.168.1.20", false)]
+    [InlineData("64:ff9b::a00:1", false)]
+    [InlineData("127.0.0.1", false)]
+    [InlineData("172.32.0.1", true)]
+    [InlineData("203.0.113.7", true)]
+    [InlineData("2001:db8::1", true)]
+    public void Restricted_requests_reach_only_public_addresses(string address, bool reachable) =>
+        Assert.Equal(reachable, OutboundAddressGuard.IsPublic(IPAddress.Parse(address)));
+
+    /// <summary>V-10: through an outgoing proxy, a name StreamZH cannot resolve itself is refused (the proxy could resolve it to anything).</summary>
+    [Fact]
+    public async Task A_name_that_does_not_resolve_is_refused_when_a_proxy_carries_the_request()
+    {
+        var unresolvable = new OutboundAddressGuard((_, _) => Task.FromException<IPAddress[]>(new SocketException((int)SocketError.HostNotFound)), usesProxy: _ => true);
+        using var viaProxy = new HttpRequestMessage(HttpMethod.Get, "http://router.internal/admin");
+        OutboundAddressGuard.Restrict(viaProxy, "indexer.test");
+        await Assert.ThrowsAsync<BlockedDestinationException>(() => unresolvable.CheckAsync(viaProxy, CancellationToken.None));
+
+        var direct = new OutboundAddressGuard((_, _) => Task.FromException<IPAddress[]>(new SocketException((int)SocketError.HostNotFound)));
+        await direct.CheckAsync(viaProxy, CancellationToken.None);
+    }
+
+    private sealed class Hosts(params string[] hosts) : IConfiguredServiceHosts
+    {
+        public bool Contains(string host) => hosts.Contains(host, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

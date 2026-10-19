@@ -24,7 +24,11 @@ namespace StreamZH.Indexers.Newznab;
 /// parser and the download differ. Stateless apart from the shared caps cache; the indexer definition comes with every call.
 /// </summary>
 public sealed class NewznabClient(
-    HttpClient http, NewznabCapabilitiesCache capabilitiesCache, ILogger<NewznabClient>? logger = null, OutboundAddressGuard? guard = null) : IIndexerClient
+    HttpClient http,
+    NewznabCapabilitiesCache capabilitiesCache,
+    ILogger<NewznabClient>? logger = null,
+    OutboundAddressGuard? guard = null,
+    IConfiguredServiceHosts? configuredHosts = null) : IIndexerClient
 {
     /// <summary>Pages per query; with 100 results per page this is Radarr's limit of 1000 results per query.</summary>
     public const int MaxPagesPerQuery = 10;
@@ -384,7 +388,7 @@ public sealed class NewznabClient(
             // cloud metadata addresses (checked here and again when the socket connects, see AddNewznabIndexers).
             if (IndexerHost(indexer) is { } trusted)
             {
-                OutboundAddressGuard.Restrict(request, trusted);
+                OutboundAddressGuard.Restrict(request, trusted, configuredHosts);
             }
 
             await _guard.CheckAsync(request, cancellationToken);

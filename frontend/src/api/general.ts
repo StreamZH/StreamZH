@@ -49,7 +49,7 @@ export interface GeneralSettings {
   hostOverride: string | null
   listening: string[]
   hostProblem: string | null
-  /** Security (advanced, 0.12): host names for the sign-in-free modes (besides IPs, local names and the application URL). */
+  /** Security (advanced, 0.12): host names for the sign-in-free modes (besides IPs, localhost, this computer's names and the application URL). */
   allowedHostNames: string
   /** Reverse proxies whose forwarding headers count; External sign-in only from them (empty: from local addresses). */
   trustedProxies: string
@@ -58,7 +58,11 @@ export interface GeneralSettings {
   /** External: the header the proxy must send with the signed-in user; empty = not required. */
   externalUserHeader: string
   runningInContainer: boolean
+  /** Which header of a trusted proxy names the client (0.12). */
+  clientIpHeader: ClientIpHeader
 }
+
+export type ClientIpHeader = 'auto' | 'x-forwarded-for' | 'x-real-ip' | 'cf-connecting-ip'
 
 /** PUT /settings/general: only the fields to change. Passwords: null keeps, '' clears. */
 export type GeneralSettingsChange = Partial<{

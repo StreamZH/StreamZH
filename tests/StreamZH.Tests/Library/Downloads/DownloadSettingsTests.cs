@@ -53,7 +53,7 @@ public sealed class DownloadSettingsTests : IDisposable
     [Fact]
     public void Every_switch_is_saved_and_read_back()
     {
-        var backup = Path.Combine(_bed.DataDirectory, "backup");
+        var backup = Path.Combine(_bed.DataDirectory, "downloads", "backup");
         Settings.Update(new DownloadSettingsChange
         {
             NzbBackupFolder = backup,

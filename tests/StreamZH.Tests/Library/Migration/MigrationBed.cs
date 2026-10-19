@@ -29,7 +29,7 @@ public sealed class MigrationBed : IAsyncDisposable
 
     public MigrationBed()
     {
-        Root = Path.Combine(Bed.DataDirectory, "sab");
+        Root = Path.Combine(Bed.DataDirectory, "downloads", "sab");
         Directory.CreateDirectory(Path.Combine(Root, "downloads", "incomplete"));
         Directory.CreateDirectory(Path.Combine(Root, "downloads", "complete"));
         Directory.CreateDirectory(Path.Combine(Root, "anime"));

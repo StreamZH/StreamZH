@@ -21,6 +21,8 @@ public static class GeneralServiceExtensions
         services.AddSingleton<ProxySettings>();
         services.AddSingleton<UiSettings>();
         services.AddSingleton<SettingsWebProxy>();
+        // 0.12 (V-10): the outbound guard of indexer requests knows when the outgoing proxy carries a request.
+        services.AddSingleton(sp => new StreamZH.Core.Net.OutboundAddressGuard(usesProxy: uri => StreamZH.Core.Net.OutboundAddressGuard.ThroughProxy(sp.GetRequiredService<SettingsWebProxy>(), uri)));
         services.AddSingleton<CertificateValidator>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHttpMessageHandlerBuilderFilter, OutgoingHttpFilter>());
         services.AddSingleton<AppLifecycle>();

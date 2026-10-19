@@ -37,6 +37,7 @@ public static class IndexerEndpoints
         services.AddSingleton<IndexerHistoryRepository>();
         services.AddSingleton<IndexerService>();
         services.AddSingleton<IIndexerProvider>(sp => sp.GetRequiredService<IndexerService>());
+        services.TryAddSingleton<IConfiguredServiceHosts, ConfiguredServiceHosts>();
 
         // Every consumer (search, grab, test) gets the tracking decorator: indexer history and query/grab limits.
         services.AddTransient<IIndexerClient>(sp => new TrackedIndexerClient(

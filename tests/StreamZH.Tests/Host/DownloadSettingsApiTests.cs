@@ -46,7 +46,7 @@ public sealed class DownloadSettingsApiTests : IDisposable
         Assert.Equal("normal", Text(defaults, "toolPriority"));
         Assert.Contains(".nfo", Text(defaults, "cleanupList"));
 
-        var watch = Path.Combine(_base.DataDirectory, "watch");
+        var watch = Path.Combine(_base.DataDirectory, "downloads", "watch");
         var saved = await client.PutAsJsonAsync("/api/v1/settings/downloads", new
         {
             watchFolder = watch,

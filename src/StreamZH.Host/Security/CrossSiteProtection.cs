@@ -67,10 +67,14 @@ public static class CrossSiteProtection
             return null;
         }
 
+        // A browser that sends Sec-Fetch-Site has the last word (0.12, V-04): same-site, cross-site and anything else are
+        // refused, even when the Origin is the application URL. The Origin only counts for browsers without Sec-Fetch-Site.
         var site = request.Headers["Sec-Fetch-Site"].FirstOrDefault();
-        if (string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase) || string.Equals(site, "none", StringComparison.OrdinalIgnoreCase))
+        if (site is { Length: > 0 })
         {
-            return null;
+            return string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase) || string.Equals(site, "none", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : $"Sec-Fetch-Site {site}";
         }
 
         if (request.Headers.Origin.FirstOrDefault() is { Length: > 0 } requestOrigin && OriginMatches(context, requestOrigin))
@@ -78,7 +82,7 @@ public static class CrossSiteProtection
             return null;
         }
 
-        return site is { Length: > 0 } ? $"Sec-Fetch-Site {site}" : "no proof of a same-origin request (Origin, Sec-Fetch-Site or X-StreamZH-Request)";
+        return "no proof of a same-origin request (Origin, Sec-Fetch-Site or X-StreamZH-Request)";
     }
 
     /// <summary>The Origin is this request's host (port included, default ports ignored) or the application URL.</summary>
@@ -90,11 +94,11 @@ public static class CrossSiteProtection
             return false;
         }
 
-        var host = context.Request.Host;
-        if (host.HasValue && string.Equals(HostAccess.Normalize(host.Host), HostAccess.Normalize(originUri.Host), StringComparison.Ordinal))
+        var (hostName, hostPort) = HostAccess.ParseHostHeader(context.Request.Headers.Host.ToString());
+        if (hostName.Length > 0 && string.Equals(hostName, HostAccess.Normalize(originUri.Host), StringComparison.Ordinal))
         {
             // A Host without port: a default port (behind a TLS proxy the scheme seen here may be http, the browser's https).
-            if (host.Port is { } port ? port == originUri.Port : originUri.IsDefaultPort)
+            if (hostPort is { } port ? port == originUri.Port : originUri.IsDefaultPort)
             {
                 return true;
             }

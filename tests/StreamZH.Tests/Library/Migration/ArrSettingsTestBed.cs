@@ -107,9 +107,9 @@ public sealed class ArrSettingsTestBed : IDisposable
 
     public string DataDirectory { get; } = Path.Combine(Path.GetTempPath(), $"streamzh-arrsettings-{Guid.NewGuid():N}");
 
-    public string MoviesFolder => Path.Combine(DataDirectory, "media", "movies");
+    public string MoviesFolder => Path.Combine(DataDirectory, "downloads", "media", "movies");
 
-    public string TvFolder => Path.Combine(DataDirectory, "media", "tv");
+    public string TvFolder => Path.Combine(DataDirectory, "downloads", "media", "tv");
 
     public Database Database { get; }
 

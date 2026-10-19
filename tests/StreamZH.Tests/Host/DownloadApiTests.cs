@@ -149,7 +149,7 @@ public sealed class DownloadApiTests : IDisposable
         var errors = (await invalid.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
         Assert.Equal(["client", "completeFolder", "speedLimitKBps"], errors.EnumerateObject().Select(p => p.Name).Order());
 
-        var complete = Path.Combine(_base.DataDirectory, "finished");
+        var complete = Path.Combine(_base.DataDirectory, "downloads", "finished");
         var saved = await client.PutAsJsonAsync("/api/v1/settings/downloads", new { client = "blackhole", completeFolder = complete, speedLimitKBps = 2048 });
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         var result = await saved.Content.ReadFromJsonAsync<JsonElement>();

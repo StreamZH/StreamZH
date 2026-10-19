@@ -3,6 +3,28 @@
 All notable changes for users of StreamZH. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/). Versions before 1.0 were private test versions.
 
+## [1.0.0-rc.2] - unreleased
+
+### Changed
+
+- **Simpler, branded Windows installer.** New look with the StreamZH logo (follows Windows' light or dark mode, sharp
+  at every display scaling) and fewer pages: Welcome, "How should StreamZH run?" (Windows service or only while you are
+  signed in, plus the firewall, Controlled folder access and desktop shortcut options on the same page), for the
+  service "Where are your movies and series?" (nothing to set up for another drive or a NAS, one click for your Videos
+  and Downloads folders, or folders of your choice), Ready, Finish. No license and no folder page. The Finish page
+  has **Start StreamZH** and **Open StreamZH in my browser**. Updates show only Welcome, Ready and Finish, keep your
+  choices, close StreamZH and its tray icon by themselves and start it again.
+- **Start menu:** "StreamZH" opens the web interface, "StreamZH tray icon" starts the tray icon; both directly in the
+  Start menu instead of a folder. Optional desktop shortcut.
+- **Simpler uninstaller:** one question, "Remove StreamZH from this computer?", with the unticked box "Also delete my
+  data" and a clear note what stays or goes, then progress and a short final message. Silent switches as before
+  (`/VERYSILENT`, `/DELETEDATA=1`).
+- **Tray-only mode:** StreamZH runs without a console window.
+
+### Fixed
+
+- The installer's "Open StreamZH in the browser" did nothing: its PowerShell command had a syntax error.
+
 ## [1.0.0-rc.1] - unreleased
 
 The first public release candidate: download, install, configure, use.

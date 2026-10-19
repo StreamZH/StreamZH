@@ -137,6 +137,14 @@ dotnet publish src\StreamZH.Tray @publish
 `ISCC.exe /DSourceDir=out\win-x64 /DOutputDir=dist packaging\windows\StreamZH.iss` (the version is read from
 `Directory.Build.props`, or `/DAppVersion=1.2.3`).
 
+Build inputs besides the published folder: `tools\*.ps1`, `LICENSE`, `NOTICE.md`, `src\StreamZH.Tray\streamzh.ico`
+(setup, uninstaller and Start menu icon) and the wizard images in `packaging\windows\images` (the banner of the
+Welcome and Finish pages on the CloudZH graphite, and the app icon at the top right, each in the seven sizes Inno Setup
+picks from for 100 % to 250 % display scaling). The images are committed; after a logo change regenerate them with
+`python3 packaging/windows/generate-wizard-images.py` (cairosvg, fonttools, brotli, Pillow; it renders the SVGs in
+`docs/brand`). The wizard follows Windows' light or dark mode (`WizardStyle=modern dynamic`; `/DWizardLook="modern
+dark"` forces dark, for screenshots).
+
 What the setup does (details in the header of `StreamZH.iss`):
 
 - Installs per machine to `C:\Program Files\StreamZH`. Only administrators may change that folder, which is what
@@ -149,25 +157,40 @@ What the setup does (details in the header of `StreamZH.iss`):
   another account created and filled before the first installation is refused with instructions; an empty one is
   created anew. StreamZH shows the notice "Data folder not private" when another person's account owns it or a secret folder (keys, Backups, restore, tools) is a link.
 - Data stays in `C:\ProgramData\StreamZH`, through upgrades and uninstalling.
-- Wizard: **Windows service** (default) or **tray icon only**; firewall rule for private networks (TCP 9797, off by
-  default); allow StreamZH in Controlled folder access (off by default); up to three folders the service account may
-  change (only for the service).
-- Runs the bundled scripts so there is one implementation: `tools\Install-Service.ps1 -NonInteractive` (service) or
-  `tools\Install-Tray.ps1 -NonInteractive -NoStart` (tray only; the setup then starts the tray as the signed-in user
-  with `--start`, which starts StreamZH). The script output goes into the setup log
+- Wizard: Welcome → **How should StreamZH run?** (Windows service, the default, or only while signed in with the tray
+  icon; options: firewall rule for private networks, TCP 9797; Controlled folder access; desktop shortcut; all off by
+  default) → **Where are your movies and series?** (service only: nothing to set up, the user's Videos and Downloads,
+  or up to three folders) → Ready → Finish with **Start StreamZH** and **Open StreamZH in my browser**. No license page
+  (the GPL needs no acceptance; the Welcome page links it), no folder page (only with `/ALLOWCUSTOMDIR`), no Start menu
+  folder page. An upgrade shows Welcome → Ready → Finish with the remembered choices; a box on the Welcome page shows
+  the choice pages again. The choices are Inno tasks (`service`, `trayonly`, `firewall`, `cfa`, `desktopicon`), so
+  `/TASKS=` and upgrades work as before; the folder choice is stored as previous data.
+- Runs the bundled scripts so there is one implementation: `tools\Install-Service.ps1 -NonInteractive -NoStart`
+  (service) or `tools\Install-Tray.ps1 -NonInteractive -NoStart` (tray only). The script output goes into the setup log
   (`%TEMP%\Setup Log <date> #<n>.txt`). The service folders reach the script in a file (`-FoldersFile`), never as
   PowerShell code.
+- **Start StreamZH** (Finish page; silent installs run it too): service: `Start-Service StreamZH` as administrator, a
+  message when it is not running afterwards, then the tray icon as the signed-in user through `explorer.exe`; tray
+  only: `StreamZH.Tray.exe --start` as the signed-in user. Never as SYSTEM.
+- Start menu: **StreamZH** (`http://localhost:9797` with the StreamZH icon), **StreamZH tray icon** (with `--start` in
+  tray-only mode); the desktop shortcut only with `desktopicon`. The Start menu folder of 1.0.0-rc.1 is removed.
 - Tray only is refused when the setup runs as SYSTEM (Intune, SCCM, RMM tools): StreamZH would run as SYSTEM. Such
   deployments use `/TASKS="service"`; an existing tray-only installation is upgraded by replacing the files only. The
   tray icon itself never runs as SYSTEM.
-- Upgrades in place: stops the service, the tray icons and a StreamZH in a console window, replaces the files
-  (the old `wwwroot` is removed first), runs the script again with the remembered choices.
+- Upgrades in place: stops the service, the tray icons and a StreamZH in a console window without asking, replaces the
+  files (the old `wwwroot` is removed first), runs the script again with the remembered choices and starts StreamZH
+  again.
 - An earlier manual installation (service running `C:\Tools\StreamZH\StreamZH.exe`): the script points the service at
   the new program folder; the finish page says the old folder can be deleted. The data folder is the same.
-- Opens <http://localhost:9797> at the end (after StreamZH answers on `/health`).
-- Uninstall: `tools\Uninstall-Service.ps1` (service, firewall rule, event log source, tray autostart), stops StreamZH,
-  removes the program. The data is deleted only when "Also delete data" is ticked; Inno Setup's `DelTree` deletes
-  junctions and symbolic links inside the data folder without following them.
+- **Open StreamZH in my browser** opens <http://localhost:9797> once StreamZH answers on `/health` (not in silent
+  installs).
+- Uninstall: one question, **Remove StreamZH from this computer?** with **Also delete my data** (unticked). Windows'
+  app list starts the uninstaller as `unins000.exe /SILENT /ASK` (the setup writes this `UninstallString`): `/SILENT`
+  skips Inno Setup's own confirmation and final message, `/ASK` shows StreamZH's question, the progress window and a
+  short final message instead. `unins000.exe` without parameters shows the question and then Inno Setup's
+  confirmation. Then `tools\Uninstall-Service.ps1` (service, firewall rule, event log source, tray autostart), stops
+  StreamZH, removes the program. The data is deleted only when "Also delete my data" is ticked or `/DELETEDATA=1` is
+  given; Inno Setup's `DelTree` deletes junctions and symbolic links inside the data folder without following them.
 
 Silent use:
 
@@ -181,8 +204,8 @@ StreamZH-1.0.0-win-x64-setup.exe /VERYSILENT /ALLOWCUSTOMDIR /DIR="D:\Apps\Strea
 The portable zip contains the same program and `tools\*.ps1`: unpack it anywhere, then `tools\Install-Service.ps1`
 or `tools\Install-Tray.ps1` (as administrator) use the unpacked folder.
 
-The `.iss` compiles on Linux too, with Inno Setup under Wine (32-bit Wine needed); the PowerShell steps of course only
-run on Windows. The decisions of the scripts that need no Windows (quoting, what happens to a prepared data folder)
+The `.iss` compiles on Linux too, with Inno Setup under Wine (32-bit Wine needed), and the wizard runs there (useful
+for screenshots, e.g. in a Wine virtual desktop on Xvfb); the PowerShell steps of course only run on Windows. The decisions of the scripts that need no Windows (quoting, what happens to a prepared data folder)
 are tested with `pwsh -NoProfile -File tests/scripts/ServiceHelpers.Tests.ps1` (CI runs it).
 
 ### macOS: zip

@@ -15,6 +15,7 @@ import FolderPicker from '../components/FolderPicker'
 import ui from '../components/ui.module.css'
 import { useAdvanced } from '../lib/advancedMode'
 import styles from './DownloadsPage.module.css'
+import { useIsOwner } from './useIsOwner'
 import { NumberInput, Row, SaveBar, Section, Select, Toggle } from './SettingsKit'
 import { useSettingsForm, type SettingsForm } from './useSettingsForm'
 
@@ -440,6 +441,7 @@ const priorityOptions: { value: ToolPriority; label: string }[] = [
 /** SABnzbd's Special page: rarely needed knobs. Only in advanced mode. */
 export function SpecialSection() {
   const form = useDownloadSection('special', ['articleTries', 'maxLineSpeedKBps', 'toolPriority', 'par2Arguments', 'sevenZipArguments'] as const)
+  const owner = useIsOwner()
   const v = form.values
   if (!v) return null
   return (
@@ -465,21 +467,37 @@ export function SpecialSection() {
       <Row label="par2 and 7-Zip priority" htmlFor="dl-priority" advanced help="Process priority of the tools, so repairing and unpacking do not slow down the rest." error={form.error('toolPriority')}>
         <Select id="dl-priority" value={v.toolPriority} options={priorityOptions} onChange={(toolPriority) => form.set({ toolPriority })} />
       </Row>
-      <Row label="par2 parameters" htmlFor="dl-par2-args" advanced help={<>Extra options for repairs, e.g. <code>-t4</code> (threads) or <code>-m1024</code> (memory).</>} error={form.error('par2Arguments')}>
+      <Row
+        label="par2 parameters"
+        htmlFor="dl-par2-args"
+        advanced
+        help={<>Extra options for repairs: <code>-t</code> (threads), <code>-T</code>, <code>-m</code> (memory MB), <code>-N</code>, <code>-S</code>, <code>-q</code>, <code>-v</code>. {owner ? '' : 'Only the owner can change this.'}</>}
+        error={form.error('par2Arguments')}
+      >
         <input
           id="dl-par2-args"
           className={`${ui.input} ${ui.mono} ${styles.wide}`}
           value={v.par2Arguments}
           spellCheck={false}
+          disabled={!owner}
+          placeholder="-t4 -m1024"
           onChange={(e) => form.set({ par2Arguments: e.target.value })}
         />
       </Row>
-      <Row label="7-Zip parameters" htmlFor="dl-7z-args" advanced help={<>Extra options for unpacking, e.g. <code>-mmt4</code>. Output folder and password are set by StreamZH.</>} error={form.error('sevenZipArguments')}>
+      <Row
+        label="7-Zip parameters"
+        htmlFor="dl-7z-args"
+        advanced
+        help={<>Extra options for unpacking: <code>-mmt</code> (threads), <code>-bb0</code> to <code>-bb3</code>, <code>-scc</code>, <code>-mcp=</code>, <code>-ao</code>. Output folder and password are set by StreamZH. {owner ? '' : 'Only the owner can change this.'}</>}
+        error={form.error('sevenZipArguments')}
+      >
         <input
           id="dl-7z-args"
           className={`${ui.input} ${ui.mono} ${styles.wide}`}
           value={v.sevenZipArguments}
           spellCheck={false}
+          disabled={!owner}
+          placeholder="-mmt4"
           onChange={(e) => form.set({ sevenZipArguments: e.target.value })}
         />
       </Row>

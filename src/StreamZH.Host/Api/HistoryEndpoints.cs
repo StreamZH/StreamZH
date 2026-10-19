@@ -2,8 +2,10 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Security.Claims;
 using StreamZH.Core.Media;
 using StreamZH.Core.Quality;
+using StreamZH.Core.Users;
 using StreamZH.Data;
 
 namespace StreamZH.Host.Api;
@@ -15,7 +17,7 @@ public static class HistoryEndpoints
     public static IEndpointRouteBuilder MapHistoryEndpoints(this IEndpointRouteBuilder app)
     {
         // Filters: eventType (comma list of event names), mediaType (movie, series), search (words in the release title), indexer.
-        app.MapGet("/api/v1/history", (int? page, int? pageSize, int? movieId, int? seriesId, string? eventType, string? mediaType, string? search, string? indexer, HistoryRepository history) =>
+        app.MapGet("/api/v1/history", (int? page, int? pageSize, int? movieId, int? seriesId, string? eventType, string? mediaType, string? search, string? indexer, HistoryRepository history, ClaimsPrincipal user) =>
         {
             var errors = new Dictionary<string, string[]>();
             var eventTypes = new List<HistoryEventType>();
@@ -45,7 +47,8 @@ public static class HistoryEndpoints
             var p = Math.Max(1, page ?? 1);
             var size = Math.Clamp(pageSize ?? 20, 1, MaxPageSize);
             var (records, total) = history.Page(p, size, movieId, seriesId, new HistoryFilter(eventTypes, media, search, indexer));
-            return Results.Ok(new HistoryPage(p, size, total, [.. records.Select(HistoryResource.From)]));
+            var admin = user.IsInRole(nameof(UserRole.Owner)) || user.IsInRole(nameof(UserRole.Admin));
+            return Results.Ok(new HistoryPage(p, size, total, [.. records.Select(h => HistoryResource.From(h, admin))]));
         }).RequireAuthorization().WithTags("History");
 
         // The indexers that occur in the history, for the filter.
@@ -86,9 +89,11 @@ public sealed record HistoryResource(
     long Size,
     IReadOnlyDictionary<string, string?> Data)
 {
-    public static HistoryResource From(HistoryItem h) => new(
+    /// <param name="admin">Owner or Admin. Friends (0.12) never get the download link, not even without its keys.</param>
+    public static HistoryResource From(HistoryItem h, bool admin) => new(
         h.Id, h.Date, h.EventType, h.MediaType, h.MovieId, h.SeriesId, h.EpisodeIds, h.SourceTitle,
         StreamZH.Core.Quality.Quality.FindById(h.QualityId).Name, h.QualityId,
         [.. h.LanguageIds.Select(Language.FindById).Where(l => l != Language.Unknown).Select(l => l.Name)],
-        h.ReleaseGroup, h.Indexer, h.IndexerId, h.Size, h.Data);
+        h.ReleaseGroup, h.Indexer, h.IndexerId, h.Size,
+        admin ? h.Data : h.Data.Where(p => p.Key != HistoryRepository.DownloadUrlKey).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal));
 }

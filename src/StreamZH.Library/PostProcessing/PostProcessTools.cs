@@ -184,12 +184,15 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
         return new ToolLocation(tool, null, ToolSource.NotFound, configured, problem);
     }
 
-    /// <summary>A configured value can be the executable itself or the folder that contains it.</summary>
+    /// <summary>
+    /// A configured value can be the executable itself or the folder that contains it. Since 0.12 the file must carry
+    /// the name of the tool (<see cref="IsToolFileName"/>), so a path to any other program is not run.
+    /// </summary>
     public string? ResolveConfigured(PostProcessTool tool, string configured)
     {
         if (environment.FileExists(configured))
         {
-            return configured;
+            return IsToolFileName(tool, System.IO.Path.GetFileName(configured)) ? configured : null;
         }
 
         return ExecutableNames(tool).Select(name => System.IO.Path.Combine(configured, name)).FirstOrDefault(environment.FileExists);
@@ -203,6 +206,25 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
         (PostProcessTool.FFprobe, true) => ["ffprobe.exe"],
         (PostProcessTool.FFprobe, false) => ["ffprobe"],
         _ => ["7z", "7zz", "7za"],
+    };
+
+    /// <summary>
+    /// The file names a configured tool may have: par2, par2.exe or par2j*(.exe) (MultiPar); 7z, 7za, 7zz (.exe);
+    /// ffprobe(.exe). Case-insensitive.
+    /// </summary>
+    public static bool IsToolFileName(PostProcessTool tool, string fileName) => tool switch
+    {
+        PostProcessTool.Par2 => Par2NameRegex().IsMatch(fileName),
+        PostProcessTool.FFprobe => FfprobeNameRegex().IsMatch(fileName),
+        _ => SevenZipNameRegex().IsMatch(fileName),
+    };
+
+    /// <summary>"par2 (par2.exe on Windows)": how the file must be named, for messages.</summary>
+    public static string FileNameHint(PostProcessTool tool) => tool switch
+    {
+        PostProcessTool.Par2 => "par2, par2.exe or par2j64.exe",
+        PostProcessTool.FFprobe => "ffprobe or ffprobe.exe",
+        _ => "7z, 7za, 7zz or 7z.exe",
     };
 
     public static string DisplayName(PostProcessTool tool) => tool switch
@@ -289,4 +311,13 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
     // "ffprobe version 9.0.2-essentials_build-www.gyan.dev", "ffprobe version 6.1.1-3ubuntu5", "ffprobe version n7.1"
     [GeneratedRegex(@"ffprobe version n?(\d+(?:\.\d+)*)", RegexOptions.IgnoreCase)]
     private static partial Regex FfprobeVersionRegex();
+
+    [GeneratedRegex(@"^(par2|par2j[A-Za-z0-9_-]{0,20})(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex Par2NameRegex();
+
+    [GeneratedRegex(@"^(7z|7za|7zz)(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SevenZipNameRegex();
+
+    [GeneratedRegex(@"^ffprobe(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex FfprobeNameRegex();
 }

@@ -73,19 +73,28 @@ public sealed class ImportListRepository(Database database)
     public IReadOnlyList<ImportListDefinition> All()
     {
         using var connection = database.Open();
-        return [.. connection.Query<ListRow>($"SELECT {Columns} FROM ImportLists ORDER BY Name COLLATE NOCASE").Select(r => r.ToDefinition())];
+        return [.. connection.Query<ListRow>($"SELECT {Columns} FROM ImportLists ORDER BY Name COLLATE NOCASE").Select(Read)];
     }
 
     public ImportListDefinition? Find(int id)
     {
         using var connection = database.Open();
-        return connection.QuerySingleOrDefault<ListRow>($"SELECT {Columns} FROM ImportLists WHERE Id = @id", new { id })?.ToDefinition();
+        return connection.QuerySingleOrDefault<ListRow>($"SELECT {Columns} FROM ImportLists WHERE Id = @id", new { id }) is { } row ? Read(row) : null;
     }
 
     public ImportListDefinition? FindByName(string name)
     {
         using var connection = database.Open();
-        return connection.QueryFirstOrDefault<ListRow>($"SELECT {Columns} FROM ImportLists WHERE Name = @name COLLATE NOCASE", new { name })?.ToDefinition();
+        return connection.QueryFirstOrDefault<ListRow>($"SELECT {Columns} FROM ImportLists WHERE Name = @name COLLATE NOCASE", new { name }) is { } row ? Read(row) : null;
+    }
+
+    public const string SecretKind = "Import list";
+
+    // 0.12: tokens and keys in the settings are stored encrypted; an unreadable one reads as not set.
+    private ImportListDefinition Read(ListRow row)
+    {
+        var list = row.ToDefinition();
+        return list with { Settings = database.Secrets.DecryptSettings(list.Settings, SecretKind, list.Name) };
     }
 
     public int Add(ImportListDefinition definition, DateTime added)
@@ -140,7 +149,7 @@ public sealed class ImportListRepository(Database database)
         using var connection = database.Open();
         connection.Execute(
             "UPDATE ImportLists SET LastSync = @at, LastError = @error, Failures = Failures + 1 WHERE Id = @id",
-            new { id, at, error });
+            new { id, at, error = Core.Security.SecretUrls.Redact(error) });
     }
 
     // ---- Exclusions ----
@@ -218,7 +227,13 @@ public sealed class ImportListRepository(Database database)
         connection.Execute("DELETE FROM ImportListOrigins WHERE MediaType = @media AND TmdbId = @tmdbId", new { media = MediaKey(type), tmdbId });
     }
 
-    private static object Parameters(ImportListDefinition d, DateTime added) => new
+    private object Parameters(ImportListDefinition d, DateTime added)
+    {
+        database.Secrets.Forget(SecretKind, d.Name);
+        return ParametersOf(d with { Settings = database.Secrets.EncryptSettings(d.Settings) }, added);
+    }
+
+    private static object ParametersOf(ImportListDefinition d, DateTime added) => new
     {
         d.Id,
         d.Name,

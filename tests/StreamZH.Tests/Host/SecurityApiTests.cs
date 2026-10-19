@@ -96,7 +96,7 @@ public sealed class SecurityApiTests : IDisposable
         // API key scripts send no Origin and no browser headers.
         var script = Browserless();
         script.DefaultRequestHeaders.Add("X-Api-Key", _factory.ApiKey);
-        Assert.True((await script.PostAsync("/api/v1/system/backup", null)).IsSuccessStatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await script.PutAsJsonAsync("/api/v1/settings/ui", new { timeFormat = "HH:mm" })).StatusCode);
 
         // Basic.
         await SaveAsync(owner, new { authenticationMethod = "basic" }, header: true);
@@ -107,9 +107,7 @@ public sealed class SecurityApiTests : IDisposable
         Assert.True((await Send(basic, HttpMethod.Post, "/api/v1/system/backup", null, (CrossSiteProtection.Header, "1"))).IsSuccessStatusCode);
 
         // External (a reverse proxy's single sign-on cookie is ambient as well).
-        var api = Browserless();
-        api.DefaultRequestHeaders.Add("X-Api-Key", _factory.ApiKey);
-        Assert.Equal(HttpStatusCode.OK, (await api.PutAsJsonAsync("/api/v1/settings/general", new { authenticationMethod = "external" })).StatusCode);
+        await SaveAsync(basic, new { authenticationMethod = "external" }, header: true);
         _remote.Address = IPAddress.Parse("10.0.0.2");
         var proxied = Browserless();
         Assert.Equal(HttpStatusCode.OK, (await proxied.GetAsync("/api/v1/system/status")).StatusCode);

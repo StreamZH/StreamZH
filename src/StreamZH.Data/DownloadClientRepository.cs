@@ -16,19 +16,28 @@ public sealed class DownloadClientRepository(Database database)
     public IReadOnlyList<DownloadClientDefinition> All()
     {
         using var connection = database.Open();
-        return [.. connection.Query<Row>($"SELECT {Columns} FROM DownloadClients ORDER BY Priority, Name COLLATE NOCASE").Select(r => r.ToDefinition())];
+        return [.. connection.Query<Row>($"SELECT {Columns} FROM DownloadClients ORDER BY Priority, Name COLLATE NOCASE").Select(Read)];
     }
 
     public DownloadClientDefinition? Find(int id)
     {
         using var connection = database.Open();
-        return connection.QuerySingleOrDefault<Row>($"SELECT {Columns} FROM DownloadClients WHERE Id = @id", new { id })?.ToDefinition();
+        return connection.QuerySingleOrDefault<Row>($"SELECT {Columns} FROM DownloadClients WHERE Id = @id", new { id }) is { } row ? Read(row) : null;
     }
 
     public DownloadClientDefinition? FindByName(string name)
     {
         using var connection = database.Open();
-        return connection.QuerySingleOrDefault<Row>($"SELECT {Columns} FROM DownloadClients WHERE Name = @name COLLATE NOCASE", new { name })?.ToDefinition();
+        return connection.QuerySingleOrDefault<Row>($"SELECT {Columns} FROM DownloadClients WHERE Name = @name COLLATE NOCASE", new { name }) is { } row ? Read(row) : null;
+    }
+
+    public const string SecretKind = "Download client";
+
+    // 0.12: passwords in the settings are stored encrypted; an unreadable one reads as not set.
+    private DownloadClientDefinition Read(Row row)
+    {
+        var client = row.ToDefinition();
+        return client with { Settings = database.Secrets.DecryptSettings(client.Settings, SecretKind, client.Name) };
     }
 
     public int Add(DownloadClientDefinition client)
@@ -61,18 +70,22 @@ public sealed class DownloadClientRepository(Database database)
         connection.Execute("DELETE FROM DownloadClients WHERE Id = @id", new { id });
     }
 
-    private static object Parameters(DownloadClientDefinition c, DateTime added) => new
+    private object Parameters(DownloadClientDefinition c, DateTime added)
     {
-        c.Id,
-        c.Name,
-        c.Implementation,
-        Protocol = (int)c.Protocol,
-        c.Enable,
-        c.Priority,
-        c.RemoveCompleted,
-        Settings = JsonSerializer.Serialize(c.Settings),
-        added,
-    };
+        database.Secrets.Forget(SecretKind, c.Name);
+        return new
+        {
+            c.Id,
+            c.Name,
+            c.Implementation,
+            Protocol = (int)c.Protocol,
+            c.Enable,
+            c.Priority,
+            c.RemoveCompleted,
+            Settings = JsonSerializer.Serialize(database.Secrets.EncryptSettings(c.Settings)),
+            added,
+        };
+    }
 
     private sealed class Row
     {

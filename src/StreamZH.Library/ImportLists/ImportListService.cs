@@ -87,7 +87,7 @@ public sealed class ImportListService(
     public ImportListDefinition Draft(ImportListInput input, int? storedId)
     {
         var stored = storedId is { } id ? repository.Find(id) : null;
-        return Validate(input, stored, checkName: false) with { Id = stored?.Id ?? 0 };
+        return Validate(input, stored, checkName: false, test: true) with { Id = stored?.Id ?? 0 };
     }
 
     // ---- Exclusions ----
@@ -130,7 +130,7 @@ public sealed class ImportListService(
     /// <summary>The list that added this library item, null when it was added another way.</summary>
     public ImportListOrigin? Origin(MediaType mediaType, int tmdbId) => repository.FindOrigin(mediaType, tmdbId);
 
-    private ImportListDefinition Validate(ImportListInput input, ImportListDefinition? stored, bool checkName = true)
+    private ImportListDefinition Validate(ImportListInput input, ImportListDefinition? stored, bool checkName = true, bool test = false)
     {
         ArgumentNullException.ThrowIfNull(input);
         var errors = new Dictionary<string, string[]>();
@@ -164,7 +164,7 @@ public sealed class ImportListService(
             stored = null;
         }
 
-        var settings = ConnectionSettings.Normalize(type.AsConnectType(), input.Settings, stored?.Settings, errors);
+        var settings = ConnectionSettings.Normalize(type.AsConnectType(), input.Settings, stored?.Settings, errors, test);
         var typed = new ConnectionSettings(settings);
 
         // Required fields that only apply to the other media type or to another choice are not required.

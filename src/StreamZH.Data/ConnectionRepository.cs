@@ -63,19 +63,28 @@ public sealed class ConnectionRepository(Database database)
     public IReadOnlyList<ConnectionDefinition> All()
     {
         using var connection = database.Open();
-        return [.. connection.Query<ConnectionRow>($"SELECT {Columns} FROM Connections ORDER BY Name COLLATE NOCASE").Select(r => r.ToDefinition())];
+        return [.. connection.Query<ConnectionRow>($"SELECT {Columns} FROM Connections ORDER BY Name COLLATE NOCASE").Select(Read)];
     }
 
     public ConnectionDefinition? Find(int id)
     {
         using var connection = database.Open();
-        return connection.QuerySingleOrDefault<ConnectionRow>($"SELECT {Columns} FROM Connections WHERE Id = @id", new { id })?.ToDefinition();
+        return connection.QuerySingleOrDefault<ConnectionRow>($"SELECT {Columns} FROM Connections WHERE Id = @id", new { id }) is { } row ? Read(row) : null;
     }
 
     public ConnectionDefinition? FindByName(string name)
     {
         using var connection = database.Open();
-        return connection.QueryFirstOrDefault<ConnectionRow>($"SELECT {Columns} FROM Connections WHERE Name = @name COLLATE NOCASE", new { name })?.ToDefinition();
+        return connection.QueryFirstOrDefault<ConnectionRow>($"SELECT {Columns} FROM Connections WHERE Name = @name COLLATE NOCASE", new { name }) is { } row ? Read(row) : null;
+    }
+
+    public const string SecretKind = "Connection";
+
+    // 0.12: passwords, tokens and keys in the settings are stored encrypted; an unreadable one reads as not set.
+    private ConnectionDefinition Read(ConnectionRow row)
+    {
+        var definition = row.ToDefinition();
+        return definition with { Settings = database.Secrets.DecryptSettings(definition.Settings, SecretKind, definition.Name) };
     }
 
     public int Add(ConnectionDefinition definition, DateTime added)
@@ -125,7 +134,7 @@ public sealed class ConnectionRepository(Database database)
     public void SetFailure(int id, DateTime at, string error)
     {
         using var connection = database.Open();
-        connection.Execute("UPDATE Connections SET LastFailure = @at, LastError = @error WHERE Id = @id", new { id, at, error });
+        connection.Execute("UPDATE Connections SET LastFailure = @at, LastError = @error WHERE Id = @id", new { id, at, error = Core.Security.SecretUrls.Redact(error) });
     }
 
     public static string SerializeSettings(IReadOnlyDictionary<string, JsonElement> settings) => JsonSerializer.Serialize(settings);
@@ -150,7 +159,13 @@ public sealed class ConnectionRepository(Database database)
         }
     }
 
-    private static object Parameters(ConnectionDefinition d, DateTime added) => new
+    private object Parameters(ConnectionDefinition d, DateTime added)
+    {
+        database.Secrets.Forget(SecretKind, d.Name);
+        return ParametersOf(d with { Settings = database.Secrets.EncryptSettings(d.Settings) }, added);
+    }
+
+    private static object ParametersOf(ConnectionDefinition d, DateTime added) => new
     {
         d.Id,
         d.Name,

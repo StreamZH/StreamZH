@@ -151,8 +151,9 @@ public sealed class IndexerSettingsTests : IDisposable
         Assert.NotNull(details.Capabilities);
         Assert.Equal("nzbgeek", details.Definition!.Key);
 
-        // Another URL without a test: the old capabilities no longer apply.
-        _service.Update(created.Id, created with { BaseUrl = "https://moved.example", ApiKey = IndexerService.MaskedApiKey });
+        // Another URL without a test: the old capabilities no longer apply. (0.12: the masked key is not sent to a new address.)
+        Assert.Throws<ValidationFailedException>(() => _service.Update(created.Id, created with { BaseUrl = "https://moved.example", ApiKey = IndexerService.MaskedApiKey }));
+        _service.Update(created.Id, created with { BaseUrl = "https://moved.example" });
         Assert.Null(_service.Details(created.Id)!.Capabilities);
         Assert.Null(_service.Details(created.Id)!.CapabilitiesCheckedAt);
 

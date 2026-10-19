@@ -18,14 +18,38 @@ public static class DownloadSettingsEndpoints
 {
     public static readonly IReadOnlyList<string> DayKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
+    private static bool ChangesArguments(string? given, bool sevenZip, IReadOnlyList<string> current) =>
+        given is not null && (ToolArguments.Parse(given, sevenZip, out _) is not { } parsed || !parsed.SequenceEqual(current, StringComparer.Ordinal));
+
     public static IEndpointRouteBuilder MapDownloadSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/settings/downloads").WithTags("Settings").RequireAuthorization(AuthSchemes.AdminPolicy);
 
         group.MapGet("/", (DownloadSettings downloads) => DownloadSettingsResource.From(downloads));
 
-        group.MapPut("/", (DownloadSettingsChange request, DownloadSettings downloads, ILogger<DownloadSettings> logger) =>
+        group.MapPut("/", (DownloadSettingsChange request, DownloadSettings downloads, HttpContext http, ILogger<DownloadSettings> logger) =>
         {
+            // 0.12: the extra par2 and 7-Zip parameters are the owner's (they go to programs StreamZH runs).
+            if (!GeneralSettingsEndpoints.IsOwner(http.User))
+            {
+                var errors = new Dictionary<string, string[]>();
+                var current = downloads.PostProcess;
+                if (ChangesArguments(request.Par2Arguments, sevenZip: false, current.Par2Arguments))
+                {
+                    errors["par2Arguments"] = [GeneralSettingsEndpoints.OwnerOnlyMessage];
+                }
+
+                if (ChangesArguments(request.SevenZipArguments, sevenZip: true, current.SevenZipArguments))
+                {
+                    errors["sevenZipArguments"] = [GeneralSettingsEndpoints.OwnerOnlyMessage];
+                }
+
+                if (errors.Count > 0)
+                {
+                    return Results.ValidationProblem(errors);
+                }
+            }
+
             downloads.Update(request);
             logger.LogInformation(
                 "Download settings saved: {Client}, incomplete {Incomplete}, complete {Complete}, NZB folder {NzbFolder}, limit {Limit} KB/s, "

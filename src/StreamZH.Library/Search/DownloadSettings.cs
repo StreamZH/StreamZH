@@ -597,8 +597,8 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
             ExtensionList.Parse(config.Get(ConfigKeys.DownloadCleanupList) ?? ExtensionList.Format(DefaultCleanupList), out _) ?? DefaultCleanupList,
             Flag(ConfigKeys.DownloadDeobfuscate, false),
             Flag(ConfigKeys.DownloadTemporaryFolderName, false),
-            StoredArguments(ConfigKeys.DownloadPar2Arguments),
-            StoredArguments(ConfigKeys.DownloadSevenZipArguments),
+            StoredArguments(ConfigKeys.DownloadPar2Arguments, sevenZip: false),
+            StoredArguments(ConfigKeys.DownloadSevenZipArguments, sevenZip: true),
             DownloadOptionValues.Parse<ToolPriority>(config.Get(ConfigKeys.DownloadToolPriority)) ?? ToolPriority.Normal,
             Int(ConfigKeys.DownloadPostProcessWorkers, 1, MaxPostProcessWorkers, 1),
             long.TryParse(config.Get(ConfigKeys.DownloadMaxLineSpeed), NumberStyles.None, CultureInfo.InvariantCulture, out var lineSpeed) ? lineSpeed : 0,
@@ -616,8 +616,11 @@ public sealed class DownloadSettings(ConfigRepository config, AppPaths paths) : 
     private int Int(string key, int min, int max, int fallback) =>
         int.TryParse(config.Get(key), NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n >= min && n <= max ? n : fallback;
 
-    private IReadOnlyList<string> StoredArguments(string key) =>
-        config.Get(key) is { Length: > 0 } stored ? stored.Split('\n', StringSplitOptions.RemoveEmptyEntries) : [];
+    // 0.12: values stored by an earlier version that are not on the allow-list are dropped.
+    private IReadOnlyList<string> StoredArguments(string key, bool sevenZip) =>
+        config.Get(key) is { Length: > 0 } stored
+            ? [.. stored.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(a => ToolArguments.IsAllowed(a, sevenZip)).Take(ToolArguments.MaxArguments)]
+            : [];
 
     private static string Quote(string argument) => argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
 

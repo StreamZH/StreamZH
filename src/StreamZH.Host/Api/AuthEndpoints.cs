@@ -122,10 +122,10 @@ public static class AuthEndpoints
             return null;
         }
 
-        // API key, local network without sign-in, External authentication: the owner without an account.
+        // Local network without sign-in, External authentication: the owner without an account. The API key (0.12): an Admin.
         if (http.User.Identity.AuthenticationType is AuthSchemes.ApiKey or AuthSchemes.Local or AuthSchemes.External)
         {
-            return new UserInfo(0, http.User.Identity.Name ?? "api", nameof(Core.Users.UserRole.Owner));
+            return new UserInfo(0, http.User.Identity.Name ?? "api", (UserClaims.Role(http.User) ?? Core.Users.UserRole.Admin).ToString());
         }
 
         // The account may have been removed since the cookie was issued.

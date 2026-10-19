@@ -86,7 +86,7 @@ public sealed class ConnectionService(
     public async Task<string> TestAsync(ConnectionInput input, int? storedId, CancellationToken cancellationToken)
     {
         var stored = storedId is { } id ? repository.Find(id) : null;
-        var definition = Validate(input, stored, checkName: false);
+        var definition = Validate(input, stored, checkName: false, test: true);
         var sender = Sender(definition.Implementation) ?? throw new ConnectException("this type is not supported");
         var message = await sender.TestAsync(new ConnectionContext(definition with { Id = stored?.Id ?? 0 }, new ConnectionSettings(definition.Settings), InstanceName), cancellationToken);
         if (stored is { Status.Failing: true } && SameSettings(stored, definition))
@@ -101,7 +101,7 @@ public sealed class ConnectionService(
     private static bool SameSettings(ConnectionDefinition a, ConnectionDefinition b) =>
         a.Implementation == b.Implementation && ConnectionRepository.SerializeSettings(a.Settings) == ConnectionRepository.SerializeSettings(b.Settings);
 
-    private ConnectionDefinition Validate(ConnectionInput input, ConnectionDefinition? stored, bool checkName = true)
+    private ConnectionDefinition Validate(ConnectionInput input, ConnectionDefinition? stored, bool checkName = true, bool test = false)
     {
         ArgumentNullException.ThrowIfNull(input);
         var errors = new Dictionary<string, string[]>();
@@ -128,7 +128,7 @@ public sealed class ConnectionService(
             stored = null;
         }
 
-        var settings = ConnectionSettings.Normalize(type, input.Settings, stored?.Settings, errors);
+        var settings = ConnectionSettings.Normalize(type, input.Settings, stored?.Settings, errors, test);
         if (Sender(type.Key) is IConnectionValidator validator)
         {
             validator.Validate(new ConnectionSettings(settings), errors);

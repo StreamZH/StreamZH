@@ -31,7 +31,7 @@ public static class GeneralSettingsEndpoints
     {
         var settings = app.MapGroup("/api/v1/settings").WithTags("Settings").RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        settings.MapGet("/general", (HttpContext http) => GeneralSettingsResource.From(http.RequestServices));
+        settings.MapGet("/general", (HttpContext http) => GeneralSettingsResource.From(http.RequestServices, IsOwner(http.User)));
         settings.MapPut("/general", Update);
 
         settings.MapPost("/apikey", (ConfigRepository config, ILogger<GeneralSettingsResource> logger) =>
@@ -40,7 +40,7 @@ public static class GeneralSettingsEndpoints
             config.Set(ConfigKeys.ApiKey, key);
             logger.LogWarning("API key regenerated, connected tools need the new key");
             return new ApiKeyResponse(key);
-        }).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
+        }).RequireAuthorization(AuthSchemes.OwnerPolicy);
 
         var system = app.MapGroup("/api/v1/system").WithTags("System").RequireAuthorization(AuthSchemes.AdminPolicy);
 
@@ -177,6 +177,16 @@ public static class GeneralSettingsEndpoints
         CheckRange(request.BackupInterval, 0, BackupSettings.MaxIntervalDays, "backupInterval", "days", Error);
         CheckRange(request.BackupRetention, 1, BackupSettings.MaxRetentionDays, "backupRetention", "days", Error);
 
+        // 0.12: security, proxy and backup settings are the owner's. An Admin (or the API key) may send them unchanged,
+        // e.g. when a page saves a whole section, but not change them.
+        if (!IsOwner(http.User))
+        {
+            foreach (var field in OwnerOnlyChanges(request, security, proxy, backups, method, required, validation, proxyType, services.GetRequiredService<AccessSettings>()))
+            {
+                Error(field, OwnerOnlyMessage);
+            }
+        }
+
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
@@ -266,7 +276,7 @@ public static class GeneralSettingsEndpoints
         // Backups
         backups.Update(request.BackupFolder, request.BackupInterval, request.BackupRetention);
 
-        var saved = GeneralSettingsResource.From(services);
+        var saved = GeneralSettingsResource.From(services, IsOwner(http.User));
         logger.LogInformation(
             "General settings saved: authentication {Method} ({Required}), proxy {Proxy}, log level {Level}, backups every {Interval} days{Restart}",
             saved.AuthenticationMethod,
@@ -277,6 +287,127 @@ public static class GeneralSettingsEndpoints
             saved.RestartRequired ? ", restart required for the host settings" : string.Empty);
         return Results.Ok(saved);
     }
+
+    public const string OwnerOnlyMessage = "Only the owner can change this.";
+
+    /// <summary>The owner: a signed-in Owner, or the owner's own access without account (local network bypass, External).</summary>
+    public static bool IsOwner(ClaimsPrincipal user) => user.IsInRole(nameof(UserRole.Owner));
+
+    /// <summary>
+    /// The owner-only fields of the request that would change a stored value: authentication (method, required),
+    /// certificate validation, the outgoing proxy (it sees the traffic with indexer keys and passwords) and the backups
+    /// (folder, interval, retention; a backup holds every secret).
+    /// </summary>
+    internal static IEnumerable<string> OwnerOnlyChanges(
+        UpdateGeneralSettings request,
+        SecuritySettings security,
+        ProxySettings proxy,
+        BackupSettings backups,
+        AuthenticationMethod? method,
+        AuthenticationRequired? required,
+        CertificateValidation? validation,
+        ProxyType? proxyType,
+        AccessSettings access)
+    {
+        // 0.12 (FX1): who gets in without signing in and which proxies are believed.
+        if (request.AllowedHostNames is { } hosts && string.Join(", ", AccessSettings.ParseHostNames(hosts)) != access.AllowedHostNamesText)
+        {
+            yield return "allowedHostNames";
+        }
+
+        if (request.TrustedProxies is { } proxies && NetworkList.Parse(proxies).Format() != access.TrustedProxiesText)
+        {
+            yield return "trustedProxies";
+        }
+
+        if (request.TrustedLocalNetworks is { } networks && NetworkList.Parse(networks).Format() != access.TrustedLocalNetworksText)
+        {
+            yield return "trustedLocalNetworks";
+        }
+
+        if (request.ExternalUserHeader is { } header && header.Trim() != (access.ExternalUserHeader ?? string.Empty))
+        {
+            yield return "externalUserHeader";
+        }
+
+        if (method is { } m && m != security.StoredMethod)
+        {
+            yield return "authenticationMethod";
+        }
+
+        if (required is { } r && r != security.Required)
+        {
+            yield return "authenticationRequired";
+        }
+
+        if (validation is { } v && v != security.CertificateValidation)
+        {
+            yield return "certificateValidation";
+        }
+
+        if (request.ProxyEnabled is { } enabled && enabled != proxy.Enabled)
+        {
+            yield return "proxyEnabled";
+        }
+
+        if (proxyType is { } type && type != proxy.Type)
+        {
+            yield return "proxyType";
+        }
+
+        if (request.ProxyHostname is { } hostname && hostname.Trim() != (proxy.Hostname ?? string.Empty))
+        {
+            yield return "proxyHostname";
+        }
+
+        if (request.ProxyPort is { } proxyPort && proxyPort != proxy.Port)
+        {
+            yield return "proxyPort";
+        }
+
+        if (request.ProxyUsername is { } username && username.Trim() != (proxy.Username ?? string.Empty))
+        {
+            yield return "proxyUsername";
+        }
+
+        if (request.ProxyPassword is { } password && (password.Length > 0 || proxy.Password is not null))
+        {
+            yield return "proxyPassword";
+        }
+
+        if (request.ProxyBypassFilter is { } filter
+            && !ProxySettings.ParseFilter(filter).SequenceEqual(ProxySettings.ParseFilter(proxy.BypassFilter), StringComparer.Ordinal))
+        {
+            yield return "proxyBypassFilter";
+        }
+
+        if (request.ProxyBypassLocalAddresses is { } bypass && bypass != proxy.BypassLocalAddresses)
+        {
+            yield return "proxyBypassLocalAddresses";
+        }
+
+        if (request.BackupFolder is { } folder
+            && (folder.Trim().Length == 0 ? !backups.IsDefaultFolder : !SamePath(folder.Trim(), backups.Folder)))
+        {
+            yield return "backupFolder";
+        }
+
+        if (request.BackupInterval is { } interval && interval != backups.IntervalDays)
+        {
+            yield return "backupInterval";
+        }
+
+        if (request.BackupRetention is { } retention && retention != backups.RetentionDays)
+        {
+            yield return "backupRetention";
+        }
+    }
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(
+            Path.TrimEndingDirectorySeparator(a),
+            Path.TrimEndingDirectorySeparator(b),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>"forms", "disabledForLocalAddresses", "socks5": the enum names in camelCase.</summary>
     public static string ApiName<T>(T value)
@@ -379,7 +510,11 @@ public sealed record GeneralSettingsResource(
     string ExternalUserHeader = "",
     bool RunningInContainer = false)
 {
-    public static GeneralSettingsResource From(IServiceProvider services)
+    /// <summary>Shown instead of the API key to everyone but the owner (0.12).</summary>
+    public const string MaskedApiKey = "********";
+
+    /// <param name="owner">Only the owner sees the API key; Admins get <see cref="MaskedApiKey"/>.</param>
+    public static GeneralSettingsResource From(IServiceProvider services, bool owner)
     {
         ArgumentNullException.ThrowIfNull(services);
         var host = services.GetRequiredService<HostSettings>();
@@ -408,7 +543,7 @@ public sealed record GeneralSettingsResource(
             security.MethodOverride is { } methodOverride ? GeneralSettingsEndpoints.ApiName(methodOverride) : null,
             GeneralSettingsEndpoints.ApiName(security.Required),
             GeneralSettingsEndpoints.ApiName(security.CertificateValidation),
-            config.Get(ConfigKeys.ApiKey) ?? string.Empty,
+            owner ? config.Get(ConfigKeys.ApiKey) ?? string.Empty : MaskedApiKey,
             proxy.Enabled,
             GeneralSettingsEndpoints.ApiName(proxy.Type),
             proxy.Hostname ?? string.Empty,

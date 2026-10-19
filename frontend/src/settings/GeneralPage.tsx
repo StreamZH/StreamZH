@@ -20,6 +20,8 @@ import { formatDateTime } from '../lib/format'
 import { useAdvanced } from '../lib/advancedMode'
 import { RestartControls } from '../system/Restart'
 import styles from './General.module.css'
+import { OwnerOnlyNote, ReadOnly } from './OwnerOnly'
+import { useIsOwner } from './useIsOwner'
 import { NumberInput, Row, SaveBar, Section, Select, SettingsPage, Toggle } from './SettingsKit'
 import { useSettingsForm } from './useSettingsForm'
 
@@ -293,6 +295,7 @@ function SecuritySection() {
     }),
   )
   const advanced = useAdvanced()
+  const owner = useIsOwner()
   const v = form.values
   if (!v) return null
   const external = v.authenticationMethod === 'external'
@@ -304,8 +307,9 @@ function SecuritySection() {
       id="security"
       title="Security"
       hiddenCount={advanced ? 0 : (v.certificateValidation === 'disabled' ? 0 : 1) + 1 + (localBypass ? 1 : 0) + (signInFree ? 1 : 0) + (external ? 1 : 0)}
-      footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
+      footer={owner ? <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} /> : <OwnerOnlyNote />}
     >
+      <ReadOnly locked={!owner}>
       {v.authenticationMethodOverride && (
         <p className={styles.warn}>
           Started with <code>--auth-method {v.authenticationMethodOverride}</code>: that method is used until StreamZH starts without it.
@@ -432,6 +436,7 @@ function SecuritySection() {
           </small>
         )}
       </Row>
+      </ReadOnly>
     </Section>
   )
 }
@@ -440,6 +445,7 @@ function SecuritySection() {
 
 function ApiKeySection({ apiKey }: { apiKey: string }) {
   const { user } = useAuth()
+  const owner = useIsOwner()
   const queryClient = useQueryClient()
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -470,10 +476,15 @@ function ApiKeySection({ apiKey }: { apiKey: string }) {
       title="API key"
       description={
         <>
-          For CloudZH, scripts and other tools. Send it as the <code>X-Api-Key</code> header. Anyone with this key has full access.
+          For CloudZH, scripts and other tools. Send it as the <code>X-Api-Key</code> header. The key can do everything an administrator can; owner-only settings and backups need the owner’s sign-in.
         </>
       }
     >
+      {!owner ? (
+        <Row label="API key" wide>
+          <OwnerOnlyNote>Only the owner can see the API key and create a new one.</OwnerOnlyNote>
+        </Row>
+      ) : (
       <Row label="API key" wide>
         <div className={styles.keyRow}>
           <code className={styles.key}>{visible ? apiKey : '•'.repeat(32)}</code>
@@ -508,6 +519,7 @@ function ApiKeySection({ apiKey }: { apiKey: string }) {
           </div>
         )}
       </Row>
+      )}
     </Section>
   )
 }
@@ -542,6 +554,7 @@ function ProxySection() {
     }),
     ({ proxyPasswordSet: _set, proxyPassword, ...rest }) => ({ ...rest, ...(proxyPassword !== null ? { proxyPassword } : {}) }),
   )
+  const owner = useIsOwner()
   const v = form.values
   if (!v) return null
 
@@ -551,8 +564,9 @@ function ProxySection() {
       title="Proxy"
       advanced={!v.proxyEnabled && !form.hasError('proxyHostname', 'proxyPort', 'proxyType', 'proxyBypassFilter')}
       description="For every web request: indexers, TMDB, tool downloads and the update check. Usenet servers are always reached directly; the proxy carries web traffic only."
-      footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
+      footer={owner ? <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} /> : <OwnerOnlyNote />}
     >
+      <ReadOnly locked={!owner}>
       <Row label="Use proxy" help="Off: StreamZH uses the system proxy (HTTP_PROXY, HTTPS_PROXY, Windows settings), if there is one.">
         <Toggle checked={v.proxyEnabled} onChange={(proxyEnabled) => form.set({ proxyEnabled })} />
       </Row>
@@ -606,6 +620,7 @@ function ProxySection() {
           </Row>
         </>
       )}
+      </ReadOnly>
     </Section>
   )
 }
@@ -676,6 +691,7 @@ function BackupSection() {
     (d) => ({ backupFolder: d.backupFolder === d.defaultBackupFolder ? '' : d.backupFolder, backupInterval: d.backupInterval, backupRetention: d.backupRetention }),
   )
   const advanced = useAdvanced()
+  const owner = useIsOwner()
   const [picking, setPicking] = useState(false)
   const v = form.values
   if (!v) return null
@@ -690,8 +706,9 @@ function BackupSection() {
         </>
       }
       hiddenCount={advanced ? 0 : 1}
-      footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
+      footer={owner ? <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} /> : <OwnerOnlyNote>Only the owner can change backups: they hold every password and key.</OwnerOnlyNote>}
     >
+      <ReadOnly locked={!owner}>
       <Row label="Folder" htmlFor="backupFolder" wide advanced error={form.error('backupFolder')} help="Another drive is safer. Scheduled backups go to “scheduled”, manual ones to “manual”.">
         <div className={styles.folderRow}>
           <TextInput id="backupFolder" value={v.backupFolder} onChange={(backupFolder) => form.set({ backupFolder })} mono />
@@ -711,6 +728,7 @@ function BackupSection() {
       <Row label="Retention" htmlFor="backupRetention" error={form.error('backupRetention')} help="Scheduled backups older than this are deleted. Manual backups stay.">
         <NumberInput id="backupRetention" value={v.backupRetention} onChange={(backupRetention) => form.set({ backupRetention })} unit="days" min={1} max={365} />
       </Row>
+      </ReadOnly>
       {picking && (
         <FolderPicker
           initialPath={v.backupFolder}

@@ -94,6 +94,25 @@ public sealed class StreamZhFactory(ITmdbClient? tmdb = null) : WebApplicationFa
         return client;
     }
 
+    /// <summary>Client signed in as a new account with this role (the owner must exist already, e.g. via <see cref="CreateOwnerClientAsync"/>).</summary>
+    public async Task<HttpClient> CreateUserClientAsync(string username, StreamZH.Core.Users.UserRole role)
+    {
+        const string password = "a long test password";
+        var passwords = Services.GetRequiredService<StreamZH.Host.Auth.PasswordService>();
+        Services.GetRequiredService<UserRepository>().Create(username, passwords.Hash(password), role);
+        var client = CreateClient();
+        (await client.PostAsJsonAsync("/api/v1/auth/login", new { username, password })).EnsureSuccessStatusCode();
+        return client;
+    }
+
+    /// <summary>Client that sends the API key (X-Api-Key) and nothing else.</summary>
+    public HttpClient CreateApiKeyClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
+        return client;
+    }
+
     /// <summary>The test server sets no remote address; requests count as coming from this computer unless a test sets one.</summary>
     private sealed class LoopbackWhenEmpty : IStartupFilter
     {

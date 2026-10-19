@@ -131,13 +131,13 @@ public static class MeEndpoints
             code is null ? null : new LinkCodeResource(code.Code, code.Expires));
     }
 
-    /// <summary>API key, local network bypass, External: the owner without account; nothing to edit.</summary>
+    /// <summary>Local network bypass, External: the owner without account; the API key: an Admin (0.12). Nothing to edit.</summary>
     private static MeResource Ownerless(HttpContext http) => new(
         0,
         http.User.Identity?.Name ?? "owner",
         null,
         null,
-        UserRules.RoleName(UserRole.Owner),
+        UserRules.RoleName(UserClaims.Role(http.User) ?? UserRole.Admin),
         null,
         null,
         HasAccount: false,

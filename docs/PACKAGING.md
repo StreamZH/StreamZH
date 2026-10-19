@@ -25,6 +25,10 @@ gh attestation verify StreamZH-<version>-win-x64-setup.exe --repo streamzh/strea
 gh attestation verify oci://ghcr.io/streamzh/streamzh:<version> --repo streamzh/streamzh
 ```
 
+GitHub keeps attestations for private repositories only on Enterprise Cloud, so the release workflow skips both
+attestation steps while the repository is private (the release notes then mention only `SHA256SUMS`). They run
+automatically once the repository is public.
+
 `<version>` is `<Version>` in `Directory.Build.props` (for example `1.0.0` or `1.0.0-rc.1`). The packages contain
 `deb` and `rpm` metadata versions like `1.0.0~rc.1-1`, so a release sorts after its release candidates.
 

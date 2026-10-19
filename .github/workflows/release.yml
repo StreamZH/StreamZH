@@ -300,7 +300,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       # `gh attestation verify oci://ghcr.io/<owner/name>:<version> --repo <owner/name>`
+      # GitHub stores attestations for private repositories only on Enterprise Cloud: while the repository is private,
+      # this step is skipped (SHA256SUMS and the draft release still work); it runs once the repository is public.
       - name: Attest the image
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-name: ${{ env.IMAGE }}
@@ -342,12 +345,15 @@ jobs:
       # SHA256SUMS proves a download is complete; the attestation proves this workflow in this repository built it:
       # `gh attestation verify <file> --repo <owner/name>`.
       - name: Attest the release files
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-path: dist/*
 
       # The "## [x.y.z]" section of CHANGELOG.md (Keep a Changelog), else a short default.
       - name: Release notes
+        env:
+          PRIVATE_REPO: ${{ github.event.repository.private }}
         run: |
           notes=""
           if [ -f CHANGELOG.md ]; then
@@ -369,7 +375,11 @@ jobs:
             printf -- '- Debian/Ubuntu: `streamzh_%s_amd64.deb` / `_arm64.deb`; Fedora/RHEL: `streamzh-%s.x86_64.rpm` / `.aarch64.rpm`; other Linux: `StreamZH-%s-linux-x64.tar.gz` / `-linux-arm64.tar.gz` with `install-linux.sh`\n' "$VERSION" "$VERSION" "$VERSION"
             printf -- '- macOS: `StreamZH-%s-osx-arm64.zip` (Apple silicon) / `-osx-x64.zip` (Intel), not notarized\n' "$VERSION"
             printf -- '- Docker: `docker pull %s:%s`\n\n' "$IMAGE" "$VERSION"
-            printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`, and that this repository built it with `gh attestation verify <file> --repo %s`. Installation: docs/INSTALL.md.\n' "$GITHUB_REPOSITORY"
+            if [ "$PRIVATE_REPO" = "true" ]; then
+              printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`. Installation: docs/INSTALL.md.\n'
+            else
+              printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`, and that this repository built it with `gh attestation verify <file> --repo %s`. Installation: docs/INSTALL.md.\n' "$GITHUB_REPOSITORY"
+            fi
           } > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 

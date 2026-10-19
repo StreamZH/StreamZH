@@ -57,6 +57,9 @@ public sealed class DownloadEngineTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_bed.Settings.NzbQueueFolder, $"{added.Id}.nzb")));
 
         Assert.Empty(engine.Active());
+
+        // The completed state is saved right after the status changes; wait for it instead of racing it.
+        await DownloadTestBed.WaitUntilAsync(() => engine.History(1, 10).Total == 1);
         var (history, total) = engine.History(1, 10);
         Assert.Equal(1, total);
         Assert.Equal(DownloadStatus.Completed, history[0].Status);

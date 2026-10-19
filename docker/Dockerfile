@@ -25,7 +25,8 @@ RUN apt-get update \
     && mkdir -p /config \
     && chown "$APP_UID:$APP_UID" /config
 # Data in /config. The container starts as root only to give /config to PUID:PGID (default: the image's "app" user
-# 1654) and then runs StreamZH as that user; with --user it runs as that user directly. UMASK like linuxserver.io.
+# 1654) and then runs StreamZH as that user; with --user it runs as that user directly. UMASK like linuxserver.io
+# (default 027: group may read new files, others not).
 ENV STREAMZH_DATA=/config \
     PUID= \
     PGID= \

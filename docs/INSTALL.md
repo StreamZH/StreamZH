@@ -50,18 +50,25 @@ hard links (torrents, which keep seeding) instead of copies.
 
 ### Installer
 
-Run `StreamZH-<version>-win-x64-setup.exe` (needs administrator rights). It installs the program to
-`C:\Program Files\StreamZH` and keeps the data in `C:\ProgramData\StreamZH`. Run it while signed in with the Windows
-account that will use the tray icon: when Windows asks for the password of another administrator account, the tray
-icon and its "Start with Windows" entry are set up for that account instead.
+Run `StreamZH-<version>-win-x64-setup.exe` (needs administrator rights) while signed in with the Windows account that
+will use StreamZH: the tray icon and its "Start with Windows" entry are set up for the account that runs the setup.
+StreamZH goes to `C:\Program Files\StreamZH`, your data to `C:\ProgramData\StreamZH`.
 
-After the license and the program folder, the wizard asks:
-
-| Page | Choices |
+| Page | What you choose |
 |---|---|
-| Select additional tasks → **How StreamZH runs** | **As a Windows service** (recommended, default): runs in the background, also when nobody is signed in, starts with Windows and restarts after a crash. **With the tray icon only**: starts when you sign in and stops when you sign out. |
-| Select additional tasks → **Options** | **Allow other devices on private networks to open StreamZH** (off by default): a Windows Firewall rule for TCP 9797 from private and domain networks. **Allow StreamZH in Controlled folder access** (off by default): needed only when Windows Security → Ransomware protection is on and your media is in a protected folder such as Videos. |
-| **Folders for the service** (service only) | Up to three folders the service account may change: your root folders and download folders (see [The service account](#the-service-account)). Leave it empty when they are on another drive that every user may change; you can add folders later. |
+| **How should StreamZH run?** | **As a Windows service** (recommended, preselected): runs in the background, starts with Windows, also when nobody is signed in, and restarts after a crash. **Only while I am signed in**: the tray icon starts StreamZH when you sign in; it stops when you sign out. Options, all off by default: **Let other devices on my network open StreamZH** (Windows Firewall rule for TCP 9797, private and domain networks only), **Allow StreamZH in Controlled folder access** (only needed when Windows Security → Ransomware protection is on), **Add a desktop shortcut**. |
+| **Where are your movies and series?** (service only) | The service runs as its own account and may change only folders it is allowed to use. **On another drive or a network share** (preselected): nothing to set up, folders on other drives are usually open to every user and a NAS decides itself who may write (use `\\server\share` paths in StreamZH). **In my Videos and Downloads folders**: the service may use these two folders of your user. **In other folders on this PC**: up to three folders of your choice. See [The service account](#the-service-account). |
+| **Finish** | **Start StreamZH** and **Open StreamZH in my browser** (both ticked): starts the service and the tray icon (or the tray icon, which starts StreamZH) and opens `http://localhost:9797` as soon as StreamZH answers. |
+
+The Start menu gets **StreamZH** (opens the web interface) and **StreamZH tray icon**. The setup has no license page:
+StreamZH is free software under the GNU GPL v3, which needs no acceptance; the license is in the program folder and
+linked on the first page.
+
+**Updating:** run the setup of the new version. It closes StreamZH and the tray icon by itself, keeps your choices
+(tick "Change how StreamZH runs" on the first page to change them), replaces the program and starts StreamZH again.
+Your data and settings stay. If you installed StreamZH by hand before (a service running from another folder such as
+`C:\Tools\StreamZH`), the setup moves the service to `C:\Program Files\StreamZH` and tells you that the old folder can
+be deleted.
 
 The firewall option opens only the web interface. When you use the built-in torrent engine and want incoming peers,
 allow its port yourself (PowerShell as administrator):
@@ -71,14 +78,9 @@ New-NetFirewallRule -DisplayName 'StreamZH torrent (TCP)' -Direction Inbound -Pr
 New-NetFirewallRule -DisplayName 'StreamZH torrent (UDP)' -Direction Inbound -Protocol UDP -LocalPort 51414 -Action Allow -Profile Private, Domain
 ```
 
-The last page offers to open `http://localhost:9797` once StreamZH answers. Running a newer installer updates
-StreamZH in place with the choices of the last installation; your data and settings stay. If you installed StreamZH
-by hand before (a service running from another folder such as `C:\Tools\StreamZH`), the setup moves the service to
-`C:\Program Files\StreamZH` and tells you that the old folder can be deleted.
-
 **Silent installation** (for scripts and deployment tools). `/TASKS` lists the choices: `service` or `trayonly`, plus
-`firewall` and `cfa` (Controlled folder access); what is not listed is off. `/FOLDERS` gives the service account its
-folders, separated by `;`:
+`firewall`, `cfa` (Controlled folder access) and `desktopicon`; what is not listed is off. `/FOLDERS` gives the service
+account its folders, separated by `;`. A silent installation starts StreamZH at the end (not the browser):
 
 ```powershell
 StreamZH-<version>-win-x64-setup.exe /VERYSILENT /TASKS="service,firewall,cfa" /FOLDERS="D:\Media;D:\Downloads"
@@ -413,7 +415,7 @@ Backup now), then:
 
 | Installed with | Update |
 |---|---|
-| Windows installer | Run the new `StreamZH-<version>-win-x64-setup.exe`. It stops StreamZH, replaces the program and starts it again |
+| Windows installer | Run the new `StreamZH-<version>-win-x64-setup.exe`. It closes StreamZH, replaces the program and starts it again |
 | Windows portable zip | Shut StreamZH down (System → Status → Shut down), replace the files, start it again |
 | .deb | `sudo apt install ./streamzh_<new version>_amd64.deb` |
 | .rpm | `sudo dnf install ./streamzh-<new version>.x86_64.rpm` |
@@ -428,14 +430,16 @@ made before.
 
 | Installed with | Uninstall | Your data |
 |---|---|---|
-| Windows installer | Settings → Apps → StreamZH → Uninstall | Kept in `C:\ProgramData\StreamZH` unless you tick "Also delete data" |
+| Windows installer | Settings → Apps → StreamZH → Uninstall | Kept in `C:\ProgramData\StreamZH` unless you tick "Also delete my data" |
 | .deb | `sudo apt remove streamzh` | Data and the user `streamzh` are kept; `sudo apt purge streamzh` deletes both |
 | .rpm | `sudo dnf remove streamzh` | Data and user are kept (rpm has no purge); to delete them: `sudo rm -rf /var/lib/streamzh && sudo userdel streamzh` |
 | tar.gz | `sudo bash /opt/streamzh/install-linux.sh --uninstall` | Kept; add `--purge` to delete data and user |
 | Docker | `docker rm -f streamzh` | Kept in your `/config` folder |
 | macOS | Delete the `StreamZH` folder | Kept in `~/Library/Application Support/StreamZH` |
 
-The Windows uninstaller removes the service, its firewall rule and the tray icon. Silently:
+The Windows uninstaller asks one question: **Remove StreamZH**, with the box **Also delete my data** (off by default;
+it deletes `C:\ProgramData\StreamZH` with the library, settings and backups). It closes StreamZH and the tray icon by
+itself and removes the service, its firewall rule and the tray icon. Silently:
 `"C:\Program Files\StreamZH\unins000.exe" /VERYSILENT` keeps the data, `/VERYSILENT /DELETEDATA=1` deletes it too.
 
 Your media and download folders are never deleted by an uninstall.

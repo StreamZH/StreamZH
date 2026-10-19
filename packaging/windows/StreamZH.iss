@@ -890,8 +890,9 @@ begin
     WizardForm.FinishedLabel.Caption := Text;
     WizardForm.FinishedLabel.AdjustHeight();
     { "Start StreamZH" and "Open StreamZH in my browser" below the text, however long it is. }
+    WizardForm.RunList.Hide();
     WizardForm.RunList.Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(16);
-    WizardForm.FinishedPage.Invalidate();
+    WizardForm.RunList.Show();
   end;
 end;
 
@@ -1179,10 +1180,16 @@ var
   Icon: TBitmapImage;
   Heading, Info: TNewStaticText;
   RemoveButton, CancelButton: TNewButton;
-  Left: Integer;
+  Left, FormWidth, FormHeight: Integer;
 begin
-  Form := CreateCustomForm(ScaleX(520), ScaleY(176), True, True);
+  FormWidth := ScaleX(520);
+  FormHeight := ScaleY(176);
+  Form := CreateCustomForm(FormWidth, FormHeight, True, True);
   try
+    { Under Wine at 150 % display scaling the form came out scaled twice; give it the size asked for. }
+    if (Form.ClientWidth <> FormWidth) or (Form.ClientHeight <> FormHeight) then
+      Form.SetBounds(Form.Left, Form.Top, Form.Width - Form.ClientWidth + FormWidth,
+        Form.Height - Form.ClientHeight + FormHeight);
     Form.Caption := 'Remove StreamZH';
 
     Icon := TBitmapImage.Create(Form);
@@ -1211,16 +1218,19 @@ begin
     Info.Parent := Form;
     Info.Left := Left;
     Info.Top := Heading.Top + Heading.Height + ScaleY(8);
-    Info.Width := Form.ClientWidth - Left - ScaleX(20);
+    Info.Width := FormWidth - Left - ScaleX(20);
     Info.WordWrap := True;
-    Info.Caption := 'The program, its Windows service and its tray icon are removed.';
+    if RegKeyExists(HKLM, ServiceKey) then
+      Info.Caption := 'The program, its Windows service and its tray icon are removed.'
+    else
+      Info.Caption := 'The program and its tray icon are removed.';
     Info.AdjustHeight();
 
     DataCheck := TNewCheckBox.Create(Form);
     DataCheck.Parent := Form;
     DataCheck.Left := Left;
     DataCheck.Top := Info.Top + Info.Height + ScaleY(16);
-    DataCheck.Width := Form.ClientWidth - Left - ScaleX(20);
+    DataCheck.Width := FormWidth - Left - ScaleX(20);
     DataCheck.Height := ScaleY(17);
     DataCheck.Caption := '&Also delete my data (library, settings and backups)';
     DataCheck.Checked := DeleteData;
@@ -1230,7 +1240,7 @@ begin
     DataWarning.Parent := Form;
     DataWarning.Left := Left + ScaleX(18);
     DataWarning.Top := DataCheck.Top + DataCheck.Height + ScaleY(2);
-    DataWarning.Width := Form.ClientWidth - DataWarning.Left - ScaleX(20);
+    DataWarning.Width := FormWidth - DataWarning.Left - ScaleX(20);
     DataWarning.WordWrap := True;
     DataCheckClick(nil);
 
@@ -1241,8 +1251,8 @@ begin
     CancelButton.Cancel := True;
     CancelButton.Width := ScaleX(90);
     CancelButton.Height := ScaleY(25);
-    CancelButton.Top := Form.ClientHeight - CancelButton.Height - ScaleY(16);
-    CancelButton.Left := Form.ClientWidth - CancelButton.Width - ScaleX(20);
+    CancelButton.Top := FormHeight - CancelButton.Height - ScaleY(16);
+    CancelButton.Left := FormWidth - CancelButton.Width - ScaleX(20);
 
     RemoveButton := TNewButton.Create(Form);
     RemoveButton.Parent := Form;

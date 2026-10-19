@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.Globalization;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
 using StreamZH.Host.Auth;
 using StreamZH.Library.Search;
@@ -127,6 +128,29 @@ public sealed record FreeReleaseResource(
 
     public int CustomFormatScore { get; init; }
 
+    /// <summary>0.11: "usenet" or "torrent".</summary>
+    public DownloadProtocol Protocol { get; init; } = DownloadProtocol.Usenet;
+
+    /// <summary>Torrent only: seeders and peers (seeders + leechers) as the indexer reports them; null when unknown.</summary>
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
+
+    /// <summary>Radarr's indexer flag bits and their names ("freeleech", "halfleech", "doubleUpload", "internal", "scene", …).</summary>
+    public int IndexerFlags { get; init; }
+
+    public IReadOnlyList<string> Flags { get; init; } = [];
+
+    /// <summary>Torrent only: 0 = freeleech, 1 = normal; null when the indexer does not say.</summary>
+    public double? DownloadVolumeFactor { get; init; }
+
+    public double? UploadVolumeFactor { get; init; }
+
+    /// <summary>Torrent only: the tracker's minimum ratio and seed time (seconds), when the feed names them.</summary>
+    public double? MinimumRatio { get; init; }
+
+    public long? MinimumSeedTime { get; init; }
+
     public static FreeReleaseResource From(FreeSearchRelease r, DateTimeOffset now) => new(
         r.Release.Guid,
         r.Release.IndexerId,
@@ -142,5 +166,14 @@ public sealed record FreeReleaseResource(
         [.. r.Languages.Select(l => l.Name)])
     {
         CustomFormats = CustomFormatRefResource.From(r.CustomFormats),
+        Protocol = r.Release.Protocol,
+        Seeders = r.Release.Seeders,
+        Peers = r.Release.Peers,
+        IndexerFlags = r.Release.IndexerFlags,
+        Flags = IndexerFlagBits.ToNames(r.Release.IndexerFlags),
+        DownloadVolumeFactor = r.Release.DownloadVolumeFactor,
+        UploadVolumeFactor = r.Release.UploadVolumeFactor,
+        MinimumRatio = r.Release.MinimumRatio,
+        MinimumSeedTime = r.Release.MinimumSeedTimeSeconds,
     };
 }

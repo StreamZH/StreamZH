@@ -31,6 +31,7 @@ public sealed class HubNotifier(IEventBus events, IHubContext<EventsHub> hub, Re
         Track(events.Subscribe<ReleaseGrabbed>((e, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("releaseGrabbed", e, ct))));
         Track(events.Subscribe<AutomaticSearchFinished>((e, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("searchFinished", e, ct))));
         Track(events.Subscribe<IndexersChanged>((_, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("indexersChanged", ct))));
+        Track(events.Subscribe<PendingReleasesChanged>((_, ct) => new ValueTask(hub.Clients.Group(EventsHub.Members).SendAsync("pendingReleasesChanged", ct))));
 
         // Requests (0.10): lists, the admins' pending badge and Discover's badges refresh.
         // Members get every request change; requesters (0.10) only the changes of their own requests.

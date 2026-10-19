@@ -24,8 +24,22 @@ public sealed record ReleaseCandidate(
     /// <summary>Id of the indexer (0 when unknown, e.g. the release test page); release profiles can be limited to indexers.</summary>
     public int IndexerId { get; init; }
 
-    /// <summary>Indexer flags (freeleech, internal …) as bit flags of the media type's enum; Usenet indexers set none yet (0).</summary>
+    /// <summary>
+    /// Indexer flags (freeleech, internal …) as Radarr's bits (<see cref="Indexers.IndexerFlagBits"/>); the context maps them to
+    /// Sonarr's bits for series custom formats. Usenet indexers set none (0).
+    /// </summary>
     public int IndexerFlags { get; init; }
+
+    /// <summary>0.11: Usenet or Torrent.</summary>
+    public Downloads.DownloadProtocol Protocol { get; init; } = Downloads.DownloadProtocol.Usenet;
+
+    /// <summary>Torrent only: seeders and peers as the indexer reports them (null when unknown).</summary>
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
+
+    /// <summary>Torrent only: the indexer's "Minimum seeders"; releases with fewer known seeders are rejected (0 = no minimum).</summary>
+    public int MinimumSeeders { get; init; }
 }
 
 /// <summary>What the search was for: one movie, or one set of episodes (single episode, multi-episode or season pack).</summary>
@@ -64,6 +78,12 @@ public sealed record DecisionTarget(
 
     /// <summary>The custom formats the file on disk matches (from its name, release group and quality); empty without a file.</summary>
     public IReadOnlyList<CustomFormat> ExistingCustomFormats { get; init; } = [];
+
+    /// <summary>
+    /// 0.11, protocol delay: publish date of the oldest release that is already waiting (pending) for this item. Once that
+    /// one has waited longer than the delay, newer releases are taken at once too (Radarr's OldestPendingRelease).
+    /// </summary>
+    public DateTimeOffset? PendingSince { get; init; }
 }
 
 /// <summary>How PROPER, REPACK and REAL releases (a higher revision of the same quality) are treated, like Radarr and Sonarr.</summary>
@@ -149,8 +169,10 @@ public sealed record DecisionContext(
 
         return _formats.Get(Target, candidate, () =>
         {
+            // Candidates carry Radarr's flag bits; series custom formats use Sonarr's.
+            var flags = Target.MediaType == MediaType.Series ? Indexers.IndexerFlagBits.ToSonarr(candidate.IndexerFlags) : candidate.IndexerFlags;
             var input = CustomFormatInput.ForRelease(
-                candidate.Release, candidate.SizeBytes, Target.MediaType, Target.OriginalLanguage, Target.Year, candidate.IndexerFlags);
+                candidate.Release, candidate.SizeBytes, Target.MediaType, Target.OriginalLanguage, Target.Year, flags);
             return CustomFormatCalculator.Calculate(Profile, Target.CustomFormats, input);
         });
     }

@@ -20,7 +20,7 @@ public enum ProwlarrImportMode
     [JsonStringEnumMemberName("direct")]
     Direct,
 
-    /// <summary>Through Prowlarr's Newznab proxy (http://prowlarr:9696/{id}/api with Prowlarr's API key).</summary>
+    /// <summary>Through Prowlarr's Newznab/Torznab proxy (http://prowlarr:9696/{id}/api with Prowlarr's API key).</summary>
     [JsonStringEnumMemberName("proxy")]
     Proxy,
 }
@@ -46,13 +46,14 @@ public sealed record ProwlarrSkipped(int ProwlarrId, string Name, string Reason)
 public sealed record ProwlarrImportResult(IReadOnlyList<ProwlarrImported> Imported, IReadOnlyList<ProwlarrSkipped> Skipped);
 
 /// <summary>
-/// Reads the indexers of a Prowlarr instance (GET /api/v1/indexer with X-Api-Key) and creates matching Newznab indexers.
-/// Prowlarr masks API keys in its API ("********"), so usually the indexers are reached through Prowlarr's Newznab
-/// proxy; when the key is readable (or the indexer has none), the indexer is used directly.
+/// Reads the indexers of a Prowlarr instance (GET /api/v1/indexer with X-Api-Key) and creates matching Newznab (Usenet) and,
+/// since 0.11, Torznab (torrent) indexers. Prowlarr masks API keys in its API ("********"), so usually the indexers are
+/// reached through Prowlarr's proxy (it answers Torznab for torrent indexers); when the key is readable (or the indexer
+/// has none), a Newznab or Generic Torznab indexer is used directly. Torrent indexers take Prowlarr's seed settings
+/// (minimum seeders, seed ratio, seed time, season pack seed time) along.
 /// </summary>
 public sealed class ProwlarrImportService(HttpClient http, IndexerService indexers, ILogger<ProwlarrImportService> logger)
 {
-    public const string TorrentReason = "Torrent indexers follow in StreamZH 1.0";
 
     /// <summary>Prowlarr's placeholder for API keys and passwords (SchemaBuilder.PRIVATE_VALUE).</summary>
     public const string MaskedValue = "********";
@@ -221,8 +222,10 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
         var ownUrl = remote.Text("baseUrl")?.Trim().TrimEnd('/');
         var ownKey = typedKey ?? remote.Text("apiKey");
         var hasKeyField = remote.Fields.ContainsKey("apiKey");
-        var newznabLike = string.Equals(remote.Implementation, IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase) || remote.Fields.ContainsKey("apiPath");
-        var ownReachable = remote.Protocol == "usenet" && newznabLike && hasKeyField && !string.IsNullOrEmpty(ownUrl)
+        var torrent = remote.Protocol == "torrent";
+        var newznabLike = string.Equals(remote.Implementation, torrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase)
+            || remote.Fields.ContainsKey("apiPath");
+        var ownReachable = remote.Protocol is "usenet" or "torrent" && newznabLike && hasKeyField && !string.IsNullOrEmpty(ownUrl)
             && Uri.TryCreate(ownUrl, UriKind.Absolute, out _);
         var direct = ownReachable && ownKey != MaskedValue;
         var mode = direct ? ProwlarrImportMode.Direct : ProwlarrImportMode.Proxy;
@@ -232,8 +235,7 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
 
         var (supported, reason) = remote.Protocol switch
         {
-            "usenet" => (true, (string?)null),
-            "torrent" => (false, TorrentReason),
+            "usenet" or "torrent" => (true, (string?)null),
             _ => (false, "Unknown protocol."),
         };
 
@@ -262,7 +264,7 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
         var definition = new IndexerDefinition(
             0,
             remote.Name.Trim(),
-            IndexerDefinition.Newznab,
+            torrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab,
             baseUrl,
             apiPath,
             direct ? ownKey ?? string.Empty : prowlarrKey,
@@ -274,7 +276,7 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             EnableInteractiveSearch: remote.SupportsSearch)
         {
             Enable = remote.Enable,
-            DefinitionKey = IndexerCatalog.Match(remote.Name, direct ? ownUrl : null).Key,
+            DefinitionKey = IndexerCatalog.Match(remote.Name, direct ? ownUrl : null, torrent ? IndexerProtocol.Torrent : IndexerProtocol.Usenet).Key,
 
             // Through the proxy Prowlarr adds the indexer's extra parameters itself.
             AdditionalParameters = direct ? remote.Text("additionalParameters")?.Trim() ?? string.Empty : string.Empty,
@@ -283,6 +285,18 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             GrabLimit = remote.Number("baseSettings.grabLimit") is > 0 and var g ? g : null,
             LimitsUnit = unit,
         };
+
+        if (torrent)
+        {
+            // Prowlarr's IndexerTorrentBaseSettings; empty or invalid values fall back to StreamZH's defaults.
+            definition = definition with
+            {
+                MinimumSeeders = remote.Number("torrentBaseSettings.appMinimumSeeders") is >= 0 and <= IndexerService.MaxMinimumSeeders and var seeders ? seeders : 1,
+                SeedRatio = remote.Decimal("torrentBaseSettings.seedRatio") is > 0 and <= IndexerService.MaxSeedRatio and var ratio ? ratio : null,
+                SeedTimeMinutes = remote.Number("torrentBaseSettings.seedTime") is > 0 and <= IndexerService.MaxSeedTimeMinutes and var time ? time : null,
+                SeasonPackSeedTimeMinutes = remote.Number("torrentBaseSettings.packSeedTime") is > 0 and <= IndexerService.MaxSeedTimeMinutes and var pack ? pack : null,
+            };
+        }
 
         return (preview, definition);
     }
@@ -356,6 +370,14 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             {
                 JsonValueKind.Number when value.TryGetInt32(out var n) => n,
                 JsonValueKind.String when int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) => n,
+                _ => null,
+            } : null;
+
+        public double? Decimal(string field) =>
+            Fields.TryGetValue(field, out var value) ? value.ValueKind switch
+            {
+                JsonValueKind.Number when value.TryGetDouble(out var n) => n,
+                JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var n) => n,
                 _ => null,
             } : null;
 

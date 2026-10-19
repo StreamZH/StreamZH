@@ -12,8 +12,9 @@ public sealed class RetentionSpecification : IDecisionSpecification
 {
     public Rejection? Evaluate(ReleaseCandidate candidate, DecisionContext context)
     {
+        // Retention is the Usenet providers' limit; torrents live as long as someone seeds them (Radarr checks Usenet only).
         var retention = context.Rules.RetentionDays;
-        if (retention <= 0 || candidate.PublishDate == default)
+        if (retention <= 0 || candidate.PublishDate == default || candidate.Protocol != Downloads.DownloadProtocol.Usenet)
         {
             return null;
         }

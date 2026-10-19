@@ -437,7 +437,8 @@
 
 .releaseRow {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 64px 72px 120px 52px 104px 84px 104px;
+  /* Columns from the component (--release-cols): a peers column when torrents are in the results. */
+  grid-template-columns: var(--release-cols, 120px minmax(0, 1fr) 64px 72px 120px 52px 104px 84px 104px);
   align-items: start;
   gap: 4px 12px;
   padding: 10px 0;
@@ -484,6 +485,22 @@
   padding-top: 2px;
   color: var(--fg-2);
   overflow-wrap: anywhere;
+}
+
+/* 0.11: protocol icon before the indexer name, tracker flags under the title. */
+.withProtocol {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.withProtocol > span:first-child {
+  margin-top: 2px;
+}
+
+.flagLine {
+  display: flex;
+  margin-top: 4px;
 }
 
 .titleCell {
@@ -617,6 +634,11 @@
 
   .mobileLabel {
     display: inline;
+  }
+
+  /* Usenet releases have no peers: no "–" in the card. */
+  .noPeers {
+    display: none;
   }
 
   .actions {

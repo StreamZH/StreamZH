@@ -74,6 +74,8 @@ public sealed class OngoingService(
         AddToolNotices(notices);
         AddDownloadClientNotices(notices);
         DownloadNotices.Add(notices, services);
+        TorrentClientNotices.Add(notices, services);
+        TorrentEngineNotices.Add(notices, services);
         AddIndexerNotices(notices);
         AddFolderNotices(notices);
         AddFailedNotices(notices, active);

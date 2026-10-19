@@ -2,6 +2,9 @@ import { request } from './client'
 
 export type MinimumAvailability = 'announced' | 'inCinemas' | 'released'
 
+/** 0.11: the protocol that wins between equally good releases. */
+export type PreferredProtocol = 'usenet' | 'torrent' | 'noPreference'
+
 /** Settings → Indexers: release rules for all indexers and automation. 0 = off or unlimited. */
 export interface IndexerOptions {
   /** Minutes. */
@@ -22,6 +25,14 @@ export interface IndexerOptions {
   searchOnAdd: boolean
   /** Text searches also use alternative titles (German title, scene names, yours), at most three per search. */
   searchAlternativeTitles: boolean
+  /** 0.11 (missing on older servers): preferred protocol and delays, like Radarr's delay profile. */
+  preferredProtocol?: PreferredProtocol
+  /** Minutes a new Usenet release waits before RSS or automatic search may grab it. 0 = no delay. */
+  usenetDelay?: number
+  /** Minutes a new torrent release waits. 0 = no delay. */
+  torrentDelay?: number
+  /** Skip the delay when the release already has the profile's highest quality (Radarr's "bypass if highest quality"). */
+  bypassDelayIfHighestQuality?: boolean
 }
 
 export interface PreferredTerm {

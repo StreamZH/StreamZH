@@ -119,6 +119,7 @@ public sealed class SearchTestBed : IDisposable
         Downloads = new DownloadSettings(Config, Paths);
         ReleaseProfiles = new ReleaseProfileRepository(Database);
         Options = new IndexerOptions(Config, ReleaseProfiles);
+        Pending = new PendingReleaseService(Config, Time, NullLogger<PendingReleaseService>.Instance);
 
         // The search tests check the NZB folder; the built-in engine has its own tests (UseBuiltInClient).
         Config.Set(ConfigKeys.DownloadClient, DownloadSettings.BlackholeValue);
@@ -183,6 +184,9 @@ public sealed class SearchTestBed : IDisposable
 
     /// <summary>Settings → Indexers (release rules, RSS, availability), read by search, automatic search and RSS.</summary>
     public IndexerOptions Options { get; }
+
+    /// <summary>0.11: releases waiting for the protocol delay (shared by search, automatic search and RSS).</summary>
+    public PendingReleaseService Pending { get; }
     public DownloadEngine Engine { get; }
     public DownloadClientProvider Clients { get; }
     public Movie Dune { get; }
@@ -193,7 +197,8 @@ public sealed class SearchTestBed : IDisposable
     public Episode Episode(int season, int number) => Episodes.Single(e => e.SeasonNumber == season && e.EpisodeNumber == number);
 
     public ReleaseSearchService Search(TimeSpan? timeout = null) =>
-        new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Cache, NullLogger<ReleaseSearchService>.Instance, Time, Options)
+        new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Cache, NullLogger<ReleaseSearchService>.Instance, Time, Options,
+            pendingReleases: Pending)
         {
             IndexerTimeout = timeout ?? TimeSpan.FromSeconds(10),
         };
@@ -204,11 +209,11 @@ public sealed class SearchTestBed : IDisposable
 
     public AutomaticSearchService Automatic() =>
         new(Search(), Grab(), Movies, Series, History, Downloads, Events, NullLogger<AutomaticSearchService>.Instance, Engine, Time, Options,
-            new PendingImports(new DownloadRepository(Database), new DownloadImportRepository(Database)));
+            new PendingImports(new DownloadRepository(Database), new DownloadImportRepository(Database)), pendingReleases: Pending);
 
     public RssSyncService Rss() =>
         new(Indexers, Client, Movies, Series, new DecisionTargetFactory(Profiles), Definitions, Grab(), History, Downloads, Options,
-            NullLogger<RssSyncService>.Instance, Engine, Time)
+            NullLogger<RssSyncService>.Instance, Engine, Time, pendingReleases: Pending)
         {
             IndexerTimeout = TimeSpan.FromSeconds(10),
         };

@@ -26,7 +26,8 @@ namespace StreamZH.Library.Rss;
 /// <param name="Accepted">Of those, releases the decision engine accepted.</param>
 /// <param name="Grabbed">Titles grabbed.</param>
 /// <param name="SkippedPending">Library items with an accepted release that were skipped because they are already on their way.</param>
-public sealed record RssSyncResult(int Indexers, int FailedIndexers, int Releases, int Matched, int Accepted, IReadOnlyList<string> Grabbed, int SkippedPending)
+/// <param name="Delayed">0.11: releases kept as pending because their protocol delay has not passed yet.</param>
+public sealed record RssSyncResult(int Indexers, int FailedIndexers, int Releases, int Matched, int Accepted, IReadOnlyList<string> Grabbed, int SkippedPending, int Delayed = 0)
 {
     public static readonly RssSyncResult Empty = new(0, 0, 0, 0, 0, [], 0);
 }
@@ -36,7 +37,8 @@ public sealed record RssSyncResult(int Indexers, int FailedIndexers, int Release
 /// them to the library, decides with the release rules (monitored and wanted: missing, or an upgrade below the cutoff;
 /// minimum availability for movies) and grabs the best release per movie and per set of episodes. Items already in the
 /// download queue (or grabbed recently, blackhole folder) are skipped; query and grab limits are respected by the
-/// tracked indexer client.
+/// tracked indexer client. 0.11: releases held back by the protocol delay are kept as pending releases and decided again
+/// with every sync (and by the "Process pending releases" task) until the best one is grabbed, like Radarr.
 /// </summary>
 public sealed class RssSyncService(
     IIndexerProvider indexers,
@@ -55,7 +57,8 @@ public sealed class RssSyncService(
     PendingImports? pendingImports = null,
     SceneNumbering.EpisodeMapper? episodeMapper = null,
     AlternativeTitleRepository? alternativeTitles = null,
-    AutomationHold? automationHold = null)
+    AutomationHold? automationHold = null,
+    PendingReleaseService? pendingReleases = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -83,7 +86,26 @@ public sealed class RssSyncService(
         var seen = new HashSet<(int, string)>();
         var releases = answers.SelectMany(a => a.Releases).Where(r => seen.Add((r.IndexerId, r.Guid))).ToList();
         var failed = answers.Count(a => a.Failed);
+        return await ProcessAsync(releases, active.Count, failed, cancellationToken);
+    }
 
+    /// <summary>
+    /// Decides the pending releases again without asking the indexers (the "Process pending releases" task): the ones
+    /// whose delay has passed are grabbed. Nothing happens without pending releases or in side-by-side mode.
+    /// </summary>
+    public async Task<RssSyncResult> ProcessPendingAsync(CancellationToken cancellationToken = default)
+    {
+        if (pendingReleases?.HasAny != true || automationHold?.IsOn == true)
+        {
+            return RssSyncResult.Empty;
+        }
+
+        using var source = IndexerCallContext.Begin(IndexerCallSource.Rss);
+        return await ProcessAsync([], 0, 0, cancellationToken);
+    }
+
+    private async Task<RssSyncResult> ProcessAsync(List<ReleaseInfo> releases, int indexerCount, int failed, CancellationToken cancellationToken)
+    {
         var now = _time.GetUtcNow();
         var defs = definitions.All().ToDictionary(d => d.QualityId);
         var rules = options.Rules();
@@ -94,6 +116,13 @@ public sealed class RssSyncService(
 
         var movieReleases = new Dictionary<int, (Movie Movie, List<(ReleaseInfo Info, ParsedRelease Parsed)> Items)>();
         var seriesReleases = new Dictionary<int, (Series Show, List<(ReleaseInfo Info, ParsedRelease Parsed)> Items)>();
+
+        // Pending releases go to the item they wait for (the fresh copy from this sync wins: newer seeders).
+        var waiting = pendingReleases?.All() ?? [];
+        var routed = RoutePending(waiting, releases, movieReleases, seriesReleases);
+        var fresh = releases.Select(r => (r.IndexerId, r.Guid)).ToHashSet();
+        releases = [.. releases.Where(r => !routed.Contains((r.IndexerId, r.Guid)))];
+
         foreach (var info in releases)
         {
             var parsed = ReleaseParser.Parse(info.Title);
@@ -132,13 +161,71 @@ public sealed class RssSyncService(
             await ProcessSeriesAsync(show, items, defs, rules, now, pending, run, cancellationToken);
         }
 
-        var result = new RssSyncResult(active.Count, failed, releases.Count, run.Matched, run.Accepted, run.Grabbed, run.SkippedPending);
+        var received = releases.Count + routed.Count(fresh.Contains);
+        var result = new RssSyncResult(indexerCount, failed, received, run.Matched, run.Accepted, run.Grabbed, run.SkippedPending, run.Delayed);
         logger.LogInformation(
             "RSS sync: {Releases} releases from {Indexers} indexers ({Failed} failed), {Matched} for the library, {Accepted} accepted, "
-            + "{Grabbed} grabbed, {Pending} skipped (already {Where})",
+            + "{Grabbed} grabbed, {Pending} skipped (already {Where}), {Delayed} waiting for the protocol delay",
             result.Releases, result.Indexers, result.FailedIndexers, result.Matched, result.Accepted, result.Grabbed.Count, result.SkippedPending,
-            pending.UsesQueue ? "in the download queue" : "grabbed recently");
+            pending.UsesQueue ? "in the download queue" : "grabbed recently", result.Delayed);
         return result;
+    }
+
+    /// <summary>
+    /// Adds the pending releases to the items they wait for; a pending release that came again in this sync takes the
+    /// fresh copy. Entries of items that are gone are dropped. Returns the (indexer, guid) keys that were routed.
+    /// </summary>
+    private HashSet<(int, string)> RoutePending(
+        IReadOnlyList<PendingRelease> waiting,
+        List<ReleaseInfo> releases,
+        Dictionary<int, (Movie Movie, List<(ReleaseInfo Info, ParsedRelease Parsed)> Items)> movieReleases,
+        Dictionary<int, (Series Show, List<(ReleaseInfo Info, ParsedRelease Parsed)> Items)> seriesReleases)
+    {
+        var routed = new HashSet<(int, string)>();
+        if (waiting.Count == 0)
+        {
+            return routed;
+        }
+
+        var current = releases.GroupBy(r => (r.IndexerId, r.Guid)).ToDictionary(g => g.Key, g => g.First());
+        foreach (var entry in waiting)
+        {
+            var key = (entry.Release.IndexerId, entry.Release.Guid);
+            if (!routed.Add(key))
+            {
+                continue;
+            }
+
+            var info = current.GetValueOrDefault(key) ?? entry.Release;
+            if (entry.MediaType == MediaType.Movie && entry.MovieId is { } movieId)
+            {
+                if (movies.Find(movieId) is not { } movie)
+                {
+                    pendingReleases!.RemoveMovie(movieId);
+                    continue;
+                }
+
+                if ((ReleaseParser.ParseMovie(info.Title) ?? ReleaseParser.Parse(info.Title)) is { } parsed)
+                {
+                    (movieReleases.TryGetValue(movie.Id, out var item) ? item : movieReleases[movie.Id] = (movie, [])).Items.Add((info, parsed));
+                }
+            }
+            else if (entry.SeriesId is { } seriesId)
+            {
+                if (series.Find(seriesId) is not { } show)
+                {
+                    pendingReleases!.RemoveEpisodes(seriesId, entry.EpisodeIds);
+                    continue;
+                }
+
+                if (ReleaseParser.ParseEpisode(info.Title) is { } parsed)
+                {
+                    (seriesReleases.TryGetValue(show.Id, out var item) ? item : seriesReleases[show.Id] = (show, [])).Items.Add((info, parsed));
+                }
+            }
+        }
+
+        return routed;
     }
 
     private async Task ProcessMovieAsync(
@@ -155,7 +242,11 @@ public sealed class RssSyncService(
         DecisionTarget target;
         try
         {
-            target = targets.ForMovie(movie) with { AvailableFrom = options.AvailableFrom(movie, now) };
+            target = targets.ForMovie(movie) with
+            {
+                AvailableFrom = options.AvailableFrom(movie, now),
+                PendingSince = pendingReleases?.OldestForMovie(movie.Id),
+            };
         }
         catch (LibraryException ex)
         {
@@ -163,40 +254,54 @@ public sealed class RssSyncService(
             return;
         }
 
-        var candidates = items.Select(i => (i.Info, Candidate: ReleaseSearchService.Candidate(i.Info, i.Parsed))).ToList();
-        var accepted = DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules).Where(d => d.Accepted).ToList();
+        var subject = new SearchSubject(MediaType.Movie, movie.Id, null, movie.Title);
+        var seeders = MinimumSeeders(items.Select(i => i.Info));
+        var candidates = items.Select(i => (i.Info, Candidate: ReleaseSearchService.Candidate(i.Info, i.Parsed, seeders.GetValueOrDefault(i.Info.IndexerId)))).ToList();
+        var decisions = DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules)
+            .Select(d => new ReleaseDecision(candidates.First(c => ReferenceEquals(c.Candidate, d.Candidate)).Info, d.Candidate.Release, d, subject, []))
+            .ToList();
+        var accepted = decisions.Where(d => d.Accepted).ToList();
         run.Accepted += accepted.Count;
-        if (accepted.Count == 0)
-        {
-            return;
-        }
 
-        if (pending.MovieSkipReason(movie.Id) is not null)
+        if (accepted.Count > 0 && pending.MovieSkipReason(movie.Id) is not null)
         {
             logger.LogInformation("RSS sync: '{Title}' is already on its way, not grabbed again", movie.Title);
             run.SkippedPending++;
+            pendingReleases?.RemoveMovie(movie.Id);
             return;
         }
 
-        var subject = new SearchSubject(MediaType.Movie, movie.Id, null, movie.Title);
         var failedIndexers = new HashSet<int>();
         foreach (var decision in accepted)
         {
-            var info = candidates.First(c => ReferenceEquals(c.Candidate, decision.Candidate)).Info;
-            if (failedIndexers.Contains(info.IndexerId))
+            if (failedIndexers.Contains(decision.Release.IndexerId))
             {
                 continue;
             }
 
-            if (await TryGrabAsync(new ReleaseDecision(info, decision.Candidate.Release, decision, subject, []), cancellationToken))
+            if (await TryGrabAsync(decision, cancellationToken))
             {
-                run.Grabbed.Add(info.Title);
+                run.Grabbed.Add(decision.Release.Title);
+                pendingReleases?.RemoveMovie(movie.Id);
                 return;
             }
 
-            failedIndexers.Add(info.IndexerId);
+            failedIndexers.Add(decision.Release.IndexerId);
+        }
+
+        // Nothing grabbed: what only waits for the protocol delay stays pending (and replaces older entries of the movie).
+        if (pendingReleases is not null)
+        {
+            var delayed = PendingReleaseService.DelayedOnly(decisions);
+            run.Delayed += delayed.Count;
+            pendingReleases.ReplaceMovie(movie.Id, delayed);
         }
     }
+
+    /// <summary>"Minimum seeders" of the torrent indexers among the releases.</summary>
+    private Dictionary<int, int> MinimumSeeders(IEnumerable<ReleaseInfo> releases) =>
+        releases.Where(r => r.Protocol == DownloadProtocol.Torrent).Select(r => r.IndexerId).Distinct()
+            .ToDictionary(id => id, id => indexers.Find(id)?.MinimumSeeders ?? 1);
 
     private async Task ProcessSeriesAsync(
         Series show,
@@ -211,6 +316,7 @@ public sealed class RssSyncService(
         var library = series.Episodes(show.Id);
         var subject = new SearchSubject(MediaType.Series, null, show.Id, show.Title);
         var groups = new Dictionary<string, (IReadOnlyList<Episode> Episodes, List<(ReleaseInfo Info, ReleaseCandidate Candidate)> Candidates)>();
+        var seeders = MinimumSeeders(items.Select(i => i.Info));
 
         foreach (var (info, parsed) in items)
         {
@@ -228,10 +334,12 @@ public sealed class RssSyncService(
                 groups[key] = group;
             }
 
-            group.Candidates.Add((info, ReleaseSearchService.Candidate(info, parsed)));
+            group.Candidates.Add((info, ReleaseSearchService.Candidate(info, parsed, seeders.GetValueOrDefault(info.IndexerId))));
         }
 
         var accepted = new List<ReleaseDecision>();
+        var delayed = new List<ReleaseDecision>();
+        var evaluated = new HashSet<int>();
         DecisionTarget? rankingTarget = null;
         foreach (var (episodes, candidates) in groups.Values)
         {
@@ -248,16 +356,19 @@ public sealed class RssSyncService(
 
             rankingTarget ??= target;
             var ids = episodes.Select(e => e.Id).ToList();
-            foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules).Where(d => d.Accepted))
-            {
-                var info = candidates.First(c => ReferenceEquals(c.Candidate, decision.Candidate)).Info;
-                accepted.Add(new ReleaseDecision(info, decision.Candidate.Release, decision, subject, ids));
-            }
+            evaluated.UnionWith(ids);
+            target = target with { PendingSince = pendingReleases?.OldestForEpisodes(show.Id, ids) };
+            var decided = DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules)
+                .Select(d => new ReleaseDecision(candidates.First(c => ReferenceEquals(c.Candidate, d.Candidate)).Info, d.Candidate.Release, d, subject, ids))
+                .ToList();
+            accepted.AddRange(decided.Where(d => d.Accepted));
+            delayed.AddRange(PendingReleaseService.DelayedOnly(decided));
         }
 
         run.Accepted += accepted.Count;
         if (accepted.Count == 0)
         {
+            KeepDelayed(show, evaluated, delayed, new HashSet<int>(), run);
             return;
         }
 
@@ -296,6 +407,21 @@ public sealed class RssSyncService(
             logger.LogInformation("RSS sync: episodes of '{Title}' are already on their way, not grabbed again", show.Title);
             run.SkippedPending++;
         }
+
+        KeepDelayed(show, evaluated, delayed, taken, run);
+    }
+
+    /// <summary>The delayed releases of the evaluated episodes replace their pending entries, except those for episodes taken now.</summary>
+    private void KeepDelayed(Series show, HashSet<int> evaluated, List<ReleaseDecision> delayed, IReadOnlySet<int> taken, Run run)
+    {
+        if (pendingReleases is null || evaluated.Count == 0)
+        {
+            return;
+        }
+
+        var keep = delayed.Where(d => !d.EpisodeIds.Any(taken.Contains)).ToList();
+        run.Delayed += keep.Count;
+        pendingReleases.ReplaceEpisodes(show.Id, evaluated, keep);
     }
 
     private async Task<bool> TryGrabAsync(ReleaseDecision decision, CancellationToken cancellationToken)
@@ -348,6 +474,7 @@ public sealed class RssSyncService(
         public int Matched { get; set; }
         public int Accepted { get; set; }
         public int SkippedPending { get; set; }
+        public int Delayed { get; set; }
         public List<string> Grabbed { get; } = [];
         public HashSet<int> GrabbedEpisodes { get; } = [];
     }

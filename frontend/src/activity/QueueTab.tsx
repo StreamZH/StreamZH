@@ -12,6 +12,8 @@ import { Empty } from './Empty'
 import { useIsAdmin, useLiveProgress, useOngoing } from '../status/useOngoing'
 import DownloadCard, { type DownloadActions } from './DownloadCard'
 import { RemoveDialog } from './Dialogs'
+import { RemoveFromClientDialog } from '../downloadClients/TorrentActivity'
+import { isTorrent } from '../downloadClients/torrentFormat'
 import { downloadTypeOptions, matchesSearch, matchesType, pick, useCustomCategories } from './filterOptions'
 import { FilterBar, FilterSelect, NoMatches, SearchBox } from './Filters'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
@@ -85,11 +87,11 @@ export default function QueueTab({ onAddNzb }: { onAddNzb: () => void }) {
   const retry = useDownloadAction(downloadsApi.retry, fail('Could not retry'))
   const priority = useDownloadAction(({ id, value }: { id: number; value: number }) => downloadsApi.update(id, { priority: value }), fail('Could not change the priority'))
   const remove = useDownloadAction(
-    ({ id, deleteFiles }: { id: number; deleteFiles: boolean }) => downloadsApi.remove(id, deleteFiles),
+    ({ id, deleteFiles, fromClient }: { id: number; deleteFiles: boolean; fromClient?: boolean }) => downloadsApi.remove(id, deleteFiles, fromClient),
     fail('Could not remove'),
-    () => {
+    ({ fromClient }) => {
       setRemoving(null)
-      push('ok', 'Download removed')
+      push('ok', fromClient ? 'Removed from the client' : 'Download removed')
     },
   )
 
@@ -107,7 +109,8 @@ export default function QueueTab({ onAddNzb }: { onAddNzb: () => void }) {
   const busyIds = new Set([pause, resume, retry, priority].map(pendingId).filter((id) => id != null))
 
   const blackhole = settings.data?.client === 'blackhole'
-  const noServer = ongoing.data?.notices.some((n) => n.key === 'no-usenet-server') ?? false
+  // Without a Usenet server only Usenet downloads are stuck; torrents run in their client.
+  const noServer = (ongoing.data?.notices.some((n) => n.key === 'no-usenet-server') ?? false) && !(queue.data?.items.length && queue.data.items.every(isTorrent))
   const data = queue.data
 
   let body: ReactNode
@@ -203,7 +206,15 @@ export default function QueueTab({ onAddNzb }: { onAddNzb: () => void }) {
     <>
       {body}
       {!blackhole && (status === '' || status === 'import') && <PendingImports admin={admin} onToast={push} match={active ? matches : undefined} />}
-      {removing && (
+      {removing && isTorrent(removing) && (
+        <RemoveFromClientDialog
+          item={removing}
+          busy={remove.isPending}
+          onClose={() => setRemoving(null)}
+          onConfirm={(deleteFiles) => remove.mutate({ id: removing.id, deleteFiles, fromClient: true })}
+        />
+      )}
+      {removing && !isTorrent(removing) && (
         <RemoveDialog
           item={removing}
           busy={remove.isPending}

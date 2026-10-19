@@ -48,6 +48,16 @@ export interface Indexer {
   grabLimit: number | null
   limitsUnit: LimitsUnit
   status: IndexerStatus | null
+  /** 0.11: Torznab indexers are torrent, everything else Usenet (computed by the server from the implementation). */
+  protocol: IndexerProtocol
+  /** Torrent only: releases with fewer seeders are rejected (default 1). */
+  minimumSeeders: number | null
+  /** Torrent only: seed until this ratio; null = the download client's default. */
+  seedRatio: number | null
+  /** Torrent only: seed at least this many minutes; null = the client's default. */
+  seedTimeMinutes: number | null
+  /** Torrent only: seed time for season packs; null = the seed time above. */
+  seasonPackSeedTimeMinutes: number | null
 }
 
 export interface IndexerCategory {
@@ -129,6 +139,18 @@ export interface ProwlarrImportResult {
 
 export const maskedApiKey = '********'
 export const genericDefinitionKey = 'generic-newznab'
+export const genericTorznabKey = 'generic-torznab'
+export const torznabImplementation = 'Torznab'
+
+/** Generic Newznab or Generic Torznab: the fallbacks for any indexer not in the catalog. */
+export function isGenericDefinition(key: string | null | undefined): boolean {
+  return key === genericDefinitionKey || key === genericTorznabKey
+}
+
+/** Protocol of a saved or new indexer: the server's value, else from the implementation. */
+export function protocolOf(i: Pick<Indexer, 'implementation'> & { protocol?: IndexerProtocol | null }): IndexerProtocol {
+  return i.protocol ?? (i.implementation?.toLowerCase() === 'torznab' ? 'torrent' : 'usenet')
+}
 
 /** Fills fields a server older than 0.4.1 does not send yet, so the form always has defined values. */
 export function normalizeIndexer(i: Indexer): Indexer {
@@ -142,7 +164,39 @@ export function normalizeIndexer(i: Indexer): Indexer {
     grabLimit: i.grabLimit ?? null,
     limitsUnit: i.limitsUnit ?? 'day',
     status: i.status ?? null,
+    protocol: protocolOf(i),
+    minimumSeeders: i.minimumSeeders ?? 1,
+    seedRatio: i.seedRatio ?? null,
+    seedTimeMinutes: i.seedTimeMinutes ?? null,
+    seasonPackSeedTimeMinutes: i.seasonPackSeedTimeMinutes ?? null,
   }
+}
+
+/**
+ * The catalog with a Generic Torznab entry, for servers whose catalog does not list one: any Torznab feed (Jackett,
+ * Prowlarr, a tracker's own API) can be added like Generic Newznab.
+ */
+export function withGenericTorznab(definitions: IndexerDefinition[]): IndexerDefinition[] {
+  if (definitions.some((d) => d.key === genericTorznabKey || (d.protocol === 'torrent' && d.baseUrl === '' && d.supported))) return definitions
+  const newznab = definitions.find((d) => d.key === genericDefinitionKey)
+  return [
+    ...definitions,
+    {
+      key: genericTorznabKey,
+      name: 'Generic Torznab',
+      implementation: torznabImplementation,
+      protocol: 'torrent',
+      language: newznab?.language ?? 'en-US',
+      privacy: newznab?.privacy ?? 'private',
+      description: 'Any torrent indexer with a Torznab feed: Jackett, Prowlarr or the tracker itself.',
+      siteUrl: null,
+      baseUrl: '',
+      apiPath: '/api',
+      categories: [],
+      supported: true,
+      unsupportedReason: null,
+    },
+  ]
 }
 
 export const indexersApi = {
@@ -152,7 +206,7 @@ export const indexersApi = {
   update: (indexer: Indexer) => request<Indexer>('PUT', `/indexer/${indexer.id}`, indexer),
   remove: (id: number) => request<void>('DELETE', `/indexer/${id}`),
   test: (indexer: Indexer) => request<IndexerCapabilities>('POST', '/indexer/test', indexer),
-  definitions: () => request<IndexerDefinition[]>('GET', '/indexer/definitions'),
+  definitions: () => request<IndexerDefinition[]>('GET', '/indexer/definitions').then(withGenericTorznab),
   details: (id: number) =>
     request<IndexerDetails>('GET', `/indexer/${id}/details`).then((d) => ({ ...d, indexer: normalizeIndexer(d.indexer) })),
   testAll: () => request<IndexerTestResult[]>('POST', '/indexer/testall'),

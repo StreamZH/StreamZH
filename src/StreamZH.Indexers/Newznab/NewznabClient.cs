@@ -4,19 +4,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
+using StreamZH.Indexers.Torznab;
 
 namespace StreamZH.Indexers.Newznab;
 
 /// <summary>
-/// Newznab (Usenet) indexer client, ported from Radarr (movies) and Sonarr (TV). Stateless apart from the shared
-/// caps cache; the indexer definition comes with every call.
+/// Newznab (Usenet) and Torznab (torrent) indexer client, ported from Radarr (movies) and Sonarr (TV): Torznab is the
+/// same API with torrent attributes in the feed, so requests, paging, caps and errors are shared and only the feed
+/// parser and the download differ. Stateless apart from the shared caps cache; the indexer definition comes with every call.
 /// </summary>
 public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capabilitiesCache, ILogger<NewznabClient>? logger = null) : IIndexerClient
 {
@@ -37,6 +41,7 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
 
     private const string RssAccept = "application/rss+xml, text/rss+xml, application/xml, text/xml";
     private const string NzbAccept = "application/x-nzb, application/xml, text/xml, */*;q=0.8";
+    private const string TorrentAccept = "application/x-bittorrent, */*;q=0.8";
 
     private readonly ILogger _logger = logger ?? (ILogger)NullLogger.Instance;
 
@@ -114,10 +119,20 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
         return Finish(indexer, releases);
     }
 
+    /// <summary>
+    /// Usenet: the NZB file. Torznab: the .torrent file, or the magnet link as UTF-8 bytes when the release is magnet-only,
+    /// the indexer redirects to a magnet link, or the .torrent cannot be fetched but the release has a magnet link
+    /// (see <see cref="TorrentFiles.TryGetMagnet"/>).
+    /// </summary>
     public async Task<byte[]> DownloadNzbAsync(IndexerDefinition indexer, ReleaseInfo release, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(indexer);
         ArgumentNullException.ThrowIfNull(release);
+
+        if (indexer.Protocol == DownloadProtocol.Torrent)
+        {
+            return await DownloadTorrentAsync(indexer, release, cancellationToken);
+        }
 
         Uri.TryCreate(NewznabUrls.ApiEndpoint(indexer), UriKind.Absolute, out var endpoint);
         var url = NewznabUrls.Resolve(endpoint, release.DownloadUrl);
@@ -145,6 +160,79 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
         return body;
     }
 
+    /// <summary>Radarr's Torznab download: follows redirects (also to a magnet link), validates the .torrent, falls back to the magnet link.</summary>
+    private async Task<byte[]> DownloadTorrentAsync(IndexerDefinition indexer, ReleaseInfo release, CancellationToken cancellationToken)
+    {
+        if (MagnetLinks.IsMagnet(release.DownloadUrl))
+        {
+            return Encoding.UTF8.GetBytes(release.DownloadUrl.Trim());
+        }
+
+        Uri.TryCreate(NewznabUrls.ApiEndpoint(indexer), UriKind.Absolute, out var endpoint);
+        var url = NewznabUrls.Resolve(endpoint, release.DownloadUrl);
+        if (url is null)
+        {
+            return MagnetOr(release, NewznabErrors.Create(indexer, $"{indexer.Name}: the release '{release.Title}' has no valid download link."));
+        }
+
+        url = NewznabUrls.WithApiKeyForIndexerHost(indexer, url);
+        _logger.LogDebug("Downloading torrent from {Url}", NewznabUrls.Redact(url, indexer.ApiKey));
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Accept.ParseAdd(TorrentAccept);
+            using var response = await SendAsync(indexer, request, cancellationToken);
+
+            // The handler follows http(s) redirects itself; a redirect to a magnet link comes back as the 3xx answer.
+            if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is { } location
+                && MagnetLinks.IsMagnet(location.OriginalString))
+            {
+                return Encoding.UTF8.GetBytes(location.OriginalString.Trim());
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await ReadLimitedAsync(indexer, response.Content, MaxApiResponseBytes, cancellationToken);
+                throw ErrorForStatus(indexer, response, errorBody, url);
+            }
+
+            var body = await ReadLimitedAsync(indexer, response.Content, TorrentFiles.MaxTorrentBytes, cancellationToken);
+            if (TorrentFiles.LooksLikeTorrent(body) || TorrentFiles.TryGetMagnet(body, out _))
+            {
+                return body;
+            }
+
+            if (!IsHtml(response, body) && body.Length > 0)
+            {
+                try
+                {
+                    if (NewznabRssParser.FindError(NewznabRssParser.Load(Decode(response, body))) is { } error)
+                    {
+                        throw NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response));
+                    }
+                }
+                catch (XmlException)
+                {
+                    // Not XML: reported below.
+                }
+            }
+
+            throw NewznabErrors.Create(indexer, IsHtml(response, body)
+                ? $"{indexer.Name} answered with an HTML page instead of a .torrent file (blocked, logged out or download limit?)."
+                : $"{indexer.Name} did not return a .torrent file.");
+        }
+        catch (IndexerException ex) when (!ex.IsAuthError && ex.RetryAfter is null && release.MagnetUrl is not null)
+        {
+            // Radarr: when the .torrent cannot be fetched, the magnet link still works.
+            _logger.LogInformation("{Indexer}: .torrent of '{Title}' not available ({Message}), using the magnet link", indexer.Name, release.Title, ex.Message);
+            return MagnetOr(release, ex);
+        }
+    }
+
+    private static byte[] MagnetOr(ReleaseInfo release, IndexerException error) =>
+        MagnetLinks.IsMagnet(release.MagnetUrl) ? Encoding.UTF8.GetBytes(release.MagnetUrl!.Trim()) : throw error;
+
     private async Task<NewznabCaps> FetchCapabilitiesAsync(IndexerDefinition indexer, CancellationToken cancellationToken)
     {
         var document = await GetXmlAsync(indexer, NewznabUrls.Build(indexer, "caps"), cancellationToken);
@@ -154,7 +242,8 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
         }
         catch (FormatException)
         {
-            throw NewznabErrors.Create(indexer, $"{indexer.Name} did not return Newznab capabilities. Check the URL and the API path.");
+            var api = indexer.Protocol == DownloadProtocol.Torrent ? "Torznab" : "Newznab";
+            throw NewznabErrors.Create(indexer, $"{indexer.Name} did not return {api} capabilities. Check the URL and the API path.");
         }
     }
 
@@ -190,7 +279,7 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
             var offset = page * pageSize;
             var url = NewznabUrls.Build(indexer, query.Function, query.Categories, offset, pageSize, query.Parameters);
             var document = await GetXmlAsync(indexer, url, cancellationToken);
-            var feed = NewznabRssParser.Parse(document, url);
+            var feed = indexer.Protocol == DownloadProtocol.Torrent ? TorznabRssParser.Parse(document, url) : NewznabRssParser.Parse(document, url);
             releases.AddRange(feed.Releases);
 
             if (releases.Count >= MaxResultsPerQuery
@@ -242,7 +331,45 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
         return document;
     }
 
+    /// <summary>Redirects followed per request (Radarr's HttpClient follows them itself as well).</summary>
+    public const int MaxRedirects = 5;
+
+    /// <summary>
+    /// Sends a GET and follows http(s) redirects itself (the handler's own redirects are off, see AddNewznabIndexers):
+    /// .NET would try to follow a redirect to a magnet link too and fail, Torznab download links do exactly that. A
+    /// redirect to another scheme (magnet:) or from https to http comes back as the 3xx answer.
+    /// </summary>
     private async Task<HttpResponseMessage> SendAsync(IndexerDefinition indexer, HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var response = await SendOnceAsync(indexer, request, cancellationToken);
+        var current = request.RequestUri!;
+        for (var hop = 0; hop < MaxRedirects && IsRedirect(response) && response.Headers.Location is { } location; hop++)
+        {
+            var target = location.IsAbsoluteUri ? location : new Uri(current, location);
+            if (target.Scheme is not ("http" or "https") || (current.Scheme == Uri.UriSchemeHttps && target.Scheme == Uri.UriSchemeHttp))
+            {
+                return response;
+            }
+
+            response.Dispose();
+            var next = new HttpRequestMessage(HttpMethod.Get, target);
+            foreach (var accept in request.Headers.Accept)
+            {
+                next.Headers.Accept.Add(accept);
+            }
+
+            current = target;
+            response = await SendOnceAsync(indexer, next, cancellationToken);
+        }
+
+        return response;
+    }
+
+    private static bool IsRedirect(HttpResponseMessage response) =>
+        response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther
+            or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect;
+
+    private async Task<HttpResponseMessage> SendOnceAsync(IndexerDefinition indexer, HttpRequestMessage request, CancellationToken cancellationToken)
     {
         try
         {

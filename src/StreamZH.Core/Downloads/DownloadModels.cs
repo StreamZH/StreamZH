@@ -203,6 +203,9 @@ public sealed record DownloadItem
 
     public long UploadedBytes { get; init; }
 
+    /// <summary>Torrent: upload speed (bytes per second) at the last poll of the client; 0 when not uploading.</summary>
+    public long UploadSpeedBps { get; init; }
+
     public int? Seeders { get; init; }
 
     public int? Peers { get; init; }

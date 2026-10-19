@@ -15,8 +15,9 @@ public sealed class MinimumAgeSpecification : IDecisionSpecification
 {
     public Rejection? Evaluate(ReleaseCandidate candidate, DecisionContext context)
     {
+        // Propagation is a Usenet thing (Radarr checks Usenet releases only).
         var minimum = context.Rules.MinimumAgeMinutes;
-        if (minimum <= 0 || candidate.PublishDate == default)
+        if (minimum <= 0 || candidate.PublishDate == default || candidate.Protocol != Downloads.DownloadProtocol.Usenet)
         {
             return null;
         }

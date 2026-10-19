@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { generalApi, generalKeys, type DiskSpaceEntry, type SystemInfo } from '../api/general'
+import { ClientsStatusPanel } from '../downloadClients/ClientsStatusPanel'
+import { useIsAdmin } from '../status/useOngoing'
 import Icon, { type IconName } from '../components/Icon'
 import { Skeleton } from '../components/Loader'
 import ui from '../components/ui.module.css'
@@ -26,6 +28,7 @@ const modeIcons: Record<SystemInfo['runtimeMode'], IconName> = {
 /** System → Status (like CloudZH's System Health): metrics on top, health checks, disk space, about, licence. */
 export default function StatusPage() {
   const info = useQuery({ queryKey: generalKeys.info, queryFn: generalApi.info, refetchInterval: 30_000 })
+  const admin = useIsAdmin()
   const data = info.data
   const errors = data?.health.filter((n) => n.level === 'error').length ?? 0
   const warnings = data?.health.filter((n) => n.level === 'warn').length ?? 0
@@ -138,6 +141,8 @@ export default function StatusPage() {
               </ul>
             </section>
           </div>
+
+          <ClientsStatusPanel canTest={admin} />
 
           <section id="about" className={ui.panel}>
             <div className={styles.phead}>

@@ -1,0 +1,127 @@
+/* Protocol icon, seeders/peers, tracker flags and ratio (tokens only, light and dark). */
+.protocol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  vertical-align: -2px;
+}
+
+.usenet {
+  color: var(--info);
+}
+
+.torrent {
+  color: var(--ok);
+}
+
+.protocolTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 6px;
+  white-space: nowrap;
+  background: color-mix(in srgb, currentColor 11%, transparent);
+}
+
+.peers {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.seeders {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  align-self: center;
+}
+
+.slash,
+.leechers {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.ok .seeders {
+  color: var(--ok);
+}
+
+.low .seeders {
+  color: var(--warn);
+}
+
+.dead .seeders {
+  color: var(--err);
+}
+
+.unknown .seeders {
+  color: var(--muted);
+}
+
+.flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.flag {
+  --tone: var(--fg-2);
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 7px;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  border-radius: 999px;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 13%, transparent);
+  white-space: nowrap;
+}
+
+.flagFree {
+  --tone: var(--ok);
+}
+
+.flagUp {
+  --tone: var(--info);
+}
+
+.flagInfo {
+  --tone: var(--fg-2);
+}
+
+.flagBad {
+  --tone: var(--err);
+}
+
+.ratio {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.ratioOk {
+  color: var(--ok);
+}
+
+.ratioLow {
+  color: var(--warn);
+}

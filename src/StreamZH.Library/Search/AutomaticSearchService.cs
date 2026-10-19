@@ -17,7 +17,8 @@ namespace StreamZH.Library.Search;
 /// Searches and grabs the best accepted release without asking, like Radarr/Sonarr's automatic search
 /// (ProcessDownloadDecisions): the best release per item wins; for episodes, releases that overlap with
 /// one already grabbed in this run are skipped. If an indexer fails to deliver the NZB, the next release
-/// from another indexer is tried.
+/// from another indexer is tried. 0.11: releases held back only by the protocol delay are kept as pending releases
+/// (RSS sync and the "Process pending releases" task grab them once the delay has passed).
 /// </summary>
 public sealed class AutomaticSearchService(
     ReleaseSearchService search,
@@ -33,7 +34,8 @@ public sealed class AutomaticSearchService(
     IndexerOptions? options = null,
     PendingImports? pendingImports = null,
     LastSearchRepository? lastSearches = null,
-    AutomationHold? automationHold = null)
+    AutomationHold? automationHold = null,
+    PendingReleaseService? pendingReleases = null)
 {
     /// <summary>
     /// With the blackhole folder StreamZH cannot see whether a grab is still downloading: items grabbed this recently are
@@ -246,11 +248,36 @@ public sealed class AutomaticSearchService(
         var accepted = result.Decisions.Where(d => d.Accepted).ToList();
         if (accepted.Count == 0)
         {
+            KeepDelayed(result.Decisions, movieId);
             logger.LogInformation("No acceptable release for movie {Id} ({Count} results)", movieId, result.Decisions.Count);
             return false;
         }
 
-        return await GrabFirstAsync(accepted, cancellationToken) is not null;
+        if (await GrabFirstAsync(accepted, cancellationToken) is not null)
+        {
+            pendingReleases?.RemoveMovie(movieId);
+            return true;
+        }
+
+        KeepDelayed(result.Decisions, movieId);
+        return false;
+    }
+
+    /// <summary>Releases that only wait for the protocol delay become pending releases (Radarr's "Pending").</summary>
+    private void KeepDelayed(IEnumerable<ReleaseDecision> decisions, int? movieId, IReadOnlySet<int>? taken = null)
+    {
+        if (pendingReleases is null)
+        {
+            return;
+        }
+
+        var delayed = PendingReleaseService.DelayedOnly(decisions.Where(d => taken is null || !d.EpisodeIds.Any(taken.Contains)));
+        if (delayed.Count > 0)
+        {
+            logger.LogInformation(
+                "{Count} releases for {Subject} wait for the protocol delay (pending)", delayed.Count, movieId is { } id ? $"movie {id}" : delayed[0].Subject.Title);
+            pendingReleases.Add(delayed);
+        }
     }
 
     private async Task<int> SearchEpisodesCoreAsync(
@@ -322,7 +349,12 @@ public sealed class AutomaticSearchService(
         {
             logger.LogInformation("No acceptable release for season {Season} of series {Id} ({Count} results)", seasonNumber, seriesId, result.Decisions.Count);
         }
+        else
+        {
+            pendingReleases?.RemoveEpisodes(seriesId, [.. taken.Except(done)]);
+        }
 
+        KeepDelayed(result.Decisions.Where(d => d.EpisodeIds.Any(open.Contains)), null, taken);
         return grabbed;
     }
 

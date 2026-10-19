@@ -23,6 +23,7 @@ import UsenetServers from './pages/UsenetServers'
 import RequestSettingsPage from './requests/RequestSettingsPage'
 import RequestsPage from './requests/RequestsPage'
 import DownloadsPage from './settings/DownloadsPage'
+import DownloadClientsPage from './downloadClients/DownloadClientsPage'
 import GeneralPage from './settings/GeneralPage'
 import MediaManagementPage from './settings/MediaManagementPage'
 import MetadataPage from './settings/MetadataPage'
@@ -97,6 +98,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="settings/quality" element={<QualityPage />} />
             <Route path="settings/indexers" element={<IndexerOptionsPage />} />
             <Route path="settings/downloads" element={<DownloadsPage />} />
+            <Route path="settings/downloadclients" element={<DownloadClientsPage />} />
             <Route path="settings/usenet" element={<UsenetServers />} />
             <Route path="settings/connect" element={<ConnectPage />} />
             <Route path="settings/requests" element={<RequestSettingsPage />} />

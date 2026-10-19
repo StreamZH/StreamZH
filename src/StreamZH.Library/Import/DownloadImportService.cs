@@ -177,14 +177,15 @@ public sealed class DownloadImportService(
     public IReadOnlyList<ImportFileCandidate> Candidates(int downloadId, int? seriesId)
     {
         var item = queue?.Find(downloadId) ?? throw new LibraryException($"Download {downloadId} not found.", LibraryError.NotFound);
-        if (item.OutputPath is not { } folder || !Directory.Exists(folder))
+        if (item.OutputPath is not { } output || !(Directory.Exists(output) || File.Exists(output)))
         {
             throw new LibraryException("The download folder no longer exists.", LibraryError.NotFound);
         }
 
+        var folder = Directory.Exists(output) ? output : Path.GetDirectoryName(output)!;
         var show = seriesId is { } id ? series.Find(id) : null;
         var library = show is not null ? series.Episodes(show.Id) : [];
-        return [.. VideoFiles(folder).OrderBy(f => f.FullName, StringComparer.OrdinalIgnoreCase).Select(file =>
+        return [.. DownloadVideos(item, folder).OrderBy(f => f.FullName, StringComparer.OrdinalIgnoreCase).Select(file =>
         {
             var info = Describe(item.Title, file.FullName);
             var parsed = ParseEpisodeFile(file.FullName, item.Title, single: false);
@@ -220,11 +221,11 @@ public sealed class DownloadImportService(
 
     private async Task<Outcome> ImportMovieAsync(DownloadItem item, int? movieId, ManualImportRequest? manual, CancellationToken cancellationToken)
     {
-        var options = settings.Current;
+        var options = OptionsFor(item);
         var movie = (movieId is { } id ? movies.Find(id) : null) ?? throw new ImportException("The movie is no longer in the library.");
         var folder = DownloadFolder(item);
 
-        var videoCount = VideoFiles(folder).Count();
+        var videoCount = DownloadVideos(item, folder).Count;
         FileInfo source;
         if (manual is { Files.Count: > 0 })
         {
@@ -232,7 +233,7 @@ public sealed class DownloadImportService(
         }
         else
         {
-            var videos = VideoFiles(folder).ToList();
+            var videos = DownloadVideos(item, folder);
             source = videos.MaxBy(f => f.Length) ?? throw new ImportException(NoVideoMessage(folder));
         }
 
@@ -265,7 +266,7 @@ public sealed class DownloadImportService(
         var replaced = PlaceFile(source.FullName, destination, existingPath is null ? [] : [existingPath], itemFolderName, options);
 
         SetFileDate(destination, await ReleaseDateAsync(movie, options, cancellationToken), options);
-        ImportExtras(folder, source, [source], destination, options);
+        ImportExtras(folder, source, [source], destination, options with { ImportExtraFiles = options.ImportExtraFiles && !IsSingleFile(item) });
 
         var modified = File.GetLastWriteTimeUtc(destination);
         movie.File = new MediaFile(Path.GetRelativePath(movie.FolderPath, destination), new FileInfo(destination).Length, modified);
@@ -292,12 +293,12 @@ public sealed class DownloadImportService(
 
     private async Task<Outcome> ImportEpisodesAsync(DownloadItem item, int? seriesId, ManualImportRequest? manual, CancellationToken cancellationToken)
     {
-        var options = settings.Current;
+        var options = OptionsFor(item);
         var show = (seriesId is { } id ? series.Find(id) : null) ?? throw new ImportException("The series is no longer in the library.");
         var library = series.Episodes(show.Id);
         var byId = library.ToDictionary(e => e.Id);
         var folder = DownloadFolder(item);
-        var videos = VideoFiles(folder).ToList();
+        var videos = DownloadVideos(item, folder).ToList();
         if (videos.Count == 0 && manual is not { Files.Count: > 0 })
         {
             throw new ImportException(NoVideoMessage(folder));
@@ -448,7 +449,7 @@ public sealed class DownloadImportService(
 
             var replaced = PlaceFile(file.FullName, destination, replaceable, seriesFolderName, options);
             SetFileDate(destination, AirDate(episodes), options);
-            ImportExtras(folder, file, videos.Count == 1 ? [file] : videos, destination, options);
+            ImportExtras(folder, file, videos.Count == 1 ? [file] : videos, destination, options with { ImportExtraFiles = options.ImportExtraFiles && !IsSingleFile(item) });
 
             var media = new MediaFile(Path.GetRelativePath(show.FolderPath, destination), new FileInfo(destination).Length, File.GetLastWriteTimeUtc(destination));
             episodeFiles.SetFile(ids, media);
@@ -487,12 +488,46 @@ public sealed class DownloadImportService(
             throw new ImportException("The download has no folder with finished files.");
         }
 
+        // 0.11: a torrent with a single file reports that file; its folder is the client's save folder.
+        if (item.Protocol == DownloadProtocol.Torrent && File.Exists(item.OutputPath))
+        {
+            return Path.GetDirectoryName(item.OutputPath)!;
+        }
+
         if (!Directory.Exists(item.OutputPath))
         {
-            throw new ImportException($"The download folder {item.OutputPath} no longer exists. It may have been moved or deleted.");
+            throw new ImportException(item.Protocol == DownloadProtocol.Torrent
+                ? $"StreamZH cannot see {item.OutputPath}, which the download client reported. If the client runs on another machine or in a "
+                    + "container, add a remote path mapping (Settings → Download clients)."
+                : $"The download folder {item.OutputPath} no longer exists. It may have been moved or deleted.");
         }
 
         return item.OutputPath;
+    }
+
+    /// <summary>
+    /// 0.11: torrents are still seeding (or may be), so their files are never moved: they are hard-linked when the
+    /// library is on the same volume and "Use hardlinks" is on, else copied (Radarr's behaviour for torrents).
+    /// </summary>
+    private MediaManagementValues OptionsFor(DownloadItem item)
+    {
+        var options = settings.Current;
+        return item.Protocol == DownloadProtocol.Torrent ? options with { ImportMode = ImportMode.Copy } : options;
+    }
+
+    private static bool IsSingleFile(DownloadItem item) =>
+        item.Protocol == DownloadProtocol.Torrent && item.OutputPath is { } output && File.Exists(output);
+
+    /// <summary>The video files of the download: every one in its folder, or the one file of a single-file torrent.</summary>
+    private static IReadOnlyList<FileInfo> DownloadVideos(DownloadItem item, string folder)
+    {
+        if (IsSingleFile(item))
+        {
+            var file = new FileInfo(item.OutputPath!);
+            return DiskScanner.VideoExtensions.Contains(file.Extension) && !file.Name.Contains("sample", StringComparison.OrdinalIgnoreCase) ? [file] : [];
+        }
+
+        return [.. VideoFiles(folder)];
     }
 
     private static FileInfo ManualFile(string folder, string relative)
@@ -917,13 +952,14 @@ public sealed class DownloadImportService(
     /// <summary>Cleanup, download list, events. Problems here no longer make the import fail.</summary>
     private async Task AfterImportAsync(DownloadItem item, Outcome outcome, CancellationToken cancellationToken)
     {
-        var options = settings.Current;
+        var options = OptionsFor(item);
         if (options.ImportMode == ImportMode.Move && !downloads.KeepFiles && outcome.EverythingImported && item.OutputPath is { } folder && IsDownloadFolder(folder))
         {
             files.DeleteFolder(folder);
         }
 
-        if (options.RemoveCompletedDownloads && engine is not null)
+        // Torrents leave the client (and the history) by the seed rules of the torrent tracker instead.
+        if (options.RemoveCompletedDownloads && engine is not null && item.Protocol != DownloadProtocol.Torrent)
         {
             try
             {

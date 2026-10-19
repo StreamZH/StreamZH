@@ -15,6 +15,7 @@ export const settingsAreas: SettingsArea[] = [
   { to: '/settings/quality', label: 'Quality', description: 'File size limits per quality.' },
   { to: '/settings/indexers', label: 'Indexers', description: 'Release rules for all indexers: minimum age, retention, size, RSS sync and release profiles.' },
   { to: '/settings/downloads', label: 'Downloads', description: 'Download engine, categories, switches, schedule, post-processing and tools.' },
+  { to: '/settings/downloadclients', label: 'Download clients', description: 'Torrent clients (qBittorrent, Transmission, Deluge), the built-in torrent engine and remote path mappings for torrents.' },
   { to: '/settings/usenet', label: 'Usenet servers', description: 'Your Usenet provider accounts, primary and backup.' },
   { to: '/settings/connect', label: 'Connect', description: 'Plex, Jellyfin and Emby library updates, and notifications.' },
   { to: '/settings/requests', label: 'Requests', description: 'Requests from friends and requesters: auto-approve, limits and where approved titles go.' },

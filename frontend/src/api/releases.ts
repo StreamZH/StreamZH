@@ -35,6 +35,18 @@ export interface Release {
   /** Custom formats the release matched (0.8) and their summed score in the item's profile. */
   customFormats?: MatchedFormat[]
   customFormatScore?: number
+  /** 0.11: Usenet (Newznab) or torrent (Torznab); missing on older servers = Usenet. */
+  protocol?: 'usenet' | 'torrent'
+  /** Torrent only: seeders and peers as the indexer reports them (null = unknown). */
+  seeders?: number | null
+  peers?: number | null
+  /** Torrent only: Radarr/Sonarr IndexerFlags bits (freeleech 1, halfleech 2, double upload 4, … nuked 2048). */
+  indexerFlags?: number | string[] | null
+  /** The flags by name ("freeleech", "halfleech", "doubleUpload", "internal", "scene" …). */
+  flags?: string[]
+  /** Torrent only: 0 = freeleech, 1 = normal. */
+  downloadVolumeFactor?: number | null
+  uploadVolumeFactor?: number | null
 }
 
 export interface ReleaseSearch {
@@ -54,6 +66,9 @@ export interface GrabResult {
   indexer: string
   fileName: string
   folder: string
+  /** 0.11: torrent grabs name the client they went to (and Usenet ones may name the engine). */
+  protocol?: 'usenet' | 'torrent'
+  client?: string | null
 }
 
 export type CommandName = 'MoviesSearch' | 'MissingMoviesSearch' | 'SeasonSearch' | 'EpisodeSearch'

@@ -9,12 +9,14 @@ using StreamZH.Core.Events;
 using StreamZH.Data;
 using StreamZH.Library;
 using StreamZH.Library.Downloads;
+using StreamZH.Library.Downloads.Torrent;
 using StreamZH.Library.Indexers;
 using StreamZH.Library.Migration;
 using StreamZH.Library.Migration.Sabnzbd;
 using StreamZH.Library.Search;
 using StreamZH.Library.Usenet;
 using StreamZH.Tests.Library.Search;
+using StreamZH.Tests.Torrents;
 using StreamZH.Usenet.Pool;
 
 namespace StreamZH.Tests.Library.Migration;
@@ -50,6 +52,12 @@ public sealed class MigrationBed : IAsyncDisposable
         services.AddSingleton<DownloadScheduleService>();
         services.AddSingleton(new IndexerService(new IndexerRepository(Bed.Database), new IndexerStatusRepository(Bed.Database), TimeProvider.System, NullLogger<IndexerService>.Instance));
         services.AddSingleton(sp => new AutomationHold(Bed.Config, Bed.Time));
+        services.AddSingleton(new DownloadClientRepository(Bed.Database));
+        services.AddSingleton(new RemotePathMappingRepository(Bed.Database));
+        services.AddSingleton(sp => new DownloadClientService(
+            sp.GetRequiredService<DownloadClientRepository>(),
+            [new ScriptedTorrentClient(), new ScriptedTorrentClient(Core.Downloads.DownloadClientDefinition.Transmission), new ScriptedTorrentClient(Core.Downloads.DownloadClientDefinition.Deluge)],
+            NullLogger<DownloadClientService>.Instance));
         services.AddSingleton(new SabnzbdApiClient(new HttpClient(Sabnzbd), NullLogger<SabnzbdApiClient>.Instance));
         services.AddSingleton(sp => new ArrApiClient(new HttpClient(new ArrRouter(Radarr, Sonarr)), NullLogger<ArrApiClient>.Instance));
         services.AddSingleton(sp => new ProwlarrImportService(new HttpClient(Prowlarr), sp.GetRequiredService<IndexerService>(), NullLogger<ProwlarrImportService>.Instance));

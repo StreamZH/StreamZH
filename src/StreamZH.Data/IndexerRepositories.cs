@@ -36,7 +36,8 @@ public sealed class IndexerRepository(Database database)
     private const string Columns = """
         Id, Name, Implementation, BaseUrl, ApiPath, ApiKey, Categories, TvCategories, Priority,
         EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added,
-        Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit
+        Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit,
+        MinimumSeeders, SeedRatio, SeedTimeMinutes, SeasonPackSeedTimeMinutes
         """;
 
     /// <summary>All indexers ordered by priority, then name.</summary>
@@ -66,10 +67,12 @@ public sealed class IndexerRepository(Database database)
             """
             INSERT INTO Indexers (Name, Implementation, BaseUrl, ApiPath, ApiKey, Categories, TvCategories, Priority,
                 EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added,
-                Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit)
+                Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit,
+                MinimumSeeders, SeedRatio, SeedTimeMinutes, SeasonPackSeedTimeMinutes)
             VALUES (@Name, @Implementation, @BaseUrl, @ApiPath, @ApiKey, @Categories, @TvCategories, @Priority,
                 @EnableRss, @EnableAutomaticSearch, @EnableInteractiveSearch, @Added,
-                @Enable, @DefinitionKey, @AdditionalParameters, @VipExpiration, @QueryLimit, @GrabLimit, @LimitsUnit);
+                @Enable, @DefinitionKey, @AdditionalParameters, @VipExpiration, @QueryLimit, @GrabLimit, @LimitsUnit,
+                @MinimumSeeders, @SeedRatio, @SeedTimeMinutes, @SeasonPackSeedTimeMinutes);
             SELECT last_insert_rowid();
             """,
             IndexerRow.From(indexer, added));
@@ -84,7 +87,9 @@ public sealed class IndexerRepository(Database database)
                 Categories = @Categories, TvCategories = @TvCategories, Priority = @Priority, EnableRss = @EnableRss,
                 EnableAutomaticSearch = @EnableAutomaticSearch, EnableInteractiveSearch = @EnableInteractiveSearch,
                 Enable = @Enable, DefinitionKey = @DefinitionKey, AdditionalParameters = @AdditionalParameters, VipExpiration = @VipExpiration,
-                QueryLimit = @QueryLimit, GrabLimit = @GrabLimit, LimitsUnit = @LimitsUnit
+                QueryLimit = @QueryLimit, GrabLimit = @GrabLimit, LimitsUnit = @LimitsUnit,
+                MinimumSeeders = @MinimumSeeders, SeedRatio = @SeedRatio, SeedTimeMinutes = @SeedTimeMinutes,
+                SeasonPackSeedTimeMinutes = @SeasonPackSeedTimeMinutes
             WHERE Id = @Id
             """,
             IndexerRow.From(indexer, default));
@@ -144,6 +149,10 @@ public sealed class IndexerRepository(Database database)
         public long? QueryLimit { get; init; }
         public long? GrabLimit { get; init; }
         public string LimitsUnit { get; init; } = "day";
+        public long MinimumSeeders { get; init; } = 1;
+        public double? SeedRatio { get; init; }
+        public long? SeedTimeMinutes { get; init; }
+        public long? SeasonPackSeedTimeMinutes { get; init; }
 
         public static IndexerRow From(IndexerDefinition i, DateTime added) => new()
         {
@@ -167,6 +176,10 @@ public sealed class IndexerRepository(Database database)
             QueryLimit = i.QueryLimit,
             GrabLimit = i.GrabLimit,
             LimitsUnit = i.LimitsUnit == IndexerLimitsUnit.Hour ? "hour" : "day",
+            MinimumSeeders = i.MinimumSeeders,
+            SeedRatio = i.SeedRatio,
+            SeedTimeMinutes = i.SeedTimeMinutes,
+            SeasonPackSeedTimeMinutes = i.SeasonPackSeedTimeMinutes,
         };
 
         public IndexerDefinition ToDefinition() => new(
@@ -190,6 +203,10 @@ public sealed class IndexerRepository(Database database)
             QueryLimit = QueryLimit is { } q ? (int)q : null,
             GrabLimit = GrabLimit is { } g ? (int)g : null,
             LimitsUnit = string.Equals(LimitsUnit, "hour", StringComparison.OrdinalIgnoreCase) ? IndexerLimitsUnit.Hour : IndexerLimitsUnit.Day,
+            MinimumSeeders = (int)MinimumSeeders,
+            SeedRatio = SeedRatio,
+            SeedTimeMinutes = SeedTimeMinutes is { } t ? (int)t : null,
+            SeasonPackSeedTimeMinutes = SeasonPackSeedTimeMinutes is { } p ? (int)p : null,
         };
     }
 }

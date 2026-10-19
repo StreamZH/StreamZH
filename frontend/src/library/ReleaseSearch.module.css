@@ -121,32 +121,29 @@
 .head,
 .row {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 48px 92px;
+  /* Columns come from the component (--release-cols): optional peers, formats and score columns. */
+  grid-template-columns: var(--release-cols, 100px minmax(0, 1fr) 108px 62px 74px 132px 96px 48px 92px);
   align-items: start;
   gap: 4px 12px;
   padding: 10px 12px;
 }
 
-/* With release profile scores: one more column before Grabs. */
-.withScore .head,
-.withScore .row {
-  grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 52px 48px 92px;
-}
-
-/* With custom format scores: one more column before the preferred score / Grabs. */
-.withFormats .head,
-.withFormats .row {
-  grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 72px 48px 92px;
-}
-
-.withFormats.withScore .head,
-.withFormats.withScore .row {
-  grid-template-columns: 100px minmax(0, 1fr) 96px 62px 74px 132px 96px 72px 52px 48px 92px;
-}
-
 .formatTags {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin-top: 5px;
+}
+
+/* Protocol icon before the indexer name (0.11). */
+.indexer {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.indexer > span:first-child {
+  margin-top: 2px;
 }
 
 .head {
@@ -399,9 +396,7 @@
     display: inline-block;
   }
 
-  .row,
-  .withScore .row,
-  .withFormats .row {
+  .row {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 12px;
@@ -421,6 +416,10 @@
   .mobileLabel {
     display: inline;
     color: var(--muted);
+  }
+
+  .hideMobile {
+    display: none;
   }
 
   .reasons,

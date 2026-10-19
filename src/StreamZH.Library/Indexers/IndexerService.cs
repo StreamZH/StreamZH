@@ -111,6 +111,11 @@ public sealed class IndexerService(
     /// <summary>Sonarr's default Newznab TV categories.</summary>
     public static readonly IReadOnlyList<int> DefaultTvCategories = [5030, 5040];
 
+    /// <summary>Torznab seed settings: "Minimum seeders" range, seed ratio and seed time limits (time in minutes, at most a year).</summary>
+    public const int MaxMinimumSeeders = 1000;
+    public const double MaxSeedRatio = 1000;
+    public const int MaxSeedTimeMinutes = 525_600;
+
     private static readonly JsonSerializerOptions CapabilitiesJson = new(JsonSerializerDefaults.Web);
 
     private readonly Lock _statusLock = new();
@@ -119,10 +124,13 @@ public sealed class IndexerService(
     private readonly ConcurrentDictionary<string, (IndexerCapabilities Caps, DateTimeOffset At)> _recentTests = new(StringComparer.Ordinal);
 
     /// <summary>A new Newznab indexer to start from.</summary>
-    public static IndexerDefinition Schema() => new(
+    public static IndexerDefinition Schema() => Schema(null);
+
+    /// <summary>A new indexer of the implementation ("Newznab" or "Torznab"; anything else gives Newznab) to start from.</summary>
+    public static IndexerDefinition Schema(string? implementation) => new(
         0,
         string.Empty,
-        IndexerDefinition.Newznab,
+        string.Equals(implementation?.Trim(), IndexerDefinition.Torznab, StringComparison.OrdinalIgnoreCase) ? IndexerDefinition.Torznab : IndexerDefinition.Newznab,
         string.Empty,
         DefaultApiPath,
         string.Empty,
@@ -233,6 +241,12 @@ public sealed class IndexerService(
         try
         {
             var caps = await client.GetCapabilitiesAsync(normalized, cancellationToken);
+            if (UnsupportedCategories(normalized, caps) is { } categoryError)
+            {
+                logger.LogInformation("Indexer test for {Host}: {Message}", host, categoryError);
+                return new IndexerTestResult(null, categoryError);
+            }
+
             logger.LogInformation("Indexer test for {Host} succeeded ({Count} categories)", host, caps.Categories.Count);
             RememberTest(normalized, caps);
             if (stored is not null && ConnectionKey(stored) == ConnectionKey(normalized))
@@ -488,6 +502,24 @@ public sealed class IndexerService(
     private static string ConnectionKey(IndexerDefinition indexer) =>
         $"{indexer.BaseUrl.TrimEnd('/')}\n{indexer.ApiPath}\n{indexer.ApiKey}\n{indexer.AdditionalParameters}";
 
+    /// <summary>
+    /// Radarr's Torznab test: when the indexer lists its categories and none of the selected ones is among them, searches
+    /// would find nothing (Jackett and Prowlarr indexers offer only some of the 2000/5000 trees).
+    /// </summary>
+    private static string? UnsupportedCategories(IndexerDefinition indexer, IndexerCapabilities caps)
+    {
+        if (indexer.Protocol != Core.Downloads.DownloadProtocol.Torrent || caps.Categories.Count == 0)
+        {
+            return null;
+        }
+
+        var offered = caps.Categories.SelectMany(c => c.SubCategories.Select(s => s.Id).Prepend(c.Id)).ToHashSet();
+        List<int> selected = [.. indexer.Categories.Concat(indexer.TvCategories).Distinct()];
+        return selected.Count > 0 && !selected.Any(offered.Contains)
+            ? $"This indexer supports none of the selected categories ({string.Join(", ", selected.Order())}). Choose categories it offers."
+            : null;
+    }
+
     // ---- Validation ----
 
     private Dictionary<string, string[]> Validate(IndexerDefinition indexer, int? existingId)
@@ -532,6 +564,15 @@ public sealed class IndexerService(
             {
                 errors["definitionKey"] = [entry.UnsupportedReason ?? "This indexer is not supported yet."];
             }
+            else if (!string.Equals(entry.Implementation, indexer.Implementation, StringComparison.OrdinalIgnoreCase))
+            {
+                errors["definitionKey"] = [$"{entry.Name} is a {entry.Implementation} indexer."];
+            }
+        }
+
+        if (indexer.Protocol == Core.Downloads.DownloadProtocol.Torrent)
+        {
+            ValidateSeedSettings(indexer, errors);
         }
 
         if (indexer.VipExpiration is not null && indexer.VipExpirationDate is null)
@@ -557,9 +598,10 @@ public sealed class IndexerService(
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (!string.Equals(indexer.Implementation, IndexerDefinition.Newznab, StringComparison.Ordinal))
+        if (!string.Equals(indexer.Implementation, IndexerDefinition.Newznab, StringComparison.Ordinal)
+            && !string.Equals(indexer.Implementation, IndexerDefinition.Torznab, StringComparison.Ordinal))
         {
-            errors["implementation"] = ["Only Newznab indexers are supported."];
+            errors["implementation"] = ["Use Newznab (Usenet) or Torznab (torrents)."];
         }
 
         if (string.IsNullOrWhiteSpace(indexer.BaseUrl))
@@ -582,7 +624,42 @@ public sealed class IndexerService(
             errors["additionalParameters"] = ["Enter parameters like &attrs=poster, without spaces or #."];
         }
 
+        // Radarr: Jackett's "all" endpoint mixes every tracker into one feed and breaks paging and categories.
+        if (indexer.Protocol == Core.Downloads.DownloadProtocol.Torrent && IsJackettAll(indexer))
+        {
+            errors["baseUrl"] = ["Jackett's 'all' endpoint is not supported. Add each Jackett indexer on its own (its Torznab feed URL)."];
+        }
+
         return errors;
+    }
+
+    private static bool IsJackettAll(IndexerDefinition indexer) =>
+        new[] { indexer.BaseUrl, indexer.ApiPath }.Any(v =>
+            v.Contains("/torznab/all", StringComparison.OrdinalIgnoreCase)
+            || v.Contains("/api/v2.0/indexers/all/results/torznab", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Minimum seeders 0 to 1000; seed ratio and times empty (= the download client's setting) or positive.</summary>
+    private static void ValidateSeedSettings(IndexerDefinition indexer, Dictionary<string, string[]> errors)
+    {
+        if (indexer.MinimumSeeders is < 0 or > MaxMinimumSeeders)
+        {
+            errors["minimumSeeders"] = [$"Use 0 to {MaxMinimumSeeders} (1 is the usual minimum)."];
+        }
+
+        if (indexer.SeedRatio is { } ratio && (!double.IsFinite(ratio) || ratio <= 0 || ratio > MaxSeedRatio))
+        {
+            errors["seedRatio"] = [$"Use a ratio above 0 and up to {MaxSeedRatio:0}, or leave it empty to use the download client's setting."];
+        }
+
+        if (indexer.SeedTimeMinutes is < 1 or > MaxSeedTimeMinutes)
+        {
+            errors["seedTimeMinutes"] = [$"Use 1 to {MaxSeedTimeMinutes} minutes, or leave it empty to use the download client's setting."];
+        }
+
+        if (indexer.SeasonPackSeedTimeMinutes is < 1 or > MaxSeedTimeMinutes)
+        {
+            errors["seasonPackSeedTimeMinutes"] = [$"Use 1 to {MaxSeedTimeMinutes} minutes, or leave it empty to use the seed time."];
+        }
     }
 
     private static void ThrowIfAny(Dictionary<string, string[]> errors)
@@ -606,10 +683,25 @@ public sealed class IndexerService(
             apiPath = "/" + apiPath;
         }
 
+        var implementation = indexer.Implementation?.Trim() switch
+        {
+            null or "" => IndexerDefinition.Newznab,
+            var i when i.Equals(IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase) => IndexerDefinition.Newznab,
+            var i when i.Equals(IndexerDefinition.Torznab, StringComparison.OrdinalIgnoreCase) => IndexerDefinition.Torznab,
+            var i => i,
+        };
+        var torrent = implementation == IndexerDefinition.Torznab;
+
         return indexer with
         {
             Name = indexer.Name?.Trim() ?? string.Empty,
-            Implementation = string.IsNullOrWhiteSpace(indexer.Implementation) ? IndexerDefinition.Newznab : indexer.Implementation.Trim(),
+            Implementation = implementation,
+
+            // Seed settings only mean something for torrents; Usenet indexers keep the defaults.
+            MinimumSeeders = torrent ? indexer.MinimumSeeders : 1,
+            SeedRatio = torrent ? indexer.SeedRatio : null,
+            SeedTimeMinutes = torrent ? indexer.SeedTimeMinutes : null,
+            SeasonPackSeedTimeMinutes = torrent ? indexer.SeasonPackSeedTimeMinutes : null,
             BaseUrl = (indexer.BaseUrl?.Trim() ?? string.Empty).TrimEnd('/'),
             ApiPath = apiPath.Length > 1 ? apiPath.TrimEnd('/') : apiPath,
             ApiKey = indexer.ApiKey?.Trim() ?? string.Empty,

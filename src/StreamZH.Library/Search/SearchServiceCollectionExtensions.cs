@@ -24,6 +24,7 @@ public static class SearchServiceCollectionExtensions
         services.AddSingleton<ReleaseProfileRepository>();
         services.AddSingleton<IndexerOptions>();
         services.AddSingleton<AutomationHold>();
+        services.AddSingleton<PendingReleaseService>();
         services.AddScoped<ReleaseSearchService>();
         services.AddScoped<GrabService>();
         services.AddScoped<AutomaticSearchService>();

@@ -12,6 +12,8 @@ import { formatBytes } from '../lib/format'
 import { joinParts, relativeTime } from '../status/format'
 import { useIsAdmin } from '../status/useOngoing'
 import { RemoveDialog } from './Dialogs'
+import { ClientChip, RemoveFromClientDialog, SeedingPill, SeedStats } from '../downloadClients/TorrentActivity'
+import { isTorrent } from '../downloadClients/torrentFormat'
 import { downloadTypeOptions, mediaTypeOptions, pick, useCustomCategories } from './filterOptions'
 import { FilterBar, FilterSeg, FilterSelect, NoMatches, SearchBox, Toolbar } from './Filters'
 import { useDownloadAction, useMediaLinks, useToasts } from './hooks'
@@ -197,9 +199,12 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
   const [manual, setManual] = useState<DownloadItem | null>(null)
   const retry = useDownloadAction(downloadsApi.retry, (m) => push('error', 'Could not retry', m), () => push('ok', 'Queued again'))
   const remove = useDownloadAction(
-    ({ id, deleteFiles }: { id: number; deleteFiles: boolean }) => downloadsApi.remove(id, deleteFiles),
+    ({ id, deleteFiles, fromClient }: { id: number; deleteFiles: boolean; fromClient?: boolean }) => downloadsApi.remove(id, deleteFiles, fromClient),
     (m) => push('error', 'Could not remove', m),
-    () => setRemoving(null),
+    ({ fromClient }) => {
+      setRemoving(null)
+      if (fromClient) push('ok', 'Removed from the client')
+    },
   )
 
   return (
@@ -227,19 +232,25 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
               const failed = item.status === 'failed'
               const when = relativeTime(item.completed ?? item.added)
               const state = imports(item.id)
+              const torrent = isTorrent(item)
               return (
                 <tr key={item.id}>
                   <td className={styles.statusCell}>
-                    <span className={`${ui.pill} ${failed ? ui.pillErr : ui.pillOk} ${styles.statePill}`} title={failed ? 'Failed' : 'Completed'}>
-                      <Icon name={failed ? 'alert' : 'check'} size={13} />
-                      <span className={styles.pillText}>{failed ? 'Failed' : 'Completed'}</span>
-                    </span>
+                    {torrent && item.seeding && !failed ? (
+                      <SeedingPill className={styles.statePill} textClass={styles.pillText} />
+                    ) : (
+                      <span className={`${ui.pill} ${failed ? ui.pillErr : ui.pillOk} ${styles.statePill}`} title={failed ? 'Failed' : 'Completed'}>
+                        <Icon name={failed ? 'alert' : 'check'} size={13} />
+                        <span className={styles.pillText}>{failed ? 'Failed' : 'Completed'}</span>
+                      </span>
+                    )}
                   </td>
                   <td className={styles.release}>
                     <span className={styles.relTitle} title={item.title}>
                       {item.title}
                     </span>
                     <span className={styles.sub}>
+                      {torrent && <ClientChip item={item} />}
                       {link && (
                         <Link className={styles.mediaLink} to={link.to}>
                           {link.label}
@@ -247,6 +258,7 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
                       )}
                       <span className={styles.showSm}>{joinParts(categoryLabels[item.category], formatBytes(item.totalBytes), when)}</span>
                     </span>
+                    {torrent && !failed && (item.seeding || item.ratio != null) && <SeedStats item={item} />}
                     {failed ? (
                       <span className={styles.historyError}>{item.error ?? 'Failed'}</span>
                     ) : (
@@ -277,7 +289,7 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
                   {admin && (
                     <td className={styles.actionsCell}>
                       <div className={styles.actions}>
-                        {failed && (
+                        {failed && !torrent && (
                           <button
                             type="button"
                             className={`${ui.ghost} ${ui.icon} ${ui.sm}`}
@@ -293,8 +305,8 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
                           type="button"
                           className={`${ui.ghost} ${ui.icon} ${ui.sm} ${styles.dangerIcon}`}
                           onClick={() => setRemoving(item)}
-                          title="Remove"
-                          aria-label={`Remove ${item.title}`}
+                          title={torrent ? 'Remove from client' : 'Remove'}
+                          aria-label={`${torrent ? 'Remove from client' : 'Remove'} ${item.title}`}
                         >
                           <Icon name="trash" size={16} />
                         </button>
@@ -307,7 +319,15 @@ function DownloadRows({ records, stale, admin }: { records: DownloadItem[]; stal
           </tbody>
         </table>
       </div>
-      {removing && (
+      {removing && isTorrent(removing) && (
+        <RemoveFromClientDialog
+          item={removing}
+          busy={remove.isPending}
+          onClose={() => setRemoving(null)}
+          onConfirm={(deleteFiles) => remove.mutate({ id: removing.id, deleteFiles, fromClient: true })}
+        />
+      )}
+      {removing && !isTorrent(removing) && (
         <RemoveDialog item={removing} busy={remove.isPending} onClose={() => setRemoving(null)} onConfirm={(deleteFiles) => remove.mutate({ id: removing.id, deleteFiles })} />
       )}
       {manual && (

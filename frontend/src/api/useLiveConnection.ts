@@ -70,10 +70,27 @@ export function useLiveConnection(enabled = true): boolean {
     })
 
     // Live bars between refetches: the newest progress of every active download.
+    // Usenet (engine) and torrents (tracker) send their own messages: merge by id and drop entries not seen for 5 s.
     connection.on('downloadProgress', (event: { items: DownloadProgressItem[] }) => {
+      const now = Date.now()
+      const prev = queryClient.getQueryData<LiveProgress>(downloadKeys.live)
       const items: LiveProgress['items'] = {}
-      for (const item of event.items ?? []) items[item.id] = item
-      queryClient.setQueryData<LiveProgress>(downloadKeys.live, { at: Date.now(), items })
+      const seen: Record<number, number> = {}
+      if (prev) {
+        for (const [key, item] of Object.entries(prev.items)) {
+          const id = Number(key)
+          const at = prev.seen?.[id] ?? prev.at
+          if (now - at < 5000) {
+            items[id] = item
+            seen[id] = at
+          }
+        }
+      }
+      for (const item of event.items ?? []) {
+        items[item.id] = item
+        seen[item.id] = now
+      }
+      queryClient.setQueryData<LiveProgress>(downloadKeys.live, { at: now, items, seen })
     })
 
     // Handlers must not return a value: SignalR treats a return value as a client result and logs an error.

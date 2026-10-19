@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { useCallback, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { downloadSettingsApi, downloadSettingsKeys } from '../api/downloadSettings'
 import { historyKeys } from '../api/history'
@@ -21,24 +21,27 @@ import Loader from '../components/Loader'
 import PageHeader from '../components/PageHeader'
 import ui from '../components/ui.module.css'
 import { FormatLine } from '../customFormats/FormatTags'
+import { Peers, ProtocolIcon, TrackerFlags } from '../downloadClients/torrent'
+import { trackerFlags } from '../downloadClients/torrentFormat'
 import { formatBytes, formatDateTime } from '../lib/format'
 import MultiSelect, { type MultiOption } from './MultiSelect'
 import Toasts, { type ToastMessage } from './Toast'
 import styles from './IndexerTools.module.css'
 
-type SortKey = 'indexer' | 'title' | 'age' | 'size' | 'grabs' | 'quality'
+type SortKey = 'indexer' | 'title' | 'age' | 'size' | 'peers' | 'grabs' | 'quality'
 
 const sortLabels: Record<SortKey, string> = {
   indexer: 'Indexer',
   title: 'Title',
   age: 'Age',
   size: 'Size',
+  peers: 'Peers',
   grabs: 'Grabs',
   quality: 'Quality',
 }
 
 /** First click: newest, largest, most grabbed and best quality first. */
-const firstDescending: Record<SortKey, boolean> = { indexer: false, title: false, age: false, size: true, grabs: true, quality: true }
+const firstDescending: Record<SortKey, boolean> = { indexer: false, title: false, age: false, size: true, peers: true, grabs: true, quality: true }
 
 const typeLabels: Record<SearchType, string> = { search: 'All', movie: 'Movies', tv: 'TV' }
 
@@ -65,6 +68,8 @@ function compare(a: FreeRelease, b: FreeRelease, key: SortKey): number {
       return a.ageHours - b.ageHours
     case 'size':
       return a.size - b.size
+    case 'peers':
+      return (a.seeders ?? -1) - (b.seeders ?? -1) || (a.peers ?? -1) - (b.peers ?? -1)
     case 'grabs':
       return (a.grabs ?? -1) - (b.grabs ?? -1)
     case 'quality':
@@ -331,6 +336,13 @@ function Results({
   }
 
   const visible = releases.slice(0, limit)
+  // 0.11: a peers column as soon as one release is a torrent.
+  const hasPeers = data.releases.some((r) => r.protocol === 'torrent')
+  const columns = (
+    hasPeers
+      ? ['112px', 'minmax(0, 1fr)', '64px', '72px', '68px', '104px', '52px', '100px', '76px', '96px']
+      : ['120px', 'minmax(0, 1fr)', '64px', '72px', '120px', '52px', '104px', '84px', '104px']
+  ).join(' ')
 
   return (
     <section className={styles.results} aria-label="Search results">
@@ -367,6 +379,7 @@ function Results({
             <option value="age:asc">Newest</option>
             <option value="size:desc">Largest</option>
             <option value="size:asc">Smallest</option>
+            {hasPeers && <option value="peers:desc">Most seeders</option>}
             <option value="grabs:desc">Most grabbed</option>
             <option value="quality:desc">Best quality</option>
             <option value="indexer:asc">Indexer</option>
@@ -410,12 +423,13 @@ function Results({
           </p>
         </div>
       ) : (
-        <div className={styles.releaseTable} role="table" aria-label="Releases">
+        <div className={styles.releaseTable} style={{ '--release-cols': columns } as CSSProperties} role="table" aria-label="Releases">
           <div className={`${styles.releaseRow} ${styles.releaseHead}`} role="row">
             <SortHeader sortKey="indexer" sort={sort} onSort={sortBy} />
             <SortHeader sortKey="title" sort={sort} onSort={sortBy} />
             <SortHeader sortKey="age" sort={sort} onSort={sortBy} />
             <SortHeader sortKey="size" sort={sort} onSort={sortBy} />
+            {hasPeers && <SortHeader sortKey="peers" sort={sort} onSort={sortBy} />}
             <span role="columnheader">Categories</span>
             <SortHeader sortKey="grabs" sort={sort} onSort={sortBy} />
             <SortHeader sortKey="quality" sort={sort} onSort={sortBy} />
@@ -428,6 +442,7 @@ function Results({
               <ReleaseRow
                 key={key}
                 release={release}
+                showPeers={hasPeers}
                 grabbedFile={grabbed[key]}
                 grabbing={grab.isPending && grab.variables != null && releaseKey(grab.variables) === key}
                 onGrab={() => grab.mutate(release)}
@@ -466,23 +481,33 @@ function SortHeader({ sortKey, sort, onSort }: { sortKey: SortKey; sort: { key: 
 
 function ReleaseRow({
   release,
+  showPeers,
   grabbedFile,
   grabbing,
   onGrab,
 }: {
   release: FreeRelease
+  showPeers: boolean
   grabbedFile: string | undefined
   grabbing: boolean
   onGrab: () => void
 }) {
   const categoryNames = release.categories.map(categoryName)
+  const torrent = release.protocol === 'torrent'
+  const flags = torrent ? trackerFlags(release) : []
   return (
     <div className={styles.releaseRow} role="row">
-      <span role="cell" className={styles.indexerCell}>
-        {release.indexer}
+      <span role="cell" className={`${styles.indexerCell} ${styles.withProtocol}`}>
+        <ProtocolIcon protocol={release.protocol ?? 'usenet'} />
+        <span>{release.indexer}</span>
       </span>
       <span role="cell" className={styles.titleCell}>
         {release.title}
+        {flags.length > 0 && (
+          <span className={styles.flagLine}>
+            <TrackerFlags flags={flags} />
+          </span>
+        )}
         <FormatLine formats={release.customFormats} score={release.customFormatScore} />
       </span>
       <span className={styles.metaCells}>
@@ -492,6 +517,18 @@ function ReleaseRow({
         <span role="cell" className={`${styles.cell} ${styles.num}`}>
           {formatBytes(release.size)}
         </span>
+        {showPeers && (
+          <span role="cell" className={`${styles.cell} ${styles.num} ${torrent ? '' : styles.noPeers}`}>
+            {torrent ? (
+              <>
+                <span className={styles.mobileLabel}>Peers </span>
+                <Peers seeders={release.seeders} peers={release.peers} />
+              </>
+            ) : (
+              <span className={ui.muted}>–</span>
+            )}
+          </span>
+        )}
         <span role="cell" className={styles.cell} title={categoryNames.join(', ')}>
           {categoryNames.length === 0 ? (
             <span className={ui.muted}>–</span>

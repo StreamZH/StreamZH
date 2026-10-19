@@ -99,9 +99,8 @@ public sealed class FreeSearchService(
                 CustomFormats = FormatsOf(info, parsed, formats),
             });
 
-            var candidate = new ReleaseCandidate(
-                parsed ?? new ParsedRelease { ReleaseTitle = info.Title, Title = info.Title, CleanTitle = string.Empty },
-                info.Size, info.Indexer, info.IndexerPriority, info.PublishDate, info.DownloadUrl, info.Guid);
+            var candidate = ReleaseSearchService.Candidate(
+                info, parsed ?? new ParsedRelease { ReleaseTitle = info.Title, Title = info.Title, CleanTitle = string.Empty });
             decisions.Add(new ReleaseDecision(info, parsed, new Decision(candidate, []), subject, []));
         }
 
@@ -135,7 +134,9 @@ public sealed class FreeSearchService(
         }
 
         // No library item: the original language is unknown, so "Original" conditions only match a tagged original track.
-        return all.Count == 0 ? [] : CustomFormatCalculator.Matching(all, CustomFormatInput.ForRelease(parsed, info.Size, type, Language.Unknown));
+        // Indexer flags (freeleech …) are Radarr's bits; series formats use Sonarr's.
+        var flags = type == MediaType.Series ? IndexerFlagBits.ToSonarr(info.IndexerFlags) : info.IndexerFlags;
+        return all.Count == 0 ? [] : CustomFormatCalculator.Matching(all, CustomFormatInput.ForRelease(parsed, info.Size, type, Language.Unknown, indexerFlags: flags));
     }
 
     /// <summary>TV categories or a TV search read the name as an episode first, everything else as a movie first.</summary>

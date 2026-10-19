@@ -182,7 +182,10 @@ public sealed class IndexerCatalogApiTests : IDisposable
         var result = await import.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("NZBgeek", result.GetProperty("imported")[0].GetProperty("name").GetString());
         Assert.Equal("proxy", result.GetProperty("imported")[0].GetProperty("mode").GetString());
-        Assert.Equal(4, result.GetProperty("skipped")[0].GetProperty("prowlarrId").GetInt32());
+
+        // 0.11: the Torznab indexer comes along too (through Prowlarr).
+        Assert.Equal(("Some Torznab", "proxy"), (result.GetProperty("imported")[1].GetProperty("name").GetString(), result.GetProperty("imported")[1].GetProperty("mode").GetString()));
+        Assert.Empty(result.GetProperty("skipped").EnumerateArray());
 
         var wrongKey = await client.PostAsJsonAsync("/api/v1/indexer/import/prowlarr/preview", new { url = "http://prowlarr:9696", apiKey = "wrong" });
         Assert.Equal(HttpStatusCode.BadRequest, wrongKey.StatusCode);

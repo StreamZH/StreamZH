@@ -5,6 +5,7 @@
 
 using System.Globalization;
 using System.Text.Json.Serialization;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
 
 namespace StreamZH.Library.Indexers;
@@ -52,12 +53,14 @@ public sealed record IndexerCatalogEntry(
     string? UnsupportedReason);
 
 /// <summary>
-/// The indexers StreamZH knows: Prowlarr's Newznab presets plus a few more, and Generic Newznab for everything else.
-/// Torrent definitions arrive with the torrent engine (1.0).
+/// The indexers StreamZH knows: Prowlarr's Newznab presets plus a few more and Generic Newznab for everything else; since
+/// 0.11 Prowlarr's Torznab presets and Generic Torznab (any tracker with a Torznab API, a Jackett or Prowlarr indexer).
 /// </summary>
 public static class IndexerCatalog
 {
     public const string GenericNewznabKey = "generic-newznab";
+
+    public const string GenericTorznabKey = "generic-torznab";
 
     private const string AllCategoriesNoAdult = "1000,2000,3000,4000,5000,6000,7000";
 
@@ -86,6 +89,14 @@ public static class IndexerCatalog
         Usenet("treasure-maps", "Treasure Maps", "https://treasure-maps.com", "https://treasure-maps.com", categories: "2000,5000"),
         Usenet(GenericNewznabKey, "Generic Newznab", null, string.Empty, categories: string.Empty,
             description: "Any Usenet indexer that speaks the Newznab API; enter its URL and API key"),
+
+        // Torrents (0.11): Prowlarr's Torznab presets.
+        Torrent("animetosho-torznab", "AnimeTosho (Torrent)", "https://animetosho.org", "https://feed.animetosho.org", IndexerPrivacy.Public,
+            categories: "2020,5070", description: "AnimeTosho (Torrent) is a public torrent indexer for anime"),
+        Torrent("torrent-network", "Torrent Network", "https://tntracker.org", "https://tntracker.org", IndexerPrivacy.Private,
+            apiPath: "/api/torznab/api", language: "de-DE", description: "Torrent Network (TN) is a German private tracker for TV, movies and general content"),
+        Torrent(GenericTorznabKey, "Generic Torznab", null, string.Empty, IndexerPrivacy.Private, categories: string.Empty,
+            description: "Any torrent indexer that speaks the Torznab API: a tracker's own API, or one indexer of Jackett or Prowlarr (its Torznab feed URL and API key)"),
     ];
 
     private static readonly Dictionary<string, IndexerCatalogEntry> ByKey = All.ToDictionary(e => e.Key, StringComparer.OrdinalIgnoreCase);
@@ -93,13 +104,27 @@ public static class IndexerCatalog
     public static IndexerCatalogEntry? Find(string? key) =>
         key is not null && ByKey.TryGetValue(key, out var entry) ? entry : null;
 
-    /// <summary>The entry an indexer was created from; older indexers without a key count as Generic Newznab.</summary>
-    public static IndexerCatalogEntry? For(IndexerDefinition indexer) => Find(indexer.DefinitionKey ?? GenericNewznabKey);
-
-    /// <summary>A catalog entry with the same name (case-insensitive) or the same API host, Generic Newznab otherwise.</summary>
-    public static IndexerCatalogEntry Match(string? name, string? baseUrl)
+    /// <summary>The entry an indexer was created from; older indexers without a key count as Generic Newznab (or Generic Torznab).</summary>
+    public static IndexerCatalogEntry? For(IndexerDefinition indexer)
     {
-        var byName = All.FirstOrDefault(e => e.Key != GenericNewznabKey && string.Equals(e.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
+        ArgumentNullException.ThrowIfNull(indexer);
+        return Find(indexer.DefinitionKey ?? GenericKey(indexer.Protocol == DownloadProtocol.Torrent ? IndexerProtocol.Torrent : IndexerProtocol.Usenet));
+    }
+
+    /// <summary>"generic-newznab" or "generic-torznab".</summary>
+    public static string GenericKey(IndexerProtocol protocol) => protocol == IndexerProtocol.Torrent ? GenericTorznabKey : GenericNewznabKey;
+
+    public static bool IsGeneric(string? key) =>
+        string.Equals(key, GenericNewznabKey, StringComparison.OrdinalIgnoreCase) || string.Equals(key, GenericTorznabKey, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A catalog entry of the protocol with the same name (case-insensitive) or the same API host; Generic Newznab (or
+    /// Generic Torznab) otherwise.
+    /// </summary>
+    public static IndexerCatalogEntry Match(string? name, string? baseUrl, IndexerProtocol protocol = IndexerProtocol.Usenet)
+    {
+        var candidates = All.Where(e => e.Protocol == protocol && !IsGeneric(e.Key)).ToList();
+        var byName = candidates.FirstOrDefault(e => string.Equals(e.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (byName is not null)
         {
             return byName;
@@ -107,7 +132,7 @@ public static class IndexerCatalog
 
         if (Uri.TryCreate(baseUrl, UriKind.Absolute, out var url))
         {
-            var byHost = All.FirstOrDefault(e => e.BaseUrl.Length > 0
+            var byHost = candidates.FirstOrDefault(e => e.BaseUrl.Length > 0
                 && Uri.TryCreate(e.BaseUrl, UriKind.Absolute, out var known)
                 && string.Equals(known.Host, url.Host, StringComparison.OrdinalIgnoreCase));
             if (byHost is not null)
@@ -116,8 +141,26 @@ public static class IndexerCatalog
             }
         }
 
-        return ByKey[GenericNewznabKey];
+        return ByKey[GenericKey(protocol)];
     }
+
+    private static IndexerCatalogEntry Torrent(
+        string key, string name, string? siteUrl, string baseUrl, IndexerPrivacy privacy, string apiPath = "/api",
+        string categories = "2000,5000", string language = "en-US", string? description = null) =>
+        new(
+            key,
+            name,
+            IndexerDefinition.Torznab,
+            IndexerProtocol.Torrent,
+            language,
+            privacy,
+            description ?? $"{name} is a torrent indexer",
+            siteUrl,
+            baseUrl,
+            apiPath,
+            [.. categories.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(c => int.Parse(c, CultureInfo.InvariantCulture))],
+            Supported: true,
+            UnsupportedReason: null);
 
     private static IndexerCatalogEntry Usenet(
         string key, string name, string? siteUrl, string baseUrl, string apiPath = "/api", string categories = "1000,2000,3000,4000,5000,6000,7000,8000", string? description = null) =>

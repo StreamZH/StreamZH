@@ -53,14 +53,43 @@ public sealed class MissingSearchTask(IndexerOptions options) : IScheduledTask
     }
 }
 
+/// <summary>
+/// 0.11: decides the pending releases (held back by the protocol delay, Settings → Indexers) again every 5 minutes
+/// without asking the indexers, so a release is grabbed soon after its delay has passed and not only at the next RSS sync.
+/// Off while both delays are 0 and nothing is pending.
+/// </summary>
+public sealed class PendingReleasesTask(IndexerOptions options, PendingReleaseService pending) : IScheduledTask
+{
+    public const string TaskKey = "pending-releases";
+
+    public static readonly TimeSpan Every = TimeSpan.FromMinutes(5);
+
+    public string Key => TaskKey;
+
+    public string Name => "Process pending releases";
+
+    public TimeSpan? Interval
+    {
+        get
+        {
+            var values = options.Values;
+            return values.UsenetDelay > 0 || values.TorrentDelay > 0 || pending.HasAny ? Every : null;
+        }
+    }
+
+    public Task RunAsync(IServiceProvider services, CancellationToken cancellationToken) =>
+        services.GetRequiredService<RssSyncService>().ProcessPendingAsync(cancellationToken);
+}
+
 public static class RssServiceCollectionExtensions
 {
-    /// <summary>RSS sync and the scheduled missing search (needs AddReleaseSearch).</summary>
+    /// <summary>RSS sync, the scheduled missing search and the pending releases (needs AddReleaseSearch).</summary>
     public static IServiceCollection AddRssSync(this IServiceCollection services)
     {
         services.AddScoped<RssSyncService>();
         services.AddSingleton<IScheduledTask, RssSyncTask>();
         services.AddSingleton<IScheduledTask, MissingSearchTask>();
+        services.AddSingleton<IScheduledTask, PendingReleasesTask>();
         return services;
     }
 }

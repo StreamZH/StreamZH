@@ -26,9 +26,16 @@ public class IndexerCatalogTests
             "NZBCat", "NZBFinder", "NZBgeek", "NzbNoob", "NZBNDX", "NzbPlanet", "NZBStars", "Tabula Rasa", "House-of-Usenet", "Treasure Maps",
             "Generic Newznab",
         ];
-        Assert.Equal(expected.Order(StringComparer.Ordinal), IndexerCatalog.All.Select(e => e.Name).Order(StringComparer.Ordinal));
+        var usenet = IndexerCatalog.All.Where(e => e.Protocol == IndexerProtocol.Usenet).ToList();
+        Assert.Equal(expected.Order(StringComparer.Ordinal), usenet.Select(e => e.Name).Order(StringComparer.Ordinal));
 
-        Assert.All(IndexerCatalog.All, e =>
+        // 0.11: Prowlarr's Torznab presets and Generic Torznab.
+        Assert.Equal(
+            ["AnimeTosho (Torrent)", "Torrent Network", "Generic Torznab"],
+            IndexerCatalog.All.Where(e => e.Protocol == IndexerProtocol.Torrent).Select(e => e.Name));
+        Assert.All(IndexerCatalog.All.Where(e => e.Protocol == IndexerProtocol.Torrent), e => Assert.Equal(IndexerDefinition.Torznab, e.Implementation));
+
+        Assert.All(usenet, e =>
         {
             Assert.Equal(IndexerDefinition.Newznab, e.Implementation);
             Assert.Equal(IndexerProtocol.Usenet, e.Protocol);
@@ -48,7 +55,7 @@ public class IndexerCatalogTests
         Assert.Equal(string.Empty, generic.BaseUrl);
         Assert.Null(generic.SiteUrl);
         Assert.Equal("/api", generic.ApiPath);
-        Assert.Same(IndexerCatalog.All[^1], generic);
+        Assert.Same(IndexerCatalog.All.Last(e => e.Protocol == IndexerProtocol.Usenet), generic);
     }
 
     [Fact]
@@ -70,7 +77,7 @@ public class IndexerCatalogTests
 
         Assert.Equal([2020, 5070], IndexerCatalog.Find("animetosho-usenet")!.Categories);
         Assert.Empty(IndexerCatalog.Find("gingadaddy")!.Categories);
-        Assert.All(IndexerCatalog.All.Where(e => e.Key != IndexerCatalog.GenericNewznabKey), e => Assert.StartsWith("https://", e.BaseUrl, StringComparison.Ordinal));
+        Assert.All(IndexerCatalog.All.Where(e => !IndexerCatalog.IsGeneric(e.Key)), e => Assert.StartsWith("https://", e.BaseUrl, StringComparison.Ordinal));
     }
 
     [Fact]

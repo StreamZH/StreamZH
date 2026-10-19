@@ -1,0 +1,94 @@
+/* System → Status: the download clients panel (rows like the health checks, CloudZH .chk). */
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  animation: global(rise) 0.25s var(--ease) backwards;
+}
+
+.row:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.text b {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-weight: 600;
+}
+
+.impl {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.text small {
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.text small.errText {
+  color: var(--err);
+}
+
+.text small.okText {
+  color: var(--ok);
+}
+
+.kind {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dotOff {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.none {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.none a,
+.asideLink {
+  color: var(--accent);
+}
+
+.asideLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+}
+
+.asideLink:hover {
+  text-decoration: underline;
+}

@@ -10,6 +10,7 @@ import {
   relativeTime,
   type IndexerOptions,
   type MinimumAvailability,
+  type PreferredProtocol,
   type ReleaseProfile,
 } from '../api/indexerOptions'
 import { indexerKeys, indexersApi } from '../api/indexers'
@@ -23,12 +24,20 @@ import { TermInput } from './TermInput'
 import { useSettingsForm } from './useSettingsForm'
 
 type NumberField = 'minimumAge' | 'retention' | 'maximumSize' | 'availabilityDelay' | 'rssSyncInterval' | 'missingSearchInterval'
+type DelayField = 'usenetDelay' | 'torrentDelay'
 
 /** The form keeps empty number inputs as null; they are saved as 0. */
-type Draft = Omit<IndexerOptions, NumberField> & Record<NumberField, number | null>
+type Draft = Omit<IndexerOptions, NumberField | DelayField> & Record<NumberField, number | null> & Partial<Record<DelayField, number | null>>
 
 const optionFields = ['minimumAge', 'retention', 'maximumSize', 'allowHardcodedSubs', 'whitelistedHardcodedSubs', 'minimumAvailability', 'availabilityDelay'] as const
 const automationFields = ['rssSyncInterval', 'missingSearchInterval', 'searchOnAdd', 'searchAlternativeTitles'] as const
+const protocolFields = ['preferredProtocol', 'usenetDelay', 'torrentDelay', 'bypassDelayIfHighestQuality'] as const
+
+const protocolOptions: { value: PreferredProtocol; label: string }[] = [
+  { value: 'usenet', label: 'Usenet' },
+  { value: 'torrent', label: 'Torrent' },
+  { value: 'noPreference', label: 'No preference' },
+]
 
 const availabilityOptions: { value: MinimumAvailability; label: string }[] = [
   { value: 'announced', label: 'Announced' },
@@ -48,7 +57,7 @@ function useSection(fields: readonly (keyof IndexerOptions)[]) {
     save: (draft) => {
       const latest = queryClient.getQueryData<IndexerOptions>(indexerOptionsKeys.options)
       const merged = { ...(latest ?? draft) } as Record<string, unknown>
-      for (const field of fields) merged[field] = draft[field] ?? 0
+      for (const field of fields) if (field in draft || field in merged) merged[field] = draft[field] ?? 0
       return indexerOptionsApi.saveOptions(merged as unknown as IndexerOptions)
     },
     invalidate: [indexerOptionsKeys.tasks],
@@ -60,6 +69,7 @@ export default function IndexerOptionsPage() {
   return (
     <SettingsPage title="Indexers" lead="Release rules that apply to all indexers. The indexers themselves are under Indexers in the sidebar.">
       <OptionsSection />
+      <ProtocolSection />
       <AutomationSection />
       <ReleaseProfilesSection />
     </SettingsPage>
@@ -142,6 +152,78 @@ function OptionsSection() {
       >
         <NumberInput id="io-delay" value={v.availabilityDelay} onChange={(availabilityDelay) => form.set({ availabilityDelay })} unit="days" min={-365} max={365} step={1} />
       </Row>
+    </Section>
+  )
+}
+
+/** 0.11: Usenet or torrent first, and how long new releases of each protocol wait (Radarr's delay profile, simplified). */
+function ProtocolSection() {
+  const form = useSection(protocolFields)
+  const v = form.values
+  // Servers before 0.11 have no protocol settings.
+  if (!v || v.preferredProtocol === undefined) return null
+  const preferred = v.preferredProtocol
+  const hidden = [!v.usenetDelay, !v.torrentDelay, v.bypassDelayIfHighestQuality !== undefined].filter(Boolean).length
+  const known = protocolOptions.some((o) => o.value === preferred)
+
+  return (
+    <Section
+      id="protocol"
+      title="Usenet and torrents"
+      description="Which protocol wins when releases are otherwise equally good, and how long new releases wait so a preferred one can show up. Delays apply to RSS and automatic searches, not to your own grabs."
+      hiddenCount={hidden}
+      footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
+    >
+      <Row
+        label="Preferred protocol"
+        help={
+          preferred === 'noPreference'
+            ? 'Quality and score decide alone; on a tie the better indexer priority wins.'
+            : `On equal quality and score, the ${preferred === 'usenet' ? 'Usenet' : 'torrent'} release is grabbed.`
+        }
+        error={form.error('preferredProtocol')}
+      >
+        <div className={ui.seg} role="group" aria-label="Preferred protocol">
+          {protocolOptions.map((o) => (
+            <button key={o.value} type="button" aria-pressed={preferred === o.value} onClick={() => form.set({ preferredProtocol: o.value })}>
+              {o.label}
+            </button>
+          ))}
+          {!known && (
+            <button type="button" aria-pressed>
+              {String(preferred)}
+            </button>
+          )}
+        </div>
+      </Row>
+      <Row
+        label="Usenet delay"
+        htmlFor="io-usenet-delay"
+        advanced={!v.usenetDelay}
+        help="A new Usenet release waits this long before it may be grabbed. 0 = no delay."
+        error={form.error('usenetDelay')}
+      >
+        <NumberInput id="io-usenet-delay" value={v.usenetDelay ?? 0} onChange={(usenetDelay) => form.set({ usenetDelay })} unit="minutes" min={0} step={15} />
+      </Row>
+      <Row
+        label="Torrent delay"
+        htmlFor="io-torrent-delay"
+        advanced={!v.torrentDelay}
+        help="A new torrent release waits this long before it may be grabbed. 0 = no delay."
+        error={form.error('torrentDelay')}
+      >
+        <NumberInput id="io-torrent-delay" value={v.torrentDelay ?? 0} onChange={(torrentDelay) => form.set({ torrentDelay })} unit="minutes" min={0} step={15} />
+      </Row>
+      {v.bypassDelayIfHighestQuality !== undefined && (
+        <Row
+          label="Skip delay for the best quality"
+          advanced
+          help="A release that already has the highest allowed quality of the profile is grabbed at once."
+          error={form.error('bypassDelayIfHighestQuality')}
+        >
+          <Toggle checked={v.bypassDelayIfHighestQuality} onChange={(bypassDelayIfHighestQuality) => form.set({ bypassDelayIfHighestQuality })} />
+        </Row>
+      )}
     </Section>
   )
 }

@@ -40,6 +40,23 @@ export interface DownloadItem {
   completed: string | null
   /** The download category by name (the default ones: movies, series, other). */
   categoryName?: string
+  /** 0.11 (missing on older servers = Usenet): torrents run in a torrent client, external or built in. */
+  protocol?: 'usenet' | 'torrent'
+  /** Torrent: the download client that has it (Settings → Download clients), by id and name. */
+  downloadClientId?: number | null
+  downloadClient?: string | null
+  /** Older drafts of the contract. */
+  clientId?: number | null
+  clientName?: string | null
+  infoHash?: string | null
+  /** Torrent: done and still uploading (imported by hardlink or copy, never moved). */
+  seeding?: boolean
+  ratio?: number | null
+  uploadedBytes?: number | null
+  /** Torrent: upload speed while seeding, when the client reports it. */
+  uploadSpeedBps?: number | null
+  seeders?: number | null
+  peers?: number | null
 }
 
 export interface DownloadFile {
@@ -98,6 +115,8 @@ export interface DownloadProgressItem {
 export interface LiveProgress {
   at: number
   items: Record<number, DownloadProgressItem>
+  /** When each item was last reported (Usenet and torrents arrive in separate messages). */
+  seen?: Record<number, number>
 }
 
 export interface DownloadSettings {
@@ -161,7 +180,9 @@ export const downloadsApi = {
   retry: (id: number) => request<void>('POST', `/download/${id}/retry`),
   update: (id: number, changes: { priority?: number; category?: DownloadCategory }) =>
     request<DownloadItem>('PUT', `/download/${id}`, changes),
-  remove: (id: number, deleteFiles: boolean) => request<void>('DELETE', `/download/${id}?deleteFiles=${deleteFiles}`),
+  /** Torrents (`removeFromClient`): also removes the torrent from its client; `deleteFiles` then deletes its data there. */
+  remove: (id: number, deleteFiles: boolean, removeFromClient = false) =>
+    request<void>('DELETE', `/download/${id}?deleteFiles=${deleteFiles}${removeFromClient ? '&removeFromClient=true' : ''}`),
   pauseAll: () => request<void>('POST', '/download/pause-all'),
   resumeAll: () => request<void>('POST', '/download/resume-all'),
   settings: () => request<DownloadSettings>('GET', '/settings/downloads'),

@@ -5,7 +5,9 @@ import {
   genericDefinitionKey,
   indexerKeys,
   indexersApi,
+  isGenericDefinition,
   maskedApiKey,
+  protocolOf,
   standardCategoryNames,
   type Indexer,
   type IndexerCapabilities,
@@ -108,7 +110,8 @@ export default function IndexerForm({
   })
   const preset = definition ?? definitions.data?.find((d) => d.key === indexer.definitionKey) ?? null
   // A preset with a fixed address (not Generic Newznab).
-  const fixed = preset && preset.key !== genericDefinitionKey && preset.baseUrl !== '' ? preset : null
+  const fixed = preset && !isGenericDefinition(preset.key) && preset.baseUrl !== '' ? preset : null
+  const torrent = (preset?.protocol ?? protocolOf(draft)) === 'torrent'
 
   const done = async () => {
     await queryClient.invalidateQueries({ queryKey: indexerKeys.all })
@@ -150,7 +153,11 @@ export default function IndexerForm({
   const id = (name: string) => `${formId}-${name}`
   const unit = draft.limitsUnit === 'hour' ? 'hour' : 'day'
   const status = indexer.status
-  const title = isNew ? `Add ${preset && preset.key !== genericDefinitionKey ? preset.name : 'Newznab indexer'}` : canEdit ? `Edit ${indexer.name}` : indexer.name
+  const title = isNew
+    ? `Add ${preset && !isGenericDefinition(preset.key) ? preset.name : torrent ? 'Torznab indexer' : 'Newznab indexer'}`
+    : canEdit
+      ? `Edit ${indexer.name}`
+      : indexer.name
 
   const subtitle = (
     <>
@@ -158,12 +165,12 @@ export default function IndexerForm({
         <>
           <ProtocolChip protocol={preset.protocol} />
           <PrivacyChip privacy={preset.privacy} />
-          <span>{preset.key === genericDefinitionKey ? 'Generic Newznab' : preset.description}</span>
+          <span>{preset.key === genericDefinitionKey ? 'Generic Newznab' : isGenericDefinition(preset.key) ? 'Generic Torznab' : preset.description}</span>
         </>
       ) : (
         <>
-          <ProtocolChip protocol="usenet" />
-          <span>Generic Newznab</span>
+          <ProtocolChip protocol={torrent ? 'torrent' : 'usenet'} />
+          <span>{torrent ? 'Generic Torznab' : 'Generic Newznab'}</span>
         </>
       )}
     </>
@@ -276,6 +283,11 @@ export default function IndexerForm({
                     </>
                   )}
                 </>
+              ) : torrent ? (
+                <>
+                  The Torznab feed. From Jackett: <code>http://host:9117/api/v2.0/indexers/name/results/torznab/</code>; from Prowlarr:{' '}
+                  <code>http://host:9696/1/</code>.
+                </>
               ) : (
                 <>
                   The indexer&apos;s address. Through Prowlarr: <code>http://host:9696/1/</code> with Prowlarr&apos;s API key.
@@ -300,7 +312,7 @@ export default function IndexerForm({
             id={id('apiPath')}
             label="API path"
             error={fieldError('apiPath')}
-            help={fixed ? `Preset ${fixed.apiPath || '/api'}.` : 'Path to the Newznab API, usually /api.'}
+            help={fixed ? `Preset ${fixed.apiPath || '/api'}.` : `Path to the ${torrent ? 'Torznab' : 'Newznab'} API, usually /api.`}
           >
             <input
               id={id('apiPath')}
@@ -408,7 +420,7 @@ export default function IndexerForm({
             id={id('grabLimit')}
             label="Grab limit"
             error={fieldError('grabLimit')}
-            help={`Most NZB downloads per ${unit}. Empty for unlimited.`}
+            help={`Most ${torrent ? '.torrent' : 'NZB'} downloads per ${unit}. Empty for unlimited.`}
           >
             <input
               id={id('grabLimit')}
@@ -452,6 +464,64 @@ export default function IndexerForm({
             />
           </Field>
 
+          {torrent && (
+            <>
+              <Field
+                id={id('minimumSeeders')}
+                label="Minimum seeders"
+                error={fieldError('minimumSeeders')}
+                help="Releases with fewer seeders are rejected: they would hardly download."
+              >
+                <input
+                  id={id('minimumSeeders')}
+                  className={`${ui.input} ${styles.number}`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={limitValue(draft.minimumSeeders)}
+                  onChange={(e) => update({ minimumSeeders: e.target.value === '' ? null : e.target.valueAsNumber })}
+                />
+              </Field>
+
+              <Field id={id('seedRatio')} label="Seed ratio" error={fieldError('seedRatio')} help="Seed until this ratio after the download. Empty: the download client's default.">
+                <input
+                  id={id('seedRatio')}
+                  className={`${ui.input} ${styles.number}`}
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  inputMode="decimal"
+                  placeholder="Client default"
+                  value={limitValue(draft.seedRatio)}
+                  onChange={(e) => update({ seedRatio: e.target.value === '' ? null : e.target.valueAsNumber })}
+                />
+              </Field>
+
+              <Field
+                id={id('seedTimeMinutes')}
+                label="Seed time"
+                error={fieldError('seedTimeMinutes')}
+                help="Seed at least this long. Private trackers often ask for 72 hours or more. Empty: the client's default."
+              >
+                <MinutesInput id={id('seedTimeMinutes')} value={draft.seedTimeMinutes} onChange={(seedTimeMinutes) => update({ seedTimeMinutes })} />
+              </Field>
+
+              <Field
+                advanced
+                id={id('seasonPackSeedTimeMinutes')}
+                label="Season-pack seed time"
+                error={fieldError('seasonPackSeedTimeMinutes')}
+                help="Seed time for whole seasons. Empty: the seed time above."
+              >
+                <MinutesInput
+                  id={id('seasonPackSeedTimeMinutes')}
+                  value={draft.seasonPackSeedTimeMinutes}
+                  onChange={(seasonPackSeedTimeMinutes) => update({ seasonPackSeedTimeMinutes })}
+                />
+              </Field>
+            </>
+          )}
+
           <Field label="Use for" help="RSS watches for new releases, automatic search runs on its own, interactive search is the Search button.">
             <div className={styles.checks}>
               <label className={ui.check}>
@@ -494,9 +564,36 @@ export default function IndexerForm({
             </div>
           </Field>
         </fieldset>
-        <AdvancedHint count={fixed ? 9 : 8} />
+        <AdvancedHint count={(fixed ? 9 : 8) + (torrent ? 1 : 0)} />
       </form>
     </Dialog>
+  )
+}
+
+/** Minutes, typed as hours or days with a unit select ("72 hours" is easier than "4320"). Empty = null. */
+function MinutesInput({ id, value, onChange }: { id: string; value: number | null; onChange: (minutes: number | null) => void }) {
+  const initialUnit = value != null && value > 0 && value % 1440 === 0 ? 1440 : value != null && value > 0 && value % 60 !== 0 ? 1 : 60
+  const [unit, setUnit] = useState(initialUnit)
+  const shown = value == null || Number.isNaN(value) ? '' : Math.round((value / unit) * 100) / 100
+  return (
+    <div className={styles.inline}>
+      <input
+        id={id}
+        className={`${ui.input} ${styles.number}`}
+        type="number"
+        min={0}
+        step={unit === 1 ? 1 : 0.5}
+        inputMode="decimal"
+        placeholder="Client default"
+        value={shown}
+        onChange={(e) => onChange(e.target.value === '' ? null : Math.round(e.target.valueAsNumber * unit))}
+      />
+      <select className={`${ui.select} ${styles.unitSelect}`} aria-label="Unit" value={unit} onChange={(e) => setUnit(Number(e.target.value))}>
+        <option value={1}>minutes</option>
+        <option value={60}>hours</option>
+        <option value={1440}>days</option>
+      </select>
+    </div>
   )
 }
 

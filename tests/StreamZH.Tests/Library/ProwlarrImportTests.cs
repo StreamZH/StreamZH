@@ -19,7 +19,8 @@ public sealed class StubProwlarr : HttpMessageHandler
 
     /// <summary>
     /// 1 NZBgeek (Newznab, key masked as Prowlarr always does) → proxy; 2 "Own Newznab" (key readable) → direct;
-    /// 3 "Keyless" (Newznab without key, Prowlarr sends "") → direct; 4 Torznab (torrent); 5 Cardigann torrent; 6 NZBIndex (usenet scraper, no key field) → proxy.
+    /// 3 "Keyless" (Newznab without key, Prowlarr sends "") → direct; 4 Torznab (torrent, key masked, seed settings) → proxy;
+    /// 5 Cardigann torrent → proxy; 6 NZBIndex (usenet scraper, no key field) → proxy.
     /// </summary>
     public const string IndexerJson = """
         [
@@ -80,12 +81,24 @@ public sealed class StubProwlarr : HttpMessageHandler
           },
           {
             "id": 4, "name": "Some Torznab", "implementation": "Torznab", "tags": [],
-            "fields": [ { "name": "baseUrl", "value": "https://torznab.example" }, { "name": "apiPath", "value": "/api" }, { "name": "apiKey", "value": "********" } ],
-            "enable": true, "protocol": "torrent", "capabilities": { "categories": [ { "id": 2000, "name": "Movies", "subCategories": [] } ] }, "priority": 25
+            "fields": [
+              { "name": "baseUrl", "value": "https://torznab.example" }, { "name": "apiPath", "value": "/api" }, { "name": "apiKey", "value": "********" },
+              { "name": "torrentBaseSettings.appMinimumSeeders", "value": 3 }, { "name": "torrentBaseSettings.seedRatio", "value": 1.5 },
+              { "name": "torrentBaseSettings.seedTime", "value": 4320 }, { "name": "torrentBaseSettings.packSeedTime", "value": 10080 },
+              { "name": "torrentBaseSettings.preferMagnetUrl", "value": false }
+            ],
+            "enable": true, "protocol": "torrent", "privacy": "private",
+            "capabilities": { "categories": [ { "id": 2000, "name": "Movies", "subCategories": [ { "id": 2040, "name": "Movies/HD", "subCategories": [] } ] },
+              { "id": 5000, "name": "TV", "subCategories": [ { "id": 5040, "name": "TV/HD", "subCategories": [] } ] }, { "id": 100021, "name": "Custom", "subCategories": [] } ] },
+            "priority": 25
           },
           {
             "id": 5, "name": "1337x", "implementation": "Cardigann", "definitionName": "1337x", "tags": [],
-            "fields": [ { "name": "definitionFile", "value": "1337x" }, { "name": "baseUrl", "value": null } ],
+            "fields": [
+              { "name": "definitionFile", "value": "1337x" }, { "name": "baseUrl", "value": null },
+              { "name": "torrentBaseSettings.appMinimumSeeders", "value": null }, { "name": "torrentBaseSettings.seedRatio", "value": "0" },
+              { "name": "torrentBaseSettings.seedTime", "value": null }, { "name": "torrentBaseSettings.packSeedTime", "value": null }
+            ],
             "enable": true, "protocol": "torrent", "privacy": "public", "priority": 25
           },
           {
@@ -153,12 +166,13 @@ public sealed class ProwlarrImportTests : IDisposable
 
         Assert.Equal((ProwlarrImportMode.Direct, true), (preview[2].Mode, preview[2].AlreadyExists));
 
+        // 0.11: torrent indexers come along, through Prowlarr's Torznab proxy (keys are masked).
         Assert.All(preview.Skip(3).Take(2), p =>
         {
-            Assert.Equal("torrent", p.Protocol);
-            Assert.False(p.Supported);
-            Assert.Equal("Torrent indexers follow in StreamZH 1.0", p.Reason);
+            Assert.Equal(("torrent", true, (string?)null, ProwlarrImportMode.Proxy), (p.Protocol, p.Supported, p.Reason, p.Mode));
         });
+        Assert.Equal(("Torznab", "http://prowlarr:9696/4", "https://torznab.example/api"), (preview[3].Implementation, preview[3].BaseUrl, preview[3].OwnUrl));
+        Assert.Equal(("Cardigann", "http://prowlarr:9696/5", (string?)null), (preview[4].Implementation, preview[4].BaseUrl, preview[4].OwnUrl));
 
         Assert.Equal((true, ProwlarrImportMode.Proxy, "http://prowlarr:9696/6"), (preview[5].Supported, preview[5].Mode, preview[5].BaseUrl));
     }
@@ -169,7 +183,7 @@ public sealed class ProwlarrImportTests : IDisposable
         var preview = await _import.PreviewAsync(Url, StubProwlarr.ApiKey, CancellationToken.None);
         Assert.NotNull(preview[0].OwnUrl);
         Assert.DoesNotContain("prowlarr", preview[0].OwnUrl!, StringComparison.OrdinalIgnoreCase);
-        Assert.Null(preview[3].OwnUrl);
+        Assert.Null(preview[4].OwnUrl);
 
         var result = await _import.ImportAsync(Url, StubProwlarr.ApiKey, [1], CancellationToken.None, new Dictionary<int, string> { [1] = " my-geek-key " });
 
@@ -187,10 +201,11 @@ public sealed class ProwlarrImportTests : IDisposable
 
         var result = await _import.ImportAsync(Url, StubProwlarr.ApiKey, [1, 2, 3, 4, 6, 99], CancellationToken.None);
 
-        Assert.Equal([("NZBgeek", ProwlarrImportMode.Proxy), ("Own Newznab", ProwlarrImportMode.Direct), ("NZBIndex", ProwlarrImportMode.Proxy)],
+        Assert.Equal(
+            [("NZBgeek", ProwlarrImportMode.Proxy), ("Own Newznab", ProwlarrImportMode.Direct), ("Some Torznab", ProwlarrImportMode.Proxy), ("NZBIndex", ProwlarrImportMode.Proxy)],
             result.Imported.Select(i => (i.Name, i.Mode)));
         Assert.Equal(
-            [(99, "Not found in Prowlarr."), (3, "An indexer with this name already exists."), (4, "Torrent indexers follow in StreamZH 1.0")],
+            [(99, "Not found in Prowlarr."), (3, "An indexer with this name already exists.")],
             result.Skipped.Select(s => (s.ProwlarrId, s.Reason)));
 
         var geek = _indexers.Find(result.Imported[0].Id)!;
@@ -210,7 +225,15 @@ public sealed class ProwlarrImportTests : IDisposable
         Assert.Null(own.VipExpiration);
         Assert.Equal(IndexerCatalog.GenericNewznabKey, own.DefinitionKey);
 
-        var scraper = _indexers.Find(result.Imported[2].Id)!;
+        var torznab = _indexers.Find(result.Imported[2].Id)!;
+        Assert.Equal((IndexerDefinition.Torznab, Core.Downloads.DownloadProtocol.Torrent, "http://prowlarr:9696/4", "/api", StubProwlarr.ApiKey),
+            (torznab.Implementation, torznab.Protocol, torznab.BaseUrl, torznab.ApiPath, torznab.ApiKey));
+        Assert.Equal([2000, 2040], torznab.Categories);
+        Assert.Equal([5000, 5040], torznab.TvCategories);
+        Assert.Equal((3, 1.5, 4320, 10080), (torznab.MinimumSeeders, torznab.SeedRatio!.Value, torznab.SeedTimeMinutes!.Value, torznab.SeasonPackSeedTimeMinutes!.Value));
+        Assert.Equal(IndexerCatalog.GenericTorznabKey, torznab.DefinitionKey);
+
+        var scraper = _indexers.Find(result.Imported[3].Id)!;
         Assert.Equal([2000], scraper.Categories);
         Assert.Equal(IndexerService.DefaultTvCategories, scraper.TvCategories);
     }

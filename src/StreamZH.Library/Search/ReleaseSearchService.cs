@@ -32,12 +32,16 @@ public sealed class ReleaseSearchService(
     TimeProvider? timeProvider = null,
     IndexerOptions? options = null,
     SceneNumbering.EpisodeMapper? episodeMapper = null,
-    AlternativeTitleRepository? alternativeTitles = null)
+    AlternativeTitleRepository? alternativeTitles = null,
+    PendingReleaseService? pendingReleases = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     /// <summary>Release rules from Settings → Indexers (none in tests that do not pass the options).</summary>
     private ReleaseRules Rules() => options?.Rules() ?? ReleaseRules.None;
+
+    /// <summary>A search the user started is never delayed (Radarr's UserInvokedSearch); automatic ones are.</summary>
+    private ReleaseRules Rules(IndexerUse use) => use == IndexerUse.InteractiveSearch ? Rules().WithoutDelays() : Rules();
 
     /// <summary>How long one indexer may take before it counts as failed; the others are not held up.</summary>
     public TimeSpan IndexerTimeout { get; set; } = TimeSpan.FromSeconds(60);
@@ -62,7 +66,13 @@ public sealed class ReleaseSearchService(
         var (releases, indexerCount, failures) = await QueryAsync(use, criteria, cancellationToken);
         var now = _time.GetUtcNow();
         var defs = Definitions();
-        var rules = Rules();
+        var rules = Rules(use);
+        var seeders = MinimumSeeders(releases);
+        if (use != IndexerUse.InteractiveSearch && pendingReleases?.OldestForMovie(movie.Id) is { } pendingSince)
+        {
+            target = target with { PendingSince = pendingSince };
+        }
+
         var results = new List<Ranked>();
         var candidates = new List<(ReleaseInfo Info, ReleaseCandidate Candidate)>();
 
@@ -81,7 +91,7 @@ public sealed class ReleaseSearchService(
                 continue;
             }
 
-            candidates.Add((info, Candidate(info, parsed)));
+            candidates.Add((info, Candidate(info, parsed, seeders.GetValueOrDefault(info.IndexerId))));
         }
 
         foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules))
@@ -130,7 +140,8 @@ public sealed class ReleaseSearchService(
         var (releases, indexerCount, failures) = await QueryAllAsync(use, SeriesSearchCriteria.For(show, criteria, requested, seasonSearch), cancellationToken);
         var now = _time.GetUtcNow();
         var defs = Definitions();
-        var rules = Rules();
+        var rules = Rules(use);
+        var seeders = MinimumSeeders(releases);
         var results = new List<Ranked>();
         var groups = new Dictionary<string, (IReadOnlyList<Episode> Episodes, List<(ReleaseInfo Info, ReleaseCandidate Candidate)> Candidates)>();
 
@@ -165,13 +176,18 @@ public sealed class ReleaseSearchService(
                 groups[key] = group;
             }
 
-            group.Candidates.Add((info, Candidate(info, parsed)));
+            group.Candidates.Add((info, Candidate(info, parsed, seeders.GetValueOrDefault(info.IndexerId))));
         }
 
         foreach (var (episodes, candidates) in groups.Values)
         {
             var target = targets.ForEpisodes(show, episodes) with { Monitored = true };
             var ids = episodes.Select(e => e.Id).ToList();
+            if (use != IndexerUse.InteractiveSearch && pendingReleases?.OldestForEpisodes(show.Id, ids) is { } pendingSince)
+            {
+                target = target with { PendingSince = pendingSince };
+            }
+
             foreach (var decision in DecisionEngine.Evaluate(candidates.Select(c => c.Candidate), target, defs, now, rules))
             {
                 var info = candidates.First(c => ReferenceEquals(c.Candidate, decision.Candidate)).Info;
@@ -317,8 +333,25 @@ public sealed class ReleaseSearchService(
             title, originalTitle, alternatives, language, options?.SearchAlternativeTitles ?? true, seasonNumber);
     }
 
-    internal static ReleaseCandidate Candidate(ReleaseInfo info, ParsedRelease parsed) =>
-        new(parsed, info.Size, info.Indexer, info.IndexerPriority, info.PublishDate, info.DownloadUrl, info.Guid) { IndexerId = info.IndexerId };
+    /// <summary>
+    /// The decision engine's view of a release. Torrents carry protocol, seeders, peers and flags (freeleech, internal …,
+    /// for the "Indexer Flag" custom format condition) and the indexer's minimum seeders.
+    /// </summary>
+    internal static ReleaseCandidate Candidate(ReleaseInfo info, ParsedRelease parsed, int minimumSeeders = 0) =>
+        new(parsed, info.Size, info.Indexer, info.IndexerPriority, info.PublishDate, info.DownloadUrl, info.Guid)
+        {
+            IndexerId = info.IndexerId,
+            IndexerFlags = info.IndexerFlags,
+            Protocol = info.Protocol,
+            Seeders = info.Seeders,
+            Peers = info.Peers,
+            MinimumSeeders = minimumSeeders,
+        };
+
+    /// <summary>"Minimum seeders" of the torrent indexers among the results (one lookup per indexer, not per release).</summary>
+    private Dictionary<int, int> MinimumSeeders(IEnumerable<ReleaseInfo> releases) =>
+        releases.Where(r => r.Protocol == Core.Downloads.DownloadProtocol.Torrent).Select(r => r.IndexerId).Distinct()
+            .ToDictionary(id => id, id => indexers.Find(id)?.MinimumSeeders ?? 1);
 
     private static ReleaseDecision Decide(ReleaseInfo info, ParsedRelease parsed, IReadOnlyList<Rejection> rejections, SearchSubject subject, IReadOnlyList<int> episodeIds) =>
         new(info, parsed, new Decision(Candidate(info, parsed), rejections), subject, episodeIds);

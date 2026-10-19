@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="1.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <atom:link href="http://jackett.example:9117/" rel="self" type="application/rss+xml" />
+    <title>Example Tracker</title>
+    <description>Example Tracker is a fictional private tracker</description>
+    <link>https://tracker.example.org/</link>
+    <language>en-US</language>
+    <category>search</category>
+    <item>
+      <title>Some.Movie.2020.1080p.BluRay.x264-GRP</title>
+      <guid>https://tracker.example.org/details/1001</guid>
+      <jackettindexer id="exampletracker">Example Tracker</jackettindexer>
+      <type>private</type>
+      <comments>https://tracker.example.org/details/1001#comments</comments>
+      <pubDate>Fri, 16 Oct 2026 10:00:00 +0200</pubDate>
+      <size>8589934592</size>
+      <files>3</files>
+      <grabs>120</grabs>
+      <description />
+      <link>http://jackett.example:9117/dl/exampletracker/?jackett_apikey=abcd1234secret&amp;path=Q2ZESjhQ&amp;file=Some.Movie.2020.1080p.BluRay.x264-GRP</link>
+      <category>2000</category>
+      <category>2040</category>
+      <category>100001</category>
+      <enclosure url="http://jackett.example:9117/dl/exampletracker/?jackett_apikey=abcd1234secret&amp;path=Q2ZESjhQ&amp;file=Some.Movie.2020.1080p.BluRay.x264-GRP" length="8589934592" type="application/x-bittorrent" />
+      <torznab:attr name="category" value="2000" />
+      <torznab:attr name="category" value="2040" />
+      <torznab:attr name="category" value="100001" />
+      <torznab:attr name="genre" value="" />
+      <torznab:attr name="imdb" value="0133093" />
+      <torznab:attr name="imdbid" value="tt0133093" />
+      <torznab:attr name="tmdbid" value="603" />
+      <torznab:attr name="seeders" value="57" />
+      <torznab:attr name="peers" value="61" />
+      <torznab:attr name="infohash" value="9C1E8039DD32F16E7D82F60E20B7E522EF490757" />
+      <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:9C1E8039DD32F16E7D82F60E20B7E522EF490757&amp;dn=Some.Movie.2020.1080p.BluRay.x264-GRP&amp;tr=https%3A%2F%2Ftracker.example.org%2Fannounce" />
+      <torznab:attr name="minimumratio" value="1" />
+      <torznab:attr name="minimumseedtime" value="172800" />
+      <torznab:attr name="downloadvolumefactor" value="0" />
+      <torznab:attr name="uploadvolumefactor" value="1" />
+    </item>
+    <item>
+      <title>Some.Show.S01E02.1080p.WEB.h264-GRP</title>
+      <guid>magnet:?xt=urn:btih:QQIZAATI24QIJXDZRLNHKMQE2L3KQLBO&amp;dn=Some.Show.S01E02.1080p.WEB.h264-GRP</guid>
+      <jackettindexer id="publictracker">Public Tracker</jackettindexer>
+      <type>public</type>
+      <pubDate>Sat, 17 Oct 2026 08:30:00 +0000</pubDate>
+      <size>1288490188</size>
+      <link>magnet:?xt=urn:btih:QQIZAATI24QIJXDZRLNHKMQE2L3KQLBO&amp;dn=Some.Show.S01E02.1080p.WEB.h264-GRP</link>
+      <category>5040</category>
+      <enclosure url="magnet:?xt=urn:btih:QQIZAATI24QIJXDZRLNHKMQE2L3KQLBO&amp;dn=Some.Show.S01E02.1080p.WEB.h264-GRP" length="1288490188" type="application/x-bittorrent" />
+      <torznab:attr name="category" value="5040" />
+      <torznab:attr name="seeders" value="3" />
+      <torznab:attr name="leechers" value="9" />
+      <torznab:attr name="tag" value="internal" />
+      <torznab:attr name="tag" value="scene" />
+      <torznab:attr name="downloadvolumefactor" value="0.5" />
+      <torznab:attr name="uploadvolumefactor" value="2" />
+    </item>
+    <item>
+      <title>Another.Movie.2019.2160p.UHD.BluRay.x265-GRP</title>
+      <pubDate>Thu, 15 Oct 2026 18:00:00 +0000</pubDate>
+      <category>2045</category>
+      <torznab:attr name="category" value="2045" />
+      <torznab:attr name="infohash" value="bc5b34242f910d6a779f6daf4dcce89a478f3baa" />
+      <torznab:attr name="size" value="53687091200" />
+      <torznab:attr name="seeders" value="12" />
+    </item>
+    <item>
+      <title>Old.Movie.1999.720p.HDTV.x264-GRP</title>
+      <guid>https://tracker.example.org/details/1004</guid>
+      <pubDate>Mon, 12 Oct 2026 07:00:00 +0000</pubDate>
+      <link>https://tracker.example.org/download/1004.torrent</link>
+      <enclosure url="https://tracker.example.org/download/1004.torrent" type="application/x-bittorrent" />
+      <torznab:attr name="category" value="2030" />
+    </item>
+    <item>
+      <title></title>
+      <link>https://tracker.example.org/download/1005.torrent</link>
+    </item>
+    <item>
+      <title>Nothing.To.Download.2020.1080p.WEB-DL-GRP</title>
+      <guid>nothing-1006</guid>
+      <comments>https://tracker.example.org/details/1006</comments>
+    </item>
+  </channel>
+</rss>

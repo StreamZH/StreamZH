@@ -43,6 +43,31 @@ public sealed record DownloadRecord
 
     /// <summary>Tagged by duplicate detection.</summary>
     public bool Duplicate { get; init; }
+
+    /// <summary>0.11: Usenet rows belong to the built-in engine; torrent rows to a download client (<see cref="ClientId"/>).</summary>
+    public DownloadProtocol Protocol { get; init; } = DownloadProtocol.Usenet;
+
+    /// <summary>Torrent: the DownloadClients row.</summary>
+    public int? ClientId { get; init; }
+
+    /// <summary>Torrent: the info hash (hex, lower case).</summary>
+    public string? ExternalId { get; init; }
+
+    /// <summary>Torrent: done and still in the download client (seeding, or stopped but not removed yet).</summary>
+    public bool Seeding { get; init; }
+
+    public double? Ratio { get; init; }
+
+    public long UploadedBytes { get; init; }
+
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
+
+    /// <summary>Torrent: seed goals from the indexer (null = the client's own limits).</summary>
+    public double? SeedRatio { get; init; }
+
+    public int? SeedTimeMinutes { get; init; }
 }
 
 /// <summary>Which finished downloads by their import (see <see cref="DownloadRepository.History"/>).</summary>
@@ -103,7 +128,8 @@ public sealed class DownloadRepository(Database database)
     private const string Columns = """
         Id, Title, Category, Status, Priority, TotalBytes, DownloadedBytes, MissingArticles, Error, StatusMessage, Indexer,
         MediaType, MovieId, SeriesId, EpisodeIds, Password, NzbPath, WorkFolder, OutputPath, Added, Completed, SortOrder,
-        CategoryName, NzbHash, Duplicate
+        CategoryName, NzbHash, Duplicate, Protocol, ClientId, ExternalId, Seeding, Ratio, UploadedBytes, Seeders, Peers,
+        SeedRatio, SeedTimeMinutes
         """;
 
     private const string FileColumns = """
@@ -121,10 +147,12 @@ public sealed class DownloadRepository(Database database)
             """
             INSERT INTO Downloads (Title, Category, Status, Priority, TotalBytes, DownloadedBytes, MissingArticles, Error, StatusMessage, Indexer,
                 MediaType, MovieId, SeriesId, EpisodeIds, Password, NzbPath, WorkFolder, OutputPath, Added, Completed, SortOrder,
-                CategoryName, NzbHash, Duplicate)
+                CategoryName, NzbHash, Duplicate, Protocol, ClientId, ExternalId, Seeding, Ratio, UploadedBytes, Seeders, Peers,
+                SeedRatio, SeedTimeMinutes)
             VALUES (@Title, @Category, @Status, @Priority, @TotalBytes, @DownloadedBytes, @MissingArticles, @Error, @StatusMessage, @Indexer,
                     @MediaType, @MovieId, @SeriesId, @EpisodeIds, @Password, @NzbPath, @WorkFolder, @OutputPath, @Added, @Completed, @SortOrder,
-                    @CategoryName, @NzbHash, @Duplicate);
+                    @CategoryName, @NzbHash, @Duplicate, @Protocol, @ClientId, @ExternalId, @Seeding, @Ratio, @UploadedBytes, @Seeders, @Peers,
+                    @SeedRatio, @SeedTimeMinutes);
             SELECT last_insert_rowid();
             """,
             Parameters(stored),
@@ -191,14 +219,47 @@ public sealed class DownloadRepository(Database database)
         return connection.QuerySingleOrDefault<DownloadRow>($"SELECT {Columns} FROM Downloads WHERE Id = @id", new { id })?.ToRecord();
     }
 
-    /// <summary>Everything that is not completed or failed, in queue order.</summary>
+    /// <summary>Usenet downloads (the built-in engine's) that are not completed or failed, in queue order. Torrent rows are left out.</summary>
     public IReadOnlyList<DownloadRecord> Unfinished()
     {
         using var connection = database.Open();
         return [.. connection.Query<DownloadRow>(
-                $"SELECT {Columns} FROM Downloads WHERE Status NOT IN (@completed, @failed) ORDER BY Priority DESC, SortOrder, Id",
-                new { completed = (int)DownloadStatus.Completed, failed = (int)DownloadStatus.Failed })
+                $"SELECT {Columns} FROM Downloads WHERE Status NOT IN (@completed, @failed) AND Protocol = @usenet ORDER BY Priority DESC, SortOrder, Id",
+                new { completed = (int)DownloadStatus.Completed, failed = (int)DownloadStatus.Failed, usenet = (int)DownloadProtocol.Usenet })
             .Select(r => r.ToRecord())];
+    }
+
+    /// <summary>0.11: torrent downloads the tracker follows: unfinished ones, and finished ones still in their client (<see cref="DownloadRecord.Seeding"/>).</summary>
+    public IReadOnlyList<DownloadRecord> TrackedTorrents()
+    {
+        using var connection = database.Open();
+        return [.. connection.Query<DownloadRow>(
+                $"SELECT {Columns} FROM Downloads WHERE Protocol = @torrent AND (Status NOT IN (@completed, @failed) OR Seeding = 1) ORDER BY Priority DESC, SortOrder, Id",
+                new { completed = (int)DownloadStatus.Completed, failed = (int)DownloadStatus.Failed, torrent = (int)DownloadProtocol.Torrent })
+            .Select(r => r.ToRecord())];
+    }
+
+    /// <summary>The newest torrent row of a client with this info hash.</summary>
+    public DownloadRecord? FindTorrent(int clientId, string hash)
+    {
+        using var connection = database.Open();
+        return connection.QueryFirstOrDefault<DownloadRow>(
+            $"SELECT {Columns} FROM Downloads WHERE Protocol = @torrent AND ClientId = @clientId AND ExternalId = @hash COLLATE NOCASE ORDER BY Id DESC",
+            new { torrent = (int)DownloadProtocol.Torrent, clientId, hash })?.ToRecord();
+    }
+
+    /// <summary>Saves what the torrent tracker learns from the client (state, sizes, seeding, ratio, peers, output path).</summary>
+    public void UpdateTorrent(DownloadRecord download)
+    {
+        using var connection = database.Open();
+        connection.Execute(
+            """
+            UPDATE Downloads SET Title = @Title, Status = @Status, TotalBytes = @TotalBytes, DownloadedBytes = @DownloadedBytes, Error = @Error,
+                StatusMessage = @StatusMessage, OutputPath = @OutputPath, Completed = @Completed, Seeding = @Seeding, Ratio = @Ratio,
+                UploadedBytes = @UploadedBytes, Seeders = @Seeders, Peers = @Peers
+            WHERE Id = @Id AND Protocol = @Protocol
+            """,
+            Parameters(download));
     }
 
     /// <summary>Completed downloads that belong to a movie or series (candidates for the import).</summary>
@@ -343,6 +404,16 @@ public sealed class DownloadRepository(Database database)
         d.CategoryName,
         d.NzbHash,
         d.Duplicate,
+        Protocol = (int)d.Protocol,
+        d.ClientId,
+        d.ExternalId,
+        d.Seeding,
+        d.Ratio,
+        d.UploadedBytes,
+        d.Seeders,
+        d.Peers,
+        d.SeedRatio,
+        d.SeedTimeMinutes,
     };
 
     private sealed class DownloadRow
@@ -372,6 +443,16 @@ public sealed class DownloadRepository(Database database)
         public string? CategoryName { get; init; }
         public string? NzbHash { get; init; }
         public bool Duplicate { get; init; }
+        public long Protocol { get; init; } = 1;
+        public long? ClientId { get; init; }
+        public string? ExternalId { get; init; }
+        public bool Seeding { get; init; }
+        public double? Ratio { get; init; }
+        public long UploadedBytes { get; init; }
+        public long? Seeders { get; init; }
+        public long? Peers { get; init; }
+        public double? SeedRatio { get; init; }
+        public long? SeedTimeMinutes { get; init; }
 
         public DownloadRecord ToRecord() => new()
         {
@@ -402,6 +483,16 @@ public sealed class DownloadRepository(Database database)
             CategoryName = CategoryName,
             NzbHash = NzbHash,
             Duplicate = Duplicate,
+            Protocol = Protocol == (long)DownloadProtocol.Torrent ? DownloadProtocol.Torrent : DownloadProtocol.Usenet,
+            ClientId = ClientId is { } client ? (int)client : null,
+            ExternalId = ExternalId,
+            Seeding = Seeding,
+            Ratio = Ratio,
+            UploadedBytes = UploadedBytes,
+            Seeders = Seeders is { } seeders ? (int)seeders : null,
+            Peers = Peers is { } peers ? (int)peers : null,
+            SeedRatio = SeedRatio,
+            SeedTimeMinutes = SeedTimeMinutes is { } minutes ? (int)minutes : null,
         };
     }
 

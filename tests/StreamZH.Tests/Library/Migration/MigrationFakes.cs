@@ -167,6 +167,11 @@ public sealed class StubArr(string app) : HttpMessageHandler
 
     public string? IndexerJson { get; set; }
 
+    /// <summary>0.11: /downloadclient and /remotepathmapping answers (null = the defaults).</summary>
+    public string? DownloadClientJson { get; set; }
+
+    public string RemotePathMappingJson { get; set; } = "[]";
+
     public static string RadarrIndexers => """
         [
           {
@@ -211,7 +216,12 @@ public sealed class StubArr(string app) : HttpMessageHandler
           {
             "enableRss": true, "enableAutomaticSearch": true, "enableInteractiveSearch": true, "protocol": "torrent", "priority": 25,
             "name": "Some Torznab",
-            "fields": [ { "name": "baseUrl", "value": "https://torznab.example" }, { "name": "apiKey", "value": "********" }, { "name": "seedCriteria.seedRatio" } ],
+            "fields": [
+              { "name": "baseUrl", "value": "https://torznab.example/api/v2.0/indexers/tracker/results/torznab/" }, { "name": "apiPath", "value": "/api" },
+              { "name": "apiKey", "value": "********" }, { "name": "categories", "value": [2000, 2040] }, { "name": "minimumSeeders", "value": 3 },
+              { "name": "seedCriteria.seedRatio", "value": 1.5 }, { "name": "seedCriteria.seedTime", "value": 4320 }, { "name": "seedCriteria.seasonPackSeedTime" },
+              { "name": "rejectBlocklistedTorrentHashesWhileGrabbing", "value": false }
+            ],
             "implementation": "Torznab", "tags": [], "id": 4
           },
           {
@@ -280,7 +290,8 @@ public sealed class StubArr(string app) : HttpMessageHandler
         {
             "/api/v3/system/status" => $$"""{"appName": "{{App}}", "instanceName": "{{App}}", "version": "{{(App == "Sonarr" ? "4.0.15.2941" : "5.26.2.10099")}}"}""",
             "/api/v3/indexer" => IndexerJson ?? (App == "Sonarr" ? SonarrIndexers : RadarrIndexers),
-            "/api/v3/downloadclient" => App == "Sonarr" ? RadarrClients.Replace("movieCategory", "tvCategory", StringComparison.Ordinal).Replace("\"movies\"", "\"tv\"", StringComparison.Ordinal) : RadarrClients,
+            "/api/v3/remotepathmapping" => RemotePathMappingJson,
+            "/api/v3/downloadclient" => DownloadClientJson ?? (App == "Sonarr" ? RadarrClients.Replace("movieCategory", "tvCategory", StringComparison.Ordinal).Replace("\"movies\"", "\"tv\"", StringComparison.Ordinal) : RadarrClients),
             _ => null,
         };
         return Task.FromResult(body is null

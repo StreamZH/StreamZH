@@ -1,4 +1,4 @@
-import { genericDefinitionKey, type Indexer, type IndexerDefinition, type IndexerStatus } from '../api/indexers'
+import { isGenericDefinition, type Indexer, type IndexerDefinition, type IndexerStatus } from '../api/indexers'
 
 export function hostOf(url: string) {
   try {
@@ -79,7 +79,8 @@ function presetCategories(definition: IndexerDefinition, base: number, defaults:
 
 /** New indexer prefilled from a catalog entry, on top of the server's schema defaults. */
 export function draftFromDefinition(schema: Indexer, definition: IndexerDefinition): Indexer {
-  const generic = definition.key === genericDefinitionKey
+  const generic = isGenericDefinition(definition.key)
+  const torrent = definition.protocol === 'torrent'
   return {
     ...schema,
     id: 0,
@@ -91,6 +92,8 @@ export function draftFromDefinition(schema: Indexer, definition: IndexerDefiniti
     categories: generic ? schema.categories : presetCategories(definition, 2000, schema.categories),
     tvCategories: generic ? schema.tvCategories : presetCategories(definition, 5000, schema.tvCategories),
     status: null,
+    protocol: torrent ? 'torrent' : 'usenet',
+    minimumSeeders: schema.minimumSeeders ?? 1,
   }
 }
 

@@ -572,7 +572,7 @@ public sealed class DownloadEngine(
             return DownloadActionResult.NotFound;
         }
 
-        if (record.Status != DownloadStatus.Failed)
+        if (record.Status != DownloadStatus.Failed || record.Protocol != DownloadProtocol.Usenet)
         {
             return DownloadActionResult.Invalid;
         }
@@ -732,8 +732,13 @@ public sealed class DownloadEngine(
         }
 
         repository.Delete(id);
-        TryDelete(() => File.Delete(nzbPath));
-        if (deleteFiles && Directory.Exists(workFolder))
+        // Torrent rows (0.11) have neither an NZB nor a work folder of the engine.
+        if (nzbPath.Length > 0)
+        {
+            TryDelete(() => File.Delete(nzbPath));
+        }
+
+        if (deleteFiles && workFolder.Length > 0 && Directory.Exists(workFolder))
         {
             TryDelete(() => Directory.Delete(workFolder, recursive: true));
         }
@@ -1808,6 +1813,12 @@ public sealed class DownloadEngine(
             var entry = candidates[i];
             if ((keep > 0 && i >= keep) || (days > 0 && (entry.Completed ?? entry.Added) < cutoff))
             {
+                // 0.11: a torrent still in its client stays until its seed goal removes it (the tracker follows it by this row).
+                if (repository.Find(entry.Id) is { Seeding: true })
+                {
+                    continue;
+                }
+
                 if (await DeleteAsync(entry.Id, deleteFiles: entry.Status == DownloadStatus.Failed) == DownloadActionResult.Ok)
                 {
                     removed++;
@@ -2091,6 +2102,14 @@ public sealed class DownloadEngine(
         Completed = r.Completed is { } c ? new DateTimeOffset(c, TimeSpan.Zero) : null,
         CategoryName = r.CategoryName ?? DownloadCategoryService.DefaultName(r.Category),
         Duplicate = r.Duplicate,
+        Protocol = r.Protocol,
+        ClientId = r.ClientId,
+        ExternalId = r.ExternalId,
+        Seeding = r.Seeding,
+        Ratio = r.Ratio,
+        UploadedBytes = r.UploadedBytes,
+        Seeders = r.Seeders,
+        Peers = r.Peers,
     };
 
     private static NzbDocument ParseNzb(byte[]? content)

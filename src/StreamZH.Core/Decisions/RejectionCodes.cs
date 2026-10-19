@@ -81,4 +81,12 @@ public static class RejectionCodes
 
     /// <summary>A pack of several seasons (S01-S03).</summary>
     public const string MultiSeason = "MultiSeason";
+
+    // Torrents (0.11).
+
+    /// <summary>Fewer seeders than the indexer's minimum (Radarr's MinimumSeeders).</summary>
+    public const string MinimumSeeders = "MinimumSeeders";
+
+    /// <summary>The protocol delay has not passed yet; temporary, the release waits as pending (Radarr's MinimumAgeDelay).</summary>
+    public const string MinimumAgeDelay = "MinimumAgeDelay";
 }

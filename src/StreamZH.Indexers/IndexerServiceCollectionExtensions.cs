@@ -36,7 +36,8 @@ public static class IndexerServiceCollectionExtensions
                 client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", $"{AppInfo.Name}/{AppInfo.Version}");
                 configure?.Invoke(client);
             })
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
+            // Redirects are followed by the client itself, so a redirect to a magnet link (Torznab) can be recognised.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All, AllowAutoRedirect = false });
 
         return services;
     }

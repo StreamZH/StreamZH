@@ -79,7 +79,7 @@ export const sectionLinks: Record<string, { to: string; label: string }> = {
   qualityProfiles: { to: '/settings/profiles', label: 'Profiles' },
   releaseProfiles: { to: '/settings/indexers', label: 'Indexer settings' },
   indexers: { to: '/indexers', label: 'Indexers' },
-  downloadClients: { to: '/settings/usenet', label: 'Usenet servers' },
+  downloadClients: { to: '/settings/downloadclients', label: 'Download clients' },
   servers: { to: '/settings/usenet', label: 'Usenet servers' },
   categories: { to: '/settings/downloads', label: 'Downloads' },
   general: { to: '/settings/downloads', label: 'Downloads' },

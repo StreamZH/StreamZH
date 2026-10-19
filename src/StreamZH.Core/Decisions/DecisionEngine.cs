@@ -26,12 +26,14 @@ public static class DecisionEngine
         new MaximumSizeSpecification(),
         new MinimumAgeSpecification(),
         new RetentionSpecification(),
+        new TorrentSeedingSpecification(),
         new NotSampleSpecification(),
         new HardcodedSubsSpecification(),
         new ReleaseProfileSpecification(),
         new CustomFormatScoreSpecification(),
         new BlocklistSpecification(),
         new UpgradeSpecification(),
+        new DelaySpecification(),
     ];
 
     /// <summary>Accepted decisions first, ranked best-first; rejected ones after (in the same ranking), each with all reasons.</summary>

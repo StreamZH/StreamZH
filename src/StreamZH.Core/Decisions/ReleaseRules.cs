@@ -3,7 +3,24 @@
 // Portions based on Radarr (https://github.com/Radarr/Radarr) and Sonarr (https://github.com/Sonarr/Sonarr), Copyright (c) their contributors, GPL-3.0.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Text.Json.Serialization;
+using StreamZH.Core.Downloads;
+
 namespace StreamZH.Core.Decisions;
+
+/// <summary>0.11: which protocol ranks first when quality and scores are equal (Radarr's delay profile "Preferred protocol").</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<ProtocolPreference>))]
+public enum ProtocolPreference
+{
+    [JsonStringEnumMemberName("usenet")]
+    Usenet,
+
+    [JsonStringEnumMemberName("torrent")]
+    Torrent,
+
+    [JsonStringEnumMemberName("noPreference")]
+    NoPreference,
+}
 
 /// <summary>
 /// Release rules for all indexers (Settings → Indexers, like Radarr's "Indexers → Options" plus Sonarr's release
@@ -31,4 +48,29 @@ public sealed record ReleaseRules
 
     /// <summary>Must contain, must not contain and preferred terms (only enabled profiles are used).</summary>
     public IReadOnlyList<ReleaseProfile> ReleaseProfiles { get; init; } = [];
+
+    /// <summary>0.11: ranks releases of this protocol first when quality and scores are equal (default Usenet, like Radarr).</summary>
+    public ProtocolPreference PreferredProtocol { get; init; } = ProtocolPreference.Usenet;
+
+    /// <summary>0.11: automatic grabs of Usenet releases wait until they are this many minutes old (0 = at once).</summary>
+    public int UsenetDelayMinutes { get; init; }
+
+    /// <summary>0.11: automatic grabs of torrents wait until they are this many minutes old (0 = at once).</summary>
+    public int TorrentDelayMinutes { get; init; }
+
+    /// <summary>A release of the preferred protocol in the profile's best allowed quality is not delayed (Radarr's default).</summary>
+    public bool BypassDelayIfHighestQuality { get; init; } = true;
+
+    /// <summary>The delay of a protocol in minutes.</summary>
+    public int DelayFor(DownloadProtocol protocol) => protocol == DownloadProtocol.Torrent ? TorrentDelayMinutes : UsenetDelayMinutes;
+
+    public bool IsPreferred(DownloadProtocol protocol) => PreferredProtocol switch
+    {
+        ProtocolPreference.Usenet => protocol == DownloadProtocol.Usenet,
+        ProtocolPreference.Torrent => protocol == DownloadProtocol.Torrent,
+        _ => false,
+    };
+
+    /// <summary>The same rules without delays: searches started by the user are never held back (Radarr's UserInvokedSearch).</summary>
+    public ReleaseRules WithoutDelays() => UsenetDelayMinutes == 0 && TorrentDelayMinutes == 0 ? this : this with { UsenetDelayMinutes = 0, TorrentDelayMinutes = 0 };
 }

@@ -4,6 +4,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using StreamZH.Core.CustomFormats;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
 using StreamZH.Core.Jobs;
 using StreamZH.Core.Quality;
@@ -150,6 +151,17 @@ public static class ReleaseEndpoints
             return Results.Accepted(value: new CommandResponse(name, queued, jobs.Status));
         });
 
+        // 0.11: releases waiting for the protocol delay (Settings → Indexers), like Radarr's "Pending" queue items.
+        var pending = app.MapGroup("/api/v1/release/pending").WithTags("Release").RequireAuthorization();
+        pending.MapGet("/", (PendingReleaseService store, IndexerOptions options) =>
+        {
+            var values = options.Values;
+            return store.All().Select(p => PendingReleaseResource.From(p, values.UsenetDelay, values.TorrentDelay));
+        });
+        pending.MapDelete("/{id}", (string id, PendingReleaseService store) =>
+            store.Remove(id) ? Results.NoContent() : Results.NotFound())
+            .RequireAuthorization(AuthSchemes.AdminPolicy);
+
         return app;
     }
 
@@ -219,6 +231,29 @@ public sealed record ReleaseResource(
 
     public int CustomFormatScore { get; init; }
 
+    /// <summary>0.11: "usenet" or "torrent".</summary>
+    public DownloadProtocol Protocol { get; init; } = DownloadProtocol.Usenet;
+
+    /// <summary>Torrent only: seeders and peers (seeders + leechers) as the indexer reports them; null when unknown.</summary>
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
+
+    /// <summary>Radarr's indexer flag bits and their names ("freeleech", "halfleech", "doubleUpload", "internal", "scene", …).</summary>
+    public int IndexerFlags { get; init; }
+
+    public IReadOnlyList<string> Flags { get; init; } = [];
+
+    /// <summary>Torrent only: 0 = freeleech, 1 = normal; null when the indexer does not say.</summary>
+    public double? DownloadVolumeFactor { get; init; }
+
+    public double? UploadVolumeFactor { get; init; }
+
+    /// <summary>Torrent only: the tracker's minimum ratio and seed time (seconds), when the feed names them.</summary>
+    public double? MinimumRatio { get; init; }
+
+    public long? MinimumSeedTime { get; init; }
+
     public static ReleaseResource From(ReleaseDecision d, int rank, DateTimeOffset now)
     {
         var parsed = d.Parsed;
@@ -249,6 +284,50 @@ public sealed record ReleaseResource(
         {
             CustomFormats = CustomFormatRefResource.From(d.Decision.CustomFormats),
             CustomFormatScore = d.Decision.CustomFormatScore,
+            Protocol = d.Release.Protocol,
+            Seeders = d.Release.Seeders,
+            Peers = d.Release.Peers,
+            IndexerFlags = d.Release.IndexerFlags,
+            Flags = IndexerFlagBits.ToNames(d.Release.IndexerFlags),
+            DownloadVolumeFactor = d.Release.DownloadVolumeFactor,
+            UploadVolumeFactor = d.Release.UploadVolumeFactor,
+            MinimumRatio = d.Release.MinimumRatio,
+            MinimumSeedTime = d.Release.MinimumSeedTimeSeconds,
         };
+    }
+}
+
+/// <summary>
+/// A release waiting for its protocol delay. <see cref="ReleaseAfter"/> is when the delay has passed (publish date +
+/// delay); the next RSS sync or "Process pending releases" run after that grabs the best waiting release.
+/// </summary>
+public sealed record PendingReleaseResource(
+    string Id,
+    StreamZH.Core.Media.MediaType MediaType,
+    int? MovieId,
+    int? SeriesId,
+    IReadOnlyList<int> EpisodeIds,
+    string Subject,
+    string Title,
+    int IndexerId,
+    string Indexer,
+    DownloadProtocol Protocol,
+    long Size,
+    int? Seeders,
+    int? Peers,
+    IReadOnlyList<string> Flags,
+    DateTimeOffset PublishDate,
+    DateTimeOffset Added,
+    DateTimeOffset? ReleaseAfter,
+    string Reason)
+{
+    public static PendingReleaseResource From(PendingRelease p, int usenetDelay, int torrentDelay)
+    {
+        var release = p.Release;
+        var delay = release.Protocol == DownloadProtocol.Torrent ? torrentDelay : usenetDelay;
+        return new(
+            p.Id, p.MediaType, p.MovieId, p.SeriesId, p.EpisodeIds, p.Subject, release.Title, release.IndexerId, release.Indexer, release.Protocol,
+            release.Size, release.Seeders, release.Peers, IndexerFlagBits.ToNames(release.IndexerFlags), release.PublishDate, p.Added,
+            release.PublishDate == default ? null : release.PublishDate.AddMinutes(delay), p.Reason);
     }
 }

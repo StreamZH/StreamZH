@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import {
   genericDefinitionKey,
+  genericTorznabKey,
   indexerKeys,
+  isGenericDefinition,
   indexersApi,
   standardCategoryNames,
   topCategories,
@@ -78,9 +80,11 @@ export default function Catalog({
     })
     const byName = (a: IndexerDefinition, b: IndexerDefinition) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
     return list.sort((a, b) => {
-      // Generic Newznab stays on top: it is the fallback for any indexer not in the list.
-      if (a.key === genericDefinitionKey) return -1
-      if (b.key === genericDefinitionKey) return 1
+      // Generic Newznab and Generic Torznab stay on top: they are the fallback for any indexer not in the list.
+      const genericA = isGenericDefinition(a.key)
+      const genericB = isGenericDefinition(b.key)
+      if (genericA && genericB) return a.key === genericDefinitionKey ? -1 : 1
+      if (genericA || genericB) return genericA ? -1 : 1
       // Supported entries before the ones that arrive later (torrent in 1.0).
       if (a.supported !== b.supported) return a.supported ? -1 : 1
       const primary = sort.key === 'name' ? byName(a, b) : compare(a, b, sort.key) || byName(a, b)
@@ -90,6 +94,7 @@ export default function Catalog({
 
   const filtered = search !== '' || protocols.length + languages.length + privacy.length + categories.length > 0
   const generic = all.find((d) => d.key === genericDefinitionKey)
+  const torznab = all.find((d) => d.key === genericTorznabKey)
 
   const resetFilters = () => {
     setSearch('')
@@ -181,13 +186,21 @@ export default function Catalog({
       </div>
 
       <p className={styles.note}>
-        StreamZH supports any Usenet indexer with the Newznab standard: pick yours below or use{' '}
+        StreamZH supports any Usenet indexer with the Newznab standard and any torrent indexer with a Torznab feed: pick yours below or use{' '}
         {generic ? (
           <button type="button" className={styles.inlineLink} onClick={() => onSelect(generic)}>
             Generic Newznab
           </button>
         ) : (
           'Generic Newznab'
+        )}{' '}
+        or{' '}
+        {torznab ? (
+          <button type="button" className={styles.inlineLink} onClick={() => onSelect(torznab)}>
+            Generic Torznab
+          </button>
+        ) : (
+          'Generic Torznab'
         )}
         .
       </p>
@@ -225,7 +238,7 @@ export default function Catalog({
           </thead>
           <tbody>
             {shown.map((d) => {
-              const isAdded = d.key !== genericDefinitionKey && added.has(d.key)
+              const isAdded = !isGenericDefinition(d.key) && added.has(d.key)
               return (
                 <tr
                   key={d.key}

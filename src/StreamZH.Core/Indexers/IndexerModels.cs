@@ -20,7 +20,7 @@ public enum IndexerUse
     InteractiveSearch,
 }
 
-/// <summary>A configured indexer. Only Newznab (Usenet) for now; Torznab follows in 1.0.</summary>
+/// <summary>A configured indexer: Newznab (Usenet) or, since 0.11, Torznab (torrents; same API, torrent attributes in the feed).</summary>
 /// <param name="BaseUrl">e.g. "https://indexer.example" or a Prowlarr proxy "http://prowlarr:9696/5".</param>
 /// <param name="ApiPath">Usually "/api".</param>
 /// <param name="Categories">Newznab categories to search for movies (2000 range).</param>
@@ -139,7 +139,6 @@ public sealed record ReleaseInfo
     public int TvdbId { get; init; }
     public string? ImdbId { get; init; }
 
-    /// <summary>Age in days at <paramref name="now"/>.</summary>
     /// <summary>0.11: Usenet (NZB) or Torrent (Torznab).</summary>
     public Downloads.DownloadProtocol Protocol { get; init; } = Downloads.DownloadProtocol.Usenet;
 
@@ -164,9 +163,10 @@ public sealed record ReleaseInfo
 
     public long? MinimumSeedTimeSeconds { get; init; }
 
-    /// <summary>Radarr/Sonarr IndexerFlags bits (G_Freeleech 1, G_Halfleech 2, G_DoubleUpload 4, PTP_Golden 8, PTP_Approved 16, G_Internal 32, G_Scene 128, G_Freeleech75 256, G_Freeleech25 512, Nuked 2048 …).</summary>
+    /// <summary>Radarr's IndexerFlags bits (see <see cref="IndexerFlagBits"/>: G_Freeleech 1, G_Halfleech 2, G_DoubleUpload 4, PTP_Golden 8, PTP_Approved 16, G_Internal 32, G_Scene 128, G_Freeleech75 256, G_Freeleech25 512, Nuked 2048).</summary>
     public int IndexerFlags { get; init; }
 
+    /// <summary>Age in days at <paramref name="now"/>.</summary>
     public double AgeDays(DateTimeOffset now) => Math.Max(0, (now - PublishDate).TotalDays);
 }
 

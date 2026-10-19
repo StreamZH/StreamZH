@@ -1,0 +1,625 @@
+/* Settings → Download clients (CloudZH cards with hover lift, settings rows, tables) — tokens only. */
+.spacer {
+  flex: 1;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Monogram ---- */
+.mark {
+  --tone: var(--fg-2);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+
+.markAccent {
+  --tone: var(--accent);
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+.markInfo {
+  --tone: var(--info);
+}
+
+.markWarn {
+  --tone: var(--orange);
+}
+
+.markOk {
+  --tone: var(--ok);
+}
+
+.markMuted {
+  --tone: var(--muted);
+}
+
+/* ---- Usenet row ---- */
+.usenet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 4px 0 2px;
+}
+
+.usenetText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.usenetName {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.usenetSub {
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.usenetLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- Client cards ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 12px;
+  margin: 6px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+
+.grid > li {
+  display: flex;
+  min-width: 0;
+  animation: global(rise) 0.25s var(--ease) backwards;
+}
+
+.grid > li:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.grid > li:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+}
+
+.card.disabled .cardMain {
+  opacity: 0.6;
+}
+
+.card.failing {
+  border-color: color-mix(in srgb, var(--err) 45%, var(--line));
+  background: color-mix(in srgb, var(--err-soft) 45%, var(--surface));
+}
+
+.cardMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  font: inherit;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  border-radius: 12px 12px 0 0;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.cardMain:focus-visible,
+.addCard:focus-visible,
+.typeCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cardTitle {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.cardName {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardType {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cardFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  color: var(--fg-2);
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.fact > svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.factText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.cardError {
+  font-size: 12.5px;
+  color: var(--err);
+  overflow-wrap: anywhere;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.addCard {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 132px;
+  padding: 14px 16px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg-2);
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.addCard:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.addCard:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.plus {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: var(--sunk);
+}
+
+.empty p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--fg-2);
+}
+
+.empty b {
+  color: var(--fg);
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- Implementation picker ---- */
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.typeGrid > li {
+  display: flex;
+  animation: global(rise) 0.25s var(--ease) backwards;
+}
+
+.typeCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s;
+}
+
+.typeCard:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.typeCard:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.typeBuiltIn {
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.typeHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.typeName {
+  flex: 1;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.typeText {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.pickerNote {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---- Client form ---- */
+.formSub {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.formSub a {
+  color: var(--accent);
+}
+
+.testMsg {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.testMsg > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.testOk {
+  color: var(--ok);
+}
+
+.withUnit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unit {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.select {
+  max-width: 320px;
+}
+
+.pathRow {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pathRow > input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Engine ---- */
+.engineState {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 13px;
+}
+
+.engineFacts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.engineLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.engineLine > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.engineProblem,
+.engineWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.engineProblem {
+  color: var(--err);
+  background: var(--err-soft);
+}
+
+.engineWarn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.engineProblem > svg,
+.engineWarn > svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.sectionNote {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---- Remote path mappings ---- */
+.tableWrap {
+  overflow-x: auto;
+  margin: 2px -4px 0;
+}
+
+.mappingTable {
+  min-width: 520px;
+}
+
+.mappingTable td {
+  overflow-wrap: anywhere;
+}
+
+.mappingTable td.arrow {
+  width: 22px;
+  padding-left: 0;
+  padding-right: 0;
+  color: var(--muted);
+}
+
+.rowActions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.inlineConfirm {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.dangerIcon:hover:not(:disabled) {
+  color: var(--err);
+}
+
+.mappingForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: min(520px, 100%);
+}
+
+.inputError,
+.inputError:focus {
+  border-color: var(--err);
+}
+
+.fieldError {
+  color: var(--err);
+}
+
+.okText {
+  color: var(--ok);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .usenetLinks {
+    width: 100%;
+  }
+
+  .pathRow {
+    flex-wrap: wrap;
+  }
+
+  .mappingTable {
+    min-width: 0;
+  }
+
+  .mappingTable thead {
+    display: none;
+  }
+
+  .mappingTable tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mappingTable tr:last-child {
+    border-bottom: 0;
+  }
+
+  .mappingTable td {
+    padding: 0;
+    border: 0;
+  }
+
+  .mappingTable td.arrow {
+    display: none;
+  }
+
+  .mappingTable td[data-label]::before {
+    content: attr(data-label) ': ';
+    font-family: var(--font-body);
+    color: var(--muted);
+  }
+
+  .mappingTable td:not(.rowActions) {
+    grid-column: 1;
+  }
+
+  .rowActions {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+  }
+}

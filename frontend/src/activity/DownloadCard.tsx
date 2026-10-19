@@ -1,6 +1,9 @@
 import { Link } from 'react-router'
 import { downloadPriorities, type DownloadItem } from '../api/downloads'
 import Icon from '../components/Icon'
+import { Peers } from '../downloadClients/torrent'
+import { ClientChip, SeedingPill, SeedStats } from '../downloadClients/TorrentActivity'
+import { clientNameOf, isTorrent } from '../downloadClients/torrentFormat'
 import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
 import { formatSpeed, joinParts, relativeTime } from '../status/format'
@@ -54,6 +57,8 @@ export default function DownloadCard({
   const barValue = post ? (item.stepProgress ?? 0) : item.progress
   const priority = downloadPriorities.find((p) => p.value === item.priority)
   const left = item.status === 'downloading' && item.speedBps > 0 ? formatLeft(item.etaSeconds) : ''
+  // 0.11: torrents run in a torrent client; it cannot pause or reprioritise through StreamZH, only remove.
+  const torrent = isTorrent(item)
 
   return (
     <article className={styles.row} data-status={item.status} aria-label={item.title}>
@@ -64,6 +69,7 @@ export default function DownloadCard({
           </h3>
           <div className={styles.meta}>
             <span className={`${ui.tag} ${styles.cat} ${styles[`cat_${item.category}`]}`}>{categoryLabels[item.category]}</span>
+            {torrent && <ClientChip item={item} />}
             {media && (
               <Link className={styles.mediaLink} to={media.to}>
                 {media.label}
@@ -73,15 +79,19 @@ export default function DownloadCard({
           </div>
         </div>
 
-        <span className={`${ui.pill} ${pillTone[item.status]} ${styles.statusPill}`}>
-          {item.status === 'downloading' && <span className={styles.liveDot} aria-hidden="true" />}
-          {statusLabels[item.status]}
-          {post && <span className={ui.num}>{precisePercent(item.stepProgress)}</span>}
-        </span>
+        {torrent && item.seeding ? (
+          <SeedingPill className={styles.statusPill} />
+        ) : (
+          <span className={`${ui.pill} ${pillTone[item.status]} ${styles.statusPill}`}>
+            {item.status === 'downloading' && <span className={styles.liveDot} aria-hidden="true" />}
+            {statusLabels[item.status]}
+            {post && <span className={ui.num}>{precisePercent(item.stepProgress)}</span>}
+          </span>
+        )}
 
         {actions && (
           <div className={styles.actions}>
-            {item.status !== 'failed' && (
+            {item.status !== 'failed' && !torrent && (
               <label className={styles.priority} title="Priority: higher runs first">
                 <span className={styles.srOnly}>Priority of {item.title}</span>
                 <select
@@ -99,7 +109,7 @@ export default function DownloadCard({
                 </select>
               </label>
             )}
-            {item.status === 'failed' ? (
+            {torrent ? null : item.status === 'failed' ? (
               <button type="button" className={`${ui.ghost} ${ui.icon} ${ui.sm}`} onClick={() => actions.retry(item.id)} disabled={busy} title="Retry" aria-label={`Retry ${item.title}`}>
                 <Icon name="restart" size={16} />
               </button>
@@ -124,8 +134,8 @@ export default function DownloadCard({
               className={`${ui.ghost} ${ui.icon} ${ui.sm} ${styles.dangerIcon}`}
               onClick={() => actions.remove(item)}
               disabled={busy}
-              title="Remove"
-              aria-label={`Remove ${item.title}`}
+              title={torrent ? 'Remove from client' : 'Remove'}
+              aria-label={`${torrent ? 'Remove from client' : 'Remove'} ${item.title}`}
             >
               <Icon name="trash" size={16} />
             </button>
@@ -165,10 +175,17 @@ export default function DownloadCard({
               )}
             </>
           ) : (
-            <span>Waiting for connections</span>
+            <span>{torrent ? 'Looking for peers' : 'Waiting for connections'}</span>
           ))}
-        {item.status === 'queued' && <span>Waiting for a free slot</span>}
-        <PipelineStrip item={item} />
+        {torrent && (item.status === 'downloading' || item.status === 'queued' || item.status === 'paused') && (item.seeders != null || item.peers != null) && (
+          <span title="Seeders / peers in the swarm">
+            <Icon name="users" size={13} />
+            <Peers seeders={item.seeders} peers={item.peers} />
+          </span>
+        )}
+        {torrent && (item.seeding || (item.uploadedBytes ?? 0) > 0) && <SeedStats item={item} />}
+        {item.status === 'queued' && <span>{torrent ? `Queued in ${clientNameOf(item) ?? 'the client'}` : 'Waiting for a free slot'}</span>}
+        {!torrent && <PipelineStrip item={item} />}
       </div>
 
       {(item.missingArticles > 0 || item.statusMessage || item.error) && (

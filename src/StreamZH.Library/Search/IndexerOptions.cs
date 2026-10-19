@@ -28,7 +28,10 @@ public enum MinimumAvailability
     Released,
 }
 
-/// <summary>All values of Settings → Indexers (options and automation). Sizes in MB, ages in minutes or days.</summary>
+/// <summary>
+/// All values of Settings → Indexers (options and automation). Sizes in MB, ages in minutes or days. 0.11: preferred
+/// protocol and the delays (minutes) for automatic grabs of Usenet releases and torrents (Radarr's delay profile).
+/// </summary>
 public sealed record IndexerOptionValues(
     int MinimumAge,
     int Retention,
@@ -40,7 +43,11 @@ public sealed record IndexerOptionValues(
     int RssSyncInterval,
     int MissingSearchInterval,
     bool SearchOnAdd,
-    bool SearchAlternativeTitles = true);
+    bool SearchAlternativeTitles = true,
+    ProtocolPreference PreferredProtocol = ProtocolPreference.Usenet,
+    int UsenetDelay = 0,
+    int TorrentDelay = 0,
+    bool BypassDelayIfHighestQuality = true);
 
 /// <summary>
 /// Settings → Indexers: release rules for all indexers (Radarr's "Indexers → Options"), release profiles, RSS sync and
@@ -52,6 +59,9 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
     public const int MaxRetention = 100_000;
     public const int MaxMaximumSize = 10_000_000;
     public const int MaxAvailabilityDelay = 365;
+
+    /// <summary>Protocol delays in minutes: 0 to one week (pending releases are kept for two weeks).</summary>
+    public const int MaxProtocolDelay = 10_080;
 
     /// <summary>RSS sync interval in minutes: 0 (off) or 10 to 120 like Radarr/Sonarr. Default 60 (Radarr's default).</summary>
     public const int DefaultRssSyncInterval = 60;
@@ -76,7 +86,11 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         RssSyncInterval: DefaultRssSyncInterval,
         MissingSearchInterval: 0,
         SearchOnAdd: false,
-        SearchAlternativeTitles: true);
+        SearchAlternativeTitles: true,
+        PreferredProtocol: ProtocolPreference.Usenet,
+        UsenetDelay: 0,
+        TorrentDelay: 0,
+        BypassDelayIfHighestQuality: true);
 
     public IndexerOptionValues Values => new(
         Int(ConfigKeys.IndexerMinimumAge, Defaults.MinimumAge, 0, MaxMinimumAge),
@@ -92,7 +106,15 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         RssInterval(),
         MissingInterval(),
         Bool(ConfigKeys.IndexerSearchOnAdd, Defaults.SearchOnAdd),
-        Bool(ConfigKeys.IndexerSearchAlternativeTitles, Defaults.SearchAlternativeTitles));
+        Bool(ConfigKeys.IndexerSearchAlternativeTitles, Defaults.SearchAlternativeTitles),
+        Enum.TryParse<ProtocolPreference>(config.Get(ConfigKeys.IndexerPreferredProtocol), ignoreCase: true, out var preferred)
+            && Enum.IsDefined(preferred)
+            && !int.TryParse(config.Get(ConfigKeys.IndexerPreferredProtocol), out _)
+            ? preferred
+            : Defaults.PreferredProtocol,
+        Int(ConfigKeys.IndexerUsenetDelay, Defaults.UsenetDelay, 0, MaxProtocolDelay),
+        Int(ConfigKeys.IndexerTorrentDelay, Defaults.TorrentDelay, 0, MaxProtocolDelay),
+        Bool(ConfigKeys.IndexerBypassDelayIfHighestQuality, Defaults.BypassDelayIfHighestQuality));
 
     /// <summary>RSS sync interval; null when switched off.</summary>
     public TimeSpan? RssSyncInterval => RssInterval() is > 0 and var minutes ? TimeSpan.FromMinutes(minutes) : null;
@@ -117,6 +139,10 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
             AllowHardcodedSubs = values.AllowHardcodedSubs,
             WhitelistedHardcodedSubs = values.WhitelistedHardcodedSubs,
             ReleaseProfiles = [.. profiles.All().Where(p => p.Enabled)],
+            PreferredProtocol = values.PreferredProtocol,
+            UsenetDelayMinutes = values.UsenetDelay,
+            TorrentDelayMinutes = values.TorrentDelay,
+            BypassDelayIfHighestQuality = values.BypassDelayIfHighestQuality,
         };
     }
 
@@ -135,6 +161,10 @@ public sealed class IndexerOptions(ConfigRepository config, ReleaseProfileReposi
         Set(ConfigKeys.IndexerMissingSearchInterval, values.MissingSearchInterval);
         config.Set(ConfigKeys.IndexerSearchOnAdd, values.SearchOnAdd ? "true" : "false");
         config.Set(ConfigKeys.IndexerSearchAlternativeTitles, values.SearchAlternativeTitles ? "true" : "false");
+        config.Set(ConfigKeys.IndexerPreferredProtocol, values.PreferredProtocol.ToString());
+        Set(ConfigKeys.IndexerUsenetDelay, values.UsenetDelay);
+        Set(ConfigKeys.IndexerTorrentDelay, values.TorrentDelay);
+        config.Set(ConfigKeys.IndexerBypassDelayIfHighestQuality, values.BypassDelayIfHighestQuality ? "true" : "false");
     }
 
     /// <summary>

@@ -9,9 +9,9 @@ using StreamZH.Library.Indexers;
 namespace StreamZH.Library.Migration.Indexers;
 
 /// <summary>
-/// Prowlarr's indexers → StreamZH indexers, through the existing <see cref="ProwlarrImportService"/> (same rules as
-/// Indexers → Import from Prowlarr). Prowlarr masks the indexers' own API keys, so they are reached through Prowlarr's
-/// Newznab proxy unless the user types the indexer's own key (<see cref="MigrationContext.Secret"/>): then the indexer
+/// Prowlarr's indexers (Usenet and, since 0.11, torrent) → StreamZH indexers, through the existing <see cref="ProwlarrImportService"/>
+/// (same rules as Indexers → Import from Prowlarr). Prowlarr masks the indexers' own API keys, so they are reached through Prowlarr's
+/// Newznab/Torznab proxy unless the user types the indexer's own key (<see cref="MigrationContext.Secret"/>): then the indexer
 /// is used directly and keeps working once Prowlarr is gone. An indexer with the same name is kept as it is.
 /// </summary>
 public sealed class ProwlarrIndexersSection : IMigrationSection
@@ -24,7 +24,7 @@ public sealed class ProwlarrIndexersSection : IMigrationSection
 
     public string Label => "Indexers";
 
-    public string Description => "Usenet indexers with their categories, priority and limits. Type an indexer's own API key to use it without Prowlarr.";
+    public string Description => "Usenet and torrent indexers with their categories, priority, limits and seed settings. Type an indexer's own API key to use it without Prowlarr.";
 
     public int Order => 350;
 
@@ -112,8 +112,8 @@ public sealed class ProwlarrIndexersSection : IMigrationSection
     private static MigrationItem Item(ProwlarrIndexerPreview p, MigrationContext context)
     {
         var key = ItemKey(p.ProwlarrId);
-        var catalog = IndexerCatalog.Match(p.Name, p.OwnUrl);
-        var known = catalog.Key != IndexerCatalog.GenericNewznabKey ? $"{catalog.Name} · " : string.Empty;
+        var catalog = IndexerCatalog.Match(p.Name, p.OwnUrl, p.Protocol == "torrent" ? IndexerProtocol.Torrent : IndexerProtocol.Usenet);
+        var known = !IndexerCatalog.IsGeneric(catalog.Key) ? $"{catalog.Name} · " : string.Empty;
         if (!p.Supported)
         {
             return new MigrationItem(key, p.Name, MigrationAction.Skip, $"{p.Protocol} · {p.Implementation}", p.Reason);

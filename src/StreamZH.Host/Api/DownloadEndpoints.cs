@@ -9,6 +9,7 @@ using StreamZH.Core.Downloads;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Library.Downloads;
+using StreamZH.Library.Downloads.Torrent;
 
 namespace StreamZH.Host.Api;
 
@@ -22,12 +23,15 @@ public static class DownloadEndpoints
     {
         var api = app.MapGroup("/api/v1/download").RequireAuthorization().WithTags("Downloads");
 
-        api.MapGet("/", (DownloadEngine engine) =>
+        // 0.11: torrents of the download clients follow the engine's downloads.
+        api.MapGet("/", (DownloadEngine engine, TorrentTracker torrents, DownloadClientRepository clients) =>
         {
             var status = engine.Status();
+            var names = ClientNames(clients);
+            var torrentItems = torrents.Active();
             return new DownloadQueueResource(
-                [.. engine.Active().Select(i => DownloadItemResource.From(i))],
-                status.SpeedBps,
+                [.. engine.Active().Concat(torrentItems).Select(i => DownloadItemResource.From(i, names: names))],
+                status.SpeedBps + torrentItems.Sum(i => i.SpeedBps),
                 status.Paused,
                 status.FreeSpaceBytes,
                 status.SpeedLimitKBps,
@@ -36,7 +40,7 @@ public static class DownloadEndpoints
 
         // Filters: status (completed, failed), import (imported, notImported, importFailed), category (movie, series,
         // other = the kind; anything else = a category name), search (words in the title), since (finished at or after).
-        api.MapGet("/history", (int? page, int? pageSize, string? status, string? import, string? category, string? search, DateTimeOffset? since, DownloadEngine engine) =>
+        api.MapGet("/history", (int? page, int? pageSize, string? status, string? import, string? category, string? search, DateTimeOffset? since, DownloadEngine engine, TorrentTracker torrents, DownloadClientRepository clients) =>
         {
             var errors = new Dictionary<string, string[]>();
             DownloadStatus? statusFilter = status?.Trim().ToLowerInvariant() switch
@@ -70,16 +74,17 @@ public static class DownloadEndpoints
             var p = Math.Max(1, page ?? 1);
             var size = Math.Clamp(pageSize ?? 20, 1, MaxHistoryPageSize);
             var (items, total) = engine.History(p, size, filter);
-            return Results.Ok(new DownloadHistoryPage(p, size, total, [.. items.Select(i => DownloadItemResource.From(i))]));
+            var names = ClientNames(clients);
+            return Results.Ok(new DownloadHistoryPage(p, size, total, [.. items.Select(i => DownloadItemResource.From(torrents.Find(i.Id) ?? i, names: names))]));
         });
 
         // For the category pickers (Add NZB, Search page): name, whether it is a default one, and its kind.
         api.MapGet("/categories", (DownloadCategoryService categories) =>
             categories.All().Select(c => new DownloadCategoryChoice(c.Name, c.IsDefault, Camel(DownloadCategoryService.KindOf(c.Name).ToString()))).ToList());
 
-        api.MapGet("/{id:int}", (int id, DownloadEngine engine) =>
-            engine.Find(id) is { } item && engine.Files(id) is { } files
-                ? Results.Ok(DownloadItemResource.From(item, files))
+        api.MapGet("/{id:int}", (int id, DownloadEngine engine, TorrentTracker torrents, DownloadClientRepository clients) =>
+            (torrents.Find(id) ?? engine.Find(id)) is { } item && engine.Files(id) is { } files
+                ? Results.Ok(DownloadItemResource.From(item, files, ClientNames(clients)))
                 : NotFound(id));
 
         api.MapPost("/", async (HttpRequest http, DownloadEngine engine, DownloadCategoryService categories, CancellationToken ct) =>
@@ -145,13 +150,17 @@ public static class DownloadEndpoints
             return Results.Created($"/api/v1/download/{item.Id}", DownloadItemResource.From(item));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        api.MapPost("/{id:int}/pause", async (int id, DownloadEngine engine) => Result(id, await engine.PauseAsync(id), "Only queued or downloading items can be paused."))
+        api.MapPost("/{id:int}/pause", async (int id, DownloadEngine engine, TorrentTracker torrents) => torrents.Find(id) is not null
+                ? Result(id, DownloadActionResult.Invalid, TorrentConflict)
+                : Result(id, await engine.PauseAsync(id), "Only queued or downloading items can be paused."))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        api.MapPost("/{id:int}/resume", async (int id, DownloadEngine engine) => Result(id, await engine.ResumeAsync(id), "This download is not in the queue any more."))
+        api.MapPost("/{id:int}/resume", async (int id, DownloadEngine engine, TorrentTracker torrents) => torrents.Find(id) is not null
+                ? Result(id, DownloadActionResult.Invalid, TorrentConflict)
+                : Result(id, await engine.ResumeAsync(id), "This download is not in the queue any more."))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        api.MapPost("/{id:int}/retry", async (int id, DownloadEngine engine) => Result(id, await engine.RetryAsync(id), "Only failed downloads can be retried."))
+        api.MapPost("/{id:int}/retry", async (int id, DownloadEngine engine) => Result(id, await engine.RetryAsync(id), "Only failed Usenet downloads can be retried."))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
         api.MapPut("/{id:int}", async (int id, UpdateDownloadRequest request, DownloadEngine engine, DownloadCategoryService categories) =>
@@ -183,8 +192,12 @@ public static class DownloadEndpoints
             return item is null ? NotFound(id) : Results.Ok(DownloadItemResource.From(item));
         }).RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        api.MapDelete("/{id:int}", async (int id, bool? deleteFiles, DownloadEngine engine) =>
-            Result(id, await engine.DeleteAsync(id, deleteFiles ?? false), string.Empty))
+        // Torrents (0.11): removeFromClient also removes the torrent from its download client, deleteFiles then its data too.
+        // Without removeFromClient StreamZH only forgets it; the client keeps seeding.
+        api.MapDelete("/{id:int}", async (int id, bool? deleteFiles, bool? removeFromClient, DownloadEngine engine, TorrentTracker torrents, CancellationToken ct) =>
+            await torrents.RemoveAsync(id, removeFromClient ?? false, deleteFiles ?? false, ct)
+                ? Results.NoContent()
+                : Result(id, await engine.DeleteAsync(id, deleteFiles ?? false), string.Empty))
             .RequireAuthorization(AuthSchemes.AdminPolicy);
 
         api.MapPost("/pause-all", async (DownloadEngine engine) =>
@@ -202,7 +215,13 @@ public static class DownloadEndpoints
         return app;
     }
 
+    public const string TorrentConflict = "Torrents are paused and resumed in their download client.";
+
     public static string Camel(string value) => JsonNamingPolicy.CamelCase.ConvertName(value);
+
+    /// <summary>Download client names by id, for the torrent rows (0.11).</summary>
+    public static IReadOnlyDictionary<int, string> ClientNames(DownloadClientRepository clients) =>
+        clients.All().ToDictionary(c => c.Id, c => c.Name);
 
     public static DownloadCategory? ParseCategory(string? value) => value?.Trim().ToLowerInvariant() switch
     {
@@ -254,7 +273,10 @@ public sealed record UpdateDownloadRequest(int? Priority, string? Category, int?
 /// <summary>A download category for pickers. <see cref="Kind"/>: movie, series or other.</summary>
 public sealed record DownloadCategoryChoice(string Name, bool IsDefault, string Kind);
 
-/// <summary>A download; status, category and file kinds are camelCase strings, mediaType like elsewhere ("Movie", "Series"). <see cref="Files"/> only in the detail response.</summary>
+/// <summary>
+/// A download; status, category and file kinds are camelCase strings, mediaType like elsewhere ("Movie", "Series"). <see cref="Files"/> only in the
+/// detail response. 0.11 adds the protocol ("usenet", "torrent") and, for torrents, the client, info hash, seeding, ratio, upload and peers.
+/// </summary>
 public sealed record DownloadItemResource(
     int Id,
     string Title,
@@ -282,7 +304,31 @@ public sealed record DownloadItemResource(
     string CategoryName,
     bool Duplicate)
 {
-    public static DownloadItemResource From(DownloadItem item, IReadOnlyList<DownloadFileInfo>? files = null) => new(
+    public DownloadProtocol Protocol { get; init; } = DownloadProtocol.Usenet;
+
+    /// <summary>Torrent: the DownloadClients row and its name.</summary>
+    public int? DownloadClientId { get; init; }
+
+    public string? DownloadClient { get; init; }
+
+    /// <summary>Torrent: the info hash.</summary>
+    public string? InfoHash { get; init; }
+
+    /// <summary>Torrent: done and still in its client (seeding or stopped there, not removed yet).</summary>
+    public bool Seeding { get; init; }
+
+    public double? Ratio { get; init; }
+
+    public long UploadedBytes { get; init; }
+
+    /// <summary>Torrent: upload speed at the last poll of the client.</summary>
+    public long UploadSpeedBps { get; init; }
+
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
+
+    public static DownloadItemResource From(DownloadItem item, IReadOnlyList<DownloadFileInfo>? files = null, IReadOnlyDictionary<int, string>? names = null) => new DownloadItemResource(
         item.Id,
         item.Title,
         DownloadEndpoints.Camel(item.Category.ToString()),
@@ -307,5 +353,17 @@ public sealed record DownloadItemResource(
         item.Completed,
         files?.Select(f => new DownloadFileResource(f.Name, f.Size, f.Downloaded, DownloadEndpoints.Camel(f.Kind.ToString()), f.MissingArticles, f.Wanted)).ToList(),
         item.CategoryName ?? DownloadCategoryService.DefaultName(item.Category),
-        item.Duplicate);
+        item.Duplicate)
+    {
+        Protocol = item.Protocol,
+        DownloadClientId = item.ClientId,
+        DownloadClient = item.ClientId is { } clientId ? names?.GetValueOrDefault(clientId) : null,
+        InfoHash = item.ExternalId,
+        Seeding = item.Seeding,
+        Ratio = item.Ratio,
+        UploadedBytes = item.UploadedBytes,
+        UploadSpeedBps = item.UploadSpeedBps,
+        Seeders = item.Seeders,
+        Peers = item.Peers,
+    };
 }

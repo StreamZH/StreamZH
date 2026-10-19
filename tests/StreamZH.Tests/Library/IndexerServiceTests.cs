@@ -56,7 +56,7 @@ public sealed class IndexerServiceTests : IDisposable
             Priority = 0,
             Categories = [],
             TvCategories = [],
-            Implementation = "Torznab",
+            Implementation = "Cardigann",
         }));
         Assert.Equal(["apiPath", "baseUrl", "categories", "implementation", "name", "priority"], errors);
 

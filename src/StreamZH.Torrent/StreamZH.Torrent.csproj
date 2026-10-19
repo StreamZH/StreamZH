@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The built-in torrent engine (0.11): MonoTorrent stays in this project, out of Core. -->
+  <ItemGroup>
+    <ProjectReference Include="../StreamZH.Core/StreamZH.Core.csproj" />
+    <ProjectReference Include="../StreamZH.Data/StreamZH.Data.csproj" />
+    <ProjectReference Include="../StreamZH.Library/StreamZH.Library.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- MIT: the license texts of MonoTorrent and its dependencies ship with every build (licenses/ next to StreamZH). -->
+    <None Include="licenses/*.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoTorrent" Version="3.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+  </ItemGroup>
+</Project>

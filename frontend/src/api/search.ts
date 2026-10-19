@@ -29,6 +29,15 @@ export interface FreeRelease {
   /** Custom formats the name matches (0.8, when the server sends them; no profile, so the score is display only). */
   customFormats?: MatchedFormat[]
   customFormatScore?: number
+  /** 0.11: Usenet or torrent, seeders/peers and tracker flags (see Release in api/releases). */
+  protocol?: 'usenet' | 'torrent'
+  seeders?: number | null
+  peers?: number | null
+  indexerFlags?: number | string[] | null
+  /** The flags by name ("freeleech", "halfleech", "doubleUpload", "internal", "scene" …). */
+  flags?: string[]
+  downloadVolumeFactor?: number | null
+  uploadVolumeFactor?: number | null
 }
 
 export interface FreeSearch {

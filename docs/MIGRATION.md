@@ -188,7 +188,7 @@ blocklist) are described in the wizard itself. For the indexer and downloader pa
 | Part | What is taken over |
 |---|---|
 | Indexers | Newznab indexers: URL, API path, categories, priority, RSS/automatic/interactive search, additional parameters. StreamZH has one indexer for movies *and* TV: the same indexer from Radarr and Sonarr (same URL) becomes **one** indexer — Radarr's categories as movie categories, Sonarr's (plus its anime categories) as TV categories. An indexer that is already in StreamZH with the same URL is updated. API keys are masked by Radarr/Sonarr: type them in; an indexer without a key is added switched off. **Skipped**: torrent indexers (torrent support follows in StreamZH 1.0), non-Newznab indexers, and indexers that come from Prowlarr (`http://prowlarr:9696/3/`) — take those over from Prowlarr instead. |
-| Download clients (Advanced) | Only shown, nothing is created: StreamZH downloads by itself. A SABnzbd client shows SABnzbd's address and category, so you know what to enter for the SABnzbd migration. |
+| Download clients | qBittorrent, Transmission and Deluge become StreamZH download clients (address, SSL, URL base, user name, add paused, priority, "remove completed") with their **remote path mappings** (the local path mapped like your library folders; a folder StreamZH cannot see is skipped). The same client in Radarr and Sonarr (same kind, host and port) becomes **one**; a second run updates it. Passwords are masked: type them in; a client without its password is added switched off. StreamZH adds its torrents with its own category `streamzh`, so Radarr/Sonarr and StreamZH never pick up each other's torrents. Usenet downloaders create nothing (StreamZH downloads by itself); a SABnzbd client shows SABnzbd's address and category for the SABnzbd migration. Other torrent clients (rTorrent, µTorrent, …) are skipped. |
 
 ## 6. The Usenet connection limit
 
@@ -210,7 +210,8 @@ StreamZH never changes the old apps and does not take over:
   Direct Unpack, "pause downloading during post-processing", "only get articles for the top of the queue", the global
   download quota (StreamZH has a quota per server), the watched folder (see above), the queue and the history.
 - **Prowlarr**: torrent indexers, apps and their sync, download clients, notifications, the history.
-- **Radarr/Sonarr**: torrent indexers and download clients, and whatever the preview does not list.
+- **Radarr/Sonarr**: torrent indexers, torrent clients other than qBittorrent, Transmission and Deluge, the torrents in the
+  old app's queue, and whatever the preview does not list.
 - **Passwords and API keys** are taken over only where you type them in.
 
 The preview lists the settings that StreamZH does not have as *skip* with the reason, so you can set them up by hand

@@ -4,6 +4,7 @@ import {
   genericDefinitionKey,
   indexerKeys,
   indexersApi,
+  protocolOf,
   type Indexer,
   type IndexerCapabilities,
   type IndexerCategory,
@@ -71,7 +72,7 @@ export default function IndexerDetails({
       {state === 'disabled' && <Pill tone="off">Disabled</Pill>}
       {state === 'error' && <Pill tone="error">{indexer.status?.limitReached ? 'Limit reached' : 'Failing'}</Pill>}
       {state === 'enabled' && <Pill tone="ok">Enabled</Pill>}
-      <ProtocolChip protocol={definition?.protocol ?? 'usenet'} />
+      <ProtocolChip protocol={protocolOf(indexer)} />
       {definition && <PrivacyChip privacy={definition.privacy} />}
     </>
   )
@@ -168,6 +169,16 @@ function Params({ params }: { params: string[] }) {
   )
 }
 
+/** "Ratio 1.5 or 3 days, season packs 7 days" / "Download client default". */
+function seedGoals(i: Details['indexer']): string {
+  const days = (minutes: number) => (minutes % 1440 === 0 ? `${minutes / 1440} day${minutes === 1440 ? '' : 's'}` : minutes % 60 === 0 ? `${minutes / 60} h` : `${minutes} min`)
+  const parts = [i.seedRatio != null && i.seedRatio > 0 ? `ratio ${i.seedRatio}` : null, i.seedTimeMinutes ? days(i.seedTimeMinutes) : null].filter(Boolean)
+  const pack = i.seasonPackSeedTimeMinutes ? `, season packs ${days(i.seasonPackSeedTimeMinutes)}` : ''
+  if (parts.length === 0 && !pack) return 'Download client default'
+  const text = parts.length > 0 ? parts.join(' or ') : 'client default'
+  return text.charAt(0).toUpperCase() + text.slice(1) + pack
+}
+
 function DetailsTab({ details }: { details: Details }) {
   const { indexer, definition, capabilities, capabilitiesCheckedAt } = details
   const status = indexer.status
@@ -189,7 +200,7 @@ function DetailsTab({ details }: { details: Details }) {
       <section>
         <h3 className={styles.sectionTitle}>Indexer</h3>
         <dl className={styles.list}>
-          <Item label="Description">{definition?.description || (definition?.key === genericDefinitionKey ? 'Generic Newznab indexer' : '–')}</Item>
+          <Item label="Description">{definition?.description || (definition?.key === genericDefinitionKey ? 'Generic Newznab indexer' : protocolOf(indexer) === 'torrent' ? 'Generic Torznab indexer' : '–')}</Item>
           <Item label="Language">{definition ? `${languageName(definition.language)} (${definition.language})` : '–'}</Item>
           <Item label="Privacy">{definition ? <PrivacyChip privacy={definition.privacy} /> : '–'}</Item>
           <Item label="Indexer site">
@@ -201,7 +212,7 @@ function DetailsTab({ details }: { details: Details }) {
               '–'
             )}
           </Item>
-          <Item label="Newznab URL" mono>
+          <Item label={protocolOf(indexer) === 'torrent' ? 'Torznab URL' : 'Newznab URL'} mono>
             {indexer.baseUrl ? newznabUrl(indexer) : '–'}
           </Item>
           {indexer.additionalParameters && (
@@ -219,6 +230,12 @@ function DetailsTab({ details }: { details: Details }) {
           <Item label="Used for">{indexer.enable ? (uses.length > 0 ? uses.join(' · ') : 'Nothing') : 'Disabled'}</Item>
           <Item label="Queries">{queries.text}</Item>
           <Item label="Grabs">{grabs.text}</Item>
+          {protocolOf(indexer) === 'torrent' && (
+            <>
+              <Item label="Minimum seeders">{indexer.minimumSeeders ?? 1}</Item>
+              <Item label="Seed goals">{seedGoals(indexer)}</Item>
+            </>
+          )}
           {indexer.vipExpiration && (
             <Item label="VIP expiration">
               {formatDate(indexer.vipExpiration)}

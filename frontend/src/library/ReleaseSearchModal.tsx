@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { historyKeys } from '../api/history'
@@ -10,10 +10,12 @@ import Loader from '../components/Loader'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import { FormatTags, ScorePill } from '../customFormats/FormatTags'
+import { Peers, ProtocolIcon, TrackerFlags } from '../downloadClients/torrent'
+import { trackerFlags } from '../downloadClients/torrentFormat'
 import { formatBytes, formatDateTime } from '../lib/format'
 import styles from './ReleaseSearch.module.css'
 
-type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'grabs' | 'score' | 'formats'
+type SortKey = 'rank' | 'title' | 'indexer' | 'age' | 'size' | 'peers' | 'grabs' | 'score' | 'formats'
 
 const sortLabels: Record<SortKey, string> = {
   rank: 'Best match',
@@ -21,13 +23,14 @@ const sortLabels: Record<SortKey, string> = {
   indexer: 'Indexer',
   age: 'Age',
   size: 'Size',
+  peers: 'Peers',
   grabs: 'Grabs',
   score: 'Score',
   formats: 'Formats',
 }
 
 /** Direction a column sorts in on the first click: newest, largest, most grabbed and best scored first. */
-const firstDescending: Record<SortKey, boolean> = { rank: false, title: false, indexer: false, age: false, size: true, grabs: true, score: true, formats: true }
+const firstDescending: Record<SortKey, boolean> = { rank: false, title: false, indexer: false, age: false, size: true, peers: true, grabs: true, score: true, formats: true }
 
 function compare(a: Release, b: Release, key: SortKey): number {
   switch (key) {
@@ -41,6 +44,8 @@ function compare(a: Release, b: Release, key: SortKey): number {
       return a.ageHours - b.ageHours
     case 'size':
       return a.size - b.size
+    case 'peers':
+      return (a.seeders ?? -1) - (b.seeders ?? -1) || (a.peers ?? -1) - (b.peers ?? -1)
     case 'grabs':
       return (a.grabs ?? -1) - (b.grabs ?? -1)
     case 'score':
@@ -80,6 +85,24 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
   const hasScores = data?.releases.some((r) => r.preferredScore !== 0) ?? false
   // The custom format column shows when any release matched a format or got a format score.
   const hasFormats = data?.releases.some((r) => (r.customFormats?.length ?? 0) > 0 || (r.customFormatScore ?? 0) !== 0) ?? false
+  // 0.11: the peers column shows as soon as one release is a torrent.
+  const hasPeers = data?.releases.some((r) => r.protocol === 'torrent') ?? false
+  const columns = [
+    '100px',
+    'minmax(0, 1fr)',
+    '108px',
+    '62px',
+    '74px',
+    hasPeers && '76px',
+    '132px',
+    '96px',
+    hasFormats && '72px',
+    hasScores && '52px',
+    '48px',
+    '92px',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   // Portal: the dialog must not inherit styles of the place it is opened from (hero actions, episode table).
   return createPortal(
@@ -105,7 +128,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
           <div className={styles.state}>
             <Icon name="network" size={22} />
             <h3>No indexer for manual search</h3>
-            <p className={ui.muted}>StreamZH searches Usenet indexers (Newznab) for releases. Add one, or check that manual search is switched on for it.</p>
+            <p className={ui.muted}>StreamZH searches Usenet (Newznab) and torrent (Torznab) indexers for releases. Add one, or check that manual search is switched on for it.</p>
             <Link className={ui.primary} to="/indexers">
               Set up indexers
               <Icon name="right" size={14} />
@@ -143,6 +166,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   <option value="age:asc">Newest</option>
                   <option value="size:desc">Largest</option>
                   <option value="size:asc">Smallest</option>
+                  {hasPeers && <option value="peers:desc">Most seeders</option>}
                   <option value="grabs:desc">Most grabbed</option>
                   {hasFormats && <option value="formats:desc">Format score</option>}
                   {hasScores && <option value="score:desc">Preferred score</option>}
@@ -180,12 +204,13 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                 </p>
               </div>
             ) : (
-              <div className={`${styles.table} ${hasScores ? styles.withScore : ''} ${hasFormats ? styles.withFormats : ''}`} role="table" aria-label="Releases">
+              <div className={styles.table} style={{ '--release-cols': columns } as CSSProperties} role="table" aria-label="Releases">
                 <div className={styles.head} role="row">
                   <span role="columnheader">Verdict</span>
                   {(['title', 'indexer', 'age', 'size'] as SortKey[]).map((key) => (
                     <SortHeader key={key} sortKey={key} sort={sort} onSort={sortBy} />
                   ))}
+                  {hasPeers && <SortHeader sortKey="peers" sort={sort} onSort={sortBy} />}
                   <span role="columnheader">Quality</span>
                   <span role="columnheader">Languages</span>
                   {hasFormats && <SortHeader sortKey="formats" sort={sort} onSort={sortBy} />}
@@ -200,7 +225,7 @@ export default function ReleaseSearchModal({ title, target, onClose }: { title: 
                   </span>
                 </div>
                 {releases.map((release) => (
-                  <ReleaseRow key={`${release.indexerId}:${release.guid}`} release={release} showScore={hasScores} showFormats={hasFormats} />
+                  <ReleaseRow key={`${release.indexerId}:${release.guid}`} release={release} showScore={hasScores} showFormats={hasFormats} showPeers={hasPeers} />
                 ))}
               </div>
             )}
@@ -224,7 +249,7 @@ function SortHeader({ sortKey, sort, onSort }: { sortKey: SortKey; sort: { key: 
   )
 }
 
-function ReleaseRow({ release, showScore, showFormats }: { release: Release; showScore: boolean; showFormats: boolean }) {
+function ReleaseRow({ release, showScore, showFormats, showPeers }: { release: Release; showScore: boolean; showFormats: boolean; showPeers: boolean }) {
   const queryClient = useQueryClient()
   const [reasonsOpen, setReasonsOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -234,6 +259,8 @@ function ReleaseRow({ release, showScore, showFormats }: { release: Release; sho
   })
   const episodes = episodeLabel(release)
   const reasons = release.rejections.map((r) => r.message).join('\n')
+  const torrent = release.protocol === 'torrent'
+  const flags = torrent ? trackerFlags(release) : []
 
   return (
     <div className={`${styles.row} ${release.accepted ? '' : styles.rejectedRow}`} role="row">
@@ -267,16 +294,18 @@ function ReleaseRow({ release, showScore, showFormats }: { release: Release; sho
         ) : (
           release.title
         )}
-        {showFormats && (release.customFormats?.length ?? 0) > 0 && (
+        {(flags.length > 0 || (showFormats && (release.customFormats?.length ?? 0) > 0)) && (
           <span className={styles.formatTags}>
-            <FormatTags formats={release.customFormats} max={5} />
+            <TrackerFlags flags={flags} />
+            {showFormats && <FormatTags formats={release.customFormats} max={5} />}
           </span>
         )}
       </span>
 
       <span className={styles.meta}>
-        <span role="cell" className={styles.cell}>
-          {release.indexer}
+        <span role="cell" className={`${styles.cell} ${styles.indexer}`}>
+          <ProtocolIcon protocol={release.protocol ?? 'usenet'} />
+          <span>{release.indexer}</span>
         </span>
         <span role="cell" className={styles.cell} title={formatDateTime(release.publishDate)}>
           {formatAge(release)}
@@ -284,6 +313,18 @@ function ReleaseRow({ release, showScore, showFormats }: { release: Release; sho
         <span role="cell" className={`${styles.cell} ${styles.num}`}>
           {formatBytes(release.size)}
         </span>
+        {showPeers && (
+          <span role="cell" className={`${styles.cell} ${styles.num}`}>
+            {torrent ? (
+              <>
+                <span className={styles.mobileLabel}>Peers </span>
+                <Peers seeders={release.seeders} peers={release.peers} />
+              </>
+            ) : (
+              <span className={`${ui.muted} ${styles.hideMobile}`}>–</span>
+            )}
+          </span>
+        )}
         <span role="cell" className={styles.cell}>
           {episodes && <span className={styles.episodes}>{episodes}</span>}
           <span className={`${ui.tag} ${styles.quality}`}>{release.quality}</span>
@@ -357,7 +398,11 @@ function ReleaseRow({ release, showScore, showFormats }: { release: Release; sho
       )}
       {grab.isSuccess && (
         <p className={styles.rowNote}>
-          {grab.data.folder.replaceAll('\\', '/').endsWith('nzb-queue') ? (
+          {torrent || grab.data.protocol === 'torrent' ? (
+            <>
+              Sent to {grab.data.client ?? 'the torrent client'}. Follow it under <Link to="/activity">Activity</Link>.
+            </>
+          ) : grab.data.folder.replaceAll('\\', '/').endsWith('nzb-queue') ? (
             <>
               Added to the download queue. Follow it under <Link to="/activity">Activity</Link>.
             </>

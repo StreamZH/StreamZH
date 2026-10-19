@@ -14,7 +14,9 @@ namespace StreamZH.Core.Decisions;
 /// <item>Custom format score in the profile, higher first (Radarr's CompareCustomFormatScore).</item>
 /// <item>Dual language first, when the profile prefers it.</item>
 /// <item>Preferred score of the release profiles, higher first (after quality and language, like Sonarr v3).</item>
+/// <item>0.11: the preferred protocol first (Radarr's CompareProtocol).</item>
 /// <item>Indexer priority, lower number first.</item>
+/// <item>0.11, two torrents: more seeders, then more peers, on a log10 scale like Radarr (10 vs 12 seeders is a tie).</item>
 /// <item>Size: closest to the preferred size (per minute × runtime) when one is set, otherwise larger first;
 /// rounded to 200 MB steps like Radarr so tiny differences fall through.</item>
 /// <item>Publish date, newer first.</item>
@@ -77,7 +79,9 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
             CustomFormatScore(x).CompareTo(CustomFormatScore(y)),
             CompareDualLanguage(x, y),
             PreferredScore(x).CompareTo(PreferredScore(y)),
+            _context.Rules.IsPreferred(x.Protocol).CompareTo(_context.Rules.IsPreferred(y.Protocol)),
             y.IndexerPriority.CompareTo(x.IndexerPriority),
+            ComparePeersIfTorrent(x, y),
             SizeScore(x).CompareTo(SizeScore(y)),
             x.PublishDate.CompareTo(y.PublishDate),
         ];
@@ -87,6 +91,19 @@ public sealed class DecisionComparer : IComparer<ReleaseCandidate>
 
     /// <summary>Custom format score of a candidate in the target's profile (cached by the context).</summary>
     public int CustomFormatScore(ReleaseCandidate candidate) => _context.CustomFormatsFor(candidate).Score;
+
+    private static int ComparePeersIfTorrent(ReleaseCandidate x, ReleaseCandidate y)
+    {
+        if (x.Protocol != Downloads.DownloadProtocol.Torrent || y.Protocol != Downloads.DownloadProtocol.Torrent)
+        {
+            return 0;
+        }
+
+        var seeders = LogScale(x.Seeders).CompareTo(LogScale(y.Seeders));
+        return seeders != 0 ? seeders : LogScale(x.Peers).CompareTo(LogScale(y.Peers));
+    }
+
+    private static double LogScale(int? count) => count is > 0 and var n ? Math.Round(Math.Log10(n)) : 0;
 
     private int CompareQuality(ReleaseCandidate x, ReleaseCandidate y) =>
         _context.Profile.RankOf(x.Release.Quality.Quality.Id).CompareTo(_context.Profile.RankOf(y.Release.Quality.Quality.Id));

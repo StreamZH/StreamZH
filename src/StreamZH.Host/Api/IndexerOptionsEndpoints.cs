@@ -31,7 +31,7 @@ public static class IndexerOptionsEndpoints
 
         settings.MapPut("/", (IndexerOptionsResource request, IndexerOptions options, ILogger<IndexerOptions> logger) =>
         {
-            var errors = Validate(request, out var values);
+            var errors = Validate(request, options.Values, out var values);
             if (errors.Count > 0)
             {
                 return Results.ValidationProblem(errors);
@@ -41,10 +41,10 @@ public static class IndexerOptionsEndpoints
             logger.LogInformation(
                 "Indexer settings saved: minimum age {MinimumAge} min, retention {Retention} days, maximum size {MaximumSize} MB, hardcoded subs {Hardcoded}, "
                 + "minimum availability {Availability} (+{Delay} days), RSS sync every {Rss} min, missing search every {Missing} h, search on add {SearchOnAdd}, "
-                + "search alternative titles {AlternativeTitles}",
+                + "search alternative titles {AlternativeTitles}, preferred protocol {Protocol}, delays Usenet {UsenetDelay} min / torrent {TorrentDelay} min",
                 values!.MinimumAge, values.Retention, values.MaximumSize, values.AllowHardcodedSubs ? "allowed" : "rejected",
                 values.MinimumAvailability, values.AvailabilityDelay, values.RssSyncInterval, values.MissingSearchInterval, values.SearchOnAdd,
-                values.SearchAlternativeTitles);
+                values.SearchAlternativeTitles, values.PreferredProtocol, values.UsenetDelay, values.TorrentDelay);
             return Results.Ok(IndexerOptionsResource.From(options.Values));
         });
 
@@ -107,7 +107,8 @@ public static class IndexerOptionsEndpoints
             : new Job($"search-missing-episodes:{id}", $"Search missing episodes of {title}", (sp, ct) => sp.GetRequiredService<AutomaticSearchService>().SearchMissingEpisodesAsync(id, ct)));
     }
 
-    private static Dictionary<string, string[]> Validate(IndexerOptionsResource request, out IndexerOptionValues? values)
+    /// <param name="current">The stored values: fields a client does not send (0.11 protocol fields from an older UI) keep them.</param>
+    private static Dictionary<string, string[]> Validate(IndexerOptionsResource request, IndexerOptionValues current, out IndexerOptionValues? values)
     {
         var errors = new Dictionary<string, string[]>();
         values = null;
@@ -147,6 +148,17 @@ public static class IndexerOptionsEndpoints
             errors["minimumAvailability"] = ["Use announced, inCinemas or released."];
         }
 
+        var preferred = request.PreferredProtocol ?? current.PreferredProtocol;
+        if (!Enum.IsDefined(preferred))
+        {
+            errors["preferredProtocol"] = ["Use usenet, torrent or noPreference."];
+        }
+
+        var usenetDelay = request.UsenetDelay ?? current.UsenetDelay;
+        var torrentDelay = request.TorrentDelay ?? current.TorrentDelay;
+        Range("usenetDelay", usenetDelay, 0, IndexerOptions.MaxProtocolDelay, "minutes");
+        Range("torrentDelay", torrentDelay, 0, IndexerOptions.MaxProtocolDelay, "minutes");
+
         if (errors.Count == 0)
         {
             values = new IndexerOptionValues(
@@ -160,7 +172,11 @@ public static class IndexerOptionsEndpoints
                 request.RssSyncInterval,
                 request.MissingSearchInterval,
                 request.SearchOnAdd,
-                request.SearchAlternativeTitles);
+                request.SearchAlternativeTitles,
+                preferred,
+                usenetDelay,
+                torrentDelay,
+                request.BypassDelayIfHighestQuality ?? current.BypassDelayIfHighestQuality);
         }
 
         return errors;
@@ -246,6 +262,9 @@ public static class IndexerOptionsEndpoints
 /// <summary>
 /// Settings → Indexers. Ages in minutes (<see cref="MinimumAge"/>) or days, <see cref="MaximumSize"/> in MB, 0 = off or
 /// unlimited. <see cref="RssSyncInterval"/> in minutes (0 = off), <see cref="MissingSearchInterval"/> in hours (0 = off).
+/// 0.11: <see cref="PreferredProtocol"/> ("usenet", "torrent", "noPreference"), <see cref="UsenetDelay"/> and
+/// <see cref="TorrentDelay"/> in minutes (0 = grab at once), <see cref="BypassDelayIfHighestQuality"/>; when a client leaves
+/// them out (null), the stored values stay.
 /// </summary>
 public sealed record IndexerOptionsResource(
     int MinimumAge,
@@ -258,11 +277,16 @@ public sealed record IndexerOptionsResource(
     int RssSyncInterval,
     int MissingSearchInterval,
     bool SearchOnAdd,
-    bool SearchAlternativeTitles = true)
+    bool SearchAlternativeTitles = true,
+    ProtocolPreference? PreferredProtocol = null,
+    int? UsenetDelay = null,
+    int? TorrentDelay = null,
+    bool? BypassDelayIfHighestQuality = null)
 {
     public static IndexerOptionsResource From(IndexerOptionValues v) => new(
         v.MinimumAge, v.Retention, v.MaximumSize, v.AllowHardcodedSubs, v.WhitelistedHardcodedSubs, v.MinimumAvailability, v.AvailabilityDelay,
-        v.RssSyncInterval, v.MissingSearchInterval, v.SearchOnAdd, v.SearchAlternativeTitles);
+        v.RssSyncInterval, v.MissingSearchInterval, v.SearchOnAdd, v.SearchAlternativeTitles,
+        v.PreferredProtocol, v.UsenetDelay, v.TorrentDelay, v.BypassDelayIfHighestQuality);
 }
 
 public sealed record PreferredTermResource(string? Term, int Score);

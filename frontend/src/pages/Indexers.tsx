@@ -5,6 +5,7 @@ import {
   genericDefinitionKey,
   indexerKeys,
   indexersApi,
+  protocolOf,
   type Indexer,
   type IndexerCapabilities,
   type IndexerDefinition,
@@ -100,12 +101,19 @@ export default function Indexers() {
     </>
   )
 
+  const torrentCount = list.filter((i) => protocolOf(i) === 'torrent').length
   const lead =
     list.length > 0 ? (
       <span className={styles.lead}>
-        <span>
-          <b>{list.length}</b> Newznab indexer{list.length === 1 ? '' : 's'}
-        </span>
+        {torrentCount === 0 ? (
+          <span>
+            <b>{list.length}</b> Newznab indexer{list.length === 1 ? '' : 's'}
+          </span>
+        ) : (
+          <span>
+            <b>{list.length - torrentCount}</b> Newznab · <b>{torrentCount}</b> Torznab
+          </span>
+        )}
         <span>
           <span className={ui.dotOk} /> <b>{enabled}</b> enabled
         </span>
@@ -140,8 +148,8 @@ export default function Indexers() {
             </span>
             <h3>No indexers yet</h3>
             <p className={styles.emptyText}>
-              StreamZH searches Usenet indexers through <strong>Newznab</strong>, the API most Usenet indexers offer. Pick yours from the list of
-              known indexers, or bring them all over from Prowlarr in one go.
+              StreamZH searches Usenet indexers through <strong>Newznab</strong> and torrent indexers through <strong>Torznab</strong> (Jackett,
+              Prowlarr or the tracker itself). Pick yours from the list of known indexers, or bring them all over from Prowlarr in one go.
             </p>
             {canEdit ? (
               <div className={styles.emptyActions}>
@@ -295,7 +303,7 @@ function IndexerRow({
           >
             {i.name}
           </button>
-          <ProtocolChip protocol={definition?.protocol ?? 'usenet'} />
+          <ProtocolChip protocol={protocolOf(i)} />
           {definition && <PrivacyChip privacy={definition.privacy} />}
         </div>
         <div className={styles.badges}>

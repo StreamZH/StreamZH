@@ -73,6 +73,7 @@ installs pinned official releases (SHA-256 checked) into `<data>/tools` itself
 | `StreamZH.Metadata` | TMDB client for movies and series, artwork cache |
 | `StreamZH.Indexers` | Newznab client (Torznab later), search, RSS sync, rate limits, capabilities |
 | `StreamZH.Usenet` | Download engine: NZB parser, NNTP connection pool, yEnc decoder, file assembly, par2, unpack |
+| `StreamZH.Torrent` | Built-in torrent engine (MonoTorrent): the "StreamZH" torrent client, its settings, fast resume and seed goals |
 | `StreamZH.Library` | Root folders, disk scan, import, rename, media server notifications (Plex first) |
 | `StreamZH.Host` | API, authentication, background scheduler, SignalR, static frontend |
 | `StreamZH.Tray` | Windows only: `StreamZH.Tray.exe`, the notification area icon (WinForms); talks to the host through `/api/v1/tray` with the token from `<data>/tray.token` |

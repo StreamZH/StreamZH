@@ -218,4 +218,25 @@ public static class ConfigKeys
     public const string DiscordTvCommand = "DiscordTvCommand";
     public const string DiscordSeriesSeasons = "DiscordSeriesSeasons";
     public const string DiscordStatusText = "DiscordStatusText";
+
+    // Torrents (0.11, agent I): protocol preference and delays (Settings → Indexers); pending releases waiting for their delay (JSON).
+    public const string IndexerPreferredProtocol = "IndexerPreferredProtocol";
+    public const string IndexerUsenetDelay = "IndexerUsenetDelay";
+    public const string IndexerTorrentDelay = "IndexerTorrentDelay";
+    public const string IndexerBypassDelayIfHighestQuality = "IndexerBypassDelayIfHighestQuality";
+    public const string PendingReleases = "PendingReleases";
+    // Torrent engine (0.11): StreamZH's own torrent client (Settings → Download clients → StreamZH).
+    public const string TorrentEngineListenPort = "TorrentEngineListenPort";
+    public const string TorrentEngineBindAddress = "TorrentEngineBindAddress";
+    public const string TorrentEngineMaxConnections = "TorrentEngineMaxConnections";
+    public const string TorrentEngineMaxConnectionsPerTorrent = "TorrentEngineMaxConnectionsPerTorrent";
+    public const string TorrentEngineDownloadLimitKBps = "TorrentEngineDownloadLimitKBps";
+    public const string TorrentEngineUploadLimitKBps = "TorrentEngineUploadLimitKBps";
+    public const string TorrentEngineDht = "TorrentEngineDht";
+    public const string TorrentEnginePex = "TorrentEnginePex";
+    public const string TorrentEngineLocalPeerDiscovery = "TorrentEngineLocalPeerDiscovery";
+    public const string TorrentEngineEncryption = "TorrentEngineEncryption";
+    public const string TorrentEnginePortForwarding = "TorrentEnginePortForwarding";
+    public const string TorrentEngineSeedRatio = "TorrentEngineSeedRatio";
+    public const string TorrentEngineSeedTimeMinutes = "TorrentEngineSeedTimeMinutes";
 }

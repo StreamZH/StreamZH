@@ -36,6 +36,7 @@ const settingsIcons: Record<string, IconName> = {
   '/settings/quality': 'gauge',
   '/settings/indexers': 'filter',
   '/settings/downloads': 'download',
+  '/settings/downloadclients': 'share',
   '/settings/usenet': 'server',
   '/settings/connect': 'plug',
   '/settings/requests': 'inbox',

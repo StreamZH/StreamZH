@@ -5,6 +5,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
@@ -59,7 +60,8 @@ public static class IndexerEndpoints
             return service.All().Select(i => IndexerResource.From(
                 i, health.GetValueOrDefault(i.Id) ?? IndexerHealth.Ok(i.Id), service.LimitStatus(i, usage.GetValueOrDefault(i.Id))));
         });
-        indexers.MapGet("/schema", () => IndexerResource.From(IndexerService.Schema(), null, null));
+        // ?implementation=Torznab gives a torrent indexer to start from (0.11).
+        indexers.MapGet("/schema", (string? implementation) => IndexerResource.From(IndexerService.Schema(implementation), null, null));
         indexers.MapGet("/definitions", () => IndexerCatalog.All);
         indexers.MapGet("/{id:int}", (int id, IndexerService service) =>
             service.Find(id) is { } i ? Results.Ok(Resource(service, i)) : Results.NotFound());
@@ -208,7 +210,12 @@ public sealed record IndexerResource(
     string? VipExpiration = null,
     int? QueryLimit = null,
     int? GrabLimit = null,
-    IndexerLimitsUnit LimitsUnit = IndexerLimitsUnit.Day)
+    IndexerLimitsUnit LimitsUnit = IndexerLimitsUnit.Day,
+    DownloadProtocol Protocol = DownloadProtocol.Usenet,
+    int MinimumSeeders = 1,
+    double? SeedRatio = null,
+    int? SeedTimeMinutes = null,
+    int? SeasonPackSeedTimeMinutes = null)
 {
     public static IndexerResource From(IndexerDefinition i, IndexerHealth? health, IndexerLimitStatus? limits) => new(
         i.Id,
@@ -230,12 +237,18 @@ public sealed record IndexerResource(
         i.VipExpiration,
         i.QueryLimit,
         i.GrabLimit,
-        i.LimitsUnit);
+        i.LimitsUnit,
+        i.Protocol,
+        i.MinimumSeeders,
+        i.SeedRatio,
+        i.SeedTimeMinutes,
+        i.SeasonPackSeedTimeMinutes);
 }
 
 /// <summary>
-/// Body for create, update and test. The status is ignored; "********" as API key keeps the stored key
-/// (of the indexer itself, or of <see cref="CloneFromId"/> when creating or testing a clone).
+/// Body for create, update and test. The status and the protocol are ignored (the implementation decides: Torznab is
+/// torrent); "********" as API key keeps the stored key (of the indexer itself, or of <see cref="CloneFromId"/> when
+/// creating or testing a clone). The seed settings count for Torznab indexers only (empty = the download client's setting).
 /// </summary>
 public sealed record IndexerRequest(
     int Id,
@@ -257,7 +270,11 @@ public sealed record IndexerRequest(
     int? QueryLimit = null,
     int? GrabLimit = null,
     string? LimitsUnit = null,
-    int? CloneFromId = null)
+    int? CloneFromId = null,
+    int? MinimumSeeders = null,
+    double? SeedRatio = null,
+    int? SeedTimeMinutes = null,
+    int? SeasonPackSeedTimeMinutes = null)
 {
     /// <exception cref="ValidationFailedException">The limits unit is neither "day" nor "hour".</exception>
     public IndexerDefinition ToDefinition() => new(
@@ -281,6 +298,10 @@ public sealed record IndexerRequest(
         QueryLimit = QueryLimit,
         GrabLimit = GrabLimit,
         LimitsUnit = ParseUnit(LimitsUnit),
+        MinimumSeeders = MinimumSeeders ?? 1,
+        SeedRatio = SeedRatio,
+        SeedTimeMinutes = SeedTimeMinutes,
+        SeasonPackSeedTimeMinutes = SeasonPackSeedTimeMinutes,
     };
 
     private static IndexerLimitsUnit ParseUnit(string? unit) => unit?.Trim().ToLowerInvariant() switch

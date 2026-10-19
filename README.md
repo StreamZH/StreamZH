@@ -181,6 +181,7 @@ The OpenAPI description is at `/api/v1/openapi.json`. `/health` needs no login.
 | `src/StreamZH.Metadata` | TMDB client |
 | `src/StreamZH.Indexers` | Newznab client, search, RSS |
 | `src/StreamZH.Usenet` | Download engine: NZB, NNTP, yEnc, par2, unpack |
+| `src/StreamZH.Torrent` | Built-in torrent engine (MonoTorrent) |
 | `src/StreamZH.Library` | Import, rename, disk scan, media server notifications |
 | `src/StreamZH.Tray`, `src/StreamZH.Tray.Core` | Windows tray icon (WinForms) and its logic without UI |
 | `frontend/` | React + TypeScript web UI |

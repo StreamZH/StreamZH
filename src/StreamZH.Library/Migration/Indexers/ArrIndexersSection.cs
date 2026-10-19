@@ -34,6 +34,17 @@ public sealed record ArrIndexer(
             _ => string.Empty,
         } : string.Empty;
 
+    /// <summary>A number field (Torznab seed settings); null when empty or not a number.</summary>
+    public double? Number(string field) =>
+        Fields.TryGetValue(field, out var value) ? value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetDouble(out var n) => n,
+            JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var n) => n,
+            _ => null,
+        } : null;
+
+    public bool IsTorrent => Protocol == "torrent";
+
     public IReadOnlyList<int> Numbers(string field) =>
         Fields.TryGetValue(field, out var value) && value.ValueKind == JsonValueKind.Array
             ? [.. value.EnumerateArray().Select(v => v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : 0).Where(n => n > 0)]
@@ -105,11 +116,12 @@ public sealed record ArrIndexer(
 }
 
 /// <summary>
-/// The Newznab indexers of Radarr or Sonarr → StreamZH indexers. One StreamZH indexer serves movies and TV: the same
-/// indexer in Radarr and Sonarr (same base URL) becomes one indexer — Radarr's categories as movie categories, Sonarr's
-/// (and its anime categories) as TV categories, whichever app is taken over first. Existing StreamZH indexers are
-/// matched by base URL and updated. Torrent indexers and indexers that come from Prowlarr are skipped. API keys are
-/// masked by the apps; without a typed-in key a new indexer is added switched off.
+/// The Newznab and (0.11) Torznab indexers of Radarr or Sonarr → StreamZH indexers. One StreamZH indexer serves movies and
+/// TV: the same indexer in Radarr and Sonarr (same base URL) becomes one indexer — Radarr's categories as movie
+/// categories, Sonarr's (and its anime categories) as TV categories, whichever app is taken over first. Existing StreamZH
+/// indexers are matched by base URL and updated. Torznab indexers bring their minimum seeders and seed criteria (seed
+/// ratio, seed time, Sonarr's season pack seed time). Indexers that come from Prowlarr are skipped. API keys are masked
+/// by the apps; without a typed-in key a new indexer is added switched off.
 /// </summary>
 public sealed partial class ArrIndexersSection(string source) : IMigrationSection
 {
@@ -122,8 +134,8 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
     public string Label => "Indexers";
 
     public string Description => Source == MigrationSources.Sonarr
-        ? "Newznab indexers with their TV and anime categories and priority. The same indexer from Radarr becomes one indexer."
-        : "Newznab indexers with their movie categories and priority. The same indexer from Sonarr becomes one indexer.";
+        ? "Newznab and Torznab indexers with their TV and anime categories, priority and seed settings. The same indexer from Radarr becomes one indexer."
+        : "Newznab and Torznab indexers with their movie categories, priority and seed settings. The same indexer from Sonarr becomes one indexer.";
 
     public int Order => 350;
 
@@ -227,16 +239,11 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
         {
             var key = ItemKey(indexer.Id);
             var baseUrl = indexer.Text("baseUrl").Trim();
-            if (indexer.Protocol == "torrent")
-            {
-                steps.Add(new Step(new MigrationItem(key, indexer.Name, MigrationAction.Skip, indexer.Implementation, ProwlarrImportService.TorrentReason + ".")));
-                continue;
-            }
-
-            if (!string.Equals(indexer.Implementation, IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase))
+            var wantedImplementation = indexer.IsTorrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab;
+            if (!string.Equals(indexer.Implementation, wantedImplementation, StringComparison.OrdinalIgnoreCase))
             {
                 steps.Add(new Step(new MigrationItem(key, indexer.Name, MigrationAction.Skip, indexer.Implementation,
-                    "Only Newznab indexers can be taken over; add this one in Indexers if StreamZH's catalog has it.")));
+                    "Only Newznab and Torznab indexers can be taken over; add this one in Indexers if StreamZH's catalog has it.")));
                 continue;
             }
 
@@ -265,14 +272,22 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
             var match = existing.FirstOrDefault(e => NormalizeUrl(e.BaseUrl) == normalized);
             var masked = indexer.Text("apiKey") == ArrIndexer.Masked;
             var needsKey = masked && (match is null || match.ApiKey.Length == 0) && context.Secret(key) is null;
-            var catalog = IndexerCatalog.Match(indexer.Name, baseUrl);
+            var catalog = IndexerCatalog.Match(indexer.Name, baseUrl, ProtocolOf(indexer));
             var categories = Categories(indexer);
             var parts = new List<string>
             {
-                catalog.Key != IndexerCatalog.GenericNewznabKey ? $"{catalog.Name} · {baseUrl}" : baseUrl,
+                !IndexerCatalog.IsGeneric(catalog.Key) ? $"{catalog.Name} · {baseUrl}" : baseUrl,
                 $"{(IsSonarr ? "TV" : "movie")} categories {(categories.Count == 0 ? "default" : string.Join(", ", categories))}",
                 string.Create(CultureInfo.InvariantCulture, $"priority {indexer.Priority}"),
             };
+            if (indexer.IsTorrent)
+            {
+                parts.Insert(0, "torrent");
+                if (SeedSummary(indexer) is { } seed)
+                {
+                    parts.Add(seed);
+                }
+            }
             if (match is not null)
             {
                 parts.Add(match.Name.Equals(indexer.Name, StringComparison.OrdinalIgnoreCase)
@@ -307,9 +322,12 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
         var key = typedKey?.Trim() is { Length: > 0 } typed ? typed : remoteKey == ArrIndexer.Masked ? null : remoteKey.Trim();
         var categories = Categories(remote);
         var priority = Math.Clamp(remote.Priority, IndexerService.MinPriority, IndexerService.MaxPriority);
-        var catalog = IndexerCatalog.Match(remote.Name, baseUrl);
-        var definitionKey = catalog.Supported ? catalog.Key : IndexerCatalog.GenericNewznabKey;
+        var protocol = ProtocolOf(remote);
+        var catalog = IndexerCatalog.Match(remote.Name, baseUrl, protocol);
+        var definitionKey = catalog.Supported ? catalog.Key : IndexerCatalog.GenericKey(protocol);
         var additional = remote.Text("additionalParameters").Trim();
+        var implementation = remote.IsTorrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab;
+        var seed = SeedSettings(remote);
 
         if (existing is null)
         {
@@ -318,12 +336,16 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
             var tv = IsSonarr ? categories.Count > 0 ? categories : [.. IndexerService.DefaultTvCategories] : new List<int>();
             var enabled = key is not null;
             var created = service.Create(new IndexerDefinition(
-                0, UniqueName(service, remote.Name), IndexerDefinition.Newznab, baseUrl, apiPath, key ?? string.Empty, movies, tv, priority,
+                0, UniqueName(service, remote.Name), implementation, baseUrl, apiPath, key ?? string.Empty, movies, tv, priority,
                 remote.EnableRss, remote.EnableAutomaticSearch, remote.EnableInteractiveSearch)
             {
                 Enable = enabled,
                 DefinitionKey = definitionKey,
                 AdditionalParameters = additional,
+                MinimumSeeders = seed.MinimumSeeders,
+                SeedRatio = seed.Ratio,
+                SeedTimeMinutes = seed.Time,
+                SeasonPackSeedTimeMinutes = seed.PackTime,
             });
             run.Created(remote.Name);
             if (!enabled)
@@ -352,6 +374,11 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
             Enable = existing.Enable || (existing.ApiKey.Length == 0 && key is not null),
             DefinitionKey = existing.DefinitionKey ?? definitionKey,
             AdditionalParameters = existing.AdditionalParameters.Length > 0 ? existing.AdditionalParameters : additional,
+
+            // Seed settings: what the first app set stays, the second app fills in what is empty.
+            SeedRatio = existing.SeedRatio ?? seed.Ratio,
+            SeedTimeMinutes = existing.SeedTimeMinutes ?? seed.Time,
+            SeasonPackSeedTimeMinutes = existing.SeasonPackSeedTimeMinutes ?? seed.PackTime,
         });
         run.Updated(remote.Name);
         if (!hasKey)
@@ -360,6 +387,45 @@ public sealed partial class ArrIndexersSection(string source) : IMigrationSectio
         }
 
         return updated;
+    }
+
+    private static IndexerProtocol ProtocolOf(ArrIndexer indexer) => indexer.IsTorrent ? IndexerProtocol.Torrent : IndexerProtocol.Usenet;
+
+    /// <summary>Radarr/Sonarr's Torznab fields: minimumSeeders, seedCriteria.seedRatio, seedCriteria.seedTime (minutes), Sonarr's seedCriteria.seasonPackSeedTime.</summary>
+    private static (int MinimumSeeders, double? Ratio, int? Time, int? PackTime) SeedSettings(ArrIndexer indexer)
+    {
+        if (!indexer.IsTorrent)
+        {
+            return (1, null, null, null);
+        }
+
+        var minimum = indexer.Number("minimumSeeders") is >= 0 and <= IndexerService.MaxMinimumSeeders and var m ? (int)m : 1;
+        var ratio = indexer.Number("seedCriteria.seedRatio") is > 0 and <= IndexerService.MaxSeedRatio and var r ? r : (double?)null;
+        int? time = indexer.Number("seedCriteria.seedTime") is >= 1 and <= IndexerService.MaxSeedTimeMinutes and var t ? (int)t : null;
+        int? pack = indexer.Number("seedCriteria.seasonPackSeedTime") is >= 1 and <= IndexerService.MaxSeedTimeMinutes and var p ? (int)p : null;
+        return (minimum, ratio, time, pack);
+    }
+
+    private static string? SeedSummary(ArrIndexer indexer)
+    {
+        var (minimum, ratio, time, pack) = SeedSettings(indexer);
+        var parts = new List<string> { string.Create(CultureInfo.InvariantCulture, $"minimum {minimum} seeders") };
+        if (ratio is { } r)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"seed ratio {r:0.##}"));
+        }
+
+        if (time is { } t)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"seed time {t} min"));
+        }
+
+        if (pack is { } p)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"season pack seed time {p} min"));
+        }
+
+        return string.Join(", ", parts);
     }
 
     private static string UniqueName(IndexerService service, string name)

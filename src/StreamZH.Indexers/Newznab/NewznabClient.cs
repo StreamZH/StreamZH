@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Net;
 using StreamZH.Indexers.Torznab;
 
 namespace StreamZH.Indexers.Newznab;
@@ -22,7 +23,8 @@ namespace StreamZH.Indexers.Newznab;
 /// same API with torrent attributes in the feed, so requests, paging, caps and errors are shared and only the feed
 /// parser and the download differ. Stateless apart from the shared caps cache; the indexer definition comes with every call.
 /// </summary>
-public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capabilitiesCache, ILogger<NewznabClient>? logger = null) : IIndexerClient
+public sealed class NewznabClient(
+    HttpClient http, NewznabCapabilitiesCache capabilitiesCache, ILogger<NewznabClient>? logger = null, OutboundAddressGuard? guard = null) : IIndexerClient
 {
     /// <summary>Pages per query; with 100 results per page this is Radarr's limit of 1000 results per query.</summary>
     public const int MaxPagesPerQuery = 10;
@@ -44,6 +46,7 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
     private const string TorrentAccept = "application/x-bittorrent, */*;q=0.8";
 
     private readonly ILogger _logger = logger ?? (ILogger)NullLogger.Instance;
+    private readonly OutboundAddressGuard _guard = guard ?? OutboundAddressGuard.Default;
 
     public async Task<IndexerCapabilities> GetCapabilitiesAsync(IndexerDefinition indexer, CancellationToken cancellationToken)
     {
@@ -365,6 +368,10 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
         return response;
     }
 
+    /// <summary>The host of the indexer's configured URL; requests there are not restricted.</summary>
+    private static string? IndexerHost(IndexerDefinition indexer) =>
+        Uri.TryCreate(NewznabUrls.ApiEndpoint(indexer), UriKind.Absolute, out var endpoint) ? endpoint.IdnHost : null;
+
     private static bool IsRedirect(HttpResponseMessage response) =>
         response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther
             or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect;
@@ -373,7 +380,20 @@ public sealed class NewznabClient(HttpClient http, NewznabCapabilitiesCache capa
     {
         try
         {
+            // Feed links and redirects to another host than the indexer's may not reach this computer, link-local or
+            // cloud metadata addresses (checked here and again when the socket connects, see AddNewznabIndexers).
+            if (IndexerHost(indexer) is { } trusted)
+            {
+                OutboundAddressGuard.Restrict(request, trusted);
+            }
+
+            await _guard.CheckAsync(request, cancellationToken);
             return await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (HttpRequestException e) when ((e as BlockedDestinationException ?? e.InnerException as BlockedDestinationException) is { } ex)
+        {
+            _logger.LogWarning("{Indexer}: blocked a request to {Host}: {Message}", indexer.Name, request.RequestUri?.IdnHost, ex.Message);
+            throw NewznabErrors.Create(indexer, $"{indexer.Name}: {ex.Message}", inner: ex);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

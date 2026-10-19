@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Core;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Net;
 using StreamZH.Indexers.Newznab;
 
 namespace StreamZH.Indexers;
@@ -37,7 +38,9 @@ public static class IndexerServiceCollectionExtensions
                 configure?.Invoke(client);
             })
             // Redirects are followed by the client itself, so a redirect to a magnet link (Torznab) can be recognised.
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All, AllowAutoRedirect = false });
+            // The connect callback keeps feed links and redirects to other hosts away from loopback and metadata addresses.
+            .ConfigurePrimaryHttpMessageHandler(() => OutboundAddressGuard.Default.Apply(
+                new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All, AllowAutoRedirect = false }));
 
         return services;
     }

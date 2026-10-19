@@ -24,6 +24,12 @@ public sealed class AppPaths
 
     public void EnsureCreated()
     {
+        // A new data folder is private (0700) on Linux and macOS; it holds the database and the sign-in keys.
+        if (!OperatingSystem.IsWindows() && !Directory.Exists(DataDirectory))
+        {
+            Directory.CreateDirectory(DataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(LogDirectory);
         Directory.CreateDirectory(IncompleteDirectory);

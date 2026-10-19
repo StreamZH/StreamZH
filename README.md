@@ -93,18 +93,27 @@ administrator rights for that (the install script allows your user to start and 
 |---|---|
 | `-Firewall` (`-Port 9797`) | Allows the port from private and domain networks |
 | `-AllowControlledFolderAccess` | Adds `StreamZH.exe` to the allowed apps of Controlled folder access (Windows Security → Ransomware protection). Without it the service cannot import into protected folders such as Videos |
-| `-Account .\johndoe` | Runs the service as this user (asks for the password; Microsoft account: its password, not the PIN) instead of LocalSystem. Needed for a NAS that wants a login. `-Account LocalSystem` switches back |
+| `-Folder 'D:\Media', 'D:\Downloads'` | Lets the service account change these folders (root folders, download folders). Without it the script asks once when the service gets the virtual account |
+| `-Account .\johndoe` | Runs the service as this user (asks for the password; Microsoft account: its password, not the PIN) instead of the virtual account. Needed for a NAS share that wants a user and password. `-Account LocalSystem` runs it as LocalSystem (not recommended) |
 | `-DataDir D:\StreamZH` | Another data folder (passed as `--data`) |
 | `-NoStart` | Creates or updates the service without starting it |
 | `-NoTray` | No tray icon (removes its "Start with Windows" entry) |
+
+The service runs as its own virtual account `NT SERVICE\StreamZH`: no password, and no rights on
+the computer beyond its data folder and the folders it is given. It can change folders every user
+may change (most folders on other drives); for folders of your user (Videos, Downloads, Desktop) or
+other restricted folders, name them with `-Folder` or when the script asks. A service that ran as
+LocalSystem (before 0.12) is switched to the virtual account when you run the script again, unless you
+pass `-Account LocalSystem`. The data folder `C:\ProgramData\StreamZH` is private: only SYSTEM,
+administrators, the service account and your user may open it (StreamZH checks this at every start).
 
 Things that work differently for a service:
 
 - Mapped network drives (`Z:`) do not exist for services. Use UNC paths (`\\nas\movies`)
   for root folders and download folders; the install script lists your mapped drives with their UNC paths.
-- LocalSystem logs on to other computers as the computer account. Use `-Account` when the NAS
-  needs a user and password.
-- The proxy of your Windows user does not apply to LocalSystem; set a proxy in Settings → General if you need one.
+- The virtual account logs on to other computers as the computer account (`DOMAIN\PC$`). Use
+  `-Account .\<user>` when the NAS share needs a user and password.
+- The proxy of your Windows user does not apply to the service; set a proxy in Settings → General if you need one.
 - Logs stay in `C:\ProgramData\StreamZH\logs`. When StreamZH cannot start at all, the error is
   also in the Windows event log (Application, source StreamZH).
 
@@ -122,7 +131,8 @@ notifications when a download finishes or fails. `Update-Local.ps1` and `Install
 let it start with Windows for your user and start it (`-NoTray` leaves it out); it works for the
 service and for the console window. It needs the .NET 10 Windows Desktop Runtime, which the .NET SDK
 includes. The tray talks to StreamZH on this computer only, with a token StreamZH writes to
-`C:\ProgramData\StreamZH\tray.token` at every start (readable by administrators and signed-in users).
+`C:\ProgramData\StreamZH\tray.token` at every start (readable only by the account StreamZH runs as and
+the user the install script set up, or your own user for the console window).
 
 ### Linux: systemd service
 
@@ -150,12 +160,14 @@ StreamZH needs ICU (`sudo apt install libicu-dev`) and installs par2 and 7-Zip i
 ```bash
 docker build -f docker/Dockerfile -t streamzh:dev .
 docker run -d --name streamzh --restart unless-stopped -p 9797:9797 \
-  -e PUID=1000 -e PGID=1000 -e UMASK=002 \
+  -e PUID=1000 -e PGID=1000 -e UMASK=027 \
   -v /opt/streamzh:/config -v /srv/media:/media streamzh:dev
 ```
 
 Like the linuxserver.io images, `PUID`/`PGID` set the user StreamZH runs as (default: the
-image's `app` user, 1654) and `/config` is given to that user; `--user` works as well. The
+image's `app` user, 1654) and `/config` is given to that user and closed to others; `--user`
+works as well. `UMASK` (default `027`) decides who may read new media files: the group yes, others
+no; `002` also lets the group change them, `022` lets everyone read them. The
 image has a health check on `/health` (port 9797 inside the container; publish another port
 with `-p`, do not change it in Settings).
 

@@ -58,7 +58,7 @@ public sealed class TrayApiTests : IDisposable
         Assert.Equal(access.Token, File.ReadAllText(Path.Combine(_factory.DataDirectory, TrayContract.TokenFile)));
         if (!OperatingSystem.IsWindows())
         {
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead, File.GetUnixFileMode(access.TokenPath));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(access.TokenPath));
         }
 
         var endpoint = JsonSerializer.Deserialize<TrayEndpoint>(File.ReadAllText(access.EndpointPath), Json)!;

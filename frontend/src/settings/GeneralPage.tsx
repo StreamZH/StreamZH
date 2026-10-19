@@ -284,7 +284,7 @@ function SecuritySection() {
     <Section
       id="security"
       title="Security"
-      hiddenCount={advanced ? 0 : 1}
+      hiddenCount={advanced || v.certificateValidation === 'disabled' ? 0 : 1}
       footer={owner ? <SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} /> : <OwnerOnlyNote />}
     >
       <ReadOnly locked={!owner}>
@@ -322,9 +322,9 @@ function SecuritySection() {
       <Row
         label="Certificate validation"
         htmlFor="certificateValidation"
-        advanced
+        advanced={v.certificateValidation !== 'disabled'}
         error={form.error('certificateValidation')}
-        help="Checks HTTPS certificates of indexers, TMDB and other sites StreamZH calls. Turn it off only for your own servers with self-signed certificates."
+        help="Checks HTTPS certificates of indexers, TMDB and other sites StreamZH calls. For your own servers with self-signed certificates choose “Disabled for local addresses”; “Disabled” lets anyone on the way read indexer API keys."
       >
         <Select
           id="certificateValidation"
@@ -336,6 +336,11 @@ function SecuritySection() {
             { value: 'disabled', label: 'Disabled' },
           ]}
         />
+        {v.certificateValidation === 'disabled' && (
+          <small className={styles.warn} role="alert">
+            Not recommended: API keys can be read.
+          </small>
+        )}
       </Row>
       </ReadOnly>
     </Section>

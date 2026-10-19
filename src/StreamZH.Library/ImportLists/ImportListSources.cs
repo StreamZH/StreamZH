@@ -5,6 +5,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using StreamZH.Core.Media;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 using StreamZH.Library.Notifications;
 using StreamZH.Metadata.Tmdb;
@@ -68,7 +69,7 @@ public static partial class ImportListHttp
         HttpResponseMessage response;
         try
         {
-            response = await http.SendAsync(request, cancellationToken);
+            response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -81,7 +82,25 @@ public static partial class ImportListHttp
 
         using (response)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            string body;
+            try
+            {
+                // An admin can point a list at any server: at most 20 MB.
+                body = await ResponseLimits.ReadStringAsync(response.Content, ResponseLimits.Json, "the answer", cancellationToken);
+            }
+            catch (InvalidDataException ex)
+            {
+                throw new ImportListException($"{service}: {ex.Message.TrimEnd('.')}", ex);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException)
+            {
+                throw new ImportListException($"{service} is not reachable ({ex.Message.TrimEnd('.')})", ex);
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new ImportListException($"{service} did not answer in time", ex);
+            }
+
             if (response.IsSuccessStatusCode)
             {
                 return body;

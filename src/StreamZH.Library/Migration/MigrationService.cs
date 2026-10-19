@@ -7,6 +7,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Events;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Migration;
@@ -407,7 +408,11 @@ public static class MigrationServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMigrationCore(this IServiceCollection services)
     {
-        services.AddHttpClient<ArrApiClient>(client => client.Timeout = TimeSpan.FromSeconds(60));
+        services.AddHttpClient<ArrApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(60);
+            client.MaxResponseContentBufferSize = ResponseLimits.ArrMigration;
+        });
         services.AddSingleton<IMigrationProbe, ArrMigrationProbe>();
         services.AddSingleton<MigrationRunRepository>();
         services.AddSingleton<MigrationService>();

@@ -5,6 +5,7 @@
 using System.Net;
 using System.Text;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Net;
 using StreamZH.Indexers.Newznab;
 
 namespace StreamZH.Tests.Indexers;
@@ -70,8 +71,13 @@ internal static class NewznabTestSupport
         string limits = """<limits max="100" default="100" />""") =>
         $"""<?xml version="1.0" encoding="UTF-8"?><caps>{limits}<searching>{search}{tvSearch}{movieSearch}</searching><categories /></caps>""";
 
-    public static NewznabClient Client(StubIndexer handler, NewznabCapabilitiesCache? cache = null) =>
-        new(new HttpClient(handler), cache ?? new NewznabCapabilitiesCache());
+    public static NewznabClient Client(StubIndexer handler, NewznabCapabilitiesCache? cache = null, OutboundAddressGuard? guard = null) =>
+        new(new HttpClient(handler), cache ?? new NewznabCapabilitiesCache(), guard: guard ?? OfflineGuard);
+
+    /// <summary>The outbound guard without real DNS: "localhost" is loopback, every other name does not resolve.</summary>
+    public static OutboundAddressGuard OfflineGuard { get; } = new((host, _) => host == "localhost"
+        ? Task.FromResult(new[] { IPAddress.Loopback })
+        : Task.FromException<IPAddress[]>(new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound)));
 
     public static HttpResponseMessage Xml(string body, HttpStatusCode status = HttpStatusCode.OK, string mediaType = "application/rss+xml") =>
         new(status) { Content = new StringContent(body, Encoding.UTF8, mediaType) };

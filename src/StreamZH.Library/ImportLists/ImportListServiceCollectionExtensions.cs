@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Core.Jobs;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 using StreamZH.Metadata.Tmdb;
 
@@ -37,7 +38,11 @@ public static class ImportListServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ImportListRepository>();
         services.AddSingleton<ImportListOptions>();
-        services.AddHttpClient(ImportListHttp.ClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
+        services.AddHttpClient(ImportListHttp.ClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.MaxResponseContentBufferSize = ResponseLimits.Json;
+        });
         services.AddHttpClient<ITmdbListClient, TmdbClient>((sp, client) =>
         {
             client.Timeout = TimeSpan.FromSeconds(20);

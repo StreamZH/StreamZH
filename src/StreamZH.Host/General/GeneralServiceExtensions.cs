@@ -26,7 +26,8 @@ public static class GeneralServiceExtensions
         services.AddSingleton<AppLifecycle>();
         services.AddSingleton<IndexPage>();
         services.AddSingleton<UpdateChecker>();
-        services.AddHttpClient(UpdateChecker.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddHttpClient(UpdateChecker.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(UpdateChecker.CreateHandler);
 
         services.AddSingleton(restore);
         services.AddSingleton<BackupSettings>();

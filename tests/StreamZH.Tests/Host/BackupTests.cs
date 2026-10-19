@@ -53,6 +53,12 @@ public sealed class BackupTests : IDisposable
         Assert.StartsWith($"streamzh_backup_v{AppInfo.Version}_", backup.Name, StringComparison.Ordinal);
         var path = _backups.PathOf("manual", backup.Name)!;
         Assert.StartsWith(Path.Combine(_dir, "Backups", "manual"), path, StringComparison.Ordinal);
+        if (!OperatingSystem.IsWindows())
+        {
+            // S3-07: a backup holds every secret; only StreamZH's account may read it.
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+        }
+
         using (var zip = ZipFile.OpenRead(path))
         {
             Assert.NotNull(zip.GetEntry("streamzh.db"));

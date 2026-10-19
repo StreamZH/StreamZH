@@ -13,6 +13,7 @@ using StreamZH.Host.General;
 using StreamZH.Host.Hubs;
 using StreamZH.Host.Jobs;
 using StreamZH.Host.Logging;
+using StreamZH.Host.Security;
 using StreamZH.Host.Service;
 using StreamZH.Host.Settings;
 using StreamZH.Host.Status;
@@ -57,6 +58,7 @@ var restored = new StartupRestore(PendingRestore.Apply(paths));
 
 var database = new Database(paths.DatabaseFile);
 database.Migrate();
+var dataFolderPermissions = DataFolderPermissions.Apply(paths);
 
 var config = new ConfigRepository(database);
 var fileLogger = builder.AddStreamZhLogging(paths, config);
@@ -133,6 +135,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
 builder.Services.AddStreamZhAuth(paths);
+builder.Services.AddDataFolderPermissions(dataFolderPermissions);
 builder.Services.AddUserManagement();
 builder.Services.AddGeneralSettings(restored);
 builder.Services.AddSignalR();

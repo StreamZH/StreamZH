@@ -14,12 +14,22 @@
     area with a menu (open the dashboard, pause downloads, restart, stop, start). The script registers it to start with
     Windows for your user (HKCU ... Run, "StreamZH Tray") and starts it; -NoTray leaves it out.
 
-    The service runs as LocalSystem by default (no password needed). Two things work differently for a service:
+    The service runs as its own virtual account "NT SERVICE\StreamZH" by default (no password needed, no rights on
+    this computer beyond the folders it is given). It may change its data folder and the folders you name with -Folder
+    or when the script asks (root folders, download folders); folders that every user may change (most folders on
+    other drives) work without that. -Account LocalSystem runs it as LocalSystem as before 0.12 (full control of the
+    computer: anyone who gets into StreamZH's settings could take over Windows). Running the script on a service that
+    runs as LocalSystem switches it to the virtual account unless -Account LocalSystem is given.
+
+    The data folder becomes private: only SYSTEM, administrators, the service account and your user may open it (it
+    holds the database with the API key and password hashes, the sign-in keys and the backups).
+
+    Things that work differently for a service:
     - Controlled folder access (Windows Security -> Ransomware protection) blocks unknown programs in protected folders
       such as Videos and Documents, also for a service. -AllowControlledFolderAccess allows StreamZH.exe.
     - Mapped network drives (Z:) do not exist for services. Use UNC paths (\\nas\movies) for root folders and download
-      folders. LocalSystem logs on to other computers as the computer account; for a NAS with its own users run the
-      service as your user with -Account.
+      folders. The virtual account (like LocalSystem) logs on to other computers as the computer account; for a NAS
+      with its own users run the service as your user with -Account .\<user>.
 
     Build StreamZH.exe first: C:\Repos\StreamZH\tools\Update-Local.ps1 -NoStart
 
@@ -30,9 +40,16 @@
     Data folder. Empty: C:\ProgramData\StreamZH, the same as without a service.
 
 .PARAMETER Account
-    Run the service as this user (for example .\johndoe or DOMAIN\user) instead of LocalSystem; asks for the password.
-    With a Microsoft account use the password of the Microsoft account, not the PIN. "LocalSystem" switches back.
-    Without -Account an existing service keeps its account.
+    Empty (default): the virtual account NT SERVICE\StreamZH for a new service and for one that ran as LocalSystem; a
+    service that runs as a user keeps that user.
+    .\johndoe or DOMAIN\user: run the service as this user (asks for the password; with a Microsoft account use the
+    password of the Microsoft account, not the PIN). Needed for a NAS share that wants a user and password.
+    LocalSystem: run it as LocalSystem (not recommended).
+
+.PARAMETER Folder
+    Folders the service must read and write: root folders and download folders on this computer. The service account
+    gets "Modify" on them. Without -Folder the script asks when the service switches to the virtual account. Network
+    shares (\\nas\movies) are not changed: the NAS decides who may write there.
 
 .PARAMETER Firewall
     Allows incoming connections to -Port from the private and domain network (not from public networks).
@@ -56,6 +73,9 @@
     C:\Repos\StreamZH\tools\Install-Service.ps1 -Firewall -AllowControlledFolderAccess
 
 .EXAMPLE
+    C:\Repos\StreamZH\tools\Install-Service.ps1 -Folder 'D:\Media', 'D:\Downloads'
+
+.EXAMPLE
     C:\Repos\StreamZH\tools\Install-Service.ps1 -Account .\johndoe
 #>
 [CmdletBinding()]
@@ -63,6 +83,7 @@ param(
     [string]$InstallDir = 'C:\Tools\StreamZH',
     [string]$DataDir = '',
     [string]$Account = '',
+    [string[]]$Folder = @(),
     [switch]$Firewall,
     [ValidateRange(1, 65535)]
     [int]$Port = 9797,
@@ -162,10 +183,29 @@ function Grant-ServiceControl([string]$sid) {
     return $true
 }
 
-# Modify for the user (OI)(CI), so StreamZH started in a console can still write files the service created.
-function Grant-DataFolder([string]$folder, [string]$sid) {
+# Modify (OI)(CI) on a root folder or download folder for the service account. Network shares are left alone.
+function Grant-ServiceFolder([string]$folder, [string]$sid, [string]$accountName) {
+    $folder = $folder.Trim().Trim('"').TrimEnd('\')
+    if (-not $folder) { return }
+    if ($folder.StartsWith('\\')) {
+        Hint "${folder}: network share, not changed. The service logs on to the NAS as this computer; for a NAS with its own users use -Account .\<user>."
+        return
+    }
+    if ($folder -match '^[A-Za-z]:$') { $folder = "$folder\" }
+    if (-not (Test-Path -LiteralPath $folder -PathType Container)) {
+        Hint "${folder}: folder not found, skipped."
+        return
+    }
     $output = & icacls.exe $folder /grant "*${sid}:(OI)(CI)M" /Q 2>&1
     if ($LASTEXITCODE -ne 0) { throw "icacls $folder failed ($LASTEXITCODE): $output" }
+    Write-Host "${accountName}: may change $folder"
+}
+
+# The SID of an account name; ".\user" means a user of this computer.
+function Get-AccountSid([string]$name) {
+    if ($name.StartsWith('.\')) { $name = "$env:COMPUTERNAME\$($name.Substring(2))" }
+    if ($name -eq 'LocalSystem') { return 'S-1-5-18' }
+    return (New-Object Security.Principal.NTAccount($name)).Translate([Security.Principal.SecurityIdentifier]).Value
 }
 
 Assert-Administrator $PSCommandPath (Format-StreamZhArguments $PSBoundParameters)
@@ -186,16 +226,29 @@ if ($DataDir) { $binaryPath = "$binaryPath --data `"$DataDir`"" }
 $description = 'StreamZH - one app for your whole media pipeline (library, indexers, downloads). Web UI on http://localhost:9797 unless changed in Settings -> General.'
 $me = [Security.Principal.WindowsIdentity]::GetCurrent()
 
+$virtualAccount = "NT SERVICE\$StreamZhServiceName"
+$service = Get-StreamZhService
+$previousAccount = ''
+if ($service) { $previousAccount = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$StreamZhServiceName'").StartName }
+
 $credential = $null
 $useLocalSystem = $Account -eq 'LocalSystem' -or $Account -eq 'NT AUTHORITY\SYSTEM'
-if ($Account -and -not $useLocalSystem) {
+$useVirtual = $Account -eq $virtualAccount
+if (-not $Account) {
+    # New services and services that ran as LocalSystem get the virtual account; one that runs as a user keeps it.
+    $useVirtual = (-not $service) -or $previousAccount -eq 'LocalSystem' -or $previousAccount -eq $virtualAccount
+}
+elseif (-not $useLocalSystem -and -not $useVirtual) {
     if ($Account -notmatch '[\\@]') { $Account = ".\$Account" }
-    $credential = Get-Credential -UserName $Account -Message "Passwort für das Dienstkonto von StreamZH ($Account)"
+    $credential = Get-Credential -UserName $Account -Message "Password of the account StreamZH runs as ($Account)"
     if (-not $credential) { exit 1 }
+}
+$switchesToVirtual = $useVirtual -and $previousAccount -ne $virtualAccount
+if ($switchesToVirtual -and $previousAccount) {
+    Hint "The service ran as $previousAccount and now runs as $virtualAccount (to keep $previousAccount, run again with -Account LocalSystem)."
 }
 
 Step 'Stop StreamZH'
-$service = Get-StreamZhService
 if ($service -and (Stop-StreamZhService)) { Write-Host 'service stopped' }
 # A StreamZH in a console window holds the port and the database.
 $console = Get-Process -Name 'StreamZH' -ErrorAction SilentlyContinue
@@ -233,6 +286,12 @@ else {
     New-Service @parameters | Out-Null
 }
 
+if ($useVirtual) {
+    # Virtual account: no password; the service's own SID is in its token, so folders can be granted to it alone.
+    Invoke-Sc @('config', $StreamZhServiceName, 'obj=', $virtualAccount)
+    Invoke-Sc @('sidtype', $StreamZhServiceName, 'unrestricted')
+}
+
 Set-Service -Name $StreamZhServiceName -Description $description
 Invoke-Sc @('config', $StreamZhServiceName, 'start=', 'delayed-auto')
 # Restart after a crash: 5 s, 10 s, then every 60 s; the count starts again after a day without a crash.
@@ -250,17 +309,37 @@ if ($credential) {
     $serviceSid = Grant-ServiceLogonRight $credential.UserName
     Write-Host "$($credential.UserName): log on as a service"
 }
+elseif ($useVirtual) {
+    # "NT SERVICE\ALL SERVICES" has this right by default; granted anyway in case a policy removed it.
+    $serviceSid = Get-AccountSid $virtualAccount
+    try { [void](Grant-ServiceLogonRight $virtualAccount) } catch { Hint "Log on as a service for ${virtualAccount}: $($_.Exception.Message)" }
+}
+else {
+    $serviceSid = Get-AccountSid $runsAs
+}
 if (Grant-ServiceControl $me.User.Value) { Write-Host "$($me.Name): may start and stop the service" }
 else { Write-Host "$($me.Name): may start and stop the service (already set)" }
 
 New-Item -ItemType Directory -Path $data -Force | Out-Null
 # The service writes a new tray token for its account when it starts.
 Remove-StreamZhTrayFiles $data
-Grant-DataFolder $data $me.User.Value
-Write-Host "$($me.Name): may change $data"
-if ($credential) {
-    Grant-DataFolder $data $serviceSid
-    Write-Host "$($credential.UserName): may change $data"
+# Private: SYSTEM, administrators, the service account (full control) and you (change, for the tray icon and a
+# StreamZH in a console window); Users, Authenticated Users and Everyone lose their access.
+Protect-StreamZhDataFolder $data @($serviceSid) @($me.User.Value)
+Write-Host "${runsAs}, $($me.Name): may change $data (nobody else but SYSTEM and administrators)"
+
+# Root folders and download folders for the service account.
+$folders = @($Folder | Where-Object { $_ })
+if ($folders.Count -eq 0 -and $switchesToVirtual -and [Environment]::UserInteractive -and $serviceSid -ne 'S-1-5-18') {
+    Hint "`nStreamZH now runs as $virtualAccount. It may change folders that every user may change (most folders on other"
+    Hint 'drives), but not the folders of your user (Videos, Downloads, Desktop, Documents).'
+    Hint 'Folders StreamZH must change (root folders, download folders), separated by ";". Empty: none.'
+    $answer = Read-Host 'Folders'
+    $folders = @($answer -split ';' | Where-Object { $_.Trim() })
+}
+foreach ($path in $folders) { Grant-ServiceFolder $path $serviceSid $runsAs }
+if ($useVirtual -and $folders.Count -eq 0) {
+    Hint "More folders later: & '$PSCommandPath' -Folder 'D:\Media', 'D:\Downloads'"
 }
 
 if (-not [Diagnostics.EventLog]::SourceExists($StreamZhServiceName)) {
@@ -310,10 +389,10 @@ foreach ($drive in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Disp
     $mapped[$drive.Name.ToUpperInvariant()] = $drive.DisplayRoot
 }
 if ($mapped.Count -gt 0) {
-    Hint "`nNetzlaufwerke sieht der Dienst nicht. In StreamZH (Stammordner, Download-Ordner) diese Pfade verwenden:"
+    Hint "`nThe service does not see mapped network drives. Use these paths in StreamZH (root folders, download folders):"
     foreach ($letter in ($mapped.Keys | Sort-Object)) { Hint "    ${letter}: -> $($mapped[$letter])" }
-    if (-not $credential -and $runsAs -eq 'LocalSystem') {
-        Hint 'Braucht das NAS eine Anmeldung, den Dienst unter deinem Benutzer laufen lassen:'
+    if (-not $credential -and ($runsAs -eq 'LocalSystem' -or $runsAs -eq $virtualAccount)) {
+        Hint 'If the NAS wants a user and password, run the service as your user:'
         Hint "    & '$PSCommandPath' -Account .\$env:USERNAME"
     }
 }

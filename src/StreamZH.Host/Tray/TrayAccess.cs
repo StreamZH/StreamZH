@@ -16,13 +16,14 @@ using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
 using StreamZH.Core.Tray;
 using StreamZH.Host.General;
+using StreamZH.Host.Security;
 using StreamZH.Host.Service;
 
 namespace StreamZH.Host.Tray;
 
 /// <summary>
 /// The tray icon's access (StreamZH.Tray.exe on Windows): a random token per run, written to &lt;data&gt;/tray.token
-/// with a narrow ACL (Windows: administrators, SYSTEM and this account full, signed-in users read; elsewhere 0640),
+/// with a narrow ACL (Windows: SYSTEM and this account full, the tray's user read, see <see cref="TokenAcl"/>; elsewhere 0600),
 /// and &lt;data&gt;/tray.json with the address on this computer. Also remembers the last finished downloads, so the tray
 /// can show a notification for each.
 /// </summary>
@@ -159,7 +160,7 @@ public sealed partial class TrayAccess(
         return (authority + values.UrlBase, browser + values.UrlBase + "/");
     }
 
-    /// <summary>Writes the token so only administrators, SYSTEM, this account (full) and signed-in users (read) can open it.</summary>
+    /// <summary>Writes the token so only SYSTEM, this account and the user of the tray icon can open it (Linux, macOS: 0600).</summary>
     public static void WriteToken(string path, string token)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -177,11 +178,12 @@ public sealed partial class TrayAccess(
             return;
         }
 
+        // Only the account StreamZH runs as (the tray icon exists on Windows only).
         var options = new FileStreamOptions
         {
             Mode = FileMode.CreateNew,
             Access = FileAccess.Write,
-            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead,
+            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
         };
         using (var stream = new FileStream(path, options))
         using (var writer = new StreamWriter(stream))
@@ -190,22 +192,61 @@ public sealed partial class TrayAccess(
         }
 
         // The umask can only take rights away; set it exactly anyway.
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
+    /// <summary>
+    /// Who may open the token on Windows (S1-13): SYSTEM and the writing account fully; the user accounts in
+    /// <paramref name="readers"/> may read it. Null readers (no user known, see <see cref="TrayReaders"/>) falls back to
+    /// signed-in users, as before 0.12.
+    /// </summary>
+    public static IReadOnlyList<AclEntry> TokenAcl(string writerSid, IReadOnlyList<string>? readers)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(writerSid);
+        List<AclEntry> entries =
+        [
+            new(DataFolderAcl.LocalSystem, AclEntry.FullControl, true, 0, 0),
+            new(writerSid, AclEntry.FullControl, true, 0, 0),
+        ];
+        foreach (var reader in readers ?? [InteractiveSid])
+        {
+            entries.Add(new AclEntry(reader, AclEntry.Read | AclEntry.Synchronize, true, 0, 0));
+        }
+
+        return [.. entries.DistinctBy(e => e.Sid, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    /// <summary>"Signed-in users": only for a service whose data folder grants no user account.</summary>
+    public const string InteractiveSid = "S-1-5-4";
+
+    /// <summary>
+    /// The tray runs as the signed-in user. In a console window that is the account writing the token, so nobody else
+    /// needs it. As a service: the user accounts the data folder grants (Install-Service.ps1 adds the installing user);
+    /// null when there are none.
+    /// </summary>
+    public static IReadOnlyList<string>? TrayReaders(bool isService, string writerSid, IEnumerable<AclEntry> dataFolder)
+    {
+        if (!isService)
+        {
+            return [];
+        }
+
+        var users = DataFolderAcl.TrayReaders(dataFolder, writerSid);
+        return users.Count > 0 ? users : null;
     }
 
     [SupportedOSPlatform("windows")]
     private static void WriteWindows(string path, string token)
     {
+        var me = WindowsIdentity.GetCurrent().User?.Value ?? DataFolderAcl.LocalSystem;
+        var folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        var readers = TrayReaders(RunningAs.IsWindowsService, me, WindowsAcl.Entries(new DirectoryInfo(folder).GetAccessControl(AccessControlSections.Access)));
         var security = new FileSecurity();
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-        security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null), FileSystemRights.FullControl, AccessControlType.Allow));
-        security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), FileSystemRights.FullControl, AccessControlType.Allow));
-        if (WindowsIdentity.GetCurrent().User is { } me)
+        foreach (var entry in TokenAcl(me, readers))
         {
-            security.AddAccessRule(new FileSystemAccessRule(me, FileSystemRights.FullControl, AccessControlType.Allow));
+            security.AddAccessRule(WindowsAcl.Rule(entry));
         }
-
-        security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.InteractiveSid, null), FileSystemRights.Read, AccessControlType.Allow));
 
         using var stream = new FileInfo(path).Create(FileMode.CreateNew, FileSystemRights.WriteData | FileSystemRights.Synchronize, FileShare.None, 4096, FileOptions.None, security);
         using var writer = new StreamWriter(stream);

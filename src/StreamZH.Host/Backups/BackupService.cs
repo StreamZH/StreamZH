@@ -10,6 +10,7 @@ using Dapper;
 using Microsoft.Data.Sqlite;
 using StreamZH.Core;
 using StreamZH.Data;
+using StreamZH.Host.Security;
 
 namespace StreamZH.Host.Backups;
 
@@ -283,6 +284,9 @@ public sealed partial class BackupService(BackupSettings settings, AppPaths path
             }
 
             File.Move(partial, target);
+
+            // The database and the sign-in keys are secrets: owner only, also in a backup folder outside the data folder.
+            DataFolderPermissions.RestrictFile(target);
             var info = new FileInfo(target);
             logger.LogInformation("Backup {Name} created ({Type}, {Size} bytes)", name, TypeName(type), info.Length);
             return new BackupInfo(name, TypeName(type), info.Length, info.LastWriteTimeUtc);

@@ -115,8 +115,11 @@ internal sealed class StreamZhProcess(string dataDirectory)
             {
                 Arguments = TrayCommandLine.HostArguments(dataDirectory, AppPaths.Resolve().DataDirectory),
                 WorkingDirectory = AppContext.BaseDirectory,
-                UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Minimized,
+                // No console window at all (CREATE_NO_WINDOW): StreamZH logs to its log file, the tray shows its state.
+                // ShellExecute with a hidden or minimized window still shows one when Windows Terminal is the default
+                // console host.
+                UseShellExecute = false,
+                CreateNoWindow = true,
             });
             return null;
         }

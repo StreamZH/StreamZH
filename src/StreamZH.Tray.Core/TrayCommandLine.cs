@@ -15,7 +15,7 @@ public static class TrayCommandLine
     public const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     /// <summary>
-    /// "--start": when there is no service, the tray starts StreamZH.exe (minimized) if it is not running. The Windows
+    /// "--start": when there is no service, the tray starts StreamZH.exe (without a window) if it is not running. The Windows
     /// installer's "tray only" choice puts it in the Run entry, so StreamZH starts at sign-in without a service.
     /// </summary>
     public const string StartFlag = "--start";

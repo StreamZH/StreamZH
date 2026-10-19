@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     The simple alternative to Install-Service.ps1 (the Windows installer runs this script for its "tray icon only"
-    choice). StreamZH then runs as your user while you are signed in, in a minimized console window, and stops when you
+    choice). StreamZH then runs as your user while you are signed in, without a window (logs in the data folder), and stops when you
     sign out. Your user's mapped drives and folders work as they are; nothing needs extra permissions.
 
     - Removes the service StreamZH when there is one (Uninstall-Service.ps1); your data stays.

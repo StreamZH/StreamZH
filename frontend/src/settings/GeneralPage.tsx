@@ -281,7 +281,7 @@ function SecuritySection() {
     <Section
       id="security"
       title="Security"
-      hiddenCount={advanced ? 0 : 1}
+      hiddenCount={advanced || v.certificateValidation === 'disabled' ? 0 : 1}
       footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
     >
       {v.authenticationMethodOverride && (
@@ -318,9 +318,9 @@ function SecuritySection() {
       <Row
         label="Certificate validation"
         htmlFor="certificateValidation"
-        advanced
+        advanced={v.certificateValidation !== 'disabled'}
         error={form.error('certificateValidation')}
-        help="Checks HTTPS certificates of indexers, TMDB and other sites StreamZH calls. Turn it off only for your own servers with self-signed certificates."
+        help="Checks HTTPS certificates of indexers, TMDB and other sites StreamZH calls. For your own servers with self-signed certificates choose “Disabled for local addresses”."
       >
         <Select
           id="certificateValidation"
@@ -328,10 +328,15 @@ function SecuritySection() {
           onChange={(certificateValidation) => form.set({ certificateValidation })}
           options={[
             { value: 'enabled', label: 'Enabled' },
-            { value: 'disabledForLocalAddresses', label: 'Disabled for local addresses' },
+            { value: 'disabledForLocalAddresses', label: 'Disabled for local addresses (recommended for self-signed)' },
             { value: 'disabled', label: 'Disabled' },
           ]}
         />
+        {v.certificateValidation === 'disabled' && (
+          <small className={styles.warn} role="alert">
+            Not recommended: anyone on the way to an indexer could read its API key. Prefer “Disabled for local addresses”.
+          </small>
+        )}
       </Row>
     </Section>
   )

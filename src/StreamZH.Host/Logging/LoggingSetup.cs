@@ -43,10 +43,15 @@ public static class LoggingSetup
         builder.Logging.AddFilter<ConsoleLoggerProvider>("Microsoft", level => level >= Max(LogLevel.Warning, consoleLevel.Minimum));
         builder.Logging.AddFilter<ConsoleLoggerProvider>("Microsoft.Hosting.Lifetime", level => level >= consoleLevel.Minimum);
 
-        // Keys are stored unencrypted in the data folder by design (same as Sonarr/Radarr); no warning on every start.
-        builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
-        builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
-        builder.Logging.AddFilter<ConsoleLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+        // Linux, macOS and Docker have no DPAPI: the sign-in keys are files readable only by StreamZH's account
+        // (DataFolderPermissions), so the "key may be persisted unencrypted" warning at each new key is noise there.
+        // Windows encrypts them with DPAPI (AuthServiceExtensions) and keeps the framework's warnings.
+        if (!OperatingSystem.IsWindows())
+        {
+            builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+            builder.Logging.AddFilter<FileLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+            builder.Logging.AddFilter<ConsoleLoggerProvider>("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+        }
 
         // One line per outgoing HTTP request (TMDB, indexers) is noise; keep warnings and errors only.
         builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);

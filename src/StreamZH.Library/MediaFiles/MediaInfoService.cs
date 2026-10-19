@@ -59,6 +59,12 @@ public sealed class MediaInfoService(
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
+    /// <summary>
+    /// ffprobe may open local files only: a downloaded "video" that is really a playlist (HLS, concat, ...) cannot make it
+    /// fetch URLs (http, tcp, rtmp, ...) from the network.
+    /// </summary>
+    public static readonly IReadOnlyList<string> LocalOnly = ["-protocol_whitelist", "file,pipe"];
+
     /// <summary>ffprobe is there and analysing is switched on.</summary>
     public bool Enabled => settings.Analyze && tools.Find(PostProcessTool.FFprobe).Found;
 
@@ -76,7 +82,7 @@ public sealed class MediaInfoService(
         }
 
         var (size, modified) = SafeStat(path);
-        var streams = await RunAsync(ffprobe, ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-probesize", "50M", path], path, cancellationToken)
+        var streams = await RunAsync(ffprobe, [.. LocalOnly, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-probesize", "50M", path], path, cancellationToken)
             .ConfigureAwait(false);
         string? frames = null;
         if (FfprobeParser.NeedsFrameSideData(streams))
@@ -85,7 +91,7 @@ public sealed class MediaInfoService(
             {
                 frames = await RunAsync(
                     ffprobe,
-                    ["-v", "error", "-print_format", "json", "-select_streams", "v:0", "-read_intervals", "%+#1", "-show_frames", "-show_entries", "frame=side_data_list", path],
+                    [.. LocalOnly, "-v", "error", "-print_format", "json", "-select_streams", "v:0", "-read_intervals", "%+#1", "-show_frames", "-show_entries", "frame=side_data_list", path],
                     path,
                     cancellationToken).ConfigureAwait(false);
             }

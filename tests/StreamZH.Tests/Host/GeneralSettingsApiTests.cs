@@ -155,6 +155,35 @@ public sealed class GeneralSettingsApiTests : IDisposable
         Assert.True(info.LastCheck.UpdateAvailable);
         Assert.Equal("99.1.0", info.LastCheck.LatestVersion);
         Assert.Equal("api.github.com", github.LastHost);
+
+        // A release whose link leaves github.com is not offered (the link becomes the "Download" button).
+        foreach (var link in new[] { "https://github.com.evil.example/x", "http://github.com/streamzh/streamzh/releases/tag/v99.2.0", "https://evil.example/StreamZH.exe" })
+        {
+            github.Release = $$"""{"tag_name":"v99.2.0","html_url":"{{link}}","published_at":"2027-01-01T00:00:00Z"}""";
+            info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;
+            Assert.False(info.LastCheck.UpdateAvailable);
+            Assert.Null(info.LastCheck.ReleaseUrl);
+            Assert.Contains("unexpected link", info.LastCheck.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Update_check_validates_the_certificate_even_when_validation_is_disabled()
+    {
+        var owner = await _factory.CreateOwnerClientAsync();
+        (await owner.PutAsJsonAsync("/api/v1/settings/general", new { certificateValidation = "disabled" })).EnsureSuccessStatusCode();
+
+        var handler = _factory.Services.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(UpdateChecker.HttpClientName);
+        while (handler is DelegatingHandler { InnerHandler: { } inner })
+        {
+            handler = inner;
+        }
+
+        var sockets = Assert.IsType<SocketsHttpHandler>(handler);
+        var callback = sockets.SslOptions.RemoteCertificateValidationCallback!;
+        Assert.False(callback(new object(), null, null, System.Net.Security.SslPolicyErrors.RemoteCertificateChainErrors));
+        Assert.True(callback(new object(), null, null, System.Net.Security.SslPolicyErrors.None));
+        Assert.IsType<SettingsWebProxy>(sockets.Proxy);
     }
 
     [Theory]

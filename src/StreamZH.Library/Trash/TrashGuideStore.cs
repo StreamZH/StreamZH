@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Trash;
@@ -184,8 +185,9 @@ public sealed class TrashGuideStore(
         try
         {
             await using (var file = File.Create(zipFile))
+            await using (var body = await response.Content.ReadAsStreamAsync(cancellationToken))
             {
-                await response.Content.CopyToAsync(file, cancellationToken);
+                await ResponseLimits.CopyAsync(body, file, ResponseLimits.TrashArchive, "The TRaSH Guides archive", cancellationToken);
             }
 
             using var archive = ZipFile.OpenRead(zipFile);
@@ -224,10 +226,10 @@ public sealed class TrashGuideStore(
                 return null;
             }
 
-            var text = (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
+            var text = (await ResponseLimits.ReadStringAsync(response.Content, 4096, "The commit", cancellationToken)).Trim();
             return IsCommit(text) ? text.ToLowerInvariant() : null;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException { CancellationToken.IsCancellationRequested: false })
+        catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or IOException or TaskCanceledException { CancellationToken.IsCancellationRequested: false })
         {
             return null; // Rate limit or no API access: the archive request decides.
         }
@@ -265,8 +267,12 @@ public sealed class TrashGuideStore(
         }
 
         string metadataJson;
-        using (var reader = new StreamReader(metadata.Open(), Encoding.UTF8))
+        using (var input = metadata.Open())
+        using (var buffer = new MemoryStream())
         {
+            ResponseLimits.Copy(input, buffer, ResponseLimits.TrashFile, TrashGuideParser.MetadataFile);
+            buffer.Position = 0;
+            using var reader = new StreamReader(buffer, Encoding.UTF8);
             metadataJson = reader.ReadToEnd();
         }
 
@@ -292,7 +298,7 @@ public sealed class TrashGuideStore(
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 using var input = open();
                 using var output = File.Create(destination);
-                input.CopyTo(output);
+                ResponseLimits.Copy(input, output, ResponseLimits.TrashFile, path);
             }
 
             var guides = TrashGuideParser.Parse(target);

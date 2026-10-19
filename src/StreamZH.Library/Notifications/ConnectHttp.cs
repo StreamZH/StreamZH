@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Notifications;
@@ -67,7 +68,7 @@ public static class ConnectHttp
         HttpResponseMessage response;
         try
         {
-            response = await http.SendAsync(request, cancellationToken);
+            response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -80,7 +81,25 @@ public static class ConnectHttp
 
         using (response)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            string body;
+            try
+            {
+                // An admin can point a connection at any server: at most 20 MB.
+                body = await ResponseLimits.ReadStringAsync(response.Content, ResponseLimits.Json, "the answer", cancellationToken);
+            }
+            catch (InvalidDataException ex)
+            {
+                throw new ConnectException(ex.Message.TrimEnd('.'), retryable: false, ex);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException)
+            {
+                throw new ConnectException($"not reachable ({Short(ex.Message)})", retryable: true, ex);
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new ConnectException("timed out", retryable: true, ex);
+            }
+
             if (response.IsSuccessStatusCode)
             {
                 return body;

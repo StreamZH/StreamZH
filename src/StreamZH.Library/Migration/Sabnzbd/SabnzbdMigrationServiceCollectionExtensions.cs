@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using Microsoft.Extensions.DependencyInjection;
+using StreamZH.Core.Net;
 using StreamZH.Library.Migration.Indexers;
 
 namespace StreamZH.Library.Migration.Sabnzbd;
@@ -15,7 +16,11 @@ public static class SabnzbdMigrationServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddSabnzbdMigration(this IServiceCollection services)
     {
-        services.AddHttpClient<SabnzbdApiClient>(client => client.Timeout = TimeSpan.FromSeconds(60));
+        services.AddHttpClient<SabnzbdApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(60);
+            client.MaxResponseContentBufferSize = ResponseLimits.SabnzbdMigration;
+        });
         services.AddSingleton<IMigrationProbe, SabnzbdMigrationProbe>();
         services.AddSingleton<IMigrationSection, SabnzbdServersSection>();
         services.AddSingleton<IMigrationSection, SabnzbdCategoriesSection>();

@@ -53,7 +53,7 @@ public static class DataFolderPermissions
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException or InvalidOperationException
-                                       or IdentityNotMappedException or PrivilegeNotHeldException)
+                                       or IdentityNotMappedException or PrivilegeNotHeldException or ArgumentException)
         {
             problems.Add($"{paths.DataDirectory}: {ex.Message}");
         }
@@ -204,7 +204,12 @@ public static class WindowsAcl
         return [.. security.GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier))
             .Cast<FileSystemAccessRule>()
             .Select(r => new AclEntry(
-                r.IdentityReference.Value, (int)r.FileSystemRights, r.AccessControlType == AccessControlType.Allow, (int)r.InheritanceFlags, (int)r.PropagationFlags))];
+                r.IdentityReference.Value,
+                AclEntry.SpecificRights((int)r.FileSystemRights),
+                r.AccessControlType == AccessControlType.Allow,
+                (int)r.InheritanceFlags,
+                (int)r.PropagationFlags))
+            .Where(e => e.Rights != 0)];
     }
 
     public static FileSystemAccessRule Rule(AclEntry entry)

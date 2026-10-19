@@ -25,6 +25,37 @@ public sealed record AclEntry(string Sid, int Rights, bool Allow, int Inheritanc
     /// <summary>Full control for the folder, its subfolders and files.</summary>
     public static AclEntry FullControlFor(string sid) => new(sid, FullControl, true, ContainerInherit | ObjectInherit, 0);
 
+    /// <summary>
+    /// File rights without the generic bits that inherited entries carry (C:\ProgramData gives CREATOR OWNER
+    /// GENERIC_ALL): GENERIC_ALL becomes full control, GENERIC_READ/WRITE/EXECUTE the file equivalents; bits that are
+    /// not file rights are dropped. Windows' FileSystemAccessRule refuses masks outside the file rights.
+    /// </summary>
+    public static int SpecificRights(int mask)
+    {
+        var rights = mask & FullControl;
+        if ((mask & 0x10000000) != 0)
+        {
+            rights |= FullControl;
+        }
+
+        if ((mask & unchecked((int)0x80000000)) != 0)
+        {
+            rights |= 0x120089; // FILE_GENERIC_READ
+        }
+
+        if ((mask & 0x40000000) != 0)
+        {
+            rights |= 0x120116; // FILE_GENERIC_WRITE
+        }
+
+        if ((mask & 0x20000000) != 0)
+        {
+            rights |= 0x1200A0; // FILE_GENERIC_EXECUTE
+        }
+
+        return rights;
+    }
+
     /// <summary>Applies to the folder itself and to everything below it.</summary>
     public bool CoversAll => Inheritance == (ContainerInherit | ObjectInherit) && Propagation == 0;
 }

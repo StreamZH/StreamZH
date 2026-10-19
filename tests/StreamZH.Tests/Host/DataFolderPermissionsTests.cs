@@ -221,6 +221,14 @@ public sealed class DataFolderPermissionsTests : IDisposable
         Assert.NotNull(DataFolderAcl.Plan(current[..^1], isProtected: true, OtherUser));
     }
 
+    [Theory]
+    [InlineData(0x10000000, AclEntry.FullControl)]      // GENERIC_ALL (CREATOR OWNER in C:\ProgramData)
+    [InlineData(unchecked((int)0x80000000), 0x120089)]   // GENERIC_READ
+    [InlineData(0x60000000, 0x1201B6)]                  // GENERIC_WRITE | GENERIC_EXECUTE
+    [InlineData(0x1200A9, 0x1200A9)]                    // read and execute stays
+    [InlineData(0x01000000, 0)]                         // ACCESS_SYSTEM_SECURITY is no file right
+    public void Generic_rights_become_file_rights(int mask, int expected) => Assert.Equal(expected, AclEntry.SpecificRights(mask));
+
     [Fact]
     public void The_tray_token_is_for_the_tray_user_only()
     {

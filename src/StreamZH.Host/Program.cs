@@ -61,6 +61,7 @@ database.Migrate();
 var dataFolderPermissions = DataFolderPermissions.Apply(paths);
 
 var config = new ConfigRepository(database);
+StorageLocationService.Load(config, paths);
 var fileLogger = builder.AddStreamZhLogging(paths, config);
 var runningHost = builder.UseStreamZhHost(config, restart);
 builder.UseStreamZhService(service);
@@ -136,8 +137,10 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
 builder.Services.AddStreamZhAuth(paths);
 builder.Services.AddDataFolderPermissions(dataFolderPermissions);
+builder.Services.AddSingleton(new AppFolderCheck(AppFolderAcl.Problem(paths)));
 builder.Services.AddUserManagement();
 builder.Services.AddGeneralSettings(restored);
+builder.Services.AddStorageLocations();
 builder.Services.AddSignalR();
 builder.Services.AddOpenApi("v1");
 
@@ -161,6 +164,7 @@ app.MapAuthEndpoints();
 app.MapUserManagementEndpoints();
 app.MapSystemEndpoints();
 app.MapGeneralSettingsEndpoints();
+app.MapStorageEndpoints();
 app.MapUiSettingsEndpoints();
 app.MapAutomationEndpoints();
 app.MapSystemInfoEndpoints();

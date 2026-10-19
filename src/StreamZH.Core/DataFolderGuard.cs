@@ -24,8 +24,7 @@ public enum DataFolderUse
 /// </summary>
 public static class DataFolderGuard
 {
-    private static readonly StringComparison Comparison =
-        OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+    private static StringComparison Comparison => PathIdentity.Comparison;
 
     /// <summary>The folder below the data folder that is allowed for <paramref name="use"/>.</summary>
     public static string AllowedSubfolder(DataFolderUse use) => use == DataFolderUse.Backups ? "Backups" : "downloads";
@@ -34,7 +33,16 @@ public static class DataFolderGuard
     /// Null when <paramref name="folder"/> may be used, else why not (a sentence for the settings page). Relative or empty
     /// paths are not judged here (the callers resolve or refuse them).
     /// </summary>
-    public static string? Problem(string dataDirectory, string? folder, DataFolderUse use = DataFolderUse.Downloads)
+    public static string? Problem(string dataDirectory, string? folder, DataFolderUse use = DataFolderUse.Downloads) =>
+        Problem(dataDirectory, null, folder, use);
+
+    /// <summary>
+    /// Like <see cref="Problem(string, string?, DataFolderUse)"/>, and (0.12, SV2 N-01) the program folder
+    /// <paramref name="appDirectory"/> is protected the same way, without any allowed subfolder: nothing may be written
+    /// into the folder StreamZH runs from (a DLL or a tool placed there would run at the next start). Folders are compared
+    /// by path text, by their resolved path (<see cref="PathIdentity.Real"/>) and, on Linux and macOS, by device and inode.
+    /// </summary>
+    public static string? Problem(string dataDirectory, string? appDirectory, string? folder, DataFolderUse use = DataFolderUse.Downloads)
     {
         ArgumentException.ThrowIfNullOrEmpty(dataDirectory);
         if (string.IsNullOrWhiteSpace(folder) || !Path.IsPathFullyQualified(folder.Trim()))
@@ -45,30 +53,94 @@ public static class DataFolderGuard
         string full;
         try
         {
-            full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder.Trim()));
+            full = PathIdentity.Normalize(folder);
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException or IOException)
         {
             return null;
         }
 
-        var data = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dataDirectory));
-        var folders = new[] { full, RealPath(full) }.Distinct(StringComparer.Ordinal).ToArray();
-        var datas = new[] { data, RealPath(data) }.Distinct(StringComparer.Ordinal).ToArray();
-        foreach (var d in datas)
+        var data = PathIdentity.Normalize(dataDirectory);
+        if (Check(full, data, Path.Combine(data, AllowedSubfolder(use))) is { } dataProblem)
         {
-            var allowed = Path.Combine(d, AllowedSubfolder(use));
+            return dataProblem == Relation.Inside
+                ? $"This folder is inside the StreamZH data folder ({data}), which holds the database, keys and tools. Use a folder outside it"
+                  + $" (or below {Path.Combine(data, AllowedSubfolder(use))})."
+                : $"This folder contains the StreamZH data folder ({data}). Use a folder that does not contain it.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(appDirectory))
+        {
+            var app = PathIdentity.Normalize(appDirectory);
+            if (Check(full, app, null) is { } appProblem)
+            {
+                return appProblem == Relation.Inside
+                    ? $"This folder is inside the folder StreamZH runs from ({app}). Use a folder outside it."
+                    : $"This folder contains the folder StreamZH runs from ({app}). Use a folder that does not contain it.";
+            }
+        }
+
+        return null;
+    }
+
+    private enum Relation
+    {
+        Inside,
+        Contains,
+    }
+
+    // Is full inside protected (and not inside allowed), or does it contain protected?
+    private static Relation? Check(string full, string protectedFolder, string? allowed)
+    {
+        var folders = new[] { full, RealPath(full), PathIdentity.Real(full) }.Distinct(StringComparer.Ordinal).ToArray();
+        var protects = new[] { protectedFolder, RealPath(protectedFolder), PathIdentity.Real(protectedFolder) }.Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var p in protects)
+        {
+            var allowedHere = allowed is null ? null : Path.Combine(p, Path.GetFileName(allowed));
             foreach (var f in folders)
             {
-                if (IsSameOrInside(f, d) && !IsSameOrInside(f, allowed))
+                if (IsSameOrInside(f, p) && (allowedHere is null || !IsSameOrInside(f, allowedHere)))
                 {
-                    return $"This folder is inside the StreamZH data folder ({data}), which holds the database, keys and tools. Use a folder outside it"
-                        + $" (or below {Path.Combine(data, AllowedSubfolder(use))}).";
+                    return Relation.Inside;
                 }
 
-                if (IsSameOrInside(d, f) && !IsSameOrInside(f, d))
+                if (IsSameOrInside(p, f) && !IsSameOrInside(f, p))
                 {
-                    return $"This folder contains the StreamZH data folder ({data}). Use a folder that does not contain it.";
+                    return Relation.Contains;
+                }
+            }
+        }
+
+        return IdentityCheck(folders[^1], protects[^1], allowed is null ? null : Path.GetFileName(allowed));
+    }
+
+    // The same folder under another name (bind mount, second mount of a volume): device and inode numbers (Linux, macOS).
+    private static Relation? IdentityCheck(string realFull, string realProtected, string? allowedName)
+    {
+        if (PathIdentity.Identity(realProtected) is not { } protectedId)
+        {
+            return null;
+        }
+
+        foreach (var ancestor in PathIdentity.ExistingAncestors(realFull))
+        {
+            if (PathIdentity.Identity(ancestor) != protectedId)
+            {
+                continue;
+            }
+
+            // Inside the protected folder: allowed only below its allowed subfolder (which may not exist yet).
+            var first = Path.GetRelativePath(ancestor, realFull).Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], 2)[0];
+            return allowedName is not null && string.Equals(first, allowedName, Comparison) ? null : Relation.Inside;
+        }
+
+        if (Directory.Exists(realFull) && PathIdentity.Identity(realFull) is { } folderId)
+        {
+            foreach (var ancestor in PathIdentity.ExistingAncestors(realProtected))
+            {
+                if (PathIdentity.Identity(ancestor) == folderId)
+                {
+                    return Relation.Contains;
                 }
             }
         }

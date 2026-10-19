@@ -52,6 +52,18 @@ public sealed class TorrentPathSafetyTests : IAsyncLifetime
         Assert.Empty(await engine.GetTorrentsAsync(null, CancellationToken.None));
     }
 
+    /// <summary>SV2 N-03: a torrent named ".ssh" (or ".config", …) would become a hidden folder or file in the save folder.</summary>
+    [Theory]
+    [InlineData(".ssh")]
+    [InlineData(".bashrc")]
+    [InlineData(" .profile")]
+    public void A_torrent_named_like_a_hidden_file_is_refused(string name) =>
+        Assert.Contains("starts with a dot", TorrentPathSafety.Problem(MonoTorrent.Torrent.Load(SingleFileTorrent(name, 5))), StringComparison.Ordinal);
+
+    [Fact]
+    public void A_torrent_with_a_normal_name_passes() =>
+        Assert.Null(TorrentPathSafety.Problem(MonoTorrent.Torrent.Load(SingleFileTorrent("Some.Movie.2021.mkv", 5))));
+
     [Fact]
     public void Paths_inside_and_outside_the_folder_are_told_apart()
     {

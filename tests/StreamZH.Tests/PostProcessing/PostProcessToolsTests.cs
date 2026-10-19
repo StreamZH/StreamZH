@@ -38,20 +38,34 @@ public sealed class PostProcessToolsTests
         Assert.Equal(Path.Combine(@"D:\Apps\7-Zip", "7z.exe"), tools.Find(PostProcessTool.SevenZip).Path);
     }
 
-    [Fact]
-    public void Bundled_tools_folder_comes_before_path()
+    /// <summary>
+    /// SV2 N-01: a program placed into &lt;app&gt;/tools (e.g. by a download job named "tools" in a category folder that is
+    /// the program folder) was run before PATH and Program Files. That folder is not searched any more.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_tool_in_the_program_folder_is_never_used(bool windows)
     {
-        var bundled = Path.Combine("/opt/streamzh", "tools", "par2");
-        var tools = Tools(new FixedToolSettings(), false, "/usr/local/bin:/usr/bin", bundled, "/usr/bin/par2");
+        var app = windows ? @"C:\Tools\StreamZH" : "/opt/streamzh";
+        string[] planted = windows
+            ? [Path.Combine(app, "tools", "7z.exe"), Path.Combine(app, "tools", "ffprobe.exe"), Path.Combine(app, "tools", "par2.exe")]
+            : [Path.Combine(app, "tools", "7z"), Path.Combine(app, "tools", "ffprobe"), Path.Combine(app, "tools", "par2")];
+        string[] existing = [.. planted, windows ? Path.Combine(@"C:\Program Files", "7-Zip", "7z.exe") : "/usr/bin/7z"];
+        var environment = new ToolEnvironment(app, windows ? @"C:\Windows" : "/usr/bin", windows, windows ? [@"C:\Program Files"] : [])
+        {
+            FileExists = existing.Contains,
+        };
+        var tools = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), environment);
 
-        var found = tools.Find(PostProcessTool.Par2);
-
-        Assert.Equal(bundled, found.Path);
-        Assert.Equal(ToolSource.Bundled, found.Source);
+        Assert.DoesNotContain(tools.Find(PostProcessTool.SevenZip).Path, planted);
+        Assert.Equal(windows ? ToolSource.WindowsDefault : ToolSource.Path, tools.Find(PostProcessTool.SevenZip).Source);
+        Assert.False(tools.Find(PostProcessTool.FFprobe).Found);
+        Assert.False(tools.Find(PostProcessTool.Par2).Found);
     }
 
     [Fact]
-    public void Copy_installed_by_streamzh_comes_after_the_configured_path_and_before_the_bundled_folder()
+    public void Copy_installed_by_streamzh_comes_after_the_configured_path_and_before_path()
     {
         var installedPar2 = Path.Combine("/data/tools", "par2", "par2");
         var installed7z = Path.Combine("/data/tools", "7-Zip", "7zz");
@@ -83,7 +97,7 @@ public sealed class PostProcessToolsTests
         Assert.Equal(ToolSource.Installed, sevenZip.Source);
 
         var withoutInstallFolder = new PostProcessTools(new FixedToolSettings(), new ToolProcessRunner(), Environment(null), manifest);
-        Assert.Equal(ToolSource.Bundled, withoutInstallFolder.Find(PostProcessTool.Par2).Source);
+        Assert.Equal(ToolSource.Path, withoutInstallFolder.Find(PostProcessTool.Par2).Source);
         Assert.Equal(ToolSource.Path, withoutInstallFolder.Find(PostProcessTool.SevenZip).Source);
     }
 

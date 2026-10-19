@@ -995,8 +995,16 @@ public sealed partial class RenamerService(
             throw new ValidationFailedException(new Dictionary<string, string[]> { ["source.depth"] = [$"Use 1 to {RenamerSource.MaxDepth} levels."] });
         }
 
+        // 0.12 (SV2 N-03, N-06): only inside the owner's storage locations, judged before the folder is opened.
+        if (path is { Length: > 0 } && Path.IsPathFullyQualified(path.Trim())
+            && (PathIdentity.SyntaxProblem(path, OperatingSystem.IsWindows()) ?? paths.StorageProblem(path)) is { } outside)
+        {
+            throw new ValidationFailedException(new Dictionary<string, string[]> { ["source.path"] = [outside] });
+        }
+
         var (folder, error) = RenamerPaths.Check(path, paths.DataDirectory);
-        if (folder is null)
+        error ??= folder is null ? null : paths.FolderProblem(folder);
+        if (folder is null || error is not null)
         {
             throw new ValidationFailedException(new Dictionary<string, string[]> { ["source.path"] = [error!] });
         }

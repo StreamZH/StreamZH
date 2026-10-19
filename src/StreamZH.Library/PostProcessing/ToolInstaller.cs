@@ -160,9 +160,9 @@ public sealed class ToolInstaller(
         && int.TryParse(version["7-Zip ".Length..].Split('.')[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var major)
         && major < MinimumSevenZipMajor;
 
-    // A 7-Zip found on PATH, next to the app or in Program Files (not one the user configured, not ours).
+    // A 7-Zip found on PATH or in Program Files (not one the user configured, not ours).
     private async Task<bool> IsOutdatedSevenZipAsync(ToolLocation location, CancellationToken cancellationToken) =>
-        location is { Tool: PostProcessTool.SevenZip, Path: { } path, Source: ToolSource.Path or ToolSource.Bundled or ToolSource.WindowsDefault }
+        location is { Tool: PostProcessTool.SevenZip, Path: { } path, Source: ToolSource.Path or ToolSource.WindowsDefault }
         && IsInstallable(PostProcessTool.SevenZip)
         && IsOutdatedSevenZip(await tools.GetVersionAsync(path, cancellationToken).ConfigureAwait(false));
 

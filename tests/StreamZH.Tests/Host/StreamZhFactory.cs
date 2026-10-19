@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using StreamZH.Data;
 using StreamZH.Host.Security;
 using StreamZH.Library.PostProcessing;
@@ -46,6 +47,29 @@ public sealed class StreamZhFactory(ITmdbClient? tmdb = null) : WebApplicationFa
 
     /// <summary>The packages the tool installer uses; null = the official ones.</summary>
     public ToolCatalog? ToolCatalog { get; set; }
+
+    /// <summary>
+    /// 0.12: the temporary folder is a storage location, so tests may use root and download folders anywhere below it
+    /// (like an owner who allowed it). False: only what a new installation has (the default download folder).
+    /// </summary>
+    public bool TempFolderIsStorage { get; init; } = true;
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        if (TempFolderIsStorage)
+        {
+            var paths = host.Services.GetRequiredService<StreamZH.Core.AppPaths>();
+            var storage = host.Services.GetRequiredService<StreamZH.Library.StorageLocationService>();
+            var temp = Path.TrimEndingDirectorySeparator(Path.GetTempPath());
+            if (paths.StorageProblem(temp) is not null)
+            {
+                storage.Add(temp);
+            }
+        }
+
+        return host;
+    }
 
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {

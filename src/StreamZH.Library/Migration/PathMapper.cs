@@ -10,7 +10,7 @@ namespace StreamZH.Library.Migration;
 /// Turns a path of the old app into the path StreamZH sees (longest matching mapping wins, case-insensitive on
 /// Windows-style paths) and collects the old app's root paths for the wizard's path check.
 /// </summary>
-public sealed class PathMapper(IReadOnlyList<PathMapping>? mappings, Func<string, bool>? exists = null)
+public sealed class PathMapper(IReadOnlyList<PathMapping>? mappings, Func<string, bool>? exists = null, Func<string, string?>? storageProblem = null)
 {
     private readonly List<PathMapping> _mappings =
     [
@@ -54,6 +54,36 @@ public sealed class PathMapper(IReadOnlyList<PathMapping>? mappings, Func<string
 
     public bool IsMapped(string remotePath) => _mappings.Any(m => StartsWith(remotePath, m.Remote));
 
+    /// <summary>
+    /// 0.12 (SV3 W-03): why StreamZH does not look at <paramref name="local"/> (outside the storage locations), null when
+    /// it may. Judged as text before anything opens the path, so a network path the old app reports (\\host\share) is
+    /// never contacted unless the owner allowed it.
+    /// </summary>
+    public string? StorageProblem(string local) => string.IsNullOrWhiteSpace(local) ? null : storageProblem?.Invoke(local);
+
+    /// <summary>The folder exists and may be looked at (inside the storage locations); never throws.</summary>
+    public bool FolderExists(string local) => Probe(local, Directory.Exists);
+
+    /// <summary>The file exists and may be looked at (inside the storage locations); never throws.</summary>
+    public bool FileExists(string local) => Probe(local, File.Exists);
+
+    private bool Probe(string local, Func<string, bool> exists)
+    {
+        if (string.IsNullOrWhiteSpace(local) || StorageProblem(local) is not null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return exists(local);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Registers a root path the old app uses (root folder, download folder) for the path check.</summary>
     public void Use(string remotePath)
     {
@@ -68,6 +98,12 @@ public sealed class PathMapper(IReadOnlyList<PathMapping>? mappings, Func<string
         .. _seen.Keys.Order(StringComparer.Ordinal).Select(remote =>
         {
             var local = Map(remote);
+            if (storageProblem?.Invoke(local) is not null)
+            {
+                // Not looked at: outside the storage locations (the wizard offers the owner to allow it).
+                return new MigrationPathCheck(remote, local, false, IsMapped(remote), OutsideStorage: true);
+            }
+
             bool exists;
             try
             {

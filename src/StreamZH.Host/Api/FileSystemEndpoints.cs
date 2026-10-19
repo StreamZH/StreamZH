@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using StreamZH.Core;
 using StreamZH.Host.Auth;
 
 namespace StreamZH.Host.Api;
@@ -16,16 +17,24 @@ public static class FileSystemEndpoints
 
     public static IEndpointRouteBuilder MapFileSystemEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/v1/filesystem", (string? path) =>
+        // 0.12 (SV2 N-03, N-06): admins browse only inside the owner's storage locations (and a typed path outside them
+        // is refused before it is opened, so a network path is never contacted); the owner browses everything.
+        app.MapGet("/api/v1/filesystem", (string? path, HttpContext http, AppPaths paths) =>
         {
+            var owner = GeneralSettingsEndpoints.IsOwner(http.User);
             if (string.IsNullOrWhiteSpace(path))
             {
-                return Results.Ok(new FolderListing(null, null, Roots()));
+                return Results.Ok(new FolderListing(null, null, owner ? [.. StorageRoots(paths), .. Roots(paths)] : StorageRoots(paths)));
             }
 
             if (!Path.IsPathFullyQualified(path))
             {
                 return Results.Problem("Enter a full path.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (!owner && (PathIdentity.SyntaxProblem(path, OperatingSystem.IsWindows()) ?? paths.StorageProblem(path)) is { } outside)
+            {
+                return Results.Problem(outside, statusCode: StatusCodes.Status403Forbidden, extensions: new Dictionary<string, object?> { ["code"] = AppPaths.OutsideStorageCode });
             }
 
             var directory = new DirectoryInfo(path);
@@ -43,7 +52,14 @@ public static class FileSystemEndpoints
                     .Select(d => new FolderEntry(d.Name, d.FullName, null))
                     .ToList();
 
-                return Results.Ok(new FolderListing(directory.FullName, directory.Parent?.FullName, entries));
+                // Admins cannot go up out of a storage location (they get the list of storage locations instead).
+                var up = directory.Parent?.FullName;
+                if (!owner && up is not null && paths.StorageProblem(up) is not null)
+                {
+                    up = null;
+                }
+
+                return Results.Ok(new FolderListing(directory.FullName, up, entries));
             }
             catch (UnauthorizedAccessException)
             {
@@ -54,14 +70,19 @@ public static class FileSystemEndpoints
         return app;
     }
 
-    private static List<FolderEntry> Roots()
+    private static List<FolderEntry> StorageRoots(AppPaths paths) =>
+        [.. (paths.StorageLocations ?? []).Select(l => new FolderEntry(l, l, "Storage location"))];
+
+    private static List<FolderEntry> Roots(AppPaths paths)
     {
         var roots = new List<FolderEntry>();
+        var storage = paths.StorageLocations ?? [];
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         void Add(string? path, string? label)
         {
-            if (!string.IsNullOrEmpty(path) && Directory.Exists(path) && roots.All(r => !string.Equals(r.Path, path, StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrEmpty(path) && Directory.Exists(path) && roots.All(r => !string.Equals(r.Path, path, StringComparison.OrdinalIgnoreCase))
+                && !storage.Contains(path, StringComparer.OrdinalIgnoreCase))
             {
                 roots.Add(new FolderEntry(label ?? path, path, label is null ? null : path));
             }

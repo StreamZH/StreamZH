@@ -3,6 +3,7 @@
 // Portions based on Radarr (https://github.com/Radarr/Radarr), Copyright (c) Radarr contributors, GPL-3.0.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using StreamZH.Core;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Downloads.Torrent;
@@ -12,7 +13,8 @@ namespace StreamZH.Library.Downloads.Torrent;
 /// machine or in a container reports "/downloads/movies/X"; StreamZH sees the same folder as "/mnt/torrents/movies/X".
 /// The host must match the client's host setting (case-insensitive); the longest matching remote path wins.
 /// </summary>
-public sealed class RemotePathMappingService(RemotePathMappingRepository repository)
+/// <param name="paths">0.12 (SV2 N-03): the local folder must be inside a storage location and outside the data and program folders.</param>
+public sealed class RemotePathMappingService(RemotePathMappingRepository repository, AppPaths? paths = null)
 {
     public IReadOnlyList<RemotePathMapping> All() => repository.All();
 
@@ -122,6 +124,10 @@ public sealed class RemotePathMappingService(RemotePathMappingRepository reposit
         else if (l.Length > 1000 || !Path.IsPathFullyQualified(l))
         {
             errors["localPath"] = ["Use a full path on this computer."];
+        }
+        else if (paths?.FolderProblem(l) is { } problem)
+        {
+            errors["localPath"] = [problem];
         }
         else if (!Directory.Exists(l))
         {

@@ -137,7 +137,7 @@ public class OutboundAddressGuardTests
         Assert.Equal(["indexer.test", "cdn.example"], handler.Requests.Select(u => u.Host));
 
         // Jackett on 192.168.1.20 is a configured indexer: its links are fine.
-        var configured = new NewznabClient(new HttpClient(handler), new NewznabCapabilitiesCache(), guard: Rebinding, configuredHosts: new Hosts("192.168.1.20"));
+        var configured = new NewznabClient(new HttpClient(handler), new NewznabCapabilitiesCache(), guard: Rebinding, configuredHosts: new Hosts("192.168.1.20:9117"));
         await configured.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://indexer.test/getnzb/abc.nzb"), CancellationToken.None);
         Assert.Contains(handler.Requests, u => u.Host == "192.168.1.20");
     }
@@ -171,9 +171,33 @@ public class OutboundAddressGuardTests
         await direct.CheckAsync(viaProxy, CancellationToken.None);
     }
 
+    /// <summary>Configured services as "host:port".</summary>
     private sealed class Hosts(params string[] hosts) : IConfiguredServiceHosts
     {
-        public bool Contains(string host) => hosts.Contains(host, StringComparer.OrdinalIgnoreCase);
+        public bool Contains(string host, int port) => hosts.Contains($"{host}:{port}", StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// SV2 N-07: a configured service is trusted on its own port only. A feed link to another port of the same host (the
+    /// router or NAS admin page on a box that also runs Jackett) is checked like any LAN address; so is another port of
+    /// the indexer's own host.
+    /// </summary>
+    [Fact]
+    public async Task A_configured_host_is_trusted_on_its_port_only()
+    {
+        var handler = new StubIndexer { Respond = _ => Nzb() };
+        var configured = new NewznabClient(new HttpClient(handler), new NewznabCapabilitiesCache(), guard: Rebinding, configuredHosts: new Hosts("192.168.1.20:9117"));
+
+        await configured.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://192.168.1.20:9117/dl/abc.nzb"), CancellationToken.None);
+        await Assert.ThrowsAsync<IndexerException>(() => configured.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://192.168.1.20/admin"), CancellationToken.None));
+        await Assert.ThrowsAsync<IndexerException>(() => configured.DownloadNzbAsync(Indexer(IndexerUrl), Release("http://192.168.1.20:8080/admin"), CancellationToken.None));
+        Assert.Equal(["192.168.1.20:9117"], handler.Requests.Select(u => $"{u.Host}:{u.Port}"));
+
+        // The indexer's own host: the configured port only.
+        using var other = new HttpRequestMessage(HttpMethod.Get, "http://jackett.lan:8080/admin");
+        OutboundAddressGuard.Restrict(other, "jackett.lan:9117");
+        Assert.True(OutboundAddressGuard.IsRestricted(other, "jackett.lan", 8080));
+        Assert.False(OutboundAddressGuard.IsRestricted(other, "jackett.lan", 9117));
     }
 
     [Fact]

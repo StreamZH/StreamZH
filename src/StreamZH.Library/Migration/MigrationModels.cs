@@ -129,7 +129,8 @@ public sealed record MigrationCounts(int Create, int Update, int Link, int Skip)
 }
 
 /// <summary>A path the old app uses, mapped to what StreamZH sees, and whether StreamZH can reach it.</summary>
-public sealed record MigrationPathCheck(string Remote, string Local, bool Exists, bool Mapped);
+/// <param name="OutsideStorage">The local folder is outside the storage locations (StreamZH did not look at it).</param>
+public sealed record MigrationPathCheck(string Remote, string Local, bool Exists, bool Mapped, bool OutsideStorage = false);
 
 /// <summary>What the old app is (name and version as it reports itself).</summary>
 public sealed record MigrationAppInfo(string AppName, string Version, string? InstanceName = null);

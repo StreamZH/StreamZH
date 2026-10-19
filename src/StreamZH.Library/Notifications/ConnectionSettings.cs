@@ -69,10 +69,12 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
         {
             result[field.Name] = field.Type switch
             {
-                ConnectFieldTypes.Password => settings.Text(field.Name) is null ? string.Empty : Mask,
+                _ when field.IsSecret => settings.Text(field.Name) is null ? string.Empty : Mask,
                 ConnectFieldTypes.Bool => settings.Bool(field.Name),
                 ConnectFieldTypes.Number => settings.Int(field.Name),
                 ConnectFieldTypes.MultiSelect => settings.List(field.Name),
+                // 0.12 (SV2 N-04): a token or password inside a URL is not shown either.
+                ConnectFieldTypes.Url or ConnectFieldTypes.Text => SecretUrls.MaskCredentials(settings.Text(field.Name), Mask),
                 _ => settings.Text(field.Name) ?? string.Empty,
             };
         }
@@ -118,12 +120,28 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
             if (input is not null && input.TryGetValue(field.Name, out var given))
             {
                 // Sent: a masked secret keeps the stored one, null clears the field.
-                if (field.Type == ConnectFieldTypes.Password && given.ValueKind == JsonValueKind.String && given.GetString() == Mask)
+                if (field.IsSecret && given.ValueKind == JsonValueKind.String && given.GetString() == Mask)
                 {
                     value = Stored(stored, field.Name);
                     if (HasValue(value))
                     {
                         reused.Add(field);
+                    }
+                }
+                else if (field.Type is ConnectFieldTypes.Url or ConnectFieldTypes.Text && given.ValueKind == JsonValueKind.String && given.GetString()!.Contains(Mask, StringComparison.Ordinal))
+                {
+                    // A URL as the API showed it (credentials masked): unchanged keeps the stored one; anything else must
+                    // be typed again in full (0.12, SV2 N-04).
+                    var storedText = new ConnectionSettings(stored ?? new Dictionary<string, JsonElement>()).Text(field.Name);
+                    if (storedText is not null && SecretUrls.MaskCredentials(storedText, Mask) == given.GetString()!.Trim())
+                    {
+                        value = Stored(stored, field.Name);
+                        reused.Add(field);
+                    }
+                    else
+                    {
+                        value = null;
+                        errors.TryAdd(field.Name, [$"Enter {field.Label} again in full, with its password or token."]);
                     }
                 }
                 else
@@ -138,7 +156,8 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
                 // Not sent: keep what is stored, else the default. A kept secret is a reused one, exactly like the mask
                 // (0.12, V-01): leaving the field out must not send it to a changed address either.
                 value = Stored(stored, field.Name) ?? Default(field);
-                if (field.Type == ConnectFieldTypes.Password && HasValue(Stored(stored, field.Name)))
+                if ((field.IsSecret && HasValue(Stored(stored, field.Name)))
+                    || SecretUrls.HasCredentials(new ConnectionSettings(stored ?? new Dictionary<string, JsonElement>()).Text(field.Name)))
                 {
                     reused.Add(field);
                 }
@@ -296,7 +315,7 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
                     return Invalid(field, errors, "Too long.");
                 }
 
-                if (field.Type == ConnectFieldTypes.Password && SecretReuse.StoredFormProblem(text) is { } stored)
+                if (field.IsSecret && SecretReuse.StoredFormProblem(text) is { } stored)
                 {
                     return Invalid(field, errors, stored);
                 }

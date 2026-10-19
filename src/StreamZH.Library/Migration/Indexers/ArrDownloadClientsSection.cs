@@ -301,7 +301,7 @@ public sealed class ArrDownloadClientsSection(string source) : IMigrationSection
             return new PlanEntry(new MigrationItem(key, label, MigrationAction.Skip, null, "Incomplete mapping."), null, null);
         }
 
-        if (!Directory.Exists(local))
+        if (!context.Paths.FolderExists(local))
         {
             return new PlanEntry(new MigrationItem(key, label, MigrationAction.Skip, null,
                 $"{local} does not exist on this computer. Add a path mapping for {oldLocal} in the wizard, or add the remote path mapping later."), null, null);

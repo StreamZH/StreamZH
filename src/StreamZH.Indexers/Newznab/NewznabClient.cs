@@ -372,9 +372,9 @@ public sealed class NewznabClient(
         return response;
     }
 
-    /// <summary>The host of the indexer's configured URL; requests there are not restricted.</summary>
+    /// <summary>The host and port of the indexer's configured URL; requests there are not restricted (0.12: another port is).</summary>
     private static string? IndexerHost(IndexerDefinition indexer) =>
-        Uri.TryCreate(NewznabUrls.ApiEndpoint(indexer), UriKind.Absolute, out var endpoint) ? endpoint.IdnHost : null;
+        Uri.TryCreate(NewznabUrls.ApiEndpoint(indexer), UriKind.Absolute, out var endpoint) ? OutboundAddressGuard.HostAndPort(endpoint) : null;
 
     private static bool IsRedirect(HttpResponseMessage response) =>
         response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther

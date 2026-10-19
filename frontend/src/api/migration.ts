@@ -87,6 +87,8 @@ export interface MigrationPathCheck {
   local: string
   exists: boolean
   mapped: boolean
+  /** Outside the storage locations: StreamZH did not look at it (the owner allows it in the Folders step). */
+  outsideStorage?: boolean
 }
 
 export interface MigrationPreview {

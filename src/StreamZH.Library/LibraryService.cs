@@ -28,6 +28,9 @@ public enum LibraryError
 
     /// <summary>The change conflicts with the current state (e.g. deleting the last profile).</summary>
     Conflict,
+
+    /// <summary>0.12: the folder is outside the owner's storage locations (the web app offers the owner to add it).</summary>
+    OutsideStorage,
 }
 
 /// <summary>Adds, refreshes and removes movies and series. Never deletes files on disk.</summary>
@@ -41,8 +44,31 @@ public sealed class LibraryService(
     ILogger<LibraryService> logger,
     Import.MediaManagementSettings? mediaManagement = null,
     SceneNumbering.XemService? xem = null,
-    Titles.AlternativeTitleService? alternativeTitles = null)
+    Titles.AlternativeTitleService? alternativeTitles = null,
+    StreamZH.Core.AppPaths? paths = null)
 {
+    /// <summary>
+    /// 0.12 (SV3 W-01): an existing folder given from outside (the migration reads it from the old app) must be inside the
+    /// storage locations like every other folder, so a later "delete with files" can never reach anything else.
+    /// </summary>
+    private void CheckExistingFolder(string? folder)
+    {
+        if (folder is null || paths is null)
+        {
+            return;
+        }
+
+        if (paths.StorageProblem(folder) is { } outside)
+        {
+            throw new LibraryException(outside, LibraryError.OutsideStorage);
+        }
+
+        if (paths.FolderProblem(folder) is { } problem)
+        {
+            throw new LibraryException(problem, LibraryError.Invalid);
+        }
+    }
+
     private Import.MediaManagementValues Media => mediaManagement?.Current ?? new Import.MediaManagementValues();
 
     public async Task<Movie> AddMovieAsync(
@@ -53,6 +79,7 @@ public sealed class LibraryService(
             throw new LibraryException("This movie is already in the library.", LibraryError.AlreadyExists);
         }
 
+        CheckExistingFolder(existingFolder);
         var root = RootFolderFor(rootFolderId, MediaType.Movie);
         var profileId = profiles.Resolve(qualityProfileId);
         var details = await tmdb.GetMovieAsync(tmdbId, cancellationToken);
@@ -98,6 +125,7 @@ public sealed class LibraryService(
             throw new LibraryException("This series is already in the library.", LibraryError.AlreadyExists);
         }
 
+        CheckExistingFolder(existingFolder);
         var root = RootFolderFor(rootFolderId, MediaType.Series);
         var profileId = profiles.Resolve(qualityProfileId);
         var details = await tmdb.GetSeriesAsync(tmdbId, cancellationToken);

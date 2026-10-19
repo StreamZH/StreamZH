@@ -495,7 +495,12 @@ public sealed class SeriesMigrationSection(ArrLibraryReader reader, ILogger<Seri
                 problems.Add(profileWarning);
             }
 
-            if (!Directory.Exists(localFolder))
+            if (context.Paths.StorageProblem(localFolder) is { } outside)
+            {
+                // 0.12 (SV3 W-02/W-03): not looked at; the take-over refuses it until the owner allows the folder.
+                problems.Add(outside);
+            }
+            else if (!context.Paths.FolderExists(localFolder))
             {
                 problems.Add($"StreamZH cannot see the folder {localFolder}" + (context.Paths.IsMapped(series.Path) ? "." : "; add a path mapping."));
             }

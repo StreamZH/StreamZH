@@ -17,7 +17,6 @@ export interface ToolSettings {
   /** Set when the configured path does not point to the tool. */
   par2Problem: string | null
   sevenZipProblem: string | null
-  bundledFolder: string
   os: 'Windows' | 'Linux' | 'macOS'
   /** StreamZH can install the tool on this system. */
   par2Installable: boolean
@@ -56,7 +55,7 @@ export interface ToolSettings {
   ffprobeInstallVersion: string | null
 }
 
-export type ToolSource = 'NotFound' | 'Configured' | 'Installed' | 'Bundled' | 'Path' | 'WindowsDefault'
+export type ToolSource = 'NotFound' | 'Configured' | 'Installed' | 'Path' | 'WindowsDefault'
 
 export type ToolName = 'par2' | 'sevenZip' | 'ffprobe'
 

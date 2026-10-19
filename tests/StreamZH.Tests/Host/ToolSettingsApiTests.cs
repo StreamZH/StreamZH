@@ -26,7 +26,9 @@ public sealed class ToolSettingsApiTests : IDisposable
         Assert.Equal(string.Empty, settings.SevenZipPath);
         Assert.Equal(settings.Par2ResolvedPath is not null, settings.Par2Found);
         Assert.Contains(settings.Os, new[] { "Windows", "Linux", "macOS" });
-        Assert.EndsWith("tools", settings.BundledFolder);
+        // 0.12 (SV2 N-01): no program folder to put tools into is advertised.
+        var json = await client.GetStringAsync("/api/v1/settings/tools");
+        Assert.DoesNotContain("bundledFolder", json, StringComparison.OrdinalIgnoreCase);
 
         var invalid = await client.PutAsJsonAsync("/api/v1/settings/tools", new { par2Path = "/does/not/exist/par2", sevenZipPath = (string?)null });
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);

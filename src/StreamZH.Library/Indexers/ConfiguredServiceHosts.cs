@@ -20,7 +20,12 @@ public sealed class ConfiguredServiceHosts(IndexerRepository indexers, DownloadC
 
     private (HashSet<string> Hosts, DateTimeOffset Until)? _cache;
 
-    public bool Contains(string host) => !string.IsNullOrWhiteSpace(host) && Load().Contains(host.Trim().Trim('[', ']').TrimEnd('.'));
+    /// <summary>0.12 (SV2 N-07): host and port must both match a configured indexer or download client.</summary>
+    public bool Contains(string host, int port) =>
+        !string.IsNullOrWhiteSpace(host) && Load().Contains(Key(host, port));
+
+    private static string Key(string host, int port) =>
+        $"{host.Trim().Trim('[', ']').TrimEnd('.').ToLowerInvariant()}|{port.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 
     private HashSet<string> Load()
     {
@@ -35,20 +40,33 @@ public sealed class ConfiguredServiceHosts(IndexerRepository indexers, DownloadC
         {
             if (Uri.TryCreate(indexer.BaseUrl, UriKind.Absolute, out var url))
             {
-                hosts.Add(url.IdnHost.Trim('[', ']'));
+                hosts.Add(Key(url.IdnHost, url.Port));
             }
         }
 
         foreach (var client in clients.All())
         {
             if (client.Settings.TryGetValue(DownloadClientCatalog.Host, out var value) && value.ValueKind == JsonValueKind.String
-                && value.GetString() is { Length: > 0 } host)
+                && value.GetString() is { Length: > 0 } host && Port(client) is { } port)
             {
-                hosts.Add(host.Trim().Trim('[', ']').TrimEnd('.'));
+                hosts.Add(Key(host, port));
             }
         }
 
         _cache = (hosts, now + Lifetime);
         return hosts;
+    }
+
+    // The client's port setting, else the default port of its implementation.
+    private static int? Port(StreamZH.Core.Downloads.DownloadClientDefinition client)
+    {
+        if (client.Settings.TryGetValue(DownloadClientCatalog.Port, out var stored) && stored.ValueKind == JsonValueKind.Number && stored.TryGetInt32(out var port))
+        {
+            return port;
+        }
+
+        return DownloadClientCatalog.Find(client.Implementation)?.Field(DownloadClientCatalog.Port) is { Default: { ValueKind: JsonValueKind.Number } d } && d.TryGetInt32(out var fallback)
+            ? fallback
+            : null;
     }
 }

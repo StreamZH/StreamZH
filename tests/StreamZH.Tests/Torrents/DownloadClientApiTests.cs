@@ -171,8 +171,8 @@ public sealed class DownloadClientApiTests : IAsyncLifetime
     {
         var created = await (await _owner.PostAsJsonAsync("/api/v1/downloadclient", NewClient())).Content.ReadFromJsonAsync<JsonElement>();
         var id = created.GetProperty("id").GetInt32();
-        Directory.CreateDirectory(Path.Combine(_factory.DataDirectory, "torrents"));
-        var mapping = await _owner.PostAsJsonAsync("/api/v1/remotepathmapping", new { host = "127.0.0.1", remotePath = "/downloads", localPath = Path.Combine(_factory.DataDirectory, "torrents") });
+        Directory.CreateDirectory(Path.Combine(_factory.DataDirectory, "downloads", "torrents"));
+        var mapping = await _owner.PostAsJsonAsync("/api/v1/remotepathmapping", new { host = "127.0.0.1", remotePath = "/downloads", localPath = Path.Combine(_factory.DataDirectory, "downloads", "torrents") });
         Assert.Equal(HttpStatusCode.Created, mapping.StatusCode);
         var mappingId = (await mapping.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
 
@@ -198,7 +198,7 @@ public sealed class DownloadClientApiTests : IAsyncLifetime
     [Fact]
     public async Task Remote_path_mapping_crud_and_validation()
     {
-        var local = Path.Combine(_factory.DataDirectory, "mapped");
+        var local = Path.Combine(_factory.DataDirectory, "downloads", "mapped");
         Directory.CreateDirectory(local);
         var created = await (await _owner.PostAsJsonAsync("/api/v1/remotepathmapping", new { host = "torrent-box", remotePath = "/downloads", localPath = local }))
             .Content.ReadFromJsonAsync<JsonElement>();

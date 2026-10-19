@@ -73,7 +73,7 @@ public sealed class LibraryTargets(
             return new TargetChoice(containing.Id, containing.Path, null);
         }
 
-        if (localRoot is not null && Directory.Exists(localRoot) && !_streamZhRoots.Any(r => IsInside(r.Path, localRoot) || IsInside(localRoot, r.Path)))
+        if (localRoot is not null && context.Paths.FolderExists(localRoot) && !_streamZhRoots.Any(r => IsInside(r.Path, localRoot) || IsInside(localRoot, r.Path)))
         {
             if (!allowCreate)
             {

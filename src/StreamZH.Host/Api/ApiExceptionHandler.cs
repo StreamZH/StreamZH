@@ -16,7 +16,18 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
         if (exception is ValidationFailedException validation)
         {
             logger.LogDebug("API validation error: {Fields}", string.Join(", ", validation.Errors.Keys));
-            await Results.ValidationProblem(validation.Errors).ExecuteAsync(http);
+            var extensions = new Dictionary<string, object?>();
+            if (validation.Code is { } validationCode)
+            {
+                extensions["code"] = validationCode;
+            }
+
+            if (validation.Paths is { Count: > 0 } validationPaths)
+            {
+                extensions["paths"] = validationPaths;
+            }
+
+            await Results.ValidationProblem(validation.Errors, extensions: extensions).ExecuteAsync(http);
             return true;
         }
 
@@ -26,6 +37,7 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
             LibraryException { Error: LibraryError.AlreadyExists } => (StatusCodes.Status409Conflict, "already-exists"),
             LibraryException { Error: LibraryError.InUse } => (StatusCodes.Status409Conflict, "in-use"),
             LibraryException { Error: LibraryError.Conflict } => (StatusCodes.Status409Conflict, "conflict"),
+            LibraryException { Error: LibraryError.OutsideStorage } => (StatusCodes.Status400BadRequest, StreamZH.Core.AppPaths.OutsideStorageCode),
             LibraryException => (StatusCodes.Status400BadRequest, "invalid"),
             TmdbException { StatusCode: null } when exception.Message.StartsWith("TMDB is not set up", StringComparison.Ordinal)
                 => (StatusCodes.Status400BadRequest, "tmdb-not-configured"),

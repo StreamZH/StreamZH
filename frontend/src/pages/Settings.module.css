@@ -109,6 +109,18 @@
   flex: 1 1 280px;
 }
 
+/* A folder outside the storage locations: the owner allows it here (0.12). */
+.allowBox {
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.allowBox > span:first-child {
+  flex: 1 1 260px;
+  overflow-wrap: anywhere;
+}
+
 /* ---- Settings → Downloads → Tools: one row per tool (par2, 7-Zip) ---- */
 .toolList {
   list-style: none;

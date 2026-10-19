@@ -36,7 +36,8 @@ cd ..
 # Backend on http://localhost:9797, data in ./.devdata
 dotnet run --project src/StreamZH.Host -- --data .devdata
 # Open http://localhost:9797, create the owner account, then add a root folder
-# and your free TMDB API key under Settings
+# (the owner allows its folder as a storage location in one click) and your free
+# TMDB API key under Settings
 
 # Tests
 dotnet test

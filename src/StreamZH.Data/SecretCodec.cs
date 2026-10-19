@@ -115,7 +115,7 @@ public sealed class SecretCodec
         foreach (var (key, value) in settings)
         {
             var text = value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-            var encrypted = SecretFields.Names.Contains(key) && text is not null ? (migration ? EncryptPlain(text) : Encrypt(text)) : null;
+            var encrypted = SecretFields.IsSecret(key, text) && text is not null ? (migration ? EncryptPlain(text) : Encrypt(text)) : null;
             result[key] = encrypted is not null && encrypted != text ? JsonSerializer.SerializeToElement(encrypted) : value;
         }
 
@@ -154,8 +154,15 @@ public static class SecretFields
     /// password or secret in their catalogs; a test checks that none is missing).
     /// </summary>
     public static IReadOnlySet<string> Names { get; } = new HashSet<string>(
-        ["password", "apiKey", "authToken", "accessToken", "token", "botToken", "appToken", "userKey", "webHookUrl", "statelessUrls", "clientId"],
+        ["password", "apiKey", "authToken", "accessToken", "token", "botToken", "appToken", "userKey", "webHookUrl", "statelessUrls", "clientId", "headers"],
         StringComparer.Ordinal);
+
+    /// <summary>
+    /// True when a settings value is stored encrypted: a field of <see cref="Names"/>, or (0.12, SV2 N-04) any text with
+    /// credentials in a URL ("https://user:password@…", "?token=…").
+    /// </summary>
+    public static bool IsSecret(string key, string? value) =>
+        Names.Contains(key) || (value is { Length: > 0 } && !SecretCodec.IsEncrypted(value) && Core.Security.SecretUrls.HasCredentials(value));
 
     /// <summary>
     /// Config keys whose values are secrets. The waiting releases hold download links with indexer keys. The SSL

@@ -62,7 +62,14 @@ public sealed class RootFoldersSection(string source) : ArrSettingsSection(sourc
                 continue;
             }
 
-            if (!Path.IsPathFullyQualified(local) || !Exists(local))
+            if (Path.IsPathFullyQualified(local) && paths.StorageProblem(local) is { } outside)
+            {
+                // 0.12 (SV3 W-03): not looked at before the owner allows it (the wizard offers that in one click).
+                plan.Skip(key, label, outside, detail);
+                continue;
+            }
+
+            if (!Path.IsPathFullyQualified(local) || !paths.FolderExists(local))
             {
                 plan.Skip(
                     key,
@@ -98,17 +105,6 @@ public sealed class RootFoldersSection(string source) : ArrSettingsSection(sourc
         return plan;
     }
 
-    private static bool Exists(string path)
-    {
-        try
-        {
-            return Directory.Exists(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            return false;
-        }
-    }
 
     private static bool IsInside(string path, string parent)
     {

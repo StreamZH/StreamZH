@@ -317,21 +317,40 @@ public static class NzbFileNames
     // Invalid on Windows, macOS or Linux; the NZB folder may be a share used by another OS.
     private static readonly char[] Invalid = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
+    // Device names Windows reserves in every folder ("CON", "NUL.txt", "COM1.nzb").
+    private static readonly HashSet<string> WindowsDevices = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³",
+    };
+
+    /// <summary>
+    /// A file or folder name from a release title, NZB subject or torrent name: characters no system allows become "_",
+    /// and since 0.12 (SV2 N-03) it never starts with "." (a hidden name such as ".ssh" or ".config") and is never a
+    /// Windows device name ("CON", "NUL.nfo" get a leading "_").
+    /// </summary>
     public static string SafeName(string title)
     {
+        ArgumentNullException.ThrowIfNull(title);
         var builder = new StringBuilder(title.Length);
         foreach (var c in title.Trim())
         {
             builder.Append(char.IsControl(c) || Invalid.Contains(c) ? '_' : c);
         }
 
-        var name = builder.ToString().Trim().TrimEnd('.', ' ');
+        var name = builder.ToString().Trim().TrimStart('.', ' ').TrimEnd('.', ' ');
         if (name.Length > MaxNameLength)
         {
             name = name[..MaxNameLength].TrimEnd('.', ' ');
         }
 
-        return name.Length == 0 || name.All(c => c == '.' || c == '_') ? "release" : name;
+        if (name.Length == 0 || name.All(c => c == '.' || c == '_'))
+        {
+            return "release";
+        }
+
+        return WindowsDevices.Contains(name.Split('.')[0].TrimEnd(' ')) ? "_" + name : name;
     }
 
     /// <summary>Writes the content to "&lt;title&gt;.nzb", or "&lt;title&gt; (2).nzb" etc. when that exists. Never overwrites.</summary>

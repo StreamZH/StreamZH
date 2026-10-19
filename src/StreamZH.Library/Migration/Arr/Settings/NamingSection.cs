@@ -32,7 +32,7 @@ public sealed partial class NamingSection(string source) : ArrSettingsSection(so
     {
         var plan = new SettingsPlan();
         var naming = await reader.GetAsync("/config/naming", cancellationToken);
-        var planner = new MediaManagementPlanner(plan, reader.Service<MediaManagementSettings>(), Key, IsRadarr ? "Sonarr" : "Radarr");
+        var planner = new MediaManagementPlanner(plan, reader.Service<MediaManagementSettings>(), Key, IsRadarr ? "Sonarr" : "Radarr", reader.Context.Paths);
 
         if (IsRadarr)
         {

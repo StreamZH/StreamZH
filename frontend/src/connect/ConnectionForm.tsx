@@ -337,19 +337,33 @@ export function SettingField({
       )
       break
     }
-    case 'textArea':
+    case 'textArea': {
+      // Secret text (custom headers, 0.12): shown masked like a password; typing replaces it.
+      const saved = f.secret === true && text === maskedSecret
+      if (saved) {
+        help = (
+          <>
+            {f.help}
+            {f.help && ' '}
+            Saved. Type new ones to replace them.
+          </>
+        )
+      }
       control = (
         <textarea
           id={id}
           className={`${ui.input} ${ui.mono} ${styles.textArea}`}
           rows={3}
           spellCheck={false}
+          autoComplete="off"
           placeholder={f.placeholder ?? undefined}
           value={text}
+          onFocus={(e) => saved && e.target.select()}
           onChange={(e) => onChange(e.target.value)}
         />
       )
       break
+    }
     case 'password': {
       const saved = text === maskedSecret
       help = (

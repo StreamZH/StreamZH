@@ -45,7 +45,7 @@ public sealed class MediaManagementSection(string source) : ArrSettingsSection(s
             plan.Warnings.Add($"Could not read {reader.AppName}'s download handling settings; StreamZH keeps its own.");
         }
 
-        var planner = new MediaManagementPlanner(plan, reader.Service<MediaManagementSettings>(), Key, IsRadarr ? "Sonarr" : "Radarr");
+        var planner = new MediaManagementPlanner(plan, reader.Service<MediaManagementSettings>(), Key, IsRadarr ? "Sonarr" : "Radarr", reader.Context.Paths);
         var movies = IsRadarr;
 
         // Importing

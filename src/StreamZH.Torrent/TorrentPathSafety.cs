@@ -30,6 +30,12 @@ public static class TorrentPathSafety
             return $"its name {nameProblem}.";
         }
 
+        // 0.12 (SV2 N-03): the torrent's name becomes a folder or file in the save folder; never a hidden one (".ssh").
+        if (torrent.Name is { Length: > 0 } name && name.TrimStart(' ').StartsWith('.'))
+        {
+            return "its name starts with a dot (a hidden file or folder).";
+        }
+
         foreach (var file in torrent.Files)
         {
             if (NameProblem(file.Path) is { } fileProblem)

@@ -55,26 +55,46 @@ public static class IndexerEndpoints
         return services;
     }
 
+    /// <summary>
+    /// 0.12 (SV2 N-07): Friends and Requesters see the indexers (search pages), but not their credentials: the extra
+    /// parameters (often "&amp;passkey=…") are masked and keys in the URL removed. Admins see the settings as before.
+    /// </summary>
+    public static IndexerResource ForViewer(HttpContext http, IndexerResource resource)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(resource);
+        if (http.User.IsInRole(nameof(StreamZH.Core.Users.UserRole.Owner)) || http.User.IsInRole(nameof(StreamZH.Core.Users.UserRole.Admin)))
+        {
+            return resource;
+        }
+
+        return resource with
+        {
+            BaseUrl = StreamZH.Core.Security.SecretUrls.MaskCredentials(resource.BaseUrl, IndexerService.MaskedApiKey),
+            AdditionalParameters = string.IsNullOrWhiteSpace(resource.AdditionalParameters) ? string.Empty : IndexerService.MaskedApiKey,
+        };
+    }
+
     public static IEndpointRouteBuilder MapIndexerEndpoints(this IEndpointRouteBuilder app)
     {
         var indexers = app.MapGroup("/api/v1/indexer").RequireAuthorization().WithTags("Indexers");
 
-        indexers.MapGet("/", (IndexerService service) =>
+        indexers.MapGet("/", (IndexerService service, HttpContext http) =>
         {
             var health = service.Health();
             var usage = service.Usage();
-            return service.All().Select(i => IndexerResource.From(
-                i, health.GetValueOrDefault(i.Id) ?? IndexerHealth.Ok(i.Id), service.LimitStatus(i, usage.GetValueOrDefault(i.Id))));
+            return service.All().Select(i => ForViewer(http, IndexerResource.From(
+                i, health.GetValueOrDefault(i.Id) ?? IndexerHealth.Ok(i.Id), service.LimitStatus(i, usage.GetValueOrDefault(i.Id)))));
         });
         // ?implementation=Torznab gives a torrent indexer to start from (0.11).
         indexers.MapGet("/schema", (string? implementation) => IndexerResource.From(IndexerService.Schema(implementation), null, null));
         indexers.MapGet("/definitions", () => IndexerCatalog.All);
-        indexers.MapGet("/{id:int}", (int id, IndexerService service) =>
-            service.Find(id) is { } i ? Results.Ok(Resource(service, i)) : Results.NotFound());
+        indexers.MapGet("/{id:int}", (int id, IndexerService service, HttpContext http) =>
+            service.Find(id) is { } i ? Results.Ok(ForViewer(http, Resource(service, i))) : Results.NotFound());
 
-        indexers.MapGet("/{id:int}/details", (int id, IndexerService service) =>
+        indexers.MapGet("/{id:int}/details", (int id, IndexerService service, HttpContext http) =>
             service.Details(id) is { } details
-                ? Results.Ok(new IndexerDetailsResource(Resource(service, details.Indexer), details.Definition, details.Capabilities, details.CapabilitiesCheckedAt))
+                ? Results.Ok(new IndexerDetailsResource(ForViewer(http, Resource(service, details.Indexer)), details.Definition, details.Capabilities, details.CapabilitiesCheckedAt))
                 : Results.NotFound());
 
         indexers.MapPost("/", (IndexerRequest request, IndexerService service) =>

@@ -88,6 +88,10 @@ public sealed record ConnectFieldOption(string Value, string Label);
 /// <param name="Name">Key in the settings (camelCase); also the key of its validation error.</param>
 /// <param name="Default">bool, int, string or string[] depending on <see cref="Type"/>; null = empty.</param>
 /// <param name="Advanced">Only shown with the Advanced switch on.</param>
+/// <param name="Secret">
+/// 0.12 (SV2 N-04): a free-text field that holds credentials (custom headers such as "Authorization: Bearer …"); treated
+/// like a password field: masked in the API, encrypted at rest, kept only for the same destination.
+/// </param>
 public sealed record ConnectField(
     string Name,
     string Label,
@@ -100,7 +104,12 @@ public sealed record ConnectField(
     int? Min = null,
     int? Max = null,
     string? Placeholder = null,
-    string? Unit = null);
+    string? Unit = null,
+    bool Secret = false)
+{
+    /// <summary>A password field or a <see cref="Secret"/> text field.</summary>
+    public bool IsSecret => Type == ConnectFieldTypes.Password || Secret;
+}
 
 /// <summary>A media server or notification service StreamZH can talk to.</summary>
 /// <param name="Kind">"mediaServer" or "notification".</param>
@@ -398,7 +407,7 @@ public static class ConnectCatalog
                 new("method", "Method", ConnectFieldTypes.Select, Default: "POST", Options: [new("POST", "POST"), new("PUT", "PUT")]),
                 new("username", "User name", ConnectFieldTypes.Text, "For basic authentication.", Advanced: true),
                 new("password", "Password", ConnectFieldTypes.Password, Advanced: true),
-                new("headers", "Headers", ConnectFieldTypes.TextArea, "Extra headers, one per line: Name: value.", Advanced: true, Placeholder: "X-Token: abc"),
+                new("headers", "Headers", ConnectFieldTypes.TextArea, "Extra headers, one per line: Name: value. Stored like a password.", Advanced: true, Placeholder: "X-Token: abc", Secret: true),
             ]),
         new(
             Apprise,

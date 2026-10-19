@@ -320,6 +320,12 @@ else {
 if (Grant-ServiceControl $me.User.Value) { Write-Host "$($me.Name): may start and stop the service" }
 else { Write-Host "$($me.Name): may start and stop the service (already set)" }
 
+# The program folder: SYSTEM, administrators and you change it (updates with Update-Local.ps1 without administrator
+# rights), the service account and Users only read and run it.
+if (Protect-StreamZhInstallFolder $InstallDir $me.User.Value @($serviceSid)) {
+    Write-Host "${InstallDir}: only SYSTEM, administrators and $($me.Name) may change it; $runsAs reads and runs it"
+}
+
 New-Item -ItemType Directory -Path $data -Force | Out-Null
 # The service writes a new tray token for its account when it starts.
 Remove-StreamZhTrayFiles $data

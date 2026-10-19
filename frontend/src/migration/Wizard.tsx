@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { ApiError } from '../api/client'
+import { outsideStorageCode } from '../api/storage'
 import { isLive, migrationApi, migrationKeys, type MigrationPreview, type MigrationRun, type MigrationSource, type PathMapping } from '../api/migration'
 import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
@@ -13,6 +14,7 @@ import PathsStep from './PathsStep'
 import PreviewStep from './PreviewStep'
 import RunView from './RunView'
 import SourceStep from './SourceStep'
+import StorageNotice from './StorageNotice'
 import { migratedSources, nextSource, rememberedMappings, rememberedUrl, rememberMappings, rememberUrl, sourceMeta } from './sources'
 
 const without = (errors: Record<string, string[]>, key: string) => Object.fromEntries(Object.entries(errors).filter(([k]) => k !== key))
@@ -113,9 +115,24 @@ export default function Wizard({ runs, resume }: { runs: MigrationRun[] | undefi
     },
   })
 
-  const readError = read.error && !(read.error instanceof ApiError && (read.error.fieldErrors.url || read.error.fieldErrors.apiKey)) ? read.error.message : null
-  const startError =
-    start.error instanceof ApiError
+  // 0.12: folders outside the storage locations, from a refused request (path mappings) or from the preview (the old
+  // app's own folders). The notice above the steps lets the owner allow them and reads the preview again.
+  const outsideOf = (error: unknown) => (error instanceof ApiError && error.code === outsideStorageCode ? error.paths : null)
+  const refusedOutside = outsideOf(read.error) ?? outsideOf(start.error)
+  const outsideFolders =
+    refusedOutside ?? (step !== 'source' && step !== 'run' && preview ? [...new Set(preview.paths.filter((p) => p.outsideStorage).map((p) => p.local))] : [])
+  const allowed = () => {
+    start.reset()
+    if (source) read.mutate({ source, mappings: cleanMappings(mappings) })
+  }
+
+  const readError =
+    read.error && !outsideOf(read.error) && !(read.error instanceof ApiError && (read.error.fieldErrors.url || read.error.fieldErrors.apiKey))
+      ? read.error.message
+      : null
+  const startError = outsideOf(start.error)
+    ? null
+    : start.error instanceof ApiError
       ? (start.error.fieldErrors.sections?.[0] ?? (start.error.fieldErrors.url || start.error.fieldErrors.apiKey ? null : start.error.message))
       : start.error
         ? start.error.message
@@ -187,6 +204,8 @@ export default function Wizard({ runs, resume }: { runs: MigrationRun[] | undefi
           </li>
         )}
       </ol>
+
+      {step !== 'source' && step !== 'run' && <StorageNotice key={outsideFolders.join("\n")} folders={outsideFolders} mapped={!!refusedOutside} onAllowed={allowed} />}
 
       {step === 'source' && <SourceStep runs={runs} onPick={pick} />}
 

@@ -36,6 +36,54 @@ public sealed class MigrationService(
     private readonly ConcurrentDictionary<int, LiveRun> _live = new();
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
 
+    /// <summary>
+    /// The path mappings of the request. 0.12 (SV2 N-03, N-06): the local side must be inside a storage location (checked
+    /// before the wizard looks at the folder, so it never opens a network path the owner did not allow).
+    /// </summary>
+    /// <exception cref="ValidationFailedException">
+    /// A local folder is not a valid path, or is outside the storage locations (code <c>outside-storage</c> with all such
+    /// folders in <see cref="ValidationFailedException.Paths"/>, so the wizard can offer the owner to allow them at once).
+    /// </exception>
+    private PathMapper Mapper(MigrationRequest request)
+    {
+        if (services.GetService(typeof(StreamZH.Core.AppPaths)) is not StreamZH.Core.AppPaths paths)
+        {
+            return new PathMapper(request.PathMappings);
+        }
+
+        var outside = new List<(string Folder, string Problem)>();
+        foreach (var mapping in request.PathMappings ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(mapping.Local))
+            {
+                continue;
+            }
+
+            if (StreamZH.Core.PathIdentity.SyntaxProblem(mapping.Local, OperatingSystem.IsWindows()) is { } syntax)
+            {
+                throw new ValidationFailedException(new Dictionary<string, string[]> { ["pathMappings"] = [syntax] });
+            }
+
+            if (paths.StorageProblem(mapping.Local) is { } problem && !outside.Any(o => o.Folder == mapping.Local.Trim()))
+            {
+                outside.Add((mapping.Local.Trim(), problem));
+            }
+        }
+
+        if (outside.Count > 0)
+        {
+            throw new ValidationFailedException(new Dictionary<string, string[]> { ["pathMappings"] = [.. outside.Select(o => o.Problem)] })
+            {
+                Code = StreamZH.Core.AppPaths.OutsideStorageCode,
+                Paths = [.. outside.Select(o => o.Folder)],
+            };
+        }
+
+        // Folders of the old app without a mapping are checked against the storage locations before StreamZH looks at
+        // them (a network path the old app reports is never opened unless the owner allowed it).
+        return new PathMapper(request.PathMappings, storageProblem: folder => paths.StorageProblem(folder));
+    }
+
     public IReadOnlyList<MigrationSourceInfo> Sources() =>
     [
         .. MigrationSources.All.Select(source => new MigrationSourceInfo(
@@ -60,7 +108,7 @@ public sealed class MigrationService(
     public async Task<MigrationPreview> PreviewAsync(string source, MigrationRequest request, CancellationToken cancellationToken)
     {
         var (connection, app) = await ProbeAsync(source, request, cancellationToken);
-        var context = new MigrationContext(source, connection, app, request, new PathMapper(request.PathMappings), services);
+        var context = new MigrationContext(source, connection, app, request, Mapper(request), services);
         var previews = new List<MigrationSectionPreview>();
         var warnings = new List<string>();
         foreach (var section in For(source))
@@ -94,7 +142,12 @@ public sealed class MigrationService(
         }
 
         var paths = context.Paths.Checks();
-        if (paths.Any(p => !p.Exists))
+        if (paths.Any(p => p.OutsideStorage))
+        {
+            warnings.Add("Some folders of " + app.AppName + " are outside the storage locations. The owner allows them in the Folders step (or under Settings → General → Storage).");
+        }
+
+        if (paths.Any(p => !p.Exists && !p.OutsideStorage))
         {
             warnings.Add("StreamZH cannot see some folders of " + app.AppName + ". Add a path mapping (e.g. /tv → /data/media/tv) before you take over the library.");
         }
@@ -105,7 +158,8 @@ public sealed class MigrationService(
     /// <summary>Starts a run in the background and returns it right away (status queued/running).</summary>
     public async Task<MigrationRun> StartAsync(string source, MigrationRequest request, string? userName, CancellationToken cancellationToken)
     {
-        // Validate the connection before anything is stored, so a wrong key shows at the field.
+        // Validate the path mappings and the connection before anything is stored, so a wrong key shows at the field.
+        _ = Mapper(request);
         var (connection, app) = await ProbeAsync(source, request, cancellationToken);
         var selected = Selected(source, request);
         if (selected.Count == 0)
@@ -145,7 +199,7 @@ public sealed class MigrationService(
             var token = live.Cancel.Token;
             live.Status = MigrationRunStatus.Running;
             await PublishAsync(live);
-            var context = new MigrationContext(live.Source, connection, app, request, new PathMapper(request.PathMappings), services);
+            var context = new MigrationContext(live.Source, connection, app, request, Mapper(request), services);
             for (var i = 0; i < selected.Count; i++)
             {
                 token.ThrowIfCancellationRequested();

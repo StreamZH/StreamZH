@@ -14,6 +14,13 @@ public static class SecurityNotices
     {
         ArgumentNullException.ThrowIfNull(notices);
         ArgumentNullException.ThrowIfNull(services);
+
+        // 0.12 (SV2 N-02): the program folder is open to every user of this computer.
+        if (services.GetService<AppFolderCheck>() is { Problem: { } appFolder })
+        {
+            notices.Add(new OngoingNotice("app-folder-open", NoticeLevels.Warn, "Program folder not protected", appFolder, "/system/status", false));
+        }
+
         if (services.GetService<SecuritySettings>() is not { } security || services.GetService<AccessSettings>() is not { } access)
         {
             return;

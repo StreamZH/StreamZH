@@ -143,7 +143,7 @@ public static class ToolSettingsEndpoints
 
 /// <param name="Par2Path">Configured path; "" = search automatically.</param>
 /// <param name="Par2ResolvedPath">The executable that is used, wherever it was found.</param>
-/// <param name="Par2Source">Configured, Installed, Bundled, Path, WindowsDefault or NotFound.</param>
+/// <param name="Par2Source">Configured, Installed, Path, WindowsDefault or NotFound.</param>
 /// <param name="Os">Windows, Linux or macOS, for the install hints.</param>
 /// <param name="Par2Installable">StreamZH can install par2 on this system.</param>
 /// <param name="Par2Installing">An installation is running right now.</param>
@@ -167,7 +167,6 @@ public sealed record ToolSettingsResource(
     string SevenZipSource,
     string? Par2Problem,
     string? SevenZipProblem,
-    string BundledFolder,
     string Os,
     bool Par2Installable,
     bool SevenZipInstallable,
@@ -222,7 +221,6 @@ public sealed record ToolSettingsResource(
             sevenZip.Source.ToString(),
             par2.Problem,
             sevenZip.Problem,
-            tools.Environment.BundledDirectory,
             tools.Environment.IsWindows ? "Windows" : OperatingSystem.IsMacOS() ? "macOS" : "Linux",
             installer.IsInstallable(PostProcessTool.Par2),
             installer.IsInstallable(PostProcessTool.SevenZip),

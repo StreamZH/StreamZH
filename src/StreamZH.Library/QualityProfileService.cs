@@ -16,6 +16,12 @@ public sealed class ValidationFailedException(IReadOnlyDictionary<string, string
     : Exception("One or more fields are invalid.")
 {
     public IReadOnlyDictionary<string, string[]> Errors { get; } = errors;
+
+    /// <summary>A machine-readable reason the web app acts on (e.g. <c>outside-storage</c>), sent as the problem's "code".</summary>
+    public string? Code { get; init; }
+
+    /// <summary>The folders the error is about (sent as "paths"), e.g. the ones outside the storage locations.</summary>
+    public IReadOnlyList<string>? Paths { get; init; }
 }
 
 /// <summary>

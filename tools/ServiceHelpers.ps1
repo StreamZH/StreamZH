@@ -180,6 +180,35 @@ function Protect-StreamZhDataFolder([string]$folder, [string[]]$fullControl, [st
     }
 }
 
+# Makes the program folder (StreamZH.exe, StreamZH.Tray.exe and their files) changeable only by SYSTEM, administrators
+# and $modify (your user, so Update-Local.ps1 can install updates without administrator rights); every other account,
+# also the service account, may only read and run it ($readers, plus Users). Without this, C:\Tools\StreamZH inherits
+# "Authenticated Users: Modify" from C:\ and any local account could replace StreamZH.exe, which the service and your
+# tray icon then run. StreamZH checks this at every start (AppFolderAcl.cs) and shows a notice when it is not so.
+# Returns $true when the rules are set, $false (with a warning) when this account may not change them.
+function Protect-StreamZhInstallFolder([string]$folder, [string]$modify, [string[]]$readers) {
+    $grants = @('*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F')
+    if ($modify) { $grants += "*${modify}:(OI)(CI)M" }
+    foreach ($sid in @($readers | Where-Object { $_ })) { $grants += "*${sid}:(OI)(CI)RX" }
+    # Grant first, so nobody is locked out; Users only read and run (:r replaces what they had); then cut the
+    # inherited entries (Authenticated Users: Modify from C:\) and any broad entry that is left.
+    $steps = @()
+    $steps += , (@('/grant') + $grants)
+    $steps += , @('/grant:r', '*S-1-5-32-545:(OI)(CI)RX')
+    $steps += , @('/inheritance:r')
+    $steps += , @('/remove:g', '*S-1-1-0', '*S-1-5-4', '*S-1-5-11', '*S-1-3-0')
+    foreach ($step in $steps) {
+        $output = & icacls.exe $folder @step /Q 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "The program folder $folder could not be protected (icacls $($step -join ' '): $output)." -ForegroundColor Yellow
+            Write-Host 'Run once in a PowerShell as administrator:' -ForegroundColor Yellow
+            Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'" -ForegroundColor Yellow
+            return $false
+        }
+    }
+    return $true
+}
+
 # The tray reads <data>\tray.token and tray.json; a new owner (service account or console user) writes them anew.
 function Remove-StreamZhTrayFiles([string]$dataDir) {
     if (-not $dataDir) { $dataDir = Join-Path $env:ProgramData 'StreamZH' }

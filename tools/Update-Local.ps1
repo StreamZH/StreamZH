@@ -13,6 +13,9 @@
         C:\Repos\StreamZH\tools\Install-Service.ps1
     Back to the console window: C:\Repos\StreamZH\tools\Uninstall-Service.ps1
 
+    Program folder: only SYSTEM, administrators and your user may change <InstallDir> (inheritance from C:\ is cut, so
+    other local accounts cannot replace StreamZH.exe); everyone else may read and run it.
+
     Tray icon: also builds StreamZH.Tray.exe (StreamZH in the notification area, bottom right, with a menu to open the
     dashboard, pause downloads, restart, stop and start StreamZH), registers it to start with Windows for your user
     (HKCU ... Run, "StreamZH Tray") and starts it. -NoTray leaves it out (and removes the entry). It needs the .NET 10
@@ -137,6 +140,10 @@ try {
 
     Step "Install to $InstallDir"
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    # Only SYSTEM, administrators and you may change the program folder; everyone else (also the service) reads and
+    # runs it. Before the copy, so the new files get these rules too.
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    if (Protect-StreamZhInstallFolder $InstallDir $me @()) { Write-Host 'program folder: only SYSTEM, administrators and you may change it' }
     # /MIR also removes the old <InstallDir>\tools\par2.exe of earlier versions of this script; StreamZH then
     # installs par2cmdline-turbo into C:\ProgramData\StreamZH\tools by itself.
     robocopy $out $InstallDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null

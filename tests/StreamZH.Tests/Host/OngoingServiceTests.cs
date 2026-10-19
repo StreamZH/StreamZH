@@ -320,7 +320,7 @@ public sealed class OngoingServiceTests : IDisposable
         using var downloads = new FakeToolDownloads();
         var (package, _) = TestToolPackages.Par2();
         var existing = new HashSet<string>(StringComparer.Ordinal);
-        var environment = new ToolEnvironment(folder.Combine("app"), string.Empty, OperatingSystem.IsWindows(), [])
+        var environment = new ToolEnvironment(folder.Combine("app"), folder.Combine("bin"), OperatingSystem.IsWindows(), [])
         {
             InstalledDirectory = folder.Combine("tools"),
             FileExists = existing.Contains,
@@ -361,7 +361,7 @@ public sealed class OngoingServiceTests : IDisposable
         Assert.False(notice.Dismissible);
 
         // Installed by hand: the notice disappears.
-        existing.Add(Path.Combine(environment.BundledDirectory, tools.ExecutableNames(PostProcessTool.Par2)[0]));
+        existing.Add(Path.Combine(folder.Combine("bin"), tools.ExecutableNames(PostProcessTool.Par2)[0]));
         Assert.Empty(Service(tools: tools, installer: installer).Get().Notices);
     }
 

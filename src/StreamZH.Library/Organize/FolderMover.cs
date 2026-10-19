@@ -52,6 +52,15 @@ public sealed class FolderMover(ImportFileSystem files, ILogger<FolderMover> log
         }
     }
 
+    // 0.12 (SV3 W-01): a stored folder outside the storage locations is never moved away or deleted.
+    private void GuardSource(string source)
+    {
+        if (files.SourceProblem(source) is { } problem)
+        {
+            throw new LibraryException(problem, LibraryError.Invalid);
+        }
+    }
+
     /// <summary>Only the letter case differs ("dune (2021)" → "Dune (2021)").</summary>
     public static bool IsCaseOnly(string a, string b) =>
         !string.Equals(a, b, StringComparison.Ordinal) && string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
@@ -134,6 +143,7 @@ public sealed class FolderMover(ImportFileSystem files, ILogger<FolderMover> log
             throw new LibraryException($"The folder {target} already exists. Remove or rename it first.", LibraryError.Conflict);
         }
 
+        GuardSource(source);
         Guard(target);
 
         var parent = Path.GetDirectoryName(Path.GetFullPath(target))!;
@@ -183,6 +193,7 @@ public sealed class FolderMover(ImportFileSystem files, ILogger<FolderMover> log
             return null;
         }
 
+        GuardSource(folder);
         if (string.IsNullOrWhiteSpace(settings.RecycleBin))
         {
             try

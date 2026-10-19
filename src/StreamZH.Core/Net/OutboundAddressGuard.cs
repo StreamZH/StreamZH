@@ -14,7 +14,8 @@ public sealed class BlockedDestinationException(string message) : HttpRequestExc
 /// <summary>The hosts of the indexers and download clients the admin configured (0.12, V-10).</summary>
 public interface IConfiguredServiceHosts
 {
-    bool Contains(string host);
+    /// <summary>True for the host AND port of a configured indexer or download client (0.12, SV2 N-07: another port on that host is not trusted).</summary>
+    bool Contains(string host, int port);
 }
 
 /// <summary>
@@ -62,10 +63,41 @@ public sealed class OutboundAddressGuard(Func<string, CancellationToken, Task<IP
         }
     }
 
-    /// <summary>True when the request is marked and goes to another host than the trusted ones.</summary>
-    public static bool IsRestricted(HttpRequestMessage request, string host) =>
-        request.Options.TryGetValue(TrustedHostKey, out var trusted) && !SameHost(trusted, host)
-        && !(request.Options.TryGetValue(AlsoTrustedKey, out var also) && also.Contains(host.Trim('[', ']')));
+    /// <summary>
+    /// True when the request is marked and goes to another host (or, for the other configured services, another port)
+    /// than the trusted ones. <paramref name="port"/> -1: the port of the request URL.
+    /// </summary>
+    public static bool IsRestricted(HttpRequestMessage request, string host, int port = -1)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (port < 0)
+        {
+            port = request.RequestUri is { IsAbsoluteUri: true } uri ? uri.Port : -1;
+        }
+
+        return request.Options.TryGetValue(TrustedHostKey, out var trusted) && !SameHostAndPort(trusted, host, port)
+            && !(request.Options.TryGetValue(AlsoTrustedKey, out var also) && also.Contains(host.Trim('[', ']'), port));
+    }
+
+    // The trusted value is "host" (any port, before 0.12 SV2) or "host:port" / "[v6]:port".
+    private static bool SameHostAndPort(string trusted, string host, int port)
+    {
+        if (Uri.TryCreate("http://" + trusted, UriKind.Absolute, out var parsed) && trusted.Contains(':', StringComparison.Ordinal)
+            && !(trusted.Count(c => c == ':') > 1 && !trusted.StartsWith('[')))
+        {
+            return SameHost(parsed.IdnHost, host) && parsed.Port == port;
+        }
+
+        return SameHost(trusted, host);
+    }
+
+    /// <summary>The value for <see cref="Restrict"/>: "host:port" of <paramref name="uri"/>, so another port on that host is checked.</summary>
+    public static string HostAndPort(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        var host = uri.IdnHost.Contains(':', StringComparison.Ordinal) ? $"[{uri.IdnHost.Trim('[', ']')}]" : uri.IdnHost;
+        return $"{host}:{uri.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+    }
 
     /// <summary>
     /// What a restricted request may reach (0.12, V-10): <see cref="IsAllowed"/> and not a private, CGNAT or unique
@@ -158,7 +190,7 @@ public sealed class OutboundAddressGuard(Func<string, CancellationToken, Task<IP
     {
         ArgumentNullException.ThrowIfNull(request);
         var uri = request.RequestUri;
-        if (uri is null || !IsRestricted(request, uri.IdnHost))
+        if (uri is null || !IsRestricted(request, uri.IdnHost, uri.Port))
         {
             return;
         }
@@ -215,7 +247,7 @@ public sealed class OutboundAddressGuard(Func<string, CancellationToken, Task<IP
         var request = context.InitialRequestMessage;
         var toTarget = SameHost(endpoint.Host, request.RequestUri?.IdnHost);
         var addresses = await ResolveAsync(endpoint.Host, cancellationToken).ConfigureAwait(false);
-        if (toTarget && IsRestricted(request, endpoint.Host))
+        if (toTarget && IsRestricted(request, endpoint.Host, endpoint.Port))
         {
             addresses = [.. addresses.Where(IsPublic)];
             if (addresses.Length == 0)

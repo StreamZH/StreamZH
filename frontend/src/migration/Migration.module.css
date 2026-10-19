@@ -1697,3 +1697,28 @@ button.stepBtn:hover {
     padding-left: 14px;
   }
 }
+
+/* 0.12: folders outside the storage locations (StorageNotice). */
+.storageNotice {
+  align-items: flex-start;
+}
+
+.storageBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.storageBody p {
+  margin: 0;
+}
+
+.storageList {
+  margin: 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+
+.storageError {
+  color: var(--err);
+}

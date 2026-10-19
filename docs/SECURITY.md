@@ -23,19 +23,21 @@ released as soon as they are ready and credited in the release notes unless you 
 | Accounts and sessions | `streamzh.db` (passwords as PBKDF2 hashes), sign-in cookie | Owner manages everyone; see the roles below |
 | API key | `streamzh.db` (encrypted), Settings → General → API key (owner only) | Admin access for scripts and CloudZH; treat it like a password |
 | iCal feed token | `streamzh.db`, Calendar → iCal link | Read-only access to the calendar feed, nothing else |
-| Indexer API keys, Usenet and download client passwords, notification secrets | `streamzh.db` | Never sent back to the browser in clear text (shown as `********`) |
+| Indexer API keys, Usenet and download client passwords, notification secrets (also custom webhook headers and tokens inside URLs) | `streamzh.db` | Never sent back to the browser in clear text (shown as `********`) |
 | Cookie signing keys | `<data>/keys` | Whoever has them can forge sign-in cookies |
 | Backups | `<data>/Backups` and downloaded zips | Contain the database and the keys: everything above |
 | Setup code | `<data>/setup-code` until the owner account exists | Lets someone on another device create the owner account |
 | Tray token | `<data>/tray.token` | Status, pause/resume, restart and shut down from this computer only |
 
-Roles: **Owner** (everything), **Admin** (settings and users except owners and the owner-only settings below),
-**Friend** (library and downloads, no settings), **Requester** (Discover and their own requests only).
+Roles: **Owner** (everything), **Admin** (settings and users except owners and the owner-only settings below, folders
+only inside the owner's [storage locations](#storage-locations)), **Friend** (library and downloads, no settings),
+**Requester** (Discover and their own requests only).
 
 ## Roles, the API key and owner-only settings
 
-StreamZH has four roles: **Owner**, **Admin**, **Friend** and **Requester**. Admins configure almost everything, but
-some things would let an Admin take over the owner's account or run programs on the host. Since 0.12 only the owner may:
+StreamZH has four roles: **Owner**, **Admin**, **Friend** and **Requester**. Admins manage the configuration within
+the owner's storage locations; they cannot run programs on the host, read the owner's secrets or write outside the
+storage locations. Everything that would allow that is owner-only since 0.12:
 
 | Owner only | Why |
 |---|---|
@@ -46,6 +48,7 @@ some things would let an Admin take over the owner's account or run programs on 
 | Outgoing proxy | The proxy sees every web request, with indexer keys and passwords |
 | Backups: create, list, download, restore, delete, and the backup folder, interval and retention | A backup holds every secret and the key ring; a restore replaces the accounts |
 | Tool paths (par2, 7-Zip, ffprobe) and the extra par2/7-Zip parameters | StreamZH runs these programs with its own rights |
+| Storage locations (Settings → General → Storage) | Every folder an Admin sets must be inside one; see [Storage locations](#storage-locations) |
 | Managing other owners | Unchanged since 0.10 |
 
 An Admin can still send these settings **unchanged** (the web app saves whole sections); a change is refused with
@@ -74,6 +77,10 @@ StreamZH defends against:
   [Browser protection](#browser-protection).
 - **Users with fewer rights.** Requesters and friends cannot read settings or secrets; a disabled, demoted or signed-out
   user loses access at once, including the live connection.
+- **Admins (and the API key) taking over the host or the owner.** Admins choose folders only inside the owner's
+  storage locations and never inside the data or program folder, cannot change tool paths, read stored secrets or
+  send them elsewhere. So they cannot place a program StreamZH runs, a key that signs them in, or a file in a
+  profile or start-up folder (`~/.ssh`, `%APPDATA%\…\Startup`).
 
 StreamZH does **not** defend against:
 
@@ -227,6 +234,13 @@ A value that looks like a stored secret (`enc:v1:…`) is refused as input ("Ent
 from the database."), and the store encrypts every value it is given, so a ciphertext copied from a database can never
 be turned back into somebody's secret by saving it as a webhook password.
 
+Free-text fields that carry credentials are secrets as well (0.12, SV2): the custom **headers** of a webhook
+(`Authorization: Bearer …`) are masked, encrypted and kept only for the same URL, and a token or password inside a URL
+(`https://user:password@…`, `?token=`, `?key=`, `?apikey=`, `?password=`, `?sig=`, `?code=`, …) is shown as
+`********` and stored encrypted. Sending the URL back as shown keeps the stored one; any other URL that still contains
+`********` must be typed again in full. **Friends** see the indexer list (for the search pages) without the extra
+parameters (often `&passkey=…`) and without keys in the indexer URL.
+
 ## Secrets in links
 
 Download links of releases carry the indexer's key (`apikey=`, `r=`, `jackett_apikey=`, `passkey=`, `token=`, …).
@@ -252,19 +266,57 @@ list, never through a shell.
 Tools StreamZH installs itself go to `<data>/tools/<tool>`. At installation StreamZH records the SHA-256 of every file
 in that folder (in the database). Before each run the folder must hold exactly these files with these hashes; a
 program placed there in any other way, a changed file or an extra file next to it (a DLL Windows would load) is
-ignored and the next source is used (configured path, `<app>/tools`, `PATH`, Program Files). Tools installed by
+ignored and the next source is used (configured path, `PATH`, Program Files). Since 0.12 the program folder
+(`<app>/tools`) is not searched at all: nothing ships there, and a file placed there would run unchecked. Tools installed by
 versions before 0.12 have no record and are installed again automatically at the next start (Settings → Tools shows
 them as not installed when automatic installation is off).
 
-## Folders StreamZH writes to
+## Storage locations
+
+The **storage locations** (Settings → General → Storage, owner only) are the base folders StreamZH may read and write
+media and downloads in, for example `/data/media`, `/data/downloads`, `D:\Media` or `\\nas\share`. Every folder that
+can be set in StreamZH must be inside one of them: root folders, the download folders (completed, incomplete, NZB, NZB
+backup, watched), category folders, torrent save paths, the recycle bin, the file renamer's folders, organize and move
+targets (they are below root folders), the local side of remote path mappings and of the migration wizard's path
+mappings, and the backup folder unless it is the default `<data>/Backups`. The folder browser shows Admins only the
+storage locations and the folders below them.
+
+- The **owner** may add any folder, network shares included. The root-folder dialog and the migration wizard offer the
+  owner to allow a folder in one click; Admins get "outside the storage locations".
+- Folders that come from elsewhere are checked the same way: a movie or series folder the migration wizard reads from
+  Radarr or Sonarr must be inside a storage location, or the item is not taken over. Stored folders are not trusted
+  either: StreamZH never deletes or moves away a library folder that is outside the storage locations ("Remove" with
+  "Delete files and folder", organize, move to another root folder).
+- A path is first compared as text, **before** StreamZH opens it, so an Admin cannot make the host connect to a network
+  share the owner did not allow (on Windows that would send the account's NTLM credentials to that server). Then both
+  sides are resolved (links, junctions, mapped and substituted drives; Windows: `GetFinalPathNameByHandle`, Linux and
+  macOS: `realpath`), so a link inside a storage location cannot lead out of it.
+- Path forms that hide what they point to are refused: `..` and `.` parts, and on Windows device paths (`\\?\…`,
+  `\\.\…`), 8.3 short names (`PROGRA~3`) and alternate data streams. On macOS names are compared in Unicode NFC.
+- **Upgrading** to 0.12 adds every folder in use as a storage location (root folders, download and category folders,
+  the recycle bin, remote path mappings, a backup folder outside the data folder, and `<data>/downloads`), so nothing
+  stops working. A **new installation** starts with the default download folder only; add your media folder when you
+  add the first root folder (one click for the owner). A location cannot be removed while folders inside it are set.
+- Docker: add the container paths of your volumes (for example `/data` or `/media`).
+
+Storage locations limit what StreamZH is *told* to use. What the operating system lets StreamZH's account write is a
+second, independent limit: run it as a dedicated account (see [Service accounts](#service-accounts)).
+
+## Folders StreamZH never writes to
 
 No folder that StreamZH writes downloads, imports, renames or backups to may be inside the data folder, except its own
 `downloads/` folder (and `Backups/` for backups), and none may contain the data folder. This covers the completed,
 incomplete, NZB, NZB backup and watch folders, category folders, torrent save paths, root folders, the recycle bin,
 the backup folder, the Renamer and Organize targets and every import. Such a folder is refused when it is saved, and
 if an older version or a restored database still has one, it is not used (downloads go to the default folder, imports
-and renames fail with a message). Symbolic links and junctions on the way are followed. This keeps downloads away from
-the database, the sign-in keys (`keys/`) and the tools StreamZH runs (`tools/`).
+and renames fail with a message). Symbolic links and junctions on the way are followed, and on Linux and macOS the
+data folder is also recognised under another name (a bind mount) by its device and inode numbers. This keeps downloads
+away from the database, the sign-in keys (`keys/`) and the tools StreamZH runs (`tools/`).
+
+The same holds since 0.12 for the **program folder** (the folder of `StreamZH.exe` or `StreamZH.dll`), without any
+exception: a DLL or a tool placed next to the program would run at the next start. Names of download folders and files
+from release titles, NZB subjects and torrents never start with a dot (`.ssh` becomes `ssh`; a torrent named `.ssh` is
+refused) and are never Windows device names (`CON`, `NUL.nfo` get a leading `_`).
 
 ## Safe deployment
 
@@ -323,7 +375,21 @@ Run StreamZH with the least rights that work:
 
 The tray icon (Windows) talks to StreamZH with a token in `<data>\tray.token` that only SYSTEM, the account
 StreamZH runs as and the tray's user may read (the user the install script set up, or your own user when StreamZH
-runs in a console window). On Linux and macOS the file is `0600`.
+runs in a console window). If the data folder grants no user account (for example a data folder set up by hand), the
+token falls back to "Interactive" (everyone signed in at this computer) so the tray keeps working; run
+`tools\Install-Service.ps1` once to limit it to your user. The token only allows status, pause/resume, restart and
+shut down. On Linux and macOS the file is `0600`.
+
+### The program folder (Windows)
+
+Folders created below `C:\` inherit "Authenticated Users: Modify", so every local account could replace
+`StreamZH.exe` or `StreamZH.Tray.exe` in the default install folder `C:\Tools\StreamZH`, and the service (or your
+tray icon) would run that program. `tools\Update-Local.ps1` and `tools\Install-Service.ps1` therefore give the install
+folder a protected access list: inheritance off, SYSTEM and Administrators full control, your user Modify (so
+`Update-Local.ps1` keeps working without administrator rights), Users and the service account read and run only.
+StreamZH checks this at every start and shows "Program folder not protected" in the status window when Users,
+Authenticated Users or Everyone may change it. Installing to `C:\Program Files\StreamZH` (`-InstallDir`) gives the
+same protection by default.
 
 ## Outgoing connections
 
@@ -332,7 +398,9 @@ runs in a console window). On Linux and macOS the file is `0600`.
   or multicast addresses, or known cloud metadata addresses, unless they stay on the indexer's own host (Prowlarr or
   Jackett on the same machine keep working). Since 0.12 the same holds for your LAN (`10/8`, `172.16/12`,
   `192.168/16`, `100.64/10`, `fc00::/7`): a link to another host than the indexer may only go there when that host is
-  another configured indexer or download client. The indexer's own host may be anywhere. The check runs on the
+  another configured indexer or download client, on that service's own port (another port on the same host, such as
+  a router's admin page, is checked like any LAN address). The indexer's own host may be anywhere, on its configured
+  port. The check runs on the
   resolved IP addresses before the request and again when the connection opens, so a DNS answer that changes in
   between (DNS rebinding) does not get through. **Through an outgoing proxy** (Settings → General, or `HTTP(S)_PROXY`)
   only the check before sending runs, and a name StreamZH cannot resolve itself is refused. The proxy then resolves the

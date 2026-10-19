@@ -175,7 +175,7 @@ public sealed class SabnzbdDownloadsSection : IMigrationSection
                 return;
             }
 
-            if (!Directory.Exists(local))
+            if (!context.Paths.FolderExists(local))
             {
                 steps.Add(new Step(new MigrationItem(
                     ItemKey(key), label, MigrationAction.Skip, remote == local ? remote : $"{remote} → {local}",

@@ -58,7 +58,12 @@ export default function PathsStep({
               {p.local}
             </span>
             <span role="cell" className={styles.pathState}>
-              {p.exists ? (
+              {p.outsideStorage ? (
+                <span className={`${ui.pill} ${ui.pillWarn}`} title="Outside the storage locations">
+                  <Icon name="alert" size={13} />
+                  Not allowed
+                </span>
+              ) : p.exists ? (
                 <span className={`${ui.pill} ${ui.pillOk}`}>
                   <Icon name="check" size={13} />
                   Found

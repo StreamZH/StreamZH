@@ -31,11 +31,17 @@ export interface AuthState {
 export class ApiError extends Error {
   readonly status: number
   readonly fieldErrors: Record<string, string[]>
+  /** The problem's "code" (e.g. "outside-storage"), when the API sends one. */
+  readonly code: string | null
+  /** The folders the problem is about (e.g. the ones outside the storage locations), when the API sends them. */
+  readonly paths: string[]
 
-  constructor(status: number, message: string, fieldErrors: Record<string, string[]> = {}) {
+  constructor(status: number, message: string, fieldErrors: Record<string, string[]> = {}, code: string | null = null, paths: string[] = []) {
     super(message)
     this.status = status
     this.fieldErrors = fieldErrors
+    this.code = code
+    this.paths = paths
   }
 }
 
@@ -70,7 +76,7 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   }
 
   if (!response.ok) {
-    let problem: { title?: string; detail?: string; errors?: Record<string, string[]> } = {}
+    let problem: { title?: string; detail?: string; errors?: Record<string, string[]>; code?: string; paths?: unknown } = {}
     try {
       problem = await response.json()
     } catch {
@@ -80,7 +86,8 @@ export async function request<T>(method: string, path: string, body?: unknown): 
       response.status === 429
         ? 'Too many attempts. Please wait a minute.'
         : (problem.detail ?? problem.title ?? `${response.status} ${response.statusText}`)
-    throw new ApiError(response.status, message, problem.errors ?? {})
+    const paths = Array.isArray(problem.paths) ? problem.paths.filter((p): p is string => typeof p === 'string') : []
+    throw new ApiError(response.status, message, problem.errors ?? {}, typeof problem.code === 'string' ? problem.code : null, paths)
   }
 
   // 204, or 202 Accepted without a body (restart, shutdown).

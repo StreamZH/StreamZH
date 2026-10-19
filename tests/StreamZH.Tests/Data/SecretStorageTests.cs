@@ -184,7 +184,7 @@ public sealed class SecretStorageTests : IDisposable
     [Fact]
     public void Every_secret_field_of_the_catalogs_is_encrypted()
     {
-        var names = ConnectCatalog.All.SelectMany(t => t.Fields).Where(f => f.Type == ConnectFieldTypes.Password).Select(f => f.Name)
+        var names = ConnectCatalog.All.SelectMany(t => t.Fields).Where(f => f.IsSecret).Select(f => f.Name)
             .Concat(ImportListCatalog.All.SelectMany(t => t.AsConnectType().Fields).Where(f => f.Type == ConnectFieldTypes.Password).Select(f => f.Name))
             .Concat(DownloadClientCatalog.All.SelectMany(i => i.Fields).Where(f => f.Secret).Select(f => f.Name))
             .Distinct()

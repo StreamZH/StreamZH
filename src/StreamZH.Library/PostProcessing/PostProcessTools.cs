@@ -24,7 +24,6 @@ public enum ToolSource
 
     /// <summary>Installed by StreamZH into &lt;data&gt;/tools.</summary>
     Installed,
-    Bundled,
     Path,
     WindowsDefault,
 }
@@ -64,6 +63,7 @@ public sealed class ConfigPostProcessToolSettings(ConfigRepository config) : IPo
 }
 
 /// <summary>What the tool search looks at; replaceable so tests do not depend on the machine.</summary>
+/// <param name="AppDirectory">The program folder; not searched for tools since 0.12 (SV2 N-01).</param>
 public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, bool IsWindows, IReadOnlyList<string> ProgramFilesDirectories)
 {
     public Func<string, bool> FileExists { get; init; } = File.Exists;
@@ -92,9 +92,6 @@ public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, 
                 .Where(p => !string.IsNullOrEmpty(p)).Distinct(StringComparer.OrdinalIgnoreCase).Select(p => p!).ToArray()
             : []);
 
-    /// <summary>Folder for tools shipped with (or downloaded next to) StreamZH: &lt;app&gt;/tools.</summary>
-    public string BundledDirectory => System.IO.Path.Combine(AppDirectory, "tools");
-
     /// <summary>&lt;data&gt;/tools/par2 or &lt;data&gt;/tools/7-Zip; null without <see cref="InstalledDirectory"/>.</summary>
     public string? InstalledToolDirectory(PostProcessTool tool) =>
         InstalledDirectory is null ? null : System.IO.Path.Combine(InstalledDirectory, InstalledFolderName(tool));
@@ -108,9 +105,9 @@ public sealed record ToolEnvironment(string AppDirectory, string? PathVariable, 
 }
 
 /// <summary>
-/// Finds par2, 7-Zip and ffprobe: configured path, then the copy installed by StreamZH (&lt;data&gt;/tools/par2, &lt;data&gt;/tools/7-Zip),
-/// then &lt;app&gt;/tools, then PATH, then the Windows default (C:\Program Files\7-Zip\7z.exe, 7-Zip only). Versions are read once
-/// per executable.
+/// Finds par2, 7-Zip and ffprobe: configured path, then the copy installed by StreamZH (&lt;data&gt;/tools/par2, &lt;data&gt;/tools/7-Zip,
+/// only when it matches what the installer recorded), then PATH, then the Windows default (C:\Program Files\7-Zip\7z.exe, 7-Zip
+/// only). Since 0.12 the program folder (&lt;app&gt;/tools) is not searched. Versions are read once per executable.
 /// </summary>
 /// <param name="manifest">What StreamZH installed into &lt;data&gt;/tools (0.12); only those copies are run. Default: kept in memory.</param>
 public sealed partial class PostProcessTools(IPostProcessToolSettings settings, IToolProcessRunner runner, ToolEnvironment environment, IToolManifest? manifest = null)
@@ -174,15 +171,8 @@ public sealed partial class PostProcessTools(IPostProcessToolSettings settings, 
             }
         }
 
-        foreach (var name in names)
-        {
-            var bundled = System.IO.Path.Combine(environment.BundledDirectory, name);
-            if (environment.FileExists(bundled))
-            {
-                return new ToolLocation(tool, bundled, ToolSource.Bundled, configured, problem);
-            }
-        }
-
+        // 0.12 (SV2 N-01): no &lt;app&gt;/tools folder. Nothing ships there, and a file placed there would run unchecked;
+        // StreamZH uses only its verified install, PATH and Program Files.
         var separator = environment.IsWindows ? ';' : ':';
         var directories = (environment.PathVariable ?? string.Empty).Split(separator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         foreach (var name in names)

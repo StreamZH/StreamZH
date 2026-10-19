@@ -69,6 +69,13 @@ public sealed partial class ImportFileSystem(ILogger<ImportFileSystem> logger, A
         }
     }
 
+    /// <summary>
+    /// 0.12 (SV3 W-01): why StreamZH does not move or delete <paramref name="folder"/> (a stored library folder), null when
+    /// it may. Stored paths are not trusted: one outside the storage locations is never removed or moved away.
+    /// </summary>
+    public string? SourceProblem(string folder) =>
+        paths?.FolderProblem(folder) is { } problem ? $"StreamZH does not move or delete {folder}. {problem}" : null;
+
     /// <summary>Why StreamZH does not write to <paramref name="target"/>, null when it may.</summary>
     public string? Problem(string target) =>
         paths?.FolderProblem(target) is { } problem ? $"StreamZH does not write to {target}. {problem}" : null;

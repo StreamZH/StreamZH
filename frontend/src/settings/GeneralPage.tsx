@@ -24,6 +24,7 @@ import styles from './General.module.css'
 import { OwnerOnlyNote, ReadOnly } from './OwnerOnly'
 import { useIsOwner } from './useIsOwner'
 import { NumberInput, Row, SaveBar, Section, Select, SettingsPage, Toggle } from './SettingsKit'
+import { StorageSection } from './StorageSection'
 import { useSettingsForm } from './useSettingsForm'
 
 /** Settings → General (like Radarr): host, security, API key, proxy, logging, backups, updates. */
@@ -44,16 +45,7 @@ export default function GeneralPage() {
       <Section id="analytics" title="Analytics">
         <p className={styles.text}>StreamZH sends no usage data, crash reports or analytics anywhere. It only talks to TMDB, your indexers and Usenet servers, and to GitHub when you check for updates.</p>
       </Section>
-      {settings.data && (
-        <Section id="storage" title="Storage">
-          <Row label="Data folder" wide help="Database, settings, logs and keys. Set with --data or STREAMZH_DATA.">
-            <code className={styles.path}>{settings.data.dataDirectory}</code>
-          </Row>
-          <Row label="Log folder" wide>
-            <code className={styles.path}>{settings.data.logDirectory}</code>
-          </Row>
-        </Section>
-      )}
+      {settings.data && <StorageSection dataDirectory={settings.data.dataDirectory} logDirectory={settings.data.logDirectory} />}
     </SettingsPage>
   )
 }

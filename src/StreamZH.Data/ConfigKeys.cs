@@ -250,4 +250,7 @@ public static class ConfigKeys
     // Security (0.12, FX4): SHA-256 of the tools StreamZH installed into <data>/tools (JSON), and which header a trusted proxy sets for the client address.
     public const string ToolManifest = "ToolManifest";
     public const string ClientIpHeader = "ClientIpHeader";
+
+    // Security (0.12, FX5): the owner's storage locations (JSON list of folders); every folder an admin sets must be inside one.
+    public const string StorageLocations = "StorageLocations";
 }

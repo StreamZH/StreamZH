@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../api/client'
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
+import { outsideStorageCode, storageApi, storageKeys } from '../api/storage'
 import FolderPicker from '../components/FolderPicker'
 import Icon from '../components/Icon'
 import { Skeleton } from '../components/Loader'
@@ -10,6 +11,7 @@ import ui from '../components/ui.module.css'
 import { formatBytes } from '../lib/format'
 import styles from '../pages/Settings.module.css'
 import { Section } from './SettingsKit'
+import { useIsOwner } from './useIsOwner'
 
 export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
   const queryClient = useQueryClient()
@@ -29,6 +31,17 @@ export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
   const remove = useMutation({
     mutationFn: libraryApi.removeRootFolder,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.rootFolders }),
+  })
+
+  // 0.12: a folder outside the storage locations; the owner allows it in one click and the folder is added.
+  const owner = useIsOwner()
+  const outside = add.error instanceof ApiError && add.error.code === outsideStorageCode
+  const allow = useMutation({
+    mutationFn: () => storageApi.add(path.trim()),
+    onSuccess: (data) => {
+      queryClient.setQueryData(storageKeys.storage, data)
+      add.mutate()
+    },
   })
 
   const submit = (event: FormEvent) => {
@@ -133,8 +146,20 @@ export function RootFoldersSection({ windows = false }: { windows?: boolean }) {
           }}
         />
       )}
-      {add.error && (
+      {add.error && !(outside && owner) && (
         <p className={styles.error}>{add.error instanceof ApiError ? add.error.message : 'Could not add the folder.'}</p>
+      )}
+      {outside && owner && (
+        <div className={`${ui.infoBox} ${styles.allowBox}`} role="status">
+          <span>
+            <code>{path.trim()}</code> is outside the storage locations (the folders StreamZH may use, Settings → General → Storage).
+          </span>
+          <button className={`${ui.primary} ${ui.sm}`} type="button" onClick={() => allow.mutate()} disabled={allow.isPending || add.isPending}>
+            <Icon name="check" size={14} />
+            Allow and add
+          </button>
+          {allow.error && <span className={styles.error}>{allow.error instanceof ApiError ? (allow.error.fieldErrors.path?.[0] ?? allow.error.message) : allow.error.message}</span>}
+        </div>
       )}
     </Section>
   )

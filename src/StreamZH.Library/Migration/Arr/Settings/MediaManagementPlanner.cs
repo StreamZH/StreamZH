@@ -26,8 +26,12 @@ public sealed class MediaManagementPlanner
     private readonly Dictionary<string, (string Label, Func<MediaManagementValues, MediaManagementValues, MediaManagementValues> Restore)> _fields = new(StringComparer.Ordinal);
     private MediaManagementValues _draft;
 
-    public MediaManagementPlanner(SettingsPlan plan, MediaManagementSettings settings, string section, string otherApp)
+    private readonly PathMapper? _paths;
+
+    /// <param name="paths">0.12 (SV3 W-03): judges the recycle bin against the storage locations before looking at it.</param>
+    public MediaManagementPlanner(SettingsPlan plan, MediaManagementSettings settings, string section, string otherApp, PathMapper? paths = null)
     {
+        _paths = paths;
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(settings);
         _plan = plan;
@@ -98,7 +102,7 @@ public sealed class MediaManagementPlanner
     private const string RecycleBinField = "recycleBin";
 
     /// <summary>A recycle bin must be a full path to a folder that exists (Radarr and Sonarr ask the same).</summary>
-    private static string? RecycleBinProblem(string? path)
+    private string? RecycleBinProblem(string? path)
     {
         var bin = path?.Trim() ?? string.Empty;
         if (bin.Length == 0)
@@ -109,6 +113,11 @@ public sealed class MediaManagementPlanner
         if (!Path.IsPathFullyQualified(bin))
         {
             return "Enter a full path.";
+        }
+
+        if (_paths?.StorageProblem(bin) is { } outside)
+        {
+            return outside;
         }
 
         try

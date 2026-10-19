@@ -331,7 +331,7 @@ function ManualHint({ settings, tools }: { settings: ToolSettings; tools: Tool[]
             <a href="https://github.com/animetosho/par2cmdline-turbo/releases" target="_blank" rel="noreferrer">
               par2cmdline-turbo releases
             </a>{' '}
-            (put <code>par2.exe</code> into <code>{settings.bundledFolder}</code>){tools.some((t) => t.name === 'ffprobe') ? ', ' : '.'}
+            (put the folder with <code>par2.exe</code> on PATH, or enter its path below){tools.some((t) => t.name === 'ffprobe') ? ', ' : '.'}
           </>
         )}
         {tools.some((t) => t.name === 'ffprobe') && (
@@ -340,7 +340,7 @@ function ManualHint({ settings, tools }: { settings: ToolSettings; tools: Tool[]
             <a href="https://ffmpeg.org/download.html" target="_blank" rel="noreferrer">
               ffmpeg.org
             </a>{' '}
-            (put <code>ffprobe.exe</code> into <code>{settings.bundledFolder}</code>).
+            (put the folder with <code>ffprobe.exe</code> on PATH, or enter its path below).
           </>
         )}
       </p>

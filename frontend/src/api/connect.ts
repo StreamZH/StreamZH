@@ -31,6 +31,8 @@ export interface ConnectField {
   max: number | null
   placeholder: string | null
   unit: string | null
+  /** 0.12: a text field that holds credentials (custom headers): masked like a password. */
+  secret?: boolean
 }
 
 export interface ConnectionTriggers {

@@ -307,11 +307,16 @@ public sealed class MovieMigrationSection(ArrLibraryReader reader, ILogger<Movie
                 }
             }
 
-            if (!Directory.Exists(localFolder))
+            if (context.Paths.StorageProblem(localFolder) is { } outside)
+            {
+                // 0.12 (SV3 W-02/W-03): not looked at; the take-over refuses it until the owner allows the folder.
+                problems.Add(outside);
+            }
+            else if (!context.Paths.FolderExists(localFolder))
             {
                 problems.Add($"StreamZH cannot see the folder {localFolder}" + (context.Paths.IsMapped(movie.Path) ? "." : "; add a path mapping."));
             }
-            else if (localFile is not null && !File.Exists(localFile))
+            else if (localFile is not null && !context.Paths.FileExists(localFile))
             {
                 problems.Add($"The file {localFile} was not found; the movie will show as missing.");
             }

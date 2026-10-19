@@ -190,7 +190,7 @@ public sealed class SabnzbdCategoriesSection : IMigrationSection
             {
                 context.Paths.Use(dir);
                 var local = context.Paths.Map(dir);
-                if (Directory.Exists(local))
+                if (context.Paths.FolderExists(local))
                 {
                     folder = local;
                 }

@@ -136,8 +136,8 @@ public static class SecretMigration
                 continue;
             }
 
-            var plain = settings.Count(p => SecretFields.Names.Contains(p.Key) && p.Value.ValueKind == JsonValueKind.String
-                && p.Value.GetString() is { Length: > 0 } text && !SecretCodec.IsEncrypted(text));
+            var plain = settings.Count(p => p.Value.ValueKind == JsonValueKind.String
+                && p.Value.GetString() is { Length: > 0 } text && !SecretCodec.IsEncrypted(text) && SecretFields.IsSecret(p.Key, text));
             if (plain == 0)
             {
                 continue;

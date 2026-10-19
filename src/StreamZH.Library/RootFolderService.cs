@@ -36,6 +36,11 @@ public sealed class RootFolderService(
         }
 
         var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim()));
+        if (PathIdentity.SyntaxProblem(path, OperatingSystem.IsWindows()) is null && paths?.StorageProblem(full) is { } outside)
+        {
+            throw new LibraryException(outside, LibraryError.OutsideStorage);
+        }
+
         if (paths?.FolderProblem(full) is { } dataProblem)
         {
             throw new LibraryException(dataProblem, LibraryError.Invalid);

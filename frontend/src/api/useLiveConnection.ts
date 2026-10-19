@@ -2,6 +2,7 @@ import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/s
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { withBase } from '../lib/urlBase'
+import { appHeaders } from './client'
 import { downloadKeys, type DownloadProgressItem, type LiveProgress } from './downloads'
 import { historyKeys } from './history'
 import { indexerKeys } from './indexers'
@@ -24,7 +25,7 @@ export function useLiveConnection(enabled = true): boolean {
     // Requesters (0.10) connect too; the server sends them only "requestChanged" of their own requests.
     if (!enabled) return
     const connection = new HubConnectionBuilder()
-      .withUrl(withBase('/hub'))
+      .withUrl(withBase('/hub'), { headers: { ...appHeaders } })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build()

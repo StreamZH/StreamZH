@@ -59,7 +59,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (state.data.setupRequired) {
-    return <SetupPage />
+    return <SetupPage codeRequired={state.data.setupCodeRequired} />
   }
 
   if (!state.data.authenticated) {

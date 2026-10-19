@@ -9,8 +9,10 @@ import PasswordInput from './PasswordInput'
 import { shake } from './shake'
 import styles from './Auth.module.css'
 
-export default function SetupPage() {
+/** First-run setup. From another device (not this computer) StreamZH asks for the one-time setup code it printed at start. */
+export default function SetupPage({ codeRequired = false }: { codeRequired?: boolean }) {
   const queryClient = useQueryClient()
+  const [setupCode, setSetupCode] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [repeat, setRepeat] = useState('')
@@ -18,7 +20,7 @@ export default function SetupPage() {
   const card = useRef<HTMLFormElement>(null)
 
   const setup = useMutation({
-    mutationFn: () => api.setup(username, password),
+    mutationFn: () => api.setup(username, password, codeRequired ? setupCode : undefined),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: authQueryKey }),
     onError: () => shake(card.current),
   })
@@ -45,6 +47,31 @@ export default function SetupPage() {
             <p className={styles.lead}>Create the owner account. It has full access and manages everyone else.</p>
           </div>
 
+          {codeRequired && (
+            <label className={ui.field}>
+              Setup code
+              <input
+                className={`${ui.input} ${ui.mono} ${styles.input}`}
+                value={setupCode}
+                onChange={(e) => setSetupCode(e.target.value)}
+                autoComplete="one-time-code"
+                spellCheck={false}
+                autoCapitalize="characters"
+                placeholder="XXXX-XXXX-XXXX"
+                autoFocus
+              />
+              {fieldErrors.setupCode ? (
+                <small className={styles.fieldError}>{fieldErrors.setupCode[0]}</small>
+              ) : (
+                <small>
+                  You are setting up StreamZH from another device. Find the code in StreamZH&apos;s console or log (Docker: <code>docker logs</code>), in the file{' '}
+                  <code>setup-code</code> in its data folder, or under &quot;Show setup code&quot; in the Windows tray icon. On the computer StreamZH runs on, no code is
+                  needed.
+                </small>
+              )}
+            </label>
+          )}
+
           <label className={ui.field}>
             Username
             <input
@@ -53,7 +80,7 @@ export default function SetupPage() {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               spellCheck={false}
-              autoFocus
+              autoFocus={!codeRequired}
             />
             {fieldErrors.username && <small className={styles.fieldError}>{fieldErrors.username[0]}</small>}
           </label>

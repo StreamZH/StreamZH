@@ -118,6 +118,7 @@ export const wantedKeys = {
 export const calendarKeys = {
   all: ['calendar'] as const,
   range: (filter: CalendarFilter) => ['calendar', filter] as const,
+  feedToken: ['calendar-feed-token'] as const,
 }
 
 export const wantedApi = {
@@ -132,6 +133,10 @@ export const wantedApi = {
 
 export const calendarApi = {
   entries: (filter: CalendarFilter) => request<CalendarEntry[]>('GET', `/calendar?${query({ ...filter })}`),
+  /** The read-only token of the iCal feed link (admins). */
+  feedToken: () => request<{ token: string }>('GET', '/calendar/feed-token'),
+  /** A new token: subscribed links stop working. */
+  newFeedToken: () => request<{ token: string }>('POST', '/calendar/feed-token'),
 }
 
 /** Wanted and Calendar show files, queue states and "last searched": refetch them when the library or a download changes. */

@@ -248,6 +248,11 @@ interface SecurityDraft {
   authenticationRequired: AuthenticationRequired
   certificateValidation: CertificateValidation
   authenticationMethodOverride: AuthenticationMethod | null
+  allowedHostNames: string
+  trustedProxies: string
+  trustedLocalNetworks: string
+  externalUserHeader: string
+  runningInContainer: boolean
 }
 
 const methodOptions: { value: AuthenticationMethod; label: string }[] = [
@@ -259,7 +264,8 @@ const methodOptions: { value: AuthenticationMethod; label: string }[] = [
 const methodHelp: Record<AuthenticationMethod, string> = {
   forms: 'StreamZH’s own sign-in page. The default.',
   basic: 'The browser asks for user name and password (same accounts). Use it only over HTTPS; there is no sign-out.',
-  external: 'No sign-in in StreamZH: a reverse proxy in front of it (e.g. CloudZH single sign-on) must ask for it. Anyone who reaches StreamZH directly has full access.',
+  external:
+    'No sign-in in StreamZH: a reverse proxy in front of it (e.g. CloudZH single sign-on) must ask for it. Requests from the trusted proxies (none set: from local addresses) get full access.',
 }
 
 function SecuritySection() {
@@ -270,18 +276,34 @@ function SecuritySection() {
       authenticationRequired: s.authenticationRequired,
       certificateValidation: s.certificateValidation,
       authenticationMethodOverride: s.authenticationMethodOverride,
+      allowedHostNames: s.allowedHostNames,
+      trustedProxies: s.trustedProxies,
+      trustedLocalNetworks: s.trustedLocalNetworks,
+      externalUserHeader: s.externalUserHeader,
+      runningInContainer: s.runningInContainer,
     }),
-    (d) => ({ authenticationMethod: d.authenticationMethod, authenticationRequired: d.authenticationRequired, certificateValidation: d.certificateValidation }),
+    (d) => ({
+      authenticationMethod: d.authenticationMethod,
+      authenticationRequired: d.authenticationRequired,
+      certificateValidation: d.certificateValidation,
+      allowedHostNames: d.allowedHostNames,
+      trustedProxies: d.trustedProxies,
+      trustedLocalNetworks: d.trustedLocalNetworks,
+      externalUserHeader: d.externalUserHeader,
+    }),
   )
   const advanced = useAdvanced()
   const v = form.values
   if (!v) return null
+  const external = v.authenticationMethod === 'external'
+  const localBypass = !external && v.authenticationRequired === 'disabledForLocalAddresses'
+  const signInFree = external || localBypass
 
   return (
     <Section
       id="security"
       title="Security"
-      hiddenCount={advanced ? 0 : 1}
+      hiddenCount={advanced ? 0 : 2 + (localBypass ? 1 : 0) + (signInFree ? 1 : 0) + (external ? 1 : 0)}
       footer={<SaveBar dirty={form.dirty} saving={form.saving} saved={form.saved} error={form.formError} onSave={form.save} onReset={form.reset} />}
     >
       {v.authenticationMethodOverride && (
@@ -312,6 +334,78 @@ function SecuritySection() {
               { value: 'enabled', label: 'Enabled' },
               { value: 'disabledForLocalAddresses', label: 'Disabled for local addresses' },
             ]}
+          />
+          {localBypass && (
+            <small className={styles.warn}>
+              Everyone who can reach StreamZH from these networks has full access, guests on your Wi-Fi and VPN users included.
+              {v.runningInContainer && !v.trustedLocalNetworks.trim()
+                ? ' StreamZH runs in a container: with published ports every visitor may come from the container network and count as local. Set Trusted local networks below or keep sign-in on.'
+                : ''}
+            </small>
+          )}
+        </Row>
+      )}
+      {localBypass && (
+        <Row
+          label="Trusted local networks"
+          htmlFor="trustedLocalNetworks"
+          advanced
+          error={form.error('trustedLocalNetworks')}
+          help="Only these addresses or networks count as local, e.g. 192.168.1.0/24. Empty: all private networks (10.x, 172.16–31.x, 192.168.x, IPv6 local) and this computer."
+        >
+          <TextInput
+            id="trustedLocalNetworks"
+            value={v.trustedLocalNetworks}
+            onChange={(trustedLocalNetworks) => form.set({ trustedLocalNetworks })}
+            placeholder="192.168.1.0/24, fd00::/8"
+            mono
+          />
+        </Row>
+      )}
+      {signInFree && (
+        <Row
+          label="Allowed host names"
+          htmlFor="allowedHostNames"
+          advanced
+          error={form.error('allowedHostNames')}
+          help="Sign-in-free access is only given to IP addresses, local names (nas, *.local, *.lan), this computer's name and the application URL. Add other names you open StreamZH with, e.g. media.example.com or *.example.com."
+        >
+          <TextInput
+            id="allowedHostNames"
+            value={v.allowedHostNames}
+            onChange={(allowedHostNames) => form.set({ allowedHostNames })}
+            placeholder="media.example.com"
+            mono
+          />
+        </Row>
+      )}
+      <Row
+        label="Trusted proxies"
+        htmlFor="trustedProxies"
+        advanced
+        error={form.error('trustedProxies')}
+        help={
+          external
+            ? 'Addresses of your reverse proxies, e.g. 172.18.0.2 or 10.0.0.0/24. Only they may sign people in (External), and their client address and HTTPS headers count. Empty: any local address may sign in.'
+            : 'Addresses of your reverse proxies, e.g. 172.18.0.2 or 10.0.0.0/24. Their X-Forwarded-For and X-Forwarded-Proto headers count: sign-in limits per real client, secure cookie behind HTTPS.'
+        }
+      >
+        <TextInput id="trustedProxies" value={v.trustedProxies} onChange={(trustedProxies) => form.set({ trustedProxies })} placeholder="172.18.0.2" mono />
+      </Row>
+      {external && (
+        <Row
+          label="User header"
+          htmlFor="externalUserHeader"
+          advanced
+          error={form.error('externalUserHeader')}
+          help="Optional: the header your proxy sets with the signed-in user, e.g. Remote-User. Requests without it get the sign-in page."
+        >
+          <TextInput
+            id="externalUserHeader"
+            value={v.externalUserHeader}
+            onChange={(externalUserHeader) => form.set({ externalUserHeader })}
+            placeholder="Remote-User"
+            mono
           />
         </Row>
       )}

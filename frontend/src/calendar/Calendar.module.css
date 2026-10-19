@@ -611,6 +611,15 @@
   gap: 8px 18px;
 }
 
+.icalRenew {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
 .dialogActions {
   display: flex;
   flex-wrap: wrap;

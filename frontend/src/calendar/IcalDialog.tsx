@@ -1,14 +1,27 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { apiUrl } from '../api/client'
-import { generalApi, generalKeys } from '../api/general'
+import { calendarApi, calendarKeys } from '../api/wanted'
 import Modal from '../components/Modal'
 import ui from '../components/ui.module.css'
 import styles from './Calendar.module.css'
 
-/** Subscribe in Google Calendar, Outlook or Apple Calendar: the feed URL with the API key, like Radarr's "iCal link". */
+/**
+ * Subscribe in Google Calendar, Outlook or Apple Calendar, like Radarr's "iCal link". Since 0.12 the link carries a
+ * read-only feed token instead of the API key: it opens this feed and nothing else.
+ */
 export default function IcalDialog({ onClose }: { onClose: () => void }) {
-  const general = useQuery({ queryKey: generalKeys.general, queryFn: generalApi.general })
+  const queryClient = useQueryClient()
+  const general = useQuery({ queryKey: calendarKeys.feedToken, queryFn: calendarApi.feedToken })
+  const [confirming, setConfirming] = useState(false)
+  const renew = useMutation({
+    mutationFn: calendarApi.newFeedToken,
+    onSuccess: (data) => {
+      queryClient.setQueryData(calendarKeys.feedToken, data)
+      setConfirming(false)
+      setCopied(null)
+    },
+  })
   const [pastDays, setPastDays] = useState(7)
   const [futureDays, setFutureDays] = useState(28)
   const [unmonitored, setUnmonitored] = useState(false)
@@ -17,7 +30,7 @@ export default function IcalDialog({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState<'ok' | 'failed' | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
-  const params = new URLSearchParams({ apikey: general.data?.apiKey ?? '' })
+  const params = new URLSearchParams({ token: general.data?.token ?? '' })
   if (pastDays !== 7) params.set('pastDays', String(pastDays))
   if (futureDays !== 28) params.set('futureDays', String(futureDays))
   if (unmonitored) params.set('unmonitored', 'true')
@@ -41,8 +54,7 @@ export default function IcalDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="iCal feed" onClose={onClose}>
       <p className={styles.dialogText}>
-        Calendar apps can subscribe to this address and show your movies and episodes. It contains the API key: share it only with people who may use
-        StreamZH.
+        Calendar apps can subscribe to this address and show your movies and episodes. The link opens only this calendar; anyone who has it can read it.
       </p>
       {general.isError ? (
         <p className={ui.error}>{general.error.message}</p>
@@ -78,6 +90,24 @@ export default function IcalDialog({ onClose }: { onClose: () => void }) {
             {copied === 'ok' && <small>Copied.</small>}
             {copied === 'failed' && <small>Copying is blocked by the browser here: the address is selected, press Ctrl+C.</small>}
           </label>
+          <div className={styles.icalRenew}>
+            {confirming ? (
+              <>
+                <span>Calendar apps with the old link stop updating.</span>
+                <button type="button" className={`${ui.danger} ${ui.sm}`} onClick={() => renew.mutate()} disabled={renew.isPending}>
+                  Yes, new link
+                </button>
+                <button type="button" className={`${ui.button} ${ui.sm}`} onClick={() => setConfirming(false)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button type="button" className={`${ui.ghost} ${ui.sm}`} onClick={() => setConfirming(true)} disabled={!general.data}>
+                Create new link
+              </button>
+            )}
+            {renew.error && <span className={ui.error}>{renew.error.message}</span>}
+          </div>
         </div>
       )}
       <div className={styles.dialogActions}>

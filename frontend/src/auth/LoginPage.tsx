@@ -13,7 +13,7 @@ export default function LoginPage({ instanceName }: { instanceName: string }) {
   const queryClient = useQueryClient()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(true)
+  const [rememberMe, setRememberMe] = useState(false)
   const card = useRef<HTMLFormElement>(null)
 
   const login = useMutation({
@@ -57,7 +57,7 @@ export default function LoginPage({ instanceName }: { instanceName: string }) {
 
           <label className={ui.check}>
             <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-            <span>Stay signed in for 30 days</span>
+            <span>Remember me for 30 days</span>
           </label>
 
           {login.error && (

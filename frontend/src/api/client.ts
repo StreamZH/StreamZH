@@ -23,6 +23,8 @@ export interface AuthState {
   instanceName: string
   /** False for sessions without a sign-in cookie (Basic, External, local network): no "Sign out". */
   canSignOut: boolean
+  /** First-run setup from another device: the setup page asks for the one-time setup code. */
+  setupCodeRequired: boolean
 }
 
 /** Error from the API, with field errors for validation problems (400). */
@@ -42,6 +44,12 @@ export function apiUrl(path: string): string {
   return withBase(`/api/v1${path}`)
 }
 
+/**
+ * Sent with every request of the web app (and the live connection): StreamZH refuses changing requests that cannot show
+ * they come from its own pages, so other web pages cannot act in the user's name (cross-site request protection).
+ */
+export const appHeaders = { 'X-StreamZH-Request': '1' } as const
+
 /** Fired when a request comes back 401, so the app can show the login page. */
 export const unauthorizedEvent = 'streamzh:unauthorized'
 
@@ -50,6 +58,7 @@ export async function request<T>(method: string, path: string, body?: unknown): 
     method,
     credentials: 'same-origin',
     headers: {
+      ...appHeaders,
       Accept: 'application/json',
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },
@@ -81,7 +90,8 @@ export async function request<T>(method: string, path: string, body?: unknown): 
 
 export const api = {
   authState: () => request<AuthState>('GET', '/auth/state'),
-  setup: (username: string, password: string) => request<UserInfo>('POST', '/auth/setup', { username, password }),
+  setup: (username: string, password: string, setupCode?: string) =>
+    request<UserInfo>('POST', '/auth/setup', { username, password, ...(setupCode ? { setupCode } : {}) }),
   login: (username: string, password: string, rememberMe: boolean) =>
     request<UserInfo>('POST', '/auth/login', { username, password, rememberMe }),
   logout: () => request<void>('POST', '/auth/logout'),

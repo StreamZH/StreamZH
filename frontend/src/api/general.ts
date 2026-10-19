@@ -1,5 +1,5 @@
 import type { OngoingNotice } from './status'
-import { ApiError, apiUrl, request, unauthorizedEvent } from './client'
+import { ApiError, apiUrl, appHeaders, request, unauthorizedEvent } from './client'
 
 // Settings → General and UI, and the System pages (Status, Tasks, Backup, Logs).
 
@@ -49,6 +49,15 @@ export interface GeneralSettings {
   hostOverride: string | null
   listening: string[]
   hostProblem: string | null
+  /** Security (advanced, 0.12): host names for the sign-in-free modes (besides IPs, local names and the application URL). */
+  allowedHostNames: string
+  /** Reverse proxies whose forwarding headers count; External sign-in only from them (empty: from local addresses). */
+  trustedProxies: string
+  /** Networks of "Disabled for local addresses"; empty = the private networks. */
+  trustedLocalNetworks: string
+  /** External: the header the proxy must send with the signed-in user; empty = not required. */
+  externalUserHeader: string
+  runningInContainer: boolean
 }
 
 /** PUT /settings/general: only the fields to change. Passwords: null keeps, '' clears. */
@@ -200,7 +209,7 @@ export const generalApi = {
     const response = await fetch(apiUrl(`/system/backup/restore?name=${encodeURIComponent(file.name)}`), {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/zip', Accept: 'application/json' },
+      headers: { ...appHeaders, 'Content-Type': 'application/zip', Accept: 'application/json' },
       body: file,
     })
     if (response.status === 401) window.dispatchEvent(new Event(unauthorizedEvent))

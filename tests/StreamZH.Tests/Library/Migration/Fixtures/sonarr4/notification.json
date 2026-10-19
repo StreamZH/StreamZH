@@ -1,0 +1,330 @@
+[
+  {
+    "name": "Discord Serien",
+    "fields": [
+      {
+        "order": 0,
+        "name": "webHookUrl",
+        "label": "Webhookurl",
+        "value": "********",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "apiKey",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "username",
+        "label": "Username",
+        "value": "Sonarr",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 2,
+        "name": "avatar",
+        "label": "Avatar",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 3,
+        "name": "author",
+        "label": "Author",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 4,
+        "name": "grabFields",
+        "label": "Grabfields",
+        "value": [
+          0,
+          3,
+          5,
+          10
+        ],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 5,
+        "name": "importFields",
+        "label": "Importfields",
+        "value": [
+          0,
+          3,
+          6,
+          9,
+          11
+        ],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 6,
+        "name": "manualInteractionFields",
+        "label": "Manualinteractionfields",
+        "value": [],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Discord",
+    "implementation": "Discord",
+    "configContract": "DiscordSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": true,
+    "onDownload": true,
+    "onUpgrade": true,
+    "onRename": false,
+    "onHealthIssue": false,
+    "includeHealthWarnings": false,
+    "onHealthRestored": false,
+    "onApplicationUpdate": false,
+    "onManualInteractionRequired": false,
+    "id": 1,
+    "onImportComplete": false,
+    "onSeriesAdd": false,
+    "onSeriesDelete": false,
+    "onEpisodeFileDelete": false,
+    "onEpisodeFileDeleteForUpgrade": false
+  },
+  {
+    "name": "Jellyfin",
+    "fields": [
+      {
+        "order": 0,
+        "name": "host",
+        "label": "Host",
+        "value": "jellyfin",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "port",
+        "label": "Port",
+        "value": 8096,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 2,
+        "name": "useSsl",
+        "label": "Usessl",
+        "value": false,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 3,
+        "name": "urlBase",
+        "label": "Urlbase",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 4,
+        "name": "apiKey",
+        "label": "Apikey",
+        "value": "********",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "apiKey",
+        "isFloat": false
+      },
+      {
+        "order": 5,
+        "name": "notify",
+        "label": "Notify",
+        "value": false,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 6,
+        "name": "updateLibrary",
+        "label": "Updatelibrary",
+        "value": true,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 7,
+        "name": "mapFrom",
+        "label": "Mapfrom",
+        "value": "/tv",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 8,
+        "name": "mapTo",
+        "label": "Mapto",
+        "value": "/data/tvshows",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Emby / Jellyfin",
+    "implementation": "MediaBrowser",
+    "configContract": "MediaBrowserSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": false,
+    "onDownload": true,
+    "onUpgrade": true,
+    "onRename": true,
+    "onHealthIssue": false,
+    "includeHealthWarnings": false,
+    "onHealthRestored": false,
+    "onApplicationUpdate": false,
+    "onManualInteractionRequired": false,
+    "id": 2,
+    "onImportComplete": false,
+    "onSeriesAdd": false,
+    "onSeriesDelete": false,
+    "onEpisodeFileDelete": false,
+    "onEpisodeFileDeleteForUpgrade": false
+  },
+  {
+    "name": "Pushover",
+    "fields": [
+      {
+        "order": 0,
+        "name": "apiKey",
+        "label": "Apikey",
+        "value": "********",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "apiKey",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "userKey",
+        "label": "Userkey",
+        "value": "********",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "apiKey",
+        "isFloat": false
+      },
+      {
+        "order": 2,
+        "name": "devices",
+        "label": "Devices",
+        "value": [
+          "phone"
+        ],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 3,
+        "name": "priority",
+        "label": "Priority",
+        "value": 1,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 4,
+        "name": "retry",
+        "label": "Retry",
+        "value": 60,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 5,
+        "name": "expire",
+        "label": "Expire",
+        "value": 3600,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 6,
+        "name": "ttl",
+        "label": "Ttl",
+        "value": 0,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 7,
+        "name": "sound",
+        "label": "Sound",
+        "value": "magic",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Pushover",
+    "implementation": "Pushover",
+    "configContract": "PushoverSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": false,
+    "onDownload": true,
+    "onUpgrade": false,
+    "onRename": false,
+    "onHealthIssue": true,
+    "includeHealthWarnings": true,
+    "onHealthRestored": true,
+    "onApplicationUpdate": false,
+    "onManualInteractionRequired": false,
+    "id": 3,
+    "onImportComplete": false,
+    "onSeriesAdd": false,
+    "onSeriesDelete": false,
+    "onEpisodeFileDelete": false,
+    "onEpisodeFileDeleteForUpgrade": false
+  }
+]

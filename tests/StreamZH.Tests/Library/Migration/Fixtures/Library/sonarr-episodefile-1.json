@@ -1,0 +1,226 @@
+[
+  {
+    "id": 201,
+    "seriesId": 1,
+    "seasonNumber": 1,
+    "relativePath": "Season 01/Crystal.Lake.S01E01.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+    "path": "/tv/Crystal Lake/Season 01/Crystal.Lake.S01E01.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+    "size": 1200000000,
+    "dateAdded": "2025-10-10T22:00:00Z",
+    "sceneName": "Crystal.Lake.S01E01.German.DL.1080p.WEB.h264-ZZGtv",
+    "releaseGroup": "ZZGtv",
+    "quality": {
+      "quality": {
+        "id": 3,
+        "name": "WEBDL-1080p",
+        "source": "web",
+        "resolution": 1080
+      },
+      "revision": {
+        "version": 1,
+        "real": 0,
+        "isRepack": false
+      }
+    },
+    "customFormats": [],
+    "customFormatScore": 0,
+    "indexerFlags": 0,
+    "releaseType": "singleEpisode",
+    "mediaInfo": {
+      "audioBitrate": 1509000,
+      "audioChannels": 5.1,
+      "audioCodec": "EAC3",
+      "audioLanguages": "ger/eng",
+      "audioStreamCount": 2,
+      "videoBitDepth": 8,
+      "videoBitrate": 12000000,
+      "videoCodec": "h264",
+      "videoFps": 23.976,
+      "videoDynamicRange": "",
+      "videoDynamicRangeType": "",
+      "resolution": "1920x1080",
+      "runTime": "44:10",
+      "scanType": "Progressive",
+      "subtitles": "ger"
+    },
+    "qualityCutoffNotMet": false,
+    "languages": [
+      {
+        "id": 4,
+        "name": "German"
+      },
+      {
+        "id": 1,
+        "name": "English"
+      }
+    ]
+  },
+  {
+    "id": 202,
+    "seriesId": 1,
+    "seasonNumber": 1,
+    "relativePath": "Season 01/Crystal.Lake.S01E02.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+    "path": "/tv/Crystal Lake/Season 01/Crystal.Lake.S01E02.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+    "size": 1200000000,
+    "dateAdded": "2025-10-10T22:00:00Z",
+    "sceneName": "Crystal.Lake.S01E02.German.DL.1080p.WEB.h264-ZZGtv",
+    "releaseGroup": "ZZGtv",
+    "quality": {
+      "quality": {
+        "id": 3,
+        "name": "WEBDL-1080p",
+        "source": "web",
+        "resolution": 1080
+      },
+      "revision": {
+        "version": 1,
+        "real": 0,
+        "isRepack": false
+      }
+    },
+    "customFormats": [],
+    "customFormatScore": 0,
+    "indexerFlags": 0,
+    "releaseType": "singleEpisode",
+    "mediaInfo": {
+      "audioBitrate": 1509000,
+      "audioChannels": 5.1,
+      "audioCodec": "EAC3",
+      "audioLanguages": "ger/eng",
+      "audioStreamCount": 2,
+      "videoBitDepth": 8,
+      "videoBitrate": 12000000,
+      "videoCodec": "h264",
+      "videoFps": 23.976,
+      "videoDynamicRange": "",
+      "videoDynamicRangeType": "",
+      "resolution": "1920x1080",
+      "runTime": "44:10",
+      "scanType": "Progressive",
+      "subtitles": "ger"
+    },
+    "qualityCutoffNotMet": false,
+    "languages": [
+      {
+        "id": 4,
+        "name": "German"
+      },
+      {
+        "id": 1,
+        "name": "English"
+      }
+    ]
+  },
+  {
+    "id": 203,
+    "seriesId": 1,
+    "seasonNumber": 1,
+    "relativePath": "Season 01/Crystal.Lake.S01E03E04.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+    "path": "/tv/Crystal Lake/Season 01/Crystal.Lake.S01E03E04.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+    "size": 2400000000,
+    "dateAdded": "2025-10-10T22:00:00Z",
+    "sceneName": "Crystal.Lake.S01E03E04.German.DL.1080p.WEB.h264-ZZGtv",
+    "releaseGroup": "ZZGtv",
+    "quality": {
+      "quality": {
+        "id": 3,
+        "name": "WEBDL-1080p",
+        "source": "web",
+        "resolution": 1080
+      },
+      "revision": {
+        "version": 1,
+        "real": 0,
+        "isRepack": false
+      }
+    },
+    "customFormats": [],
+    "customFormatScore": 0,
+    "indexerFlags": 0,
+    "releaseType": "singleEpisode",
+    "mediaInfo": {
+      "audioBitrate": 1509000,
+      "audioChannels": 5.1,
+      "audioCodec": "EAC3",
+      "audioLanguages": "ger/eng",
+      "audioStreamCount": 2,
+      "videoBitDepth": 8,
+      "videoBitrate": 12000000,
+      "videoCodec": "h264",
+      "videoFps": 23.976,
+      "videoDynamicRange": "",
+      "videoDynamicRangeType": "",
+      "resolution": "1920x1080",
+      "runTime": "44:10",
+      "scanType": "Progressive",
+      "subtitles": "ger"
+    },
+    "qualityCutoffNotMet": false,
+    "languages": [
+      {
+        "id": 4,
+        "name": "German"
+      },
+      {
+        "id": 1,
+        "name": "English"
+      }
+    ]
+  },
+  {
+    "id": 205,
+    "seriesId": 1,
+    "seasonNumber": 1,
+    "relativePath": "Season 01/Crystal.Lake.S01E05.German.DL.1080p.BluRay.REMUX.AVC-PtBM.mkv",
+    "path": "/tv/Crystal Lake/Season 01/Crystal.Lake.S01E05.German.DL.1080p.BluRay.REMUX.AVC-PtBM.mkv",
+    "size": 9000000000,
+    "dateAdded": "2025-10-10T22:00:00Z",
+    "sceneName": null,
+    "releaseGroup": "PtBM",
+    "quality": {
+      "quality": {
+        "id": 20,
+        "name": "Bluray-1080p Remux",
+        "source": "blurayRaw",
+        "resolution": 1080
+      },
+      "revision": {
+        "version": 1,
+        "real": 0,
+        "isRepack": false
+      }
+    },
+    "customFormats": [],
+    "customFormatScore": 0,
+    "indexerFlags": 0,
+    "releaseType": "singleEpisode",
+    "mediaInfo": {
+      "audioBitrate": 1509000,
+      "audioChannels": 7.1,
+      "audioCodec": "TrueHD Atmos",
+      "audioLanguages": "ger/eng",
+      "audioStreamCount": 2,
+      "videoBitDepth": 8,
+      "videoBitrate": 12000000,
+      "videoCodec": "AVC",
+      "videoFps": 23.976,
+      "videoDynamicRange": "",
+      "videoDynamicRangeType": "",
+      "resolution": "1920x1080",
+      "runTime": "47:00",
+      "scanType": "Progressive",
+      "subtitles": "ger/eng"
+    },
+    "qualityCutoffNotMet": false,
+    "languages": [
+      {
+        "id": 4,
+        "name": "German"
+      },
+      {
+        "id": 1,
+        "name": "English"
+      }
+    ]
+  }
+]

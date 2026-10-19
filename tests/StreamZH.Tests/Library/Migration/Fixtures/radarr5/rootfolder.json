@@ -1,0 +1,22 @@
+[
+  {
+    "path": "/movies",
+    "accessible": true,
+    "freeSpace": 812345678901,
+    "unmappedFolders": [],
+    "id": 1
+  },
+  {
+    "path": "/movies-uhd",
+    "accessible": true,
+    "freeSpace": 812345678901,
+    "unmappedFolders": [
+      {
+        "name": "Old",
+        "path": "/movies-uhd/Old",
+        "relativePath": "Old"
+      }
+    ],
+    "id": 2
+  }
+]

@@ -1,0 +1,450 @@
+[
+  {
+    "id": 1,
+    "title": "Freitag der 13.",
+    "originalTitle": "Freitag der 13.",
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "alternateTitles": [],
+    "secondaryYearSourceId": 0,
+    "sortTitle": "freitag der 13.",
+    "sizeOnDisk": 9876543210,
+    "status": "released",
+    "overview": "…",
+    "inCinemas": "2009-02-13T00:00:00Z",
+    "images": [],
+    "website": "",
+    "year": 2009,
+    "youTubeTrailerId": "",
+    "studio": "",
+    "path": "/movies/Freitag der 13. (2009)",
+    "qualityProfileId": 4,
+    "hasFile": true,
+    "movieFileId": 11,
+    "monitored": true,
+    "minimumAvailability": "released",
+    "isAvailable": true,
+    "folderName": "/movies/Freitag der 13. (2009)",
+    "runtime": 97,
+    "cleanTitle": "freitagder13.",
+    "imdbId": "tt0758746",
+    "tmdbId": 13207,
+    "titleSlug": "13207",
+    "rootFolderPath": "/movies",
+    "certification": "R",
+    "genres": [
+      "Horror"
+    ],
+    "keywords": [],
+    "tags": [
+      1
+    ],
+    "added": "2023-05-01T20:00:00Z",
+    "ratings": {
+      "tmdb": {
+        "votes": 2000,
+        "value": 5.7,
+        "type": "user"
+      }
+    },
+    "popularity": 12.3,
+    "statistics": {
+      "movieFileCount": 1,
+      "sizeOnDisk": 9876543210,
+      "releaseGroups": []
+    },
+    "movieFile": {
+      "id": 11,
+      "movieId": 1,
+      "relativePath": "Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS.mkv",
+      "path": "/movies/Freitag der 13. (2009)/Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS.mkv",
+      "size": 9876543210,
+      "dateAdded": "2023-05-01T20:15:00Z",
+      "sceneName": "Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS",
+      "releaseGroup": "DETAiLS",
+      "edition": "",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 7,
+          "name": "Bluray-1080p",
+          "source": "bluray",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "indexerFlags": 0,
+      "mediaInfo": {
+        "audioBitrate": 1509000,
+        "audioChannels": 5.1,
+        "audioCodec": "DTS",
+        "audioLanguages": "ger/eng",
+        "audioStreamCount": 2,
+        "videoBitDepth": 8,
+        "videoBitrate": 12000000,
+        "videoCodec": "x264",
+        "videoFps": 23.976,
+        "videoDynamicRange": "",
+        "videoDynamicRangeType": "",
+        "resolution": "1920x1080",
+        "runTime": "1:37:12",
+        "scanType": "Progressive",
+        "subtitles": "ger/eng"
+      },
+      "originalFilePath": "Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS/Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS.mkv",
+      "qualityCutoffNotMet": false
+    }
+  },
+  {
+    "id": 2,
+    "title": "Dune: Part Two",
+    "originalTitle": "Dune: Part Two",
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "alternateTitles": [],
+    "secondaryYearSourceId": 0,
+    "sortTitle": "dune: part two",
+    "sizeOnDisk": 23456789012,
+    "status": "released",
+    "overview": "…",
+    "inCinemas": "2024-02-13T00:00:00Z",
+    "images": [],
+    "website": "",
+    "year": 2024,
+    "youTubeTrailerId": "",
+    "studio": "",
+    "path": "/movies/Dune Part Two (2024)",
+    "qualityProfileId": 5,
+    "hasFile": true,
+    "movieFileId": 12,
+    "monitored": true,
+    "minimumAvailability": "inCinemas",
+    "isAvailable": true,
+    "folderName": "/movies/Dune Part Two (2024)",
+    "runtime": 97,
+    "cleanTitle": "dune:parttwo",
+    "imdbId": "tt15239678",
+    "tmdbId": 693134,
+    "titleSlug": "693134",
+    "rootFolderPath": "/movies",
+    "certification": "R",
+    "genres": [
+      "Horror"
+    ],
+    "keywords": [],
+    "tags": [],
+    "added": "2024-03-01T09:30:00Z",
+    "ratings": {
+      "tmdb": {
+        "votes": 2000,
+        "value": 5.7,
+        "type": "user"
+      }
+    },
+    "popularity": 12.3,
+    "statistics": {
+      "movieFileCount": 1,
+      "sizeOnDisk": 23456789012,
+      "releaseGroups": []
+    },
+    "movieFile": {
+      "id": 12,
+      "movieId": 2,
+      "relativePath": "Dune.Part.Two.2024.German.DL.2160p.WEB.H265-W4K.mkv",
+      "path": "/movies/Dune Part Two (2024)/Dune.Part.Two.2024.German.DL.2160p.WEB.H265-W4K.mkv",
+      "size": 23456789012,
+      "dateAdded": "2024-05-10T08:00:00Z",
+      "sceneName": "Dune.Part.Two.2024.German.DL.2160p.WEB.H265.REPACK-W4K",
+      "releaseGroup": "W4K",
+      "edition": "",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 18,
+          "name": "WEBDL-2160p",
+          "source": "webdl",
+          "resolution": 2160,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 2,
+          "real": 0,
+          "isRepack": true
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "indexerFlags": 0,
+      "mediaInfo": {
+        "audioBitrate": 1509000,
+        "audioChannels": 7.1,
+        "audioCodec": "EAC3 Atmos",
+        "audioLanguages": "ger/eng",
+        "audioStreamCount": 2,
+        "videoBitDepth": 10,
+        "videoBitrate": 12000000,
+        "videoCodec": "h265",
+        "videoFps": 23.976,
+        "videoDynamicRange": "HDR",
+        "videoDynamicRangeType": "DV HDR10",
+        "resolution": "3840x1600",
+        "runTime": "2:46:00",
+        "scanType": "Progressive",
+        "subtitles": "ger"
+      },
+      "originalFilePath": "Dune.Part.Two.2024.German.DL.2160p.WEB.H265.REPACK-W4K/Dune.Part.Two.2024.German.DL.2160p.WEB.H265-W4K.mkv",
+      "qualityCutoffNotMet": false
+    }
+  },
+  {
+    "id": 3,
+    "title": "Arrival",
+    "originalTitle": "Arrival",
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "alternateTitles": [],
+    "secondaryYearSourceId": 0,
+    "sortTitle": "arrival",
+    "sizeOnDisk": 8765432100,
+    "status": "released",
+    "overview": "…",
+    "inCinemas": "2016-02-13T00:00:00Z",
+    "images": [],
+    "website": "",
+    "year": 2016,
+    "youTubeTrailerId": "",
+    "studio": "",
+    "path": "/movies/Arrival (2016)",
+    "qualityProfileId": 7,
+    "hasFile": true,
+    "movieFileId": 13,
+    "monitored": false,
+    "minimumAvailability": "released",
+    "isAvailable": true,
+    "folderName": "/movies/Arrival (2016)",
+    "runtime": 97,
+    "cleanTitle": "arrival",
+    "imdbId": "tt2543164",
+    "tmdbId": 329865,
+    "titleSlug": "329865",
+    "rootFolderPath": "/movies",
+    "certification": "R",
+    "genres": [
+      "Horror"
+    ],
+    "keywords": [],
+    "tags": [],
+    "added": "2022-01-01T11:00:00Z",
+    "ratings": {
+      "tmdb": {
+        "votes": 2000,
+        "value": 5.7,
+        "type": "user"
+      }
+    },
+    "popularity": 12.3,
+    "statistics": {
+      "movieFileCount": 1,
+      "sizeOnDisk": 8765432100,
+      "releaseGroups": []
+    },
+    "movieFile": {
+      "id": 13,
+      "movieId": 3,
+      "relativePath": "Arrival.2016.German.DL.1080p.BluRay.x264-SAViOUR.mkv",
+      "path": "/movies/Arrival (2016)/Arrival.2016.German.DL.1080p.BluRay.x264-SAViOUR.mkv",
+      "size": 8765432100,
+      "dateAdded": "2022-01-01T12:00:00Z",
+      "sceneName": null,
+      "releaseGroup": "SAViOUR",
+      "edition": "",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 7,
+          "name": "Bluray-1080p",
+          "source": "bluray",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "indexerFlags": 0,
+      "mediaInfo": {
+        "audioBitrate": 1509000,
+        "audioChannels": 5.1,
+        "audioCodec": "DTS-HD MA",
+        "audioLanguages": "ger/eng",
+        "audioStreamCount": 2,
+        "videoBitDepth": 8,
+        "videoBitrate": 12000000,
+        "videoCodec": "x264",
+        "videoFps": 23.976,
+        "videoDynamicRange": "",
+        "videoDynamicRangeType": "",
+        "resolution": "1920x800",
+        "runTime": "1:56:00",
+        "scanType": "Progressive",
+        "subtitles": ""
+      },
+      "originalFilePath": "None/Arrival.2016.German.DL.1080p.BluRay.x264-SAViOUR.mkv",
+      "qualityCutoffNotMet": false
+    }
+  },
+  {
+    "id": 4,
+    "title": "Blade Runner 2049",
+    "originalTitle": "Blade Runner 2049",
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "alternateTitles": [],
+    "secondaryYearSourceId": 0,
+    "sortTitle": "blade runner 2049",
+    "sizeOnDisk": 0,
+    "status": "released",
+    "overview": "…",
+    "inCinemas": "2017-02-13T00:00:00Z",
+    "images": [],
+    "website": "",
+    "year": 2017,
+    "youTubeTrailerId": "",
+    "studio": "",
+    "path": "/movies/Blade Runner 2049 (2017)",
+    "qualityProfileId": 4,
+    "hasFile": false,
+    "movieFileId": 0,
+    "monitored": true,
+    "minimumAvailability": "released",
+    "isAvailable": true,
+    "folderName": "/movies/Blade Runner 2049 (2017)",
+    "runtime": 97,
+    "cleanTitle": "bladerunner2049",
+    "imdbId": "tt1856101",
+    "tmdbId": 335984,
+    "titleSlug": "335984",
+    "rootFolderPath": "/movies",
+    "certification": "R",
+    "genres": [
+      "Horror"
+    ],
+    "keywords": [],
+    "tags": [],
+    "added": "2021-11-11T11:11:00Z",
+    "ratings": {
+      "tmdb": {
+        "votes": 2000,
+        "value": 5.7,
+        "type": "user"
+      }
+    },
+    "popularity": 12.3,
+    "statistics": {
+      "movieFileCount": 0,
+      "sizeOnDisk": 0,
+      "releaseGroups": []
+    }
+  },
+  {
+    "id": 5,
+    "title": "Unbekannter Film",
+    "originalTitle": "Unbekannter Film",
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "alternateTitles": [],
+    "secondaryYearSourceId": 0,
+    "sortTitle": "unbekannter film",
+    "sizeOnDisk": 0,
+    "status": "released",
+    "overview": "…",
+    "inCinemas": "1999-02-13T00:00:00Z",
+    "images": [],
+    "website": "",
+    "year": 1999,
+    "youTubeTrailerId": "",
+    "studio": "",
+    "path": "/movies/Unbekannter Film (1999)",
+    "qualityProfileId": 4,
+    "hasFile": false,
+    "movieFileId": 0,
+    "monitored": false,
+    "minimumAvailability": "released",
+    "isAvailable": true,
+    "folderName": "/movies/Unbekannter Film (1999)",
+    "runtime": 97,
+    "cleanTitle": "unbekannterfilm",
+    "imdbId": "",
+    "tmdbId": 0,
+    "titleSlug": "0",
+    "rootFolderPath": "/movies",
+    "certification": "R",
+    "genres": [
+      "Horror"
+    ],
+    "keywords": [],
+    "tags": [],
+    "added": "2020-01-01T00:00:00Z",
+    "ratings": {
+      "tmdb": {
+        "votes": 2000,
+        "value": 5.7,
+        "type": "user"
+      }
+    },
+    "popularity": 12.3,
+    "statistics": {
+      "movieFileCount": 0,
+      "sizeOnDisk": 0,
+      "releaseGroups": []
+    }
+  }
+]

@@ -7,6 +7,7 @@ export interface SettingsArea {
 }
 
 export const settingsAreas: SettingsArea[] = [
+  { to: '/settings/migration', label: 'Migration', description: 'Take over Radarr, Sonarr, Prowlarr and SABnzbd: settings, indexers and your library with its files.' },
   { to: '/settings/media-management', label: 'Media Management', description: 'Root folders, naming, importing, file handling and permissions.' },
   { to: '/settings/import-lists', label: 'Import lists', description: 'Add movies and series automatically from TMDB lists, Trakt, Plex watchlists and more.' },
   { to: '/settings/profiles', label: 'Profiles', description: 'Quality profiles: which qualities and languages to grab and until when to upgrade.' },

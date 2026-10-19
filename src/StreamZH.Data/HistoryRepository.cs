@@ -34,6 +34,9 @@ public enum HistoryEventType
 
     /// <summary>A file in the library was renamed to the naming scheme.</summary>
     Renamed = 7,
+
+    /// <summary>A library file was deleted (taken over from Radarr's or Sonarr's history, 0.9).</summary>
+    FileDeleted = 8,
 }
 
 /// <summary>One history entry. <see cref="Data"/> holds event-specific details (download URL, NZB path, …).</summary>

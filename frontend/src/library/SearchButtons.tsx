@@ -11,6 +11,8 @@ export type FinishedEvent = SearchFinished & { at: number }
 
 function finishedNote(done: SearchFinished): { text: string; ok?: boolean } {
   if (done.grabbed > 0) return { text: `Grabbed ${done.grabbed} release${done.grabbed === 1 ? '' : 's'}`, ok: true }
+  if (done.skipReason === 'automationHold')
+    return { text: 'Side by side is on: StreamZH grabs nothing automatically. Use Manual search to grab by hand.' }
   if ((done.skipped ?? 0) > 0 && done.skipReason === 'inQueue') return { text: 'Already in the download queue, see Activity', ok: true }
   if ((done.skipped ?? 0) > 0 && done.skipReason === 'recentlyGrabbed')
     return { text: 'Grabbed in the last 12 hours, not searched again. Use Manual search to grab another release.' }

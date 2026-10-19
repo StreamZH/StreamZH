@@ -29,7 +29,8 @@ public sealed class GrabService(
     HistoryRepository history,
     IEventBus events,
     ILogger<GrabService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    AutomationHold? automationHold = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -52,6 +53,14 @@ public sealed class GrabService(
     public async Task<GrabResult> GrabAsync(ReleaseDecision decision, string? categoryName, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(decision);
+
+        // Side-by-side mode: RSS sync and automatic searches grab nothing; grabs by hand still work.
+        if (automationHold?.Blocks == true)
+        {
+            logger.LogInformation("Not grabbing '{Title}': side-by-side mode is on", decision.Release.Title);
+            throw new LibraryException(AutomationHold.Message, LibraryError.Invalid);
+        }
+
         var release = decision.Release;
         var indexer = indexers.Find(release.IndexerId)
             ?? throw new LibraryException("The indexer of this release no longer exists.", LibraryError.NotFound);

@@ -34,6 +34,7 @@ const eventLabels: Record<HistoryRecord['eventType'], { label: string; icon: Ico
   Upgraded: { label: 'Upgraded', icon: 'arrowup' },
   ImportFailed: { label: 'Import failed', icon: 'alert', failed: true },
   Renamed: { label: 'Renamed', icon: 'rename', neutral: true },
+  FileDeleted: { label: 'File deleted', icon: 'trash', neutral: true },
 }
 
 const downloadFilterKeys = ['q', 'status', 'import', 'type', 'range'] as const

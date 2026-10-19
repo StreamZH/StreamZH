@@ -117,6 +117,7 @@ builder.Services.AddTrayAccess();
 builder.Services.AddCustomFormats();
 builder.Services.AddSceneNumbering(builder.Configuration["xem-url"]);
 builder.Services.AddAlternativeTitles();
+builder.Services.AddMigration();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
@@ -140,6 +141,7 @@ app.MapAuthEndpoints();
 app.MapSystemEndpoints();
 app.MapGeneralSettingsEndpoints();
 app.MapUiSettingsEndpoints();
+app.MapAutomationEndpoints();
 app.MapSystemInfoEndpoints();
 app.MapBackupEndpoints();
 app.MapLogEndpoints();
@@ -171,6 +173,7 @@ app.MapTrashEndpoints();
 app.MapTrayEndpoints();
 app.MapCustomFormatEndpoints();
 app.MapAlternativeTitleEndpoints();
+app.MapMigrationEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization();
 
 // Unknown API routes are real 404s; everything else is client-side routing in the React app.

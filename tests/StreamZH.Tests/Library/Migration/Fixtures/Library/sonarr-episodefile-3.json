@@ -1,0 +1,36 @@
+[
+  {
+    "id": 601,
+    "seriesId": 3,
+    "seasonNumber": 2026,
+    "relativePath": "Season 2026/The.Daily.Show.2026.10.14.Guest.1.1080p.WEB.h264-EDITH.mkv",
+    "path": "/tv/The Daily Show/Season 2026/The.Daily.Show.2026.10.14.Guest.1.1080p.WEB.h264-EDITH.mkv",
+    "size": 1000000000,
+    "dateAdded": "2025-10-10T22:00:00Z",
+    "sceneName": "The.Daily.Show.2026.10.14.Guest.1.1080p.WEB.h264-EDITH",
+    "releaseGroup": "EDITH",
+    "quality": {
+      "quality": {
+        "id": 3,
+        "name": "WEBDL-1080p",
+        "source": "web",
+        "resolution": 1080
+      },
+      "revision": {
+        "version": 1,
+        "real": 0,
+        "isRepack": false
+      }
+    },
+    "customFormats": [],
+    "customFormatScore": 0,
+    "indexerFlags": 0,
+    "releaseType": "singleEpisode",
+    "mediaInfo": null,
+    "qualityCutoffNotMet": false,
+    "language": {
+      "id": 1,
+      "name": "English"
+    }
+  }
+]

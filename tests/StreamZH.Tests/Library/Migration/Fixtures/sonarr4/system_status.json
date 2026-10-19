@@ -1,0 +1,21 @@
+{
+  "appName": "Sonarr",
+  "instanceName": "Sonarr",
+  "version": "4.0.15.2941",
+  "buildTime": "2025-06-01T00:00:00Z",
+  "isDebug": false,
+  "isProduction": true,
+  "isAdmin": false,
+  "isUserInteractive": false,
+  "startupPath": "/app/sonarr/bin",
+  "appData": "/config",
+  "osName": "ubuntu",
+  "isNetCore": true,
+  "isLinux": true,
+  "isDocker": true,
+  "branch": "main",
+  "authentication": "forms",
+  "urlBase": "",
+  "runtimeVersion": "6.0.36",
+  "runtimeName": ".NET"
+}

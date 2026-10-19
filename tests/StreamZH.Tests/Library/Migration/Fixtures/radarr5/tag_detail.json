@@ -1,0 +1,34 @@
+[
+  {
+    "label": "anime",
+    "delayProfileIds": [],
+    "importListIds": [],
+    "notificationIds": [
+      3
+    ],
+    "releaseProfileIds": [
+      2
+    ],
+    "indexerIds": [],
+    "downloadClientIds": [],
+    "autoTagIds": [],
+    "movieIds": [
+      10,
+      11,
+      12
+    ],
+    "id": 1
+  },
+  {
+    "label": "kids",
+    "delayProfileIds": [],
+    "importListIds": [],
+    "notificationIds": [],
+    "releaseProfileIds": [],
+    "indexerIds": [],
+    "downloadClientIds": [],
+    "autoTagIds": [],
+    "movieIds": [],
+    "id": 2
+  }
+]

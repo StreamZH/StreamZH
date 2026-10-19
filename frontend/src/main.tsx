@@ -31,6 +31,7 @@ import SettingsOverview from './settings/SettingsOverview'
 import LogsPage from './system/LogsPage'
 import CalendarPage from './calendar/CalendarPage'
 import WantedPage from './wanted/WantedPage'
+import MigrationPage from './migration/MigrationPage'
 import FileRenamerPage from './tools/FileRenamerPage'
 import ImportListsPage from './settings/ImportListsPage'
 import BackupPage from './system/BackupPage'
@@ -85,6 +86,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="settings/general" element={<GeneralPage />} />
             <Route path="settings/ui" element={<UiPage />} />
             <Route path="settings/release-test" element={<ParseTest />} />
+            <Route path="settings/migration" element={<MigrationPage />} />
             <Route path="system" element={<Navigate to="/system/status" replace />} />
             <Route path="system/status" element={<StatusPage />} />
             <Route path="system/tasks" element={<TasksPage />} />

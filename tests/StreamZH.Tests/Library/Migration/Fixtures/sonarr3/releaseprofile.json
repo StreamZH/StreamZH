@@ -1,0 +1,44 @@
+[
+  {
+    "name": "",
+    "enabled": true,
+    "required": "",
+    "ignored": "dubbed,/\\bsubbed\\b/i",
+    "preferred": [
+      {
+        "key": "/\\b(German\\.DL)\\b/i",
+        "value": 100
+      },
+      {
+        "key": "x265",
+        "value": -50
+      },
+      {
+        "key": "REPACK",
+        "value": 0
+      }
+    ],
+    "includePreferredWhenRenaming": true,
+    "indexerId": 0,
+    "tags": [],
+    "id": 1
+  },
+  {
+    "name": "Nur 1080p Gruppen",
+    "enabled": true,
+    "required": [
+      "1080p"
+    ],
+    "ignored": [],
+    "preferred": [
+      {
+        "key": "/(GROUP1|GROUP2)/i",
+        "value": 20000
+      }
+    ],
+    "includePreferredWhenRenaming": false,
+    "indexerId": 0,
+    "tags": [],
+    "id": 2
+  }
+]

@@ -5,7 +5,8 @@
 namespace StreamZH.Host.Status;
 
 /// <summary>Everything the status window shows: what is running right now and what needs attention.</summary>
-public sealed record OngoingResource(IReadOnlyList<OngoingRunning> Running, IReadOnlyList<OngoingNotice> Notices);
+/// <param name="AutomationHold">Side-by-side mode (0.9) is on: StreamZH grabs nothing automatically (for the top bar).</param>
+public sealed record OngoingResource(IReadOnlyList<OngoingRunning> Running, IReadOnlyList<OngoingNotice> Notices, bool AutomationHold = false);
 
 /// <summary>One running row.</summary>
 /// <param name="Kind">"job", "download", "postprocess" or "install" (par2 or 7-Zip being installed).</param>

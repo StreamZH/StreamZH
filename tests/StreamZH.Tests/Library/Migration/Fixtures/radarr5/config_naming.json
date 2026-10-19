@@ -1,0 +1,8 @@
+{
+  "renameMovies": true,
+  "replaceIllegalCharacters": true,
+  "colonReplacementFormat": "dash",
+  "standardMovieFormat": "{Movie CleanTitle} {(Release Year)} {edition-{Edition Tags}} {[Custom Formats]}{[Quality Full]}{[MediaInfo VideoDynamicRangeType]}{[Mediainfo AudioCodec}{ Mediainfo AudioChannels]}{[MediaInfo VideoCodec]}{-Release Group}",
+  "movieFolderFormat": "{Movie Collection} - {Movie CleanTitle} ({Release Year})",
+  "id": 1
+}

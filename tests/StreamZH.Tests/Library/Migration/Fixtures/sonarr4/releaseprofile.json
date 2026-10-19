@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Kein Upscale",
+    "enabled": true,
+    "required": [],
+    "ignored": [
+      "upscaled",
+      "/\\bAI[ ._-]?upscale\\b/i"
+    ],
+    "indexerId": 0,
+    "tags": [],
+    "id": 1
+  },
+  {
+    "name": "Nur Deutsch",
+    "enabled": true,
+    "required": [
+      "German"
+    ],
+    "ignored": [],
+    "indexerId": 0,
+    "tags": [
+      1
+    ],
+    "id": 2
+  }
+]

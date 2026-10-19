@@ -1,0 +1,350 @@
+[
+  {
+    "id": 1,
+    "name": "German DL",
+    "includeCustomFormatWhenRenaming": true,
+    "specifications": [
+      {
+        "name": "German",
+        "implementation": "LanguageSpecification",
+        "implementationName": "Language",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 4,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          },
+          {
+            "order": 1,
+            "name": "exceptLanguage",
+            "label": "Exceptlanguage",
+            "value": false,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Original Language",
+        "implementation": "LanguageSpecification",
+        "implementationName": "Language",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": -2,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          },
+          {
+            "order": 1,
+            "name": "exceptLanguage",
+            "label": "Exceptlanguage",
+            "value": false,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "x265 (HD)",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "x265/HEVC",
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "ReleaseTitle",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "[xh][ ._-]?265|\\bHEVC(\\b|\\d)",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Not 2160p",
+        "implementation": "ResolutionSpecification",
+        "implementationName": "Resolution",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": true,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 2160,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "LQ",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "CHX",
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "ReleaseGroup",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "^(CHX)$",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "EVO",
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "ReleaseGroup",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "^(EVO)$",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Anime Dual Audio",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "Dual Audio",
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "ReleaseTitle",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "dual[ ._-]?audio|[([]dual[])]|\\b(JA|ZH|KO)\\+EN\\b",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Not Single Language Only",
+        "implementation": "LanguageSpecification",
+        "implementationName": "Language",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": true,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 8,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          },
+          {
+            "order": 1,
+            "name": "exceptLanguage",
+            "label": "Exceptlanguage",
+            "value": false,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Remux Tier 01",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "BLURANiUM",
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "ReleaseGroup",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "^(BLURANiUM)$",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "FraMeSToR",
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "ReleaseGroup",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "^(FraMeSToR)$",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Remux",
+        "implementation": "QualityModifierSpecification",
+        "implementationName": "QualityModifier",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 5,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Too Big",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "Over 40 GB",
+        "implementation": "SizeSpecification",
+        "implementationName": "Size",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "min",
+            "label": "Minimum Size",
+            "value": 40,
+            "type": "number",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          },
+          {
+            "order": 1,
+            "name": "max",
+            "label": "Maximum Size",
+            "value": 400,
+            "type": "number",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Broken Regex",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "Unclosed",
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "ReleaseTitle",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "(German",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  }
+]

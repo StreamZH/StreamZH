@@ -1,0 +1,237 @@
+[
+  {
+    "id": 11,
+    "name": "German DL",
+    "includeCustomFormatWhenRenaming": true,
+    "specifications": [
+      {
+        "name": "German",
+        "implementation": "LanguageSpecification",
+        "implementationName": "Language",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 4,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          },
+          {
+            "order": 1,
+            "name": "exceptLanguage",
+            "label": "Exceptlanguage",
+            "value": false,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Original Language",
+        "implementation": "LanguageSpecification",
+        "implementationName": "Language",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": -2,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          },
+          {
+            "order": 1,
+            "name": "exceptLanguage",
+            "label": "Exceptlanguage",
+            "value": false,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "name": "x265 (HD)",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "x265/HEVC",
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "ReleaseTitle",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "[xh][ ._-]?265|\\bHEVC(\\b|\\d)",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Not 2160p",
+        "implementation": "ResolutionSpecification",
+        "implementationName": "Resolution",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": true,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 2160,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "name": "Anime BD Tier 01 (Top SeaDex Muxers)",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "Aergia",
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "ReleaseGroup",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "^(Aergia)$",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Arg0",
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "ReleaseGroup",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": false,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "^(Arg0)$",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      },
+      {
+        "name": "Bluray",
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 6,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "v0",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "v0",
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "ReleaseTitle",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": "(\\b|\\d)(v0)\\b",
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "Season Pack",
+    "includeCustomFormatWhenRenaming": false,
+    "specifications": [
+      {
+        "name": "Season Pack",
+        "implementation": "ReleaseTypeSpecification",
+        "implementationName": "ReleaseType",
+        "infoLink": "https://wiki.servarr.com/",
+        "negate": false,
+        "required": true,
+        "fields": [
+          {
+            "order": 0,
+            "name": "value",
+            "label": "Value",
+            "value": 3,
+            "type": "textbox",
+            "advanced": false,
+            "privacy": "normal",
+            "isFloat": false
+          }
+        ]
+      }
+    ]
+  }
+]

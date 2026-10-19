@@ -1,0 +1,9 @@
+{
+  "appName": "Sonarr",
+  "instanceName": "Sonarr",
+  "version": "3.0.10.1567",
+  "isLinux": true,
+  "isMono": true,
+  "branch": "main",
+  "urlBase": ""
+}

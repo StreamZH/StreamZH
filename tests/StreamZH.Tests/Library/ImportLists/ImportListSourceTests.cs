@@ -164,7 +164,7 @@ public class ImportListSourceTests
             });
         });
 
-        var fetch = await Fetch(new TraktListSource(http), ImportListCatalog.Trakt, MediaType.Movie, new { clientId = "my-client-id", listKind = "watchlist", username = "the owner" });
+        var fetch = await Fetch(new TraktListSource(http), ImportListCatalog.Trakt, MediaType.Movie, new { clientId = "my-client-id", listKind = "watchlist", username = "johndoe" });
 
         var dune = Assert.Single(fetch.Items);
         Assert.Equal((438631, "tt1160419", "Dune", 2021), (dune.TmdbId!.Value, dune.ImdbId, dune.Title, dune.Year));

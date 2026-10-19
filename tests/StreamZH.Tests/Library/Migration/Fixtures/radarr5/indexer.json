@@ -1,0 +1,13 @@
+[
+  {
+    "name": "NZBgeek",
+    "implementation": "Newznab",
+    "enableRss": true,
+    "enableAutomaticSearch": true,
+    "protocol": "usenet",
+    "priority": 25,
+    "tags": [],
+    "fields": [],
+    "id": 2
+  }
+]

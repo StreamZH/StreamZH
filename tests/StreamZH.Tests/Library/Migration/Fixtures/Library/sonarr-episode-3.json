@@ -1,0 +1,50 @@
+[
+  {
+    "id": 500,
+    "seriesId": 3,
+    "tvdbId": 9000500,
+    "episodeFileId": 0,
+    "seasonNumber": 2026,
+    "episodeNumber": 120,
+    "title": "October 13, 2026 - Guest 0",
+    "airDate": "2026-10-13",
+    "airDateUtc": "2026-10-13T02:00:00Z",
+    "runtime": 45,
+    "overview": "…",
+    "hasFile": false,
+    "monitored": true,
+    "unverifiedSceneNumbering": false
+  },
+  {
+    "id": 501,
+    "seriesId": 3,
+    "tvdbId": 9000501,
+    "episodeFileId": 601,
+    "seasonNumber": 2026,
+    "episodeNumber": 121,
+    "title": "October 14, 2026 - Guest 1",
+    "airDate": "2026-10-14",
+    "airDateUtc": "2026-10-14T02:00:00Z",
+    "runtime": 45,
+    "overview": "…",
+    "hasFile": true,
+    "monitored": true,
+    "unverifiedSceneNumbering": false
+  },
+  {
+    "id": 502,
+    "seriesId": 3,
+    "tvdbId": 9000502,
+    "episodeFileId": 0,
+    "seasonNumber": 2026,
+    "episodeNumber": 122,
+    "title": "October 15, 2026 - Guest 2",
+    "airDate": "2026-10-15",
+    "airDateUtc": "2026-10-15T02:00:00Z",
+    "runtime": 45,
+    "overview": "…",
+    "hasFile": false,
+    "monitored": true,
+    "unverifiedSceneNumbering": false
+  }
+]

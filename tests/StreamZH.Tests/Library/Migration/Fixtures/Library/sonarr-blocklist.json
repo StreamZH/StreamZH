@@ -1,0 +1,41 @@
+{
+  "page": 1,
+  "pageSize": 250,
+  "sortKey": "date",
+  "sortDirection": "descending",
+  "totalRecords": 1,
+  "records": [
+    {
+      "id": 41,
+      "seriesId": 1,
+      "episodeIds": [
+        106
+      ],
+      "sourceTitle": "Crystal.Lake.S01E06.German.DL.1080p.WEB.h264-FAKE",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "web",
+          "resolution": 1080
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "date": "2026-10-16T21:00:00Z",
+      "protocol": "usenet",
+      "indexer": "NZBgeek (Prowlarr)",
+      "message": "Download failed: missing articles"
+    }
+  ]
+}

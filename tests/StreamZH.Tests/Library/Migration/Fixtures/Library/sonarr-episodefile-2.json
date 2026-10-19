@@ -1,0 +1,58 @@
+[
+  {
+    "id": 401,
+    "seriesId": 2,
+    "seasonNumber": 2,
+    "relativePath": "Season 02/[SubsPlease] Sousou no Frieren - 03 (1080p) [9A1B2C3D].mkv",
+    "path": "/tv/Frieren - Beyond Journey's End/Season 02/[SubsPlease] Sousou no Frieren - 03 (1080p) [9A1B2C3D].mkv",
+    "size": 1400000000,
+    "dateAdded": "2025-10-10T22:00:00Z",
+    "sceneName": "[SubsPlease] Sousou no Frieren - 03 (1080p) [9A1B2C3D]",
+    "releaseGroup": "SubsPlease",
+    "quality": {
+      "quality": {
+        "id": 3,
+        "name": "WEBDL-1080p",
+        "source": "web",
+        "resolution": 1080
+      },
+      "revision": {
+        "version": 1,
+        "real": 0,
+        "isRepack": false
+      }
+    },
+    "customFormats": [],
+    "customFormatScore": 0,
+    "indexerFlags": 0,
+    "releaseType": "singleEpisode",
+    "mediaInfo": {
+      "audioBitrate": 1509000,
+      "audioChannels": 2.0,
+      "audioCodec": "AAC",
+      "audioLanguages": "jpn",
+      "audioStreamCount": 1,
+      "videoBitDepth": 8,
+      "videoBitrate": 12000000,
+      "videoCodec": "h264",
+      "videoFps": 23.976,
+      "videoDynamicRange": "",
+      "videoDynamicRangeType": "",
+      "resolution": "1920x1080",
+      "runTime": "24:00",
+      "scanType": "Progressive",
+      "subtitles": "eng"
+    },
+    "qualityCutoffNotMet": false,
+    "languages": [
+      {
+        "id": 8,
+        "name": "Japanese"
+      },
+      {
+        "id": 1,
+        "name": "English"
+      }
+    ]
+  }
+]

@@ -1,0 +1,19 @@
+[
+  {
+    "label": "anime",
+    "delayProfileIds": [],
+    "importListIds": [],
+    "notificationIds": [],
+    "restrictionIds": [
+      1
+    ],
+    "indexerIds": [],
+    "downloadClientIds": [],
+    "autoTagIds": [],
+    "seriesIds": [
+      3,
+      4
+    ],
+    "id": 1
+  }
+]

@@ -20,7 +20,11 @@ SABnzbd and the indexer setup on the CloudZH home server.
 | 0.7.1 ✅ | Design | The CloudZH look: palette (light and dark), fonts, icons, sidebar with groups, search or jump to (Ctrl K), top bar with downloads (percent and time left), splash screen with the animated logo, page transitions; every page restyled; simple file renamer | StreamZH visibly belongs to the CloudZH family |
 | 0.8 ✅ | Custom Formats & TRaSH | Custom formats like Radarr/Sonarr (all condition types, scores in profiles, minimum score, upgrade until score, quality groups, {Custom Formats} token, import/export), TRaSH Guides sync built in (templates incl. German profiles, cf-groups, quality sizes, daily sync keeping own scores), recyclarr.yml import, Windows tray icon | A TRaSH profile ranks real releases like Radarr with the same profile |
 | 0.8.1 ✅ | Titles, numbering, media info | Alternative titles (TMDB titles and translations, own titles, used for matching and search), series type Standard/Daily/Anime with absolute numbering and TheXEM scene numbering, media info via ffprobe (installed like par2/7-Zip) with MediaInfo naming tokens and audio languages, small import/renamer fixes | German release names and anime releases match like in Sonarr/Radarr |
-| 0.9 | Migration | Import settings and libraries from existing Sonarr/Radarr/Prowlarr/SABnzbd via their APIs (incl. custom formats and scores) | Home server switched over to StreamZH |
+| 0.9 ✅ | Migration | Migration wizard (Settings → Migration): take over Radarr, Sonarr, Prowlarr and SABnzbd through their APIs, read-only: root folders, quality sizes, custom formats and scores, quality profiles (Radarr and Sonarr merged), release profiles, naming, media management, notifications, list exclusions, indexers, Usenet servers, categories, speed and schedule, movies and series with their existing files (linked, never moved), history and blocklist; path mappings, preview, dry run, report; side-by-side mode (grabs nothing automatically until you switch over); docs/MIGRATION.md and a Docker compose example | An existing Radarr/Sonarr/SABnzbd setup is taken over without re-downloading anything |
+| 0.10 | Users & Requests | User management (Admin, Friend, invites, request limits), Discover (TMDB trending/popular/search), requests with approval and auto-approve, availability notifications, built-in Discord bot (replaces Requestrr) | Friends request in the web UI or on Discord and get told when it is available |
+| 0.11 | Torrent | Torznab indexers, qBittorrent bridge and/or built-in engine, seeding rules | Torrent and Usenet releases are ranked and downloaded side by side |
+| 0.12 | Security & privacy | Independent security review (auth, roles, SSRF, file access, secrets at rest, headers, rate limits, dependencies, container), privacy check of repo and history | No open critical or high findings |
+| 1.0 RC | Ready to use | Installers and packages (Windows installer, Linux packages, Docker image on GHCR), first-run setup, complete documentation with screenshots | Download, configure, use |
 
 ### How the test runs on the home server
 
@@ -38,7 +42,7 @@ SABnzbd and the indexer setup on the CloudZH home server.
 | Discover & Requests | Request flow for Friends, replaces Requestrr; Discord bot |
 | Users & roles | Owner, Admin, Friend as in CloudZH |
 | Compatibility | Optional Sonarr/Radarr-compatible API endpoints for third-party tools |
-| UI | German as second UI language, mobile layout |
+| UI | English only (decision 2026-10-19), mobile layout |
 | Packaging | Native installers and packages for every platform below, Docker image on GHCR, CloudZH App Store entry |
 
 ## Platforms

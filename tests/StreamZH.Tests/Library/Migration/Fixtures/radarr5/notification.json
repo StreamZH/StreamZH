@@ -1,0 +1,360 @@
+[
+  {
+    "name": "Plex",
+    "fields": [
+      {
+        "order": 0,
+        "name": "server",
+        "label": "Server",
+        "value": null,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "host",
+        "label": "Host",
+        "value": "plex",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 2,
+        "name": "port",
+        "label": "Port",
+        "value": 32400,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 3,
+        "name": "useSsl",
+        "label": "Usessl",
+        "value": false,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 4,
+        "name": "urlBase",
+        "label": "Urlbase",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 5,
+        "name": "authToken",
+        "label": "Authtoken",
+        "value": "********",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "apiKey",
+        "isFloat": false
+      },
+      {
+        "order": 6,
+        "name": "signIn",
+        "label": "Signin",
+        "value": "startOAuth",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 7,
+        "name": "updateLibrary",
+        "label": "Updatelibrary",
+        "value": true,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 8,
+        "name": "mapFrom",
+        "label": "Mapfrom",
+        "value": "/movies",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 9,
+        "name": "mapTo",
+        "label": "Mapto",
+        "value": "/data/movies",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Plex Media Server",
+    "implementation": "PlexServer",
+    "configContract": "PlexServerSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": false,
+    "onDownload": true,
+    "onUpgrade": true,
+    "onRename": true,
+    "onMovieAdded": false,
+    "onMovieDelete": true,
+    "onMovieFileDelete": false,
+    "onMovieFileDeleteForUpgrade": false,
+    "onHealthIssue": false,
+    "includeHealthWarnings": false,
+    "onHealthRestored": false,
+    "onApplicationUpdate": false,
+    "onManualInteractionRequired": false,
+    "id": 1
+  },
+  {
+    "name": "Discord Filme",
+    "fields": [
+      {
+        "order": 0,
+        "name": "webHookUrl",
+        "label": "Webhookurl",
+        "value": "********",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "apiKey",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "username",
+        "label": "Username",
+        "value": "Radarr",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 2,
+        "name": "avatar",
+        "label": "Avatar",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 3,
+        "name": "author",
+        "label": "Author",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 4,
+        "name": "grabFields",
+        "label": "Grabfields",
+        "value": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          8,
+          10
+        ],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 5,
+        "name": "importFields",
+        "label": "Importfields",
+        "value": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          11
+        ],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 6,
+        "name": "manualInteractionFields",
+        "label": "Manualinteractionfields",
+        "value": [
+          0,
+          1
+        ],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Discord",
+    "implementation": "Discord",
+    "configContract": "DiscordSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": true,
+    "onDownload": true,
+    "onUpgrade": true,
+    "onRename": false,
+    "onMovieAdded": false,
+    "onMovieDelete": false,
+    "onMovieFileDelete": false,
+    "onMovieFileDeleteForUpgrade": false,
+    "onHealthIssue": true,
+    "includeHealthWarnings": false,
+    "onHealthRestored": false,
+    "onApplicationUpdate": true,
+    "onManualInteractionRequired": false,
+    "id": 2
+  },
+  {
+    "name": "Slack",
+    "fields": [
+      {
+        "order": 0,
+        "name": "webHookUrl",
+        "label": "Webhookurl",
+        "value": "https://hooks.slack.example/T000/B000/XXXX",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "username",
+        "label": "Username",
+        "value": "radarr",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Slack",
+    "implementation": "Slack",
+    "configContract": "SlackSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": true,
+    "onDownload": false,
+    "onUpgrade": false,
+    "onRename": false,
+    "onMovieAdded": false,
+    "onMovieDelete": false,
+    "onMovieFileDelete": false,
+    "onMovieFileDeleteForUpgrade": false,
+    "onHealthIssue": false,
+    "includeHealthWarnings": false,
+    "onHealthRestored": false,
+    "onApplicationUpdate": false,
+    "onManualInteractionRequired": false,
+    "id": 3
+  },
+  {
+    "name": "Webhook",
+    "fields": [
+      {
+        "order": 0,
+        "name": "url",
+        "label": "Url",
+        "value": "http://automation.example:8123/api/webhook/radarr",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 1,
+        "name": "method",
+        "label": "Method",
+        "value": 1,
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 2,
+        "name": "username",
+        "label": "Username",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 3,
+        "name": "password",
+        "label": "Password",
+        "value": "",
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      },
+      {
+        "order": 4,
+        "name": "headers",
+        "label": "Headers",
+        "value": [],
+        "type": "textbox",
+        "advanced": false,
+        "privacy": "normal",
+        "isFloat": false
+      }
+    ],
+    "implementationName": "Webhook",
+    "implementation": "Webhook",
+    "configContract": "WebhookSettings",
+    "infoLink": "https://wiki.servarr.com/",
+    "tags": [],
+    "onGrab": true,
+    "onDownload": true,
+    "onUpgrade": false,
+    "onRename": false,
+    "onMovieAdded": false,
+    "onMovieDelete": false,
+    "onMovieFileDelete": false,
+    "onMovieFileDeleteForUpgrade": false,
+    "onHealthIssue": false,
+    "includeHealthWarnings": false,
+    "onHealthRestored": false,
+    "onApplicationUpdate": false,
+    "onManualInteractionRequired": false,
+    "id": 4
+  }
+]

@@ -23,3 +23,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
+
+# Docker Compose: your own copy of the example and its data
+docker/docker-compose.yml
+docker/config/

@@ -60,6 +60,9 @@ StreamZH runs unattended as a Windows service, a systemd service on Linux or a D
 container. Your data stays in the data folder in all cases (`C:\ProgramData\StreamZH`,
 `/var/lib/streamzh`, `/config`); updating only replaces the program files.
 
+Coming from Sonarr, Radarr, Prowlarr and SABnzbd? [docs/MIGRATION.md](docs/MIGRATION.md) walks through taking
+everything over, the side-by-side phase and switching over.
+
 ### Windows: build, install, run as a service
 
 One command pulls the latest code, builds `StreamZH.exe`, stops the running instance,

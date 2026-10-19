@@ -114,7 +114,8 @@ export interface SearchFinished {
   grabbed: number
   /** Items not searched: already in the download queue, or (NZB folder) grabbed in the last 12 hours. */
   skipped?: number
-  skipReason?: 'inQueue' | 'recentlyGrabbed' | null
+  /** automationHold: side by side is on, StreamZH grabs nothing automatically (0.9). */
+  skipReason?: 'inQueue' | 'recentlyGrabbed' | 'automationHold' | null
 }
 
 function searchQuery(target: SearchTarget): string {

@@ -6,6 +6,7 @@ import { downloadKeys, downloadsApi } from '../api/downloads'
 import { libraryApi, queryKeys } from '../api/library'
 import { useLiveConnection } from '../api/useLiveConnection'
 import { authQueryKey, useAuth } from '../auth/auth'
+import { SideBySidePill } from '../migration/SideBySide'
 import { formatSpeed } from '../status/format'
 import StatusWindow from '../status/StatusWindow'
 import { useIsAdmin, useLiveProgress, useOngoing } from '../status/useOngoing'
@@ -257,6 +258,8 @@ export default function Layout() {
           <div className={styles.topTitle}>{title}</div>
           <span className={live ? styles.liveDot : styles.liveDotOff} role="status" title={live ? 'Live: pages update by themselves' : 'Offline: reconnecting …'} />
           <div className={styles.spacer} />
+
+          {admin && <SideBySidePill />}
 
           {dl.count > 0 && (
             <NavLink to="/activity" className={styles.dlPill} title={`${dl.count} in the queue`}>

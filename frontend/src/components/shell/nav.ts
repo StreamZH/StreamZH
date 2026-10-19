@@ -28,6 +28,7 @@ export interface NavGroup {
 export const overview: NavPage = { to: '/', label: 'Overview', icon: 'home', keywords: 'home dashboard start' }
 
 const settingsIcons: Record<string, IconName> = {
+  '/settings/migration': 'mountin',
   '/settings/media-management': 'folder',
   '/settings/import-lists': 'list',
   '/settings/profiles': 'star',

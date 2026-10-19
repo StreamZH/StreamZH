@@ -1,0 +1,49 @@
+# StreamZH with Docker Compose - an example to copy and adapt.
+#
+#   cp docker/docker-compose.example.yml docker/docker-compose.yml   # adapt the paths below
+#   docker compose -f docker/docker-compose.yml up -d --build
+#
+# Elsewhere (e.g. /opt/streamzh/docker-compose.yml): set build.context to your StreamZH checkout.
+#
+# Then open http://<your server>:9797 and create the first user. See docs/MIGRATION.md for moving over from
+# Sonarr, Radarr, Prowlarr and SABnzbd.
+#
+# Paths: mount your media and download folders at the SAME paths inside the container as the old apps use (e.g.
+# /data/media/movies, /data/media/tv, /data/downloads). Then the migration wizard needs no path mappings and
+# StreamZH finds every file Radarr and Sonarr know about.
+
+services:
+  streamzh:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: streamzh:local
+    container_name: streamzh
+    restart: unless-stopped
+
+    environment:
+      # The user and group StreamZH runs as (`id -u` / `id -g` of the user that owns your media). The container starts
+      # as root only to give /config to this user, then drops to it. Never use 0 (root).
+      PUID: "1000"
+      PGID: "1000"
+      # 002: new files are writable for the group (handy when Plex or another app shares the group).
+      UMASK: "002"
+      TZ: "Etc/UTC"
+
+    ports:
+      # Only the web UI/API port. To reach StreamZH only through a reverse proxy on this host, use
+      # "127.0.0.1:9797:9797" instead. Keep 9797 inside the container (change the left number to publish another port).
+      - "9797:9797"
+
+    volumes:
+      # Database, settings, logs, backups. Back this folder up.
+      - ./config:/config
+      # Media and downloads: same paths as in Sonarr/Radarr/SABnzbd (left: on the host, right: in the container).
+      - /data/media:/data/media
+      - /data/downloads:/data/downloads
+
+    # No privileges beyond what the entrypoint needs to switch to PUID:PGID.
+    security_opt:
+      - no-new-privileges:true
+
+    # The image has a health check on /health (no login needed); `docker ps` shows "healthy".

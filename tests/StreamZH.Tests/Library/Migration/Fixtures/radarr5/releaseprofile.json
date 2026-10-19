@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Keine Hardsubs",
+    "enabled": true,
+    "required": [],
+    "ignored": [
+      "hardsub",
+      "/\\b(HC|hardcoded)\\b/i"
+    ],
+    "indexerId": 0,
+    "tags": [],
+    "id": 1
+  },
+  {
+    "name": "",
+    "enabled": false,
+    "required": [
+      "German"
+    ],
+    "ignored": [],
+    "indexerId": 2,
+    "tags": [
+      1
+    ],
+    "id": 2
+  }
+]

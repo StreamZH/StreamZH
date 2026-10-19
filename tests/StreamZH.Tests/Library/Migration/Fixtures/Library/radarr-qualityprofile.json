@@ -1,0 +1,44 @@
+[
+  {
+    "id": 4,
+    "name": "HD-1080p",
+    "upgradeAllowed": true,
+    "cutoff": 7,
+    "items": [],
+    "minFormatScore": 0,
+    "cutoffFormatScore": 0,
+    "formatItems": [],
+    "language": {
+      "id": 4,
+      "name": "German"
+    }
+  },
+  {
+    "id": 5,
+    "name": "Ultra-HD",
+    "upgradeAllowed": true,
+    "cutoff": 19,
+    "items": [],
+    "minFormatScore": 0,
+    "cutoffFormatScore": 0,
+    "formatItems": [],
+    "language": {
+      "id": 4,
+      "name": "German"
+    }
+  },
+  {
+    "id": 7,
+    "name": "German Remux",
+    "upgradeAllowed": false,
+    "cutoff": 30,
+    "items": [],
+    "minFormatScore": 0,
+    "cutoffFormatScore": 0,
+    "formatItems": [],
+    "language": {
+      "id": 4,
+      "name": "German"
+    }
+  }
+]

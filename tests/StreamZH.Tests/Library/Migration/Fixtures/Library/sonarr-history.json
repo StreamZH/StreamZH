@@ -1,0 +1,192 @@
+{
+  "page": 1,
+  "pageSize": 250,
+  "sortKey": "date",
+  "sortDirection": "descending",
+  "totalRecords": 4,
+  "records": [
+    {
+      "id": 901,
+      "episodeId": 103,
+      "sourceTitle": "Crystal.Lake.S01E03E04.German.DL.1080p.WEB.h264-ZZGtv",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "web",
+          "resolution": 1080
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@HOURS_AGO:3@",
+      "eventType": "grabbed",
+      "data": {
+        "indexer": "NZBgeek (Prowlarr)",
+        "nzbInfoUrl": "https://nzbgeek.info/geekseek.php?guid=cl34",
+        "releaseGroup": "ZZGtv",
+        "publishedDate": "2026-10-19T06:00:00Z",
+        "downloadClient": "SABnzbd",
+        "downloadClientName": "SABnzbd",
+        "size": "2400000000",
+        "downloadUrl": "https://api.nzbgeek.info/api?t=get&id=cl34",
+        "guid": "https://nzbgeek.info/geekseek.php?guid=cl34",
+        "protocol": "1",
+        "tvdbId": "450001",
+        "seriesMatchType": "1",
+        "releaseSource": "Rss",
+        "fullSeason": "False",
+        "releaseType": "MultiEpisode"
+      },
+      "downloadId": "SABnzbd_nzo_cl34",
+      "seriesId": 1
+    },
+    {
+      "id": 902,
+      "episodeId": 104,
+      "sourceTitle": "Crystal.Lake.S01E03E04.German.DL.1080p.WEB.h264-ZZGtv",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "web",
+          "resolution": 1080
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@HOURS_AGO:3@",
+      "eventType": "grabbed",
+      "data": {
+        "indexer": "NZBgeek (Prowlarr)",
+        "nzbInfoUrl": "https://nzbgeek.info/geekseek.php?guid=cl34",
+        "releaseGroup": "ZZGtv",
+        "publishedDate": "2026-10-19T06:00:00Z",
+        "downloadClient": "SABnzbd",
+        "downloadClientName": "SABnzbd",
+        "size": "2400000000",
+        "downloadUrl": "https://api.nzbgeek.info/api?t=get&id=cl34",
+        "guid": "https://nzbgeek.info/geekseek.php?guid=cl34",
+        "protocol": "1",
+        "tvdbId": "450001",
+        "seriesMatchType": "1",
+        "releaseSource": "Rss",
+        "fullSeason": "False",
+        "releaseType": "MultiEpisode"
+      },
+      "downloadId": "SABnzbd_nzo_cl34",
+      "seriesId": 1
+    },
+    {
+      "id": 900,
+      "episodeId": 101,
+      "sourceTitle": "Crystal.Lake.S01E01.German.DL.1080p.WEB.h264-ZZGtv",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "web",
+          "resolution": 1080
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:10@",
+      "eventType": "downloadFolderImported",
+      "data": {
+        "droppedPath": "/downloads/complete/tv/Crystal.Lake.S01E01/cl.mkv",
+        "importedPath": "/tv/Crystal Lake/Season 01/Crystal.Lake.S01E01.German.DL.1080p.WEB.h264-ZZGtv.mkv",
+        "downloadClient": "SABnzbd",
+        "downloadClientName": "SABnzbd",
+        "releaseGroup": "ZZGtv",
+        "size": "1200000000"
+      },
+      "downloadId": "SABnzbd_nzo_cl01",
+      "seriesId": 1
+    },
+    {
+      "id": 899,
+      "episodeId": 302,
+      "sourceTitle": "[SubsPlease] Sousou no Frieren - 03 (1080p) [9A1B2C3D]",
+      "languages": [
+        {
+          "id": 8,
+          "name": "Japanese"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "web",
+          "resolution": 1080
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:12@",
+      "eventType": "grabbed",
+      "data": {
+        "indexer": "Nyaa (Prowlarr)",
+        "downloadClientName": "SABnzbd",
+        "size": "1400000000"
+      },
+      "downloadId": "SABnzbd_nzo_fr3",
+      "seriesId": 2
+    }
+  ]
+}

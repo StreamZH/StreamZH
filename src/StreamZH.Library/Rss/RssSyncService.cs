@@ -54,7 +54,8 @@ public sealed class RssSyncService(
     TimeProvider? timeProvider = null,
     PendingImports? pendingImports = null,
     SceneNumbering.EpisodeMapper? episodeMapper = null,
-    AlternativeTitleRepository? alternativeTitles = null)
+    AlternativeTitleRepository? alternativeTitles = null,
+    AutomationHold? automationHold = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -63,6 +64,13 @@ public sealed class RssSyncService(
 
     public async Task<RssSyncResult> SyncAsync(CancellationToken cancellationToken = default)
     {
+        // Side-by-side mode: the old apps grab; asking the indexers would only use up their API limits.
+        if (automationHold?.IsOn == true)
+        {
+            logger.LogInformation("RSS sync skipped: side-by-side mode is on");
+            return RssSyncResult.Empty;
+        }
+
         using var source = IndexerCallContext.Begin(IndexerCallSource.Rss);
         var active = indexers.Active(IndexerUse.Rss);
         if (active.Count == 0)

@@ -32,7 +32,8 @@ public sealed class AutomaticSearchService(
     TimeProvider? timeProvider = null,
     IndexerOptions? options = null,
     PendingImports? pendingImports = null,
-    LastSearchRepository? lastSearches = null)
+    LastSearchRepository? lastSearches = null,
+    AutomationHold? automationHold = null)
 {
     /// <summary>
     /// With the blackhole folder StreamZH cannot see whether a grab is still downloading: items grabbed this recently are
@@ -62,6 +63,22 @@ public sealed class AutomaticSearchService(
     private bool IsAvailable(Movie movie, DateTimeOffset now) =>
         options?.IsAvailable(movie, now)
         ?? IndexerOptions.AvailableFrom(movie, IndexerOptions.Defaults.MinimumAvailability, 0, now) is null;
+
+    /// <summary>
+    /// Side-by-side mode: no automatic search runs (the indexers are not asked, so their API limits stay for the old
+    /// apps). The finished event names the reason, so a "Search" button can say why nothing happened.
+    /// </summary>
+    private bool Held(int count)
+    {
+        if (automationHold?.IsOn != true)
+        {
+            return false;
+        }
+
+        logger.LogInformation("Automatic search skipped: side-by-side mode is on");
+        Skip(AutomationHold.SkipReason, Math.Max(count, 1));
+        return true;
+    }
 
     private void Skip(string reason, int count = 1)
     {
@@ -193,6 +210,11 @@ public sealed class AutomaticSearchService(
 
     private async Task<bool> SearchMovieCoreAsync(int movieId, CancellationToken cancellationToken)
     {
+        if (Held(1))
+        {
+            return false;
+        }
+
         if (MovieSkipReason(movieId) is { } reason)
         {
             if (reason == SkipInQueue)
@@ -234,6 +256,11 @@ public sealed class AutomaticSearchService(
     private async Task<int> SearchEpisodesCoreAsync(
         int seriesId, int seasonNumber, IReadOnlyCollection<int>? episodeIds, IReadOnlySet<int> wanted, CancellationToken cancellationToken)
     {
+        if (Held(wanted.Count))
+        {
+            return 0;
+        }
+
         var done = BlockedEpisodes(seriesId);
         var open = wanted.Where(id => !done.Contains(id)).ToHashSet();
         var blocked = wanted.Count - open.Count;

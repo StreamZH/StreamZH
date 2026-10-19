@@ -1,0 +1,15 @@
+{
+  "appName": "Sonarr",
+  "instanceName": "Sonarr",
+  "version": "4.0.15.2941",
+  "buildTime": "2025-06-01T12:00:00Z",
+  "isDebug": false,
+  "isProduction": true,
+  "isLinux": true,
+  "osName": "ubuntu",
+  "branch": "main",
+  "authentication": "forms",
+  "urlBase": "",
+  "runtimeVersion": "6.0.36",
+  "databaseType": "sqLite"
+}

@@ -1,0 +1,256 @@
+[
+  {
+    "id": 1,
+    "title": "Crystal Lake",
+    "alternateTitles": [],
+    "sortTitle": "crystal lake",
+    "status": "continuing",
+    "ended": false,
+    "overview": "…",
+    "network": "Peacock",
+    "airTime": "21:00",
+    "images": [],
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "seasons": [
+      {
+        "seasonNumber": 1,
+        "monitored": true,
+        "statistics": {}
+      }
+    ],
+    "year": 2025,
+    "path": "/tv/Crystal Lake",
+    "qualityProfileId": 6,
+    "seasonFolder": true,
+    "monitored": true,
+    "monitorNewItems": "all",
+    "useSceneNumbering": false,
+    "runtime": 45,
+    "tvdbId": 450001,
+    "tvRageId": 0,
+    "tvMazeId": 0,
+    "firstAired": "2025-10-01T00:00:00Z",
+    "seriesType": "standard",
+    "cleanTitle": "crystallake",
+    "imdbId": "tt22222222",
+    "titleSlug": "crystal-lake",
+    "rootFolderPath": "/tv",
+    "certification": "TV-MA",
+    "genres": [
+      "Horror"
+    ],
+    "tags": [
+      2
+    ],
+    "added": "2024-10-01T18:00:00Z",
+    "ratings": {
+      "votes": 10,
+      "value": 7.5
+    },
+    "statistics": {
+      "seasonCount": 1,
+      "episodeFileCount": 5,
+      "episodeCount": 8,
+      "totalEpisodeCount": 8,
+      "sizeOnDisk": 6000000000,
+      "releaseGroups": [],
+      "percentOfEpisodes": 50.0
+    },
+    "tmdbId": 250001,
+    "languageProfileId": 1
+  },
+  {
+    "id": 2,
+    "title": "Frieren: Beyond Journey's End",
+    "alternateTitles": [],
+    "sortTitle": "frieren: beyond journey's end",
+    "status": "continuing",
+    "ended": false,
+    "overview": "…",
+    "network": "Peacock",
+    "airTime": "21:00",
+    "images": [],
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "seasons": [
+      {
+        "seasonNumber": 0,
+        "monitored": false,
+        "statistics": {}
+      },
+      {
+        "seasonNumber": 1,
+        "monitored": true,
+        "statistics": {}
+      },
+      {
+        "seasonNumber": 2,
+        "monitored": true,
+        "statistics": {}
+      }
+    ],
+    "year": 2023,
+    "path": "/tv/Frieren - Beyond Journey's End",
+    "qualityProfileId": 1,
+    "seasonFolder": true,
+    "monitored": true,
+    "monitorNewItems": "all",
+    "useSceneNumbering": false,
+    "runtime": 45,
+    "tvdbId": 424536,
+    "tvRageId": 0,
+    "tvMazeId": 0,
+    "firstAired": "2023-10-01T00:00:00Z",
+    "seriesType": "anime",
+    "cleanTitle": "frieren:beyondjourney'send",
+    "imdbId": "tt22248376",
+    "titleSlug": "frieren:-beyond-journey's-end",
+    "rootFolderPath": "/tv",
+    "certification": "TV-MA",
+    "genres": [
+      "Horror"
+    ],
+    "tags": [],
+    "added": "2024-10-01T18:00:00Z",
+    "ratings": {
+      "votes": 10,
+      "value": 7.5
+    },
+    "statistics": {
+      "seasonCount": 2,
+      "episodeFileCount": 1,
+      "episodeCount": 8,
+      "totalEpisodeCount": 8,
+      "sizeOnDisk": 1400000000,
+      "releaseGroups": [],
+      "percentOfEpisodes": 50.0
+    },
+    "tmdbId": 209867,
+    "languageProfileId": 1
+  },
+  {
+    "id": 3,
+    "title": "The Daily Show",
+    "alternateTitles": [],
+    "sortTitle": "the daily show",
+    "status": "continuing",
+    "ended": false,
+    "overview": "…",
+    "network": "Peacock",
+    "airTime": "21:00",
+    "images": [],
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "seasons": [
+      {
+        "seasonNumber": 2026,
+        "monitored": true,
+        "statistics": {}
+      }
+    ],
+    "year": 1996,
+    "path": "/tv/The Daily Show",
+    "qualityProfileId": 6,
+    "seasonFolder": true,
+    "monitored": true,
+    "monitorNewItems": "all",
+    "useSceneNumbering": false,
+    "runtime": 45,
+    "tvdbId": 71256,
+    "tvRageId": 0,
+    "tvMazeId": 0,
+    "firstAired": "1996-10-01T00:00:00Z",
+    "seriesType": "daily",
+    "cleanTitle": "thedailyshow",
+    "imdbId": "tt0115147",
+    "titleSlug": "the-daily-show",
+    "rootFolderPath": "/tv",
+    "certification": "TV-MA",
+    "genres": [
+      "Horror"
+    ],
+    "tags": [],
+    "added": "2024-10-01T18:00:00Z",
+    "ratings": {
+      "votes": 10,
+      "value": 7.5
+    },
+    "statistics": {
+      "seasonCount": 1,
+      "episodeFileCount": 1,
+      "episodeCount": 8,
+      "totalEpisodeCount": 8,
+      "sizeOnDisk": 1000000000,
+      "releaseGroups": [],
+      "percentOfEpisodes": 50.0
+    },
+    "languageProfileId": 1
+  },
+  {
+    "id": 4,
+    "title": "Obscure Local Show",
+    "alternateTitles": [],
+    "sortTitle": "obscure local show",
+    "status": "continuing",
+    "ended": false,
+    "overview": "…",
+    "network": "Peacock",
+    "airTime": "21:00",
+    "images": [],
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    },
+    "seasons": [
+      {
+        "seasonNumber": 1,
+        "monitored": true,
+        "statistics": {}
+      }
+    ],
+    "year": 2019,
+    "path": "/tv/Obscure Local Show",
+    "qualityProfileId": 6,
+    "seasonFolder": true,
+    "monitored": true,
+    "monitorNewItems": "all",
+    "useSceneNumbering": false,
+    "runtime": 45,
+    "tvdbId": 999999,
+    "tvRageId": 0,
+    "tvMazeId": 0,
+    "firstAired": "2019-10-01T00:00:00Z",
+    "seriesType": "standard",
+    "cleanTitle": "obscurelocalshow",
+    "imdbId": "",
+    "titleSlug": "obscure-local-show",
+    "rootFolderPath": "/tv",
+    "certification": "TV-MA",
+    "genres": [
+      "Horror"
+    ],
+    "tags": [],
+    "added": "2024-10-01T18:00:00Z",
+    "ratings": {
+      "votes": 10,
+      "value": 7.5
+    },
+    "statistics": {
+      "seasonCount": 1,
+      "episodeFileCount": 0,
+      "episodeCount": 8,
+      "totalEpisodeCount": 8,
+      "sizeOnDisk": 0,
+      "releaseGroups": [],
+      "percentOfEpisodes": 50.0
+    },
+    "languageProfileId": 1
+  }
+]

@@ -1,0 +1,286 @@
+{
+  "page": 1,
+  "pageSize": 250,
+  "sortKey": "date",
+  "sortDirection": "descending",
+  "totalRecords": 7,
+  "records": [
+    {
+      "id": 601,
+      "movieId": 2,
+      "sourceTitle": "Dune.Part.Two.2024.German.DL.2160p.WEB.H265.REPACK-W4K",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 18,
+          "name": "WEBDL-2160p",
+          "source": "webdl",
+          "resolution": 2160,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 2,
+          "real": 0,
+          "isRepack": true
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@HOURS_AGO:2@",
+      "eventType": "grabbed",
+      "data": {
+        "indexer": "NZBgeek (Prowlarr)",
+        "nzbInfoUrl": "https://nzbgeek.info/geekseek.php?guid=abc",
+        "releaseGroup": "W4K",
+        "age": "0",
+        "ageHours": "1.5",
+        "ageMinutes": "90",
+        "publishedDate": "2026-10-18T10:00:00Z",
+        "downloadClient": "SABnzbd",
+        "downloadClientName": "SABnzbd",
+        "size": "23456789012",
+        "downloadUrl": "https://api.nzbgeek.info/api?t=get&id=abc",
+        "guid": "https://nzbgeek.info/geekseek.php?guid=abc",
+        "tmdbId": "693134",
+        "imdbId": "tt15239678",
+        "protocol": "1",
+        "customFormatScore": "0",
+        "movieMatchType": "1",
+        "releaseSource": "Rss",
+        "indexerFlags": "0"
+      },
+      "downloadId": "SABnzbd_nzo_abc123"
+    },
+    {
+      "id": 600,
+      "movieId": 1,
+      "sourceTitle": "Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        },
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 7,
+          "name": "Bluray-1080p",
+          "source": "bluray",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:30@",
+      "eventType": "downloadFolderImported",
+      "data": {
+        "customFormatScore": "0",
+        "droppedPath": "/downloads/complete/Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS/f13.mkv",
+        "importedPath": "/movies/Freitag der 13. (2009)/Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS.mkv",
+        "downloadClient": "SABnzbd",
+        "downloadClientName": "SABnzbd",
+        "releaseGroup": "DETAiLS",
+        "size": "9876543210",
+        "indexer": "NZBgeek (Prowlarr)"
+      },
+      "downloadId": "SABnzbd_nzo_f13"
+    },
+    {
+      "id": 599,
+      "movieId": 1,
+      "sourceTitle": "Freitag.der.13.2009.German.DL.1080p.BluRay.x264-DETAiLS",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "webdl",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:31@",
+      "eventType": "movieFileRenamed",
+      "data": {
+        "sourcePath": "/movies/Freitag der 13. (2009)/f13.mkv",
+        "sourceRelativePath": "f13.mkv",
+        "path": "/movies/x",
+        "relativePath": "x"
+      }
+    },
+    {
+      "id": 598,
+      "movieId": 4,
+      "sourceTitle": "Blade.Runner.2049.2017.German.DL.1080p.WEB.x264-OLD",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "webdl",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:40@",
+      "eventType": "downloadFailed",
+      "data": {
+        "downloadClient": "SABnzbd",
+        "downloadClientName": "SABnzbd",
+        "message": "Unpacking failed, archive requires a password",
+        "indexer": "NZBgeek (Prowlarr)",
+        "size": "4000000000"
+      },
+      "downloadId": "SABnzbd_nzo_br"
+    },
+    {
+      "id": 597,
+      "movieId": 2,
+      "sourceTitle": "Dune.Part.Two.2024.German.DL.1080p.WEB.H264-OLD",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "webdl",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:50@",
+      "eventType": "movieFileDeleted",
+      "data": {
+        "reason": "Upgrade",
+        "customFormatScore": "0",
+        "releaseGroup": "OLD",
+        "size": "8000000000"
+      }
+    },
+    {
+      "id": 596,
+      "movieId": 99,
+      "sourceTitle": "Removed.Movie.2020.German.1080p.WEB.x264-X",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "webdl",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:60@",
+      "eventType": "grabbed",
+      "data": {
+        "indexer": "NZBgeek (Prowlarr)"
+      }
+    },
+    {
+      "id": 595,
+      "movieId": 1,
+      "sourceTitle": "Freitag.der.13.2009.German.720p.BluRay.x264-OLD",
+      "languages": [
+        {
+          "id": 4,
+          "name": "German"
+        }
+      ],
+      "quality": {
+        "quality": {
+          "id": 3,
+          "name": "WEBDL-1080p",
+          "source": "webdl",
+          "resolution": 1080,
+          "modifier": "none"
+        },
+        "revision": {
+          "version": 1,
+          "real": 0,
+          "isRepack": false
+        }
+      },
+      "customFormats": [],
+      "customFormatScore": 0,
+      "qualityCutoffNotMet": false,
+      "date": "@DAYS_AGO:200@",
+      "eventType": "grabbed",
+      "data": {
+        "indexer": "NZBgeek (Prowlarr)"
+      }
+    }
+  ]
+}

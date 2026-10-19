@@ -14,6 +14,7 @@ const events: Record<HistoryRecord['eventType'], { label: string; tone: string }
   Upgraded: { label: 'Upgraded', tone: ui.pillOk },
   ImportFailed: { label: 'Import failed', tone: ui.pillErr },
   Renamed: { label: 'Renamed', tone: '' },
+  FileDeleted: { label: 'File deleted', tone: '' },
 }
 
 /** The latest grabs for one movie or series. */

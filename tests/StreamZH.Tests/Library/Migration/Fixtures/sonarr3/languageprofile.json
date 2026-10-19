@@ -1,0 +1,66 @@
+[
+  {
+    "name": "Deutsch",
+    "upgradeAllowed": true,
+    "cutoff": {
+      "id": 4,
+      "name": "German"
+    },
+    "languages": [
+      {
+        "language": {
+          "id": 26,
+          "name": "Arabic"
+        },
+        "allowed": false
+      },
+      {
+        "language": {
+          "id": 4,
+          "name": "German"
+        },
+        "allowed": true
+      },
+      {
+        "language": {
+          "id": 1,
+          "name": "English"
+        },
+        "allowed": true
+      },
+      {
+        "language": {
+          "id": 0,
+          "name": "Unknown"
+        },
+        "allowed": false
+      }
+    ],
+    "id": 1
+  },
+  {
+    "name": "Anime",
+    "upgradeAllowed": true,
+    "cutoff": {
+      "id": 8,
+      "name": "Japanese"
+    },
+    "languages": [
+      {
+        "language": {
+          "id": 8,
+          "name": "Japanese"
+        },
+        "allowed": true
+      },
+      {
+        "language": {
+          "id": 4,
+          "name": "German"
+        },
+        "allowed": false
+      }
+    ],
+    "id": 2
+  }
+]

@@ -183,4 +183,8 @@ public static class ConfigKeys
 
     // Alternative titles (0.8.1)
     public const string IndexerSearchAlternativeTitles = "IndexerSearchAlternativeTitles";
+
+    // Migration (0.9): side-by-side mode — StreamZH grabs nothing automatically while Sonarr/Radarr still run.
+    public const string AutomationHold = "AutomationHold";
+    public const string AutomationHoldSince = "AutomationHoldSince";
 }

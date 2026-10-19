@@ -10,6 +10,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Events;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Security;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Indexers;
@@ -141,6 +142,15 @@ public sealed class IndexerService(
         EnableAutomaticSearch: true,
         EnableInteractiveSearch: true);
 
+    /// <summary>Same base URL and API path: where a stored API key may be sent again (0.12).</summary>
+    public static bool SameDestination(IndexerDefinition stored, IndexerDefinition changed)
+    {
+        ArgumentNullException.ThrowIfNull(stored);
+        ArgumentNullException.ThrowIfNull(changed);
+        return SecretReuse.Same(stored.BaseUrl.TrimEnd('/'), changed.BaseUrl.TrimEnd('/'))
+            && SecretReuse.Same(stored.ApiPath.Trim('/'), changed.ApiPath.Trim('/'));
+    }
+
     /// <summary>All indexers ordered by priority, then name.</summary>
     public IReadOnlyList<IndexerDefinition> All() => indexers.All();
 
@@ -152,15 +162,23 @@ public sealed class IndexerService(
     public IndexerDefinition Create(IndexerDefinition indexer, int? cloneFromId = null)
     {
         var normalized = Normalize(indexer) with { Id = 0 };
+        var errors = Validate(normalized, null);
         if (normalized.ApiKey == MaskedApiKey && cloneFromId is > 0 && indexers.Find(cloneFromId.Value) is { } source)
         {
-            normalized = normalized with { ApiKey = source.ApiKey };
+            // 0.12: a stored key only goes to the address it was entered for.
+            if (SameDestination(source, normalized))
+            {
+                normalized = normalized with { ApiKey = source.ApiKey };
+            }
+            else
+            {
+                errors["apiKey"] = [SecretReuse.ChangedAddressMessage("API key", test: false)];
+            }
         }
 
-        var errors = Validate(normalized, null);
         if (normalized.ApiKey == MaskedApiKey)
         {
-            errors["apiKey"] = ["Enter the API key."];
+            errors.TryAdd("apiKey", ["Enter the API key."]);
         }
 
         ThrowIfAny(errors);
@@ -175,12 +193,21 @@ public sealed class IndexerService(
     {
         var existing = indexers.Find(id) ?? throw new LibraryException("Indexer not found.", LibraryError.NotFound);
         var normalized = Normalize(indexer) with { Id = id };
+        var errors = Validate(normalized, id);
         if (normalized.ApiKey == MaskedApiKey)
         {
-            normalized = normalized with { ApiKey = existing.ApiKey };
+            // 0.12: a stored key only goes to the address it was entered for.
+            if (SameDestination(existing, normalized) || string.IsNullOrEmpty(existing.ApiKey))
+            {
+                normalized = normalized with { ApiKey = existing.ApiKey };
+            }
+            else
+            {
+                errors["apiKey"] = [SecretReuse.ChangedAddressMessage("API key", test: false)];
+            }
         }
 
-        ThrowIfAny(Validate(normalized, id));
+        ThrowIfAny(errors);
         indexers.Update(normalized);
         if (!StoreRecentTest(id, normalized) && ConnectionKey(existing) != ConnectionKey(normalized))
         {
@@ -214,17 +241,19 @@ public sealed class IndexerService(
         IndexerDefinition? stored = normalized.Id > 0 ? indexers.Find(normalized.Id) : null;
         if (normalized.ApiKey == MaskedApiKey)
         {
-            if (stored is not null)
+            var keySource = stored ?? (cloneFromId is > 0 ? indexers.Find(cloneFromId.Value) : null);
+            if (keySource is null)
             {
-                normalized = normalized with { ApiKey = stored.ApiKey };
+                errors["apiKey"] = ["Enter the API key."];
             }
-            else if (cloneFromId is > 0 && indexers.Find(cloneFromId.Value) is { } cloned)
+            else if (SameDestination(keySource, normalized) || string.IsNullOrEmpty(keySource.ApiKey))
             {
-                normalized = normalized with { ApiKey = cloned.ApiKey };
+                normalized = normalized with { ApiKey = keySource.ApiKey };
             }
             else
             {
-                errors["apiKey"] = ["Enter the API key."];
+                // 0.12: a stored key only goes to the address it was entered for.
+                errors["apiKey"] = [SecretReuse.ChangedAddressMessage("API key", test: true)];
             }
         }
 

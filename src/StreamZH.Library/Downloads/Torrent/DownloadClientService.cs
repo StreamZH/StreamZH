@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Downloads;
+using StreamZH.Core.Security;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Downloads.Torrent;
@@ -97,8 +98,22 @@ public sealed partial class DownloadClientService(
     {
         ArgumentNullException.ThrowIfNull(input);
         var existing = id is { } savedId ? repository.Find(savedId) : null;
-        var client = Validate(input with { Id = existing?.Id ?? 0 }, existing, checkName: false);
+        var client = Validate(input with { Id = existing?.Id ?? 0 }, existing, checkName: false, test: true);
         return await Client(client.Implementation)!.TestAsync(client, cancellationToken);
+    }
+
+    /// <summary>Same host, port, SSL and URL base: where a stored secret may be sent again (0.12).</summary>
+    public static bool SameDestination(IReadOnlyDictionary<string, JsonElement> stored, IReadOnlyDictionary<string, JsonElement> changed)
+    {
+        ArgumentNullException.ThrowIfNull(stored);
+        ArgumentNullException.ThrowIfNull(changed);
+        static string Value(IReadOnlyDictionary<string, JsonElement> settings, string key) =>
+            settings.TryGetValue(key, out var v) ? v.ValueKind == JsonValueKind.String ? v.GetString()! : v.GetRawText() : string.Empty;
+
+        return SecretReuse.SameHost(Value(stored, DownloadClientCatalog.Host), Value(changed, DownloadClientCatalog.Host))
+            && SecretReuse.Same(Value(stored, DownloadClientCatalog.Port), Value(changed, DownloadClientCatalog.Port))
+            && SecretReuse.Same(Value(stored, DownloadClientCatalog.UseSsl), Value(changed, DownloadClientCatalog.UseSsl))
+            && SecretReuse.Same(Value(stored, DownloadClientCatalog.UrlBase).TrimEnd('/'), Value(changed, DownloadClientCatalog.UrlBase).TrimEnd('/'));
     }
 
     /// <summary>The client as the API shows it: secrets replaced by <see cref="DownloadClientCatalog.Masked"/> (empty stays empty).</summary>
@@ -119,7 +134,7 @@ public sealed partial class DownloadClientService(
     }
 
     /// <summary>Checks everything and returns the client as it is stored: known fields only, defaults filled in, secrets resolved.</summary>
-    private DownloadClientDefinition Validate(DownloadClientDefinition input, DownloadClientDefinition? existing, bool checkName = true)
+    private DownloadClientDefinition Validate(DownloadClientDefinition input, DownloadClientDefinition? existing, bool checkName = true, bool test = false)
     {
         var errors = new Dictionary<string, string[]>();
         var name = input.Name?.Trim() ?? string.Empty;
@@ -152,6 +167,7 @@ public sealed partial class DownloadClientService(
         }
 
         var settings = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var reused = new List<DownloadClientField>();
         if (implementation is not null)
         {
             var given = new Dictionary<string, JsonElement>(input.Settings ?? new Dictionary<string, JsonElement>(), StringComparer.OrdinalIgnoreCase);
@@ -161,6 +177,10 @@ public sealed partial class DownloadClientService(
                 if (field.Secret && value.ValueKind == JsonValueKind.String && value.GetString() == DownloadClientCatalog.Masked)
                 {
                     value = existing?.Settings.GetValueOrDefault(field.Name) is { ValueKind: JsonValueKind.String } stored ? stored : field.Default;
+                    if (!field.IsEmpty(value))
+                    {
+                        reused.Add(field);
+                    }
                 }
 
                 if (Normalize(field, value, out var normalized) is { } problem)
@@ -173,6 +193,15 @@ public sealed partial class DownloadClientService(
             }
 
             CheckSettings(implementation, settings, errors);
+
+            // 0.12: a stored password only goes to the address it was entered for.
+            if (reused.Count > 0 && existing is not null && !SameDestination(existing.Settings, settings))
+            {
+                foreach (var field in reused)
+                {
+                    errors[field.Name] = [SecretReuse.ChangedAddressMessage(field.Label, test)];
+                }
+            }
         }
 
         if (errors.Count > 0)

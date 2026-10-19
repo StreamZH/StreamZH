@@ -6,6 +6,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Events;
+using StreamZH.Core.Security;
 using StreamZH.Data;
 using StreamZH.Usenet.Nntp;
 using StreamZH.Usenet.Pool;
@@ -42,6 +43,14 @@ public sealed class UsenetServerService(
     /// <summary>What the API shows instead of a stored password. Sent back unchanged, it means "keep the stored password".</summary>
     public const string MaskedPassword = "********";
 
+    /// <summary>Same host, port and SSL setting: where a stored password may be sent again (0.12).</summary>
+    public static bool SameDestination(UsenetServer stored, UsenetServer changed)
+    {
+        ArgumentNullException.ThrowIfNull(stored);
+        ArgumentNullException.ThrowIfNull(changed);
+        return SecretReuse.SameHost(stored.Host, changed.Host) && stored.Port == changed.Port && stored.UseSsl == changed.UseSsl;
+    }
+
     /// <summary>A new server to start from: SSL on port 563, 20 connections, primary.</summary>
     public static UsenetServer Schema() => new(0, string.Empty, string.Empty, DefaultPort, true, string.Empty, string.Empty, DefaultConnections, 0, true, 0);
 
@@ -72,12 +81,21 @@ public sealed class UsenetServerService(
         ArgumentNullException.ThrowIfNull(server);
         var existing = servers.Find(id) ?? throw new LibraryException("Usenet server not found.", LibraryError.NotFound);
         var normalized = Normalize(server) with { Id = id };
+        var errors = Validate(normalized, id);
         if (normalized.Password == MaskedPassword)
         {
-            normalized = normalized with { Password = existing.Password };
+            // 0.12: the stored password only goes to the server it was entered for.
+            if (SameDestination(existing, normalized) || string.IsNullOrEmpty(existing.Password))
+            {
+                normalized = normalized with { Password = existing.Password };
+            }
+            else
+            {
+                errors["password"] = [SecretReuse.ChangedAddressMessage("Password", test: false)];
+            }
         }
 
-        ThrowIfAny(Validate(normalized, id));
+        ThrowIfAny(errors);
         servers.Update(normalized);
 
         // The counter starts when a quota is set and is dropped when it is removed; changing the amount keeps it.
@@ -147,7 +165,15 @@ public sealed class UsenetServerService(
         {
             if (normalized.Id > 0 && servers.Find(normalized.Id) is { } stored)
             {
-                normalized = normalized with { Password = stored.Password };
+                // 0.12: the stored password only goes to the server it was entered for.
+                if (SameDestination(stored, normalized) || string.IsNullOrEmpty(stored.Password))
+                {
+                    normalized = normalized with { Password = stored.Password };
+                }
+                else
+                {
+                    errors["password"] = [SecretReuse.ChangedAddressMessage("Password", test: true)];
+                }
             }
             else
             {

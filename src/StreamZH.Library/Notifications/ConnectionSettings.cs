@@ -4,6 +4,7 @@
 
 using System.Globalization;
 using System.Text.Json;
+using StreamZH.Core.Security;
 
 namespace StreamZH.Library.Notifications;
 
@@ -87,29 +88,50 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
     }
 
     /// <summary>
-    /// Checks and converts the settings from the API. Fields that were not sent keep the value in <paramref name="stored"/>
-    /// (else their default), a masked secret keeps the stored one. Problems are added to <paramref name="errors"/> under the field name.
+    /// The settings that say where a connection sends its secrets: server address, port and encryption. A masked secret
+    /// keeps the stored one only while these are unchanged (0.12, <see cref="SecretReuse"/>).
     /// </summary>
+    public static IReadOnlySet<string> DestinationFields { get; } =
+        new HashSet<string>(["host", "port", "useSsl", "url", "server", "serverUrl", "useEncryption"], StringComparer.Ordinal);
+
+    /// <summary>
+    /// Checks and converts the settings from the API. Fields that were not sent keep the value in <paramref name="stored"/>
+    /// (else their default), a masked secret keeps the stored one, but only while the destination
+    /// (<see cref="DestinationFields"/>) is the stored one; otherwise the secret must be entered again. Problems are added
+    /// to <paramref name="errors"/> under the field name.
+    /// </summary>
+    /// <param name="test">For a connection test (only changes the wording of the "enter it again" error).</param>
     public static Dictionary<string, JsonElement> Normalize(
         ConnectType type,
         IReadOnlyDictionary<string, JsonElement>? input,
         IReadOnlyDictionary<string, JsonElement>? stored,
-        Dictionary<string, string[]> errors)
+        Dictionary<string, string[]> errors,
+        bool test = false)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(errors);
         var result = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var reused = new List<ConnectField>();
         foreach (var field in type.Fields)
         {
             JsonElement? value;
             if (input is not null && input.TryGetValue(field.Name, out var given))
             {
                 // Sent: a masked secret keeps the stored one, null clears the field.
-                value = field.Type == ConnectFieldTypes.Password && given.ValueKind == JsonValueKind.String && given.GetString() == Mask
-                    ? Stored(stored, field.Name)
-                    : given.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                if (field.Type == ConnectFieldTypes.Password && given.ValueKind == JsonValueKind.String && given.GetString() == Mask)
+                {
+                    value = Stored(stored, field.Name);
+                    if (HasValue(value))
+                    {
+                        reused.Add(field);
+                    }
+                }
+                else
+                {
+                    value = given.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
                         ? Convert(field, null, errors)
                         : Convert(field, given, errors);
+                }
             }
             else
             {
@@ -128,8 +150,43 @@ public sealed class ConnectionSettings(IReadOnlyDictionary<string, JsonElement> 
             }
         }
 
+        // A stored secret goes only where it went before.
+        if (reused.Count > 0 && DestinationChanged(type, result, stored))
+        {
+            foreach (var field in reused)
+            {
+                result.Remove(field.Name);
+                errors[field.Name] = [SecretReuse.ChangedAddressMessage(field.Label, test)];
+            }
+        }
+
         return result;
     }
+
+    /// <summary>True when a destination field of <paramref name="normalized"/> differs from <paramref name="stored"/> (missing = default).</summary>
+    public static bool DestinationChanged(ConnectType type, IReadOnlyDictionary<string, JsonElement> normalized, IReadOnlyDictionary<string, JsonElement>? stored)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(normalized);
+        var now = new ConnectionSettings(normalized);
+        var before = new ConnectionSettings(stored ?? new Dictionary<string, JsonElement>());
+        foreach (var field in type.Fields.Where(f => DestinationFields.Contains(f.Name)))
+        {
+            var current = now.Text(field.Name) ?? DefaultText(field);
+            var previous = before.Text(field.Name) ?? DefaultText(field);
+            var same = field.Name is "host" or "server" && field.Type != ConnectFieldTypes.Url
+                ? SecretReuse.SameHost(current, previous)
+                : SecretReuse.Same(current, previous);
+            if (!same)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? DefaultText(ConnectField field) => Default(field) is { } d ? new ConnectionSettings(new Dictionary<string, JsonElement> { ["v"] = d }).Text("v") : null;
 
     private static bool HasValue(JsonElement? value) => value is { } v && v.ValueKind switch
     {

@@ -127,8 +127,16 @@ public sealed class ToolInstaller(
 
         foreach (var tool in AllTools)
         {
-            if (tools.Find(tool).Found)
+            var location = tools.Find(tool);
+            if (location.Found)
             {
+                if (await IsOutdatedSevenZipAsync(location, cancellationToken).ConfigureAwait(false))
+                {
+                    // The pinned copy in <data>/tools comes before PATH in the search, so it is used from now on.
+                    logger.LogInformation("{Path} is an old 7-Zip; installing the current one for StreamZH", location.Path);
+                    await InstallAsync(tool, cancellationToken).ConfigureAwait(false);
+                }
+
                 continue;
             }
 
@@ -141,6 +149,21 @@ public sealed class ToolInstaller(
             await InstallAsync(tool, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>Versions before 22 (p7zip 16.02 on older NAS and Linux systems) handle links in archives less carefully.</summary>
+    public const int MinimumSevenZipMajor = 22;
+
+    /// <summary>"7-Zip 16.02" is outdated, "7-Zip 23.01" is not; unknown versions are left alone.</summary>
+    public static bool IsOutdatedSevenZip(string? version) =>
+        version is not null && version.StartsWith("7-Zip ", StringComparison.Ordinal)
+        && int.TryParse(version["7-Zip ".Length..].Split('.')[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var major)
+        && major < MinimumSevenZipMajor;
+
+    // A 7-Zip found on PATH, next to the app or in Program Files (not one the user configured, not ours).
+    private async Task<bool> IsOutdatedSevenZipAsync(ToolLocation location, CancellationToken cancellationToken) =>
+        location is { Tool: PostProcessTool.SevenZip, Path: { } path, Source: ToolSource.Path or ToolSource.Bundled or ToolSource.WindowsDefault }
+        && IsInstallable(PostProcessTool.SevenZip)
+        && IsOutdatedSevenZip(await tools.GetVersionAsync(path, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Starts an installation in the background when the tool is missing and automatic installation is on.</summary>
     public bool StartIfMissing(PostProcessTool tool)

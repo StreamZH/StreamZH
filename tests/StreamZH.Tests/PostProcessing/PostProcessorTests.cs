@@ -397,6 +397,72 @@ public sealed class PostProcessorTests : IDisposable
         Assert.False(Directory.Exists(Work));
     }
 
+    [Fact]
+    public async Task A_directory_link_in_the_download_is_not_followed_when_moving()
+    {
+        // S2-5: a link to a folder outside the download must not make StreamZH move the files it points to.
+        if (OperatingSystem.IsWindows())
+        {
+            return; // creating links needs developer mode or administrator rights there
+        }
+
+        var movie = TestData.Random(300_000, 1);
+        _folder.Write("work/Some.Movie.mkv", movie);
+        var outside = _folder.Write("outside/secret.txt", TestData.Random(100, 2));
+        Directory.CreateSymbolicLink(Path.Combine(Work, "linked"), Path.GetDirectoryName(outside)!);
+        File.CreateSymbolicLink(Path.Combine(Work, "passwd.mkv"), outside);
+
+        var result = await Run();
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal([Path.Combine(Target, "Some.Movie.mkv")], result.Files);
+        Assert.True(File.Exists(outside), "the file behind the link stays where it is");
+        Assert.False(Directory.Exists(Path.Combine(Target, "linked")));
+    }
+
+    [RequiresToolsFact("7z")]
+    public async Task Links_from_an_archive_are_removed_after_extraction()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var source = _folder.Combine("src", "Some.Movie");
+        _folder.Write("src/Some.Movie/Some.Movie.mkv", TestData.Random(300_000, 3));
+        _folder.Write("src/Some.Movie/Subs/English.srt", TestData.Random(200, 4));
+        File.CreateSymbolicLink(Path.Combine(source, "Other.mkv"), "Some.Movie.mkv");
+        Directory.CreateSymbolicLink(Path.Combine(source, "SubsLink"), "Subs");
+        SevenZip("a", "-snl", "-mx=0", Path.Combine(Work, "Some.Movie.7z"), source);
+
+        var result = await Run();
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal([Path.Combine(Target, "Some.Movie", "Some.Movie.mkv"), Path.Combine(Target, "Some.Movie", "Subs", "English.srt")], result.Files);
+        Assert.DoesNotContain(Directory.EnumerateFileSystemEntries(Target, "*", SearchOption.AllDirectories), p => new FileInfo(p).LinkTarget is not null);
+    }
+
+    [Fact]
+    public void Delete_links_removes_only_the_links()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var keep = _folder.Write("tree/a/keep.txt", TestData.Random(10, 5));
+        var outside = _folder.Write("outside/target.txt", TestData.Random(10, 6));
+        Directory.CreateSymbolicLink(_folder.Combine("tree", "a", "dir"), Path.GetDirectoryName(outside)!);
+        File.CreateSymbolicLink(_folder.Combine("tree", "file"), outside);
+        File.CreateSymbolicLink(_folder.Combine("tree", "dangling"), _folder.Combine("nowhere"));
+
+        Assert.Equal(3, PostProcessor.DeleteLinks(_folder.Combine("tree")));
+
+        Assert.True(File.Exists(keep));
+        Assert.True(File.Exists(outside));
+        Assert.Equal([keep], Directory.EnumerateFileSystemEntries(_folder.Combine("tree"), "*", SearchOption.AllDirectories).Where(File.Exists));
+    }
+
     private Task<PostProcessResult> Run(bool noTools = false, string? password = null, string title = "Some.Movie.2024.1080p.WEB-DL") =>
         PostProcessorFactory.Create(noTools).RunAsync(PostProcessorFactory.Job(_folder, title, password), _progress, CancellationToken.None);
 

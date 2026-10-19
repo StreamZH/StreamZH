@@ -33,6 +33,18 @@ public sealed partial class PostProcessor(
 
     private const string StagingPrefix = ".streamzh-unpack-";
 
+    /// <summary>
+    /// All files below a folder without following symbolic links, junctions or other reparse points: a link from an
+    /// archive must never make StreamZH read or move files outside the download.
+    /// </summary>
+    public static readonly EnumerationOptions NoLinks = new()
+    {
+        RecurseSubdirectories = true,
+        AttributesToSkip = FileAttributes.ReparsePoint,
+        IgnoreInaccessible = false,
+        MatchType = MatchType.Win32,
+    };
+
     /// <summary>Never moved to the target, whatever the settings: anything executable (and links to it).</summary>
     private static readonly HashSet<string> ExecutableExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -281,7 +293,7 @@ public sealed partial class PostProcessor(
     private async Task<ExtractOutcome> ExtractAsync(
         PostProcessJob job, string work, string staging, PostProcessSwitches options, IProgress<PostProcessProgress> progress, CancellationToken cancellationToken)
     {
-        var files = Directory.EnumerateFiles(work, "*", SearchOption.AllDirectories)
+        var files = Directory.EnumerateFiles(work, "*", NoLinks)
             .Where(f => !IsStaging(f) && !f.EndsWith(".par2", StringComparison.OrdinalIgnoreCase) && !IsPar2Backup(f) && !Par2Reader.IsPar2File(f))
             .ToList();
         var sets = ArchiveSets.Detect(files);
@@ -330,10 +342,12 @@ public sealed partial class PostProcessor(
             }
         }
 
+        RemoveLinks(job, staging);
+
         // Nested archives (e.g. a rar inside the rar): extract next to themselves, then drop them. Level by level.
         for (var level = 0; options.RecursiveUnpack && level < MaxNestedLevels && Directory.Exists(staging); level++)
         {
-            var nested = ArchiveSets.Detect(Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories)).Where(s => s.FirstVolume is not null).ToList();
+            var nested = ArchiveSets.Detect(Directory.EnumerateFiles(staging, "*", NoLinks)).Where(s => s.FirstVolume is not null).ToList();
             if (nested.Count == 0)
             {
                 break;
@@ -355,10 +369,58 @@ public sealed partial class PostProcessor(
                     File.Delete(volume);
                 }
             }
+
+            RemoveLinks(job, staging);
         }
 
         progress.Report(new PostProcessProgress(PostProcessStage.Extracting, 1, null));
         return new ExtractOutcome(null, volumes);
+    }
+
+    /// <summary>
+    /// Deletes symbolic links, junctions and other reparse points that an archive created below <paramref name="folder"/>
+    /// (the link only, never what it points to). Older 7-Zip versions create them from crafted archives.
+    /// </summary>
+    private void RemoveLinks(PostProcessJob job, string folder)
+    {
+        var removed = DeleteLinks(folder);
+        if (removed > 0)
+        {
+            logger.LogWarning("{Title}: removed {Count} symbolic link(s) the archive contained", job.Title, removed);
+        }
+    }
+
+    /// <summary>Removes every link below <paramref name="folder"/> without following any; the number removed.</summary>
+    public static int DeleteLinks(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return 0;
+        }
+
+        var removed = 0;
+        foreach (var entry in new DirectoryInfo(folder).EnumerateFileSystemInfos("*", new EnumerationOptions { AttributesToSkip = 0, IgnoreInaccessible = false }))
+        {
+            if (entry.LinkTarget is not null || entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                if (entry is DirectoryInfo && OperatingSystem.IsWindows())
+                {
+                    Directory.Delete(entry.FullName); // removes the junction or directory link itself
+                }
+                else
+                {
+                    File.Delete(entry.FullName); // unlink: also a link to a directory on Linux and macOS
+                }
+
+                removed++;
+            }
+            else if (entry is DirectoryInfo directory)
+            {
+                removed += DeleteLinks(directory.FullName);
+            }
+        }
+
+        return removed;
     }
 
     /// <summary>
@@ -373,10 +435,10 @@ public sealed partial class PostProcessor(
 
         if (Directory.Exists(staging))
         {
-            moves.AddRange(Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories).Select(f => (f, Path.GetRelativePath(staging, f))));
+            moves.AddRange(Directory.EnumerateFiles(staging, "*", NoLinks).Select(f => (f, Path.GetRelativePath(staging, f))));
         }
 
-        var loose = Directory.EnumerateFiles(work, "*", SearchOption.AllDirectories)
+        var loose = Directory.EnumerateFiles(work, "*", NoLinks)
             .Where(f => !IsStaging(f) && !IsPar2Backup(f) && (!full || (!volumes.Contains(f) && !par2Files.Contains(f) && !Par2Reader.IsPar2File(f))))
             .ToList();
         moves.AddRange(loose.Select(f => (f, Path.GetRelativePath(work, f))));
@@ -427,10 +489,10 @@ public sealed partial class PostProcessor(
             return [];
         }
 
-        IEnumerable<string> files = Directory.EnumerateFiles(work, "*", SearchOption.AllDirectories).Where(f => !IsStaging(f));
+        IEnumerable<string> files = Directory.EnumerateFiles(work, "*", NoLinks).Where(f => !IsStaging(f));
         if (Directory.Exists(staging))
         {
-            files = files.Concat(Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories));
+            files = files.Concat(Directory.EnumerateFiles(staging, "*", NoLinks));
         }
 
         return [.. files.Where(f => options.UnwantedExtensions.Contains(Path.GetExtension(f))).Select(f => Path.GetFileName(f)).Distinct(StringComparer.Ordinal)];

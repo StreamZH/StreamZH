@@ -82,6 +82,8 @@ builder.Services.AddSingleton<QualityProfileRepository>();
 builder.Services.AddSingleton<CustomFormatRepository>();
 builder.Services.AddSingleton<AlternativeTitleRepository>();
 builder.Services.AddSingleton<RequestRepository>();
+builder.Services.AddSingleton<DownloadClientRepository>();
+builder.Services.AddSingleton<RemotePathMappingRepository>();
 builder.Services.AddSingleton<InviteRepository>();
 builder.Services.AddSingleton<DiscordLinkRepository>();
 builder.Services.AddSingleton<QualityDefinitionRepository>();

@@ -130,7 +130,23 @@ public sealed record DownloadRequest(
     int? Priority = null,
     string? Indexer = null,
     string? Password = null,
-    string? CategoryName = null);
+    string? CategoryName = null)
+{
+    /// <summary>0.11: Torrent requests carry <see cref="TorrentFile"/> or <see cref="MagnetUrl"/> instead of an NZB (Nzb is empty).</summary>
+    public DownloadProtocol Protocol { get; init; } = DownloadProtocol.Usenet;
+
+    public byte[]? TorrentFile { get; init; }
+
+    public string? MagnetUrl { get; init; }
+
+    /// <summary>Torrent only: seed limits from the indexer (null = client default).</summary>
+    public double? SeedRatio { get; init; }
+
+    public int? SeedTimeMinutes { get; init; }
+
+    /// <summary>The download client to use (0.11, DownloadClients.Id); null = the default client for the protocol.</summary>
+    public int? ClientId { get; init; }
+}
 
 /// <summary>The state of one download as the UI and the status window see it.</summary>
 public sealed record DownloadItem
@@ -170,6 +186,26 @@ public sealed record DownloadItem
 
     /// <summary>Duplicate detection found the same release in the queue or the history (only when it is set to "tag" or "pause").</summary>
     public bool Duplicate { get; init; }
+
+    /// <summary>0.11: Usenet downloads run in the built-in engine; torrents in a torrent client (external or built in).</summary>
+    public DownloadProtocol Protocol { get; init; } = DownloadProtocol.Usenet;
+
+    /// <summary>Torrent: the DownloadClients row that handles it.</summary>
+    public int? ClientId { get; init; }
+
+    /// <summary>Torrent: the info hash in the client.</summary>
+    public string? ExternalId { get; init; }
+
+    /// <summary>Torrent: still seeding after completion (files must be hardlinked/copied on import, never moved).</summary>
+    public bool Seeding { get; init; }
+
+    public double? Ratio { get; init; }
+
+    public long UploadedBytes { get; init; }
+
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
 
     public double Progress => TotalBytes <= 0 ? 0 : Math.Clamp((double)DownloadedBytes / TotalBytes, 0, 1);
 }

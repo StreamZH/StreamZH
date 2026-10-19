@@ -42,6 +42,23 @@ public sealed record IndexerDefinition(
 {
     public const string Newznab = "Newznab";
 
+    /// <summary>0.11: Torznab (torrent) indexers; everything else is Usenet.</summary>
+    public const string Torznab = "Torznab";
+
+    public Downloads.DownloadProtocol Protocol =>
+        string.Equals(Implementation, Torznab, StringComparison.OrdinalIgnoreCase) ? Downloads.DownloadProtocol.Torrent : Downloads.DownloadProtocol.Usenet;
+
+    /// <summary>Torrent only: releases with fewer seeders are rejected (Radarr's "Minimum Seeders", default 1).</summary>
+    public int MinimumSeeders { get; init; } = 1;
+
+    /// <summary>Torrent only: seed until this ratio (null = the download client's default).</summary>
+    public double? SeedRatio { get; init; }
+
+    /// <summary>Torrent only: seed at least this many minutes (null = the download client's default).</summary>
+    public int? SeedTimeMinutes { get; init; }
+
+    public int? SeasonPackSeedTimeMinutes { get; init; }
+
     /// <summary>Master switch (Prowlarr's "Enable"): a disabled indexer is never used.</summary>
     public bool Enable { get; init; } = true;
 
@@ -123,6 +140,33 @@ public sealed record ReleaseInfo
     public string? ImdbId { get; init; }
 
     /// <summary>Age in days at <paramref name="now"/>.</summary>
+    /// <summary>0.11: Usenet (NZB) or Torrent (Torznab).</summary>
+    public Downloads.DownloadProtocol Protocol { get; init; } = Downloads.DownloadProtocol.Usenet;
+
+    /// <summary>Torrent only: seeders/peers as the indexer reports them (null when unknown).</summary>
+    public int? Seeders { get; init; }
+
+    public int? Peers { get; init; }
+
+    /// <summary>Torrent only: BitTorrent info hash (hex, lower case) when the indexer gives it.</summary>
+    public string? InfoHash { get; init; }
+
+    /// <summary>Torrent only: magnet link; <see cref="DownloadUrl"/> may point to a .torrent file or be the magnet itself.</summary>
+    public string? MagnetUrl { get; init; }
+
+    /// <summary>Torrent only: 0 = freeleech, 1 = normal (Torznab downloadvolumefactor).</summary>
+    public double? DownloadVolumeFactor { get; init; }
+
+    public double? UploadVolumeFactor { get; init; }
+
+    /// <summary>Torrent only: the tracker's minimum ratio / seed time (Torznab minimumratio, minimumseedtime in seconds).</summary>
+    public double? MinimumRatio { get; init; }
+
+    public long? MinimumSeedTimeSeconds { get; init; }
+
+    /// <summary>Radarr/Sonarr IndexerFlags bits (G_Freeleech 1, G_Halfleech 2, G_DoubleUpload 4, PTP_Golden 8, PTP_Approved 16, G_Internal 32, G_Scene 128, G_Freeleech75 256, G_Freeleech25 512, Nuked 2048 …).</summary>
+    public int IndexerFlags { get; init; }
+
     public double AgeDays(DateTimeOffset now) => Math.Max(0, (now - PublishDate).TotalDays);
 }
 

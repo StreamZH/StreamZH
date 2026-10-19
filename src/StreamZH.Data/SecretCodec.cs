@@ -146,8 +146,11 @@ public static class SecretFields
         ["password", "apiKey", "authToken", "accessToken", "token", "botToken", "appToken", "userKey", "webHookUrl", "statelessUrls", "clientId"],
         StringComparer.Ordinal);
 
-    /// <summary>Config keys whose values are secrets. The SSL certificate password is not among them: it is read before the keys are loaded.</summary>
+    /// <summary>
+    /// Config keys whose values are secrets. The waiting releases hold download links with indexer keys. The SSL
+    /// certificate password is not among them: it is read before the keys are loaded.
+    /// </summary>
     public static IReadOnlySet<string> ConfigKeys { get; } = new HashSet<string>(
-        [Data.ConfigKeys.ApiKey, Data.ConfigKeys.TmdbToken, Data.ConfigKeys.ProxyPassword, Data.ConfigKeys.DiscordBotToken],
+        [Data.ConfigKeys.ApiKey, Data.ConfigKeys.TmdbToken, Data.ConfigKeys.ProxyPassword, Data.ConfigKeys.DiscordBotToken, Data.ConfigKeys.PendingReleases],
         StringComparer.Ordinal);
 }

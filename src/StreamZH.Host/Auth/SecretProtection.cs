@@ -46,7 +46,7 @@ public static class SecretProtectionExtensions
 
         config.GetOrCreate(ConfigKeys.ApiKey, GeneralSettingsEndpoints.NewApiKey);
 
-        var unreadable = SecretMigration.FindUnreadable(database);
+        var unreadable = SecretMigration.FindUnreadable(database).Where(l => l.Item != ConfigKeys.PendingReleases).ToList();
         if (unreadable.Count > 0)
         {
             logger.LogWarning(

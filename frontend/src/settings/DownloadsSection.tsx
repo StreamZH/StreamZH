@@ -488,7 +488,7 @@ export function SpecialSection() {
         label="7-Zip parameters"
         htmlFor="dl-7z-args"
         advanced
-        help={<>Extra options for unpacking: <code>-mmt</code> (threads), <code>-bb0</code>–<code>-bb3</code>, <code>-scc</code>, <code>-mcp=</code>, <code>-ao</code>. Output folder and password are set by StreamZH. {owner ? '' : 'Only the owner can change this.'}</>}
+        help={<>Extra options for unpacking: <code>-mmt</code> (threads), <code>-bb0</code> to <code>-bb3</code>, <code>-scc</code>, <code>-mcp=</code>, <code>-ao</code>. Output folder and password are set by StreamZH. {owner ? '' : 'Only the owner can change this.'}</>}
         error={form.error('sevenZipArguments')}
       >
         <input

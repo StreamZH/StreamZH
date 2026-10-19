@@ -22,7 +22,8 @@ public static class SecretNotices
             return;
         }
 
-        foreach (var group in database.Secrets.Unreadable.GroupBy(l => (l.Kind, l.Item)))
+        // Waiting releases that cannot be read are simply gone (the next RSS sync finds them again).
+        foreach (var group in database.Secrets.Unreadable.Where(l => l.Item != ConfigKeys.PendingReleases).GroupBy(l => (l.Kind, l.Item)))
         {
             var (kind, item) = group.Key;
             var (title, link) = Describe(kind, item);

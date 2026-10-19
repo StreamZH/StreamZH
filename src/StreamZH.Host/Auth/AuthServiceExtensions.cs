@@ -11,6 +11,7 @@ using StreamZH.Core.Users;
 using StreamZH.Data;
 using StreamZH.Host.General;
 using StreamZH.Host.Security;
+using StreamZH.Host.Service;
 
 namespace StreamZH.Host.Auth;
 
@@ -32,9 +33,17 @@ public static class AuthServiceExtensions
     public static IServiceCollection AddStreamZhAuth(this IServiceCollection services, AppPaths paths)
     {
         // Persist keys so login cookies survive restarts and updates.
-        services.AddDataProtection()
+        var dataProtection = services.AddDataProtection()
             .SetApplicationName("StreamZH")
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(paths.DataDirectory, "keys")));
+
+        // Windows: new keys are encrypted with DPAPI (for the computer when StreamZH is a service, so a switch between
+        // service accounts keeps them readable; for the user in a console window). Older unencrypted keys stay readable.
+        // Linux, macOS and Docker have no DPAPI: the key files are 0600 in a private folder (DataFolderPermissions).
+        if (OperatingSystem.IsWindows())
+        {
+            dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: RunningAs.IsWindowsService);
+        }
 
         // Smart picks the API key, the cookie (Forms) or Basic per request; see SmartAuthenticationHandler.
         services.AddSingleton<BasicCredentialCache>();

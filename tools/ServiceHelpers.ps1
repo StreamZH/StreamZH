@@ -161,6 +161,25 @@ function Start-StreamZhTray([string]$installDir, [string]$dataDir) {
     return $true
 }
 
+# Makes the data folder private (it holds the database with the API key and password hashes, the sign-in keys and the
+# backups): SYSTEM and administrators full control, $fullControl (the service account) full control, $modify (your
+# user: tray icon, console window) change; no inheritance from C:\ProgramData, Users, Authenticated Users, Everyone and
+# Interactive removed. StreamZH checks the same at every start (DataFolderAcl.cs).
+function Protect-StreamZhDataFolder([string]$folder, [string[]]$fullControl, [string[]]$modify) {
+    $grants = @('*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F')
+    foreach ($sid in @($fullControl | Where-Object { $_ })) { $grants += "*${sid}:(OI)(CI)F" }
+    foreach ($sid in @($modify | Where-Object { $_ })) { $grants += "*${sid}:(OI)(CI)M" }
+    # Grant first, so nobody is locked out, then cut the inherited and the broad entries.
+    $steps = @()
+    $steps += , (@('/grant') + $grants)
+    $steps += , @('/inheritance:r')
+    $steps += , @('/remove:g', '*S-1-1-0', '*S-1-5-4', '*S-1-5-11', '*S-1-5-32-545')
+    foreach ($step in $steps) {
+        $output = & icacls.exe $folder @step /Q 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "icacls $folder $($step -join ' ') failed ($LASTEXITCODE): $output" }
+    }
+}
+
 # The tray reads <data>\tray.token and tray.json; a new owner (service account or console user) writes them anew.
 function Remove-StreamZhTrayFiles([string]$dataDir) {
     if (-not $dataDir) { $dataDir = Join-Path $env:ProgramData 'StreamZH' }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Indexers;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 using StreamZH.Host.Auth;
 using StreamZH.Library;
@@ -45,7 +46,11 @@ public static class IndexerEndpoints
             sp.GetRequiredService<ILogger<TrackedIndexerClient>>(),
             sp.GetRequiredService<IndexerService>()));
 
-        services.AddHttpClient<ProwlarrImportService>(client => client.Timeout = TimeSpan.FromSeconds(30));
+        services.AddHttpClient<ProwlarrImportService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.MaxResponseContentBufferSize = ResponseLimits.Json;
+        });
         return services;
     }
 

@@ -436,6 +436,47 @@ public sealed class ToolInstallerTests : IDisposable
         Assert.Null(installer.Installed(PostProcessTool.SevenZip));
     }
 
+    [Theory]
+    [InlineData("7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21\np7zip Version 16.02", true)]
+    [InlineData("7-Zip (a) 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20", false)]
+    [InlineData("something else", false)]
+    public async Task An_old_7zip_on_path_gets_the_pinned_one_installed_next_to_it(string versionOutput, bool installs)
+    {
+        // S2-5: p7zip 16.02 on older NAS and Linux systems handles links in archives less carefully than 7-Zip 22+.
+        var data = TestData.Random(500, 9);
+        var download = TestToolPackages.Download("7z2603-linux-x64.tar.xz", data);
+        _downloads.Add(download, data);
+        var package = new ToolPackage(PostProcessTool.SevenZip, "7-Zip", "26.03", "LGPL", ToolInstallMethod.TarXz, download, ["7zz"]);
+        var onPath = Path.Combine("/usr/bin", "7z");
+        var runner = new FakeToolRunner((file, arguments) =>
+        {
+            if (file == onPath)
+            {
+                return new ToolProcessResult(0, versionOutput);
+            }
+
+            TestToolPackages.Create(arguments[3], "7zz");
+            return new ToolProcessResult(0, string.Empty);
+        });
+        var installer = Installer(LinuxX64, Catalog(sevenZip: package), runner, pathVariable: "/usr/bin", existing: [onPath]);
+
+        await installer.InstallMissingAsync(CancellationToken.None);
+
+        // The copy in <data>/tools comes before PATH in the search (PostProcessToolsTests), so it is the one used.
+        Assert.Equal(installs, installer.Installed(PostProcessTool.SevenZip) is not null);
+        Assert.Equal(installs, File.Exists(Path.Combine(ToolsFolder, "7-Zip", "7zz")));
+    }
+
+    [Theory]
+    [InlineData("7-Zip 16.02", true)]
+    [InlineData("7-Zip 9.20", true)]
+    [InlineData("7-Zip 21.07", true)]
+    [InlineData("7-Zip 22.01", false)]
+    [InlineData("7-Zip 26.03", false)]
+    [InlineData("par2cmdline 0.8.1", false)]
+    [InlineData(null, false)]
+    public void Old_7zip_versions(string? version, bool outdated) => Assert.Equal(outdated, ToolInstaller.IsOutdatedSevenZip(version));
+
     [Fact]
     public async Task Hosted_service_installs_missing_tools_after_startup_and_never_throws()
     {

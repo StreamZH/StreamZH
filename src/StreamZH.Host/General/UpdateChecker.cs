@@ -4,6 +4,8 @@
 
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StreamZH.Core;
@@ -50,8 +52,17 @@ public sealed class UpdateChecker(IHttpClientFactory http, TimeProvider time, IL
             {
                 var release = await response.Content.ReadFromJsonAsync<GitHubRelease>(cancellationToken);
                 var latest = release?.TagName?.TrimStart('v', 'V');
-                var newer = latest is not null && IsNewer(latest, AppInfo.Version);
-                result = new UpdateCheckResult(now, latest, release?.PublishedAt, release?.HtmlUrl, newer, latest is null ? "GitHub sent no version." : null);
+                if (latest is not null && !IsGitHubReleaseUrl(release?.HtmlUrl))
+                {
+                    // The link is shown as "Download"; only github.com is accepted.
+                    logger.LogWarning("Update check: ignored a release whose link does not point to github.com");
+                    result = new UpdateCheckResult(now, null, null, null, false, "GitHub sent a release with an unexpected link; ignored.");
+                }
+                else
+                {
+                    var newer = latest is not null && IsNewer(latest, AppInfo.Version);
+                    result = new UpdateCheckResult(now, latest, release?.PublishedAt, release?.HtmlUrl, newer, latest is null ? "GitHub sent no version." : null);
+                }
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
@@ -63,6 +74,22 @@ public sealed class UpdateChecker(IHttpClientFactory http, TimeProvider time, IL
         _last = result;
         return result;
     }
+
+    /// <summary>An https link on github.com (the release page).</summary>
+    public static bool IsGitHubReleaseUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
+        && string.Equals(uri.IdnHost, "github.com", StringComparison.OrdinalIgnoreCase) && uri.IsDefaultPort && string.IsNullOrEmpty(uri.UserInfo);
+
+    /// <summary>
+    /// The update check always validates GitHub's certificate, also when Settings → General → Certificate validation is
+    /// off (that setting is meant for the user's own servers).
+    /// </summary>
+    public static bool ValidateCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors) =>
+        errors == SslPolicyErrors.None;
+
+    /// <summary>The handler of the update client: the proxy filter adds the proxy, the certificate check stays strict.</summary>
+    public static SocketsHttpHandler CreateHandler() =>
+        new() { SslOptions = { RemoteCertificateValidationCallback = ValidateCertificate } };
 
     /// <summary>"0.7.0" is newer than "0.6.2"; pre-release suffixes are ignored.</summary>
     public static bool IsNewer(string candidate, string current) =>

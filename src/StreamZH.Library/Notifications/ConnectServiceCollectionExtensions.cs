@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using StreamZH.Core.Net;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Notifications;
@@ -19,7 +20,11 @@ public static class ConnectServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(ConnectOptions.Default);
         services.AddSingleton<ConnectionRepository>();
-        services.AddHttpClient(ConnectHttp.ClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
+        services.AddHttpClient(ConnectHttp.ClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.MaxResponseContentBufferSize = ResponseLimits.Json;
+        });
 
         services.AddSingleton<IConnectionSender, PlexSender>();
         services.AddSingleton<IConnectionSender>(sp => new JellyfinEmbySender(ConnectCatalog.Jellyfin, sp.GetRequiredService<IHttpClientFactory>()));

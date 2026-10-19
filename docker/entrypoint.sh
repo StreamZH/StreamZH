@@ -8,9 +8,9 @@
 
 set -eu
 
-if [ -n "${UMASK:-}" ]; then
-    umask "$UMASK"
-fi
+# 027: new files are readable for the group (Plex or Jellyfin in the same group can read imported media), not for
+# others. UMASK=002 makes them group-writable, UMASK=022 readable for everyone.
+umask "${UMASK:-027}"
 
 if [ "$(id -u)" -ne 0 ]; then
     exec dotnet /app/StreamZH.dll "$@"
@@ -32,6 +32,9 @@ if [ "$(stat -c %u:%g /config)" != "$uid:$gid" ]; then
     echo "Giving /config to $uid:$gid"
     chown -R "$uid:$gid" /config
 fi
+# /config holds the database (API key, password hashes, indexer keys), the sign-in keys and backups: nobody else may
+# read it (the group may look, as with the Linux installer). StreamZH tightens the files inside at every start.
+chmod u+rwx,g-w,o-rwx /config
 
 export HOME=/config
 exec setpriv --reuid="$uid" --regid="$gid" --clear-groups -- dotnet /app/StreamZH.dll "$@"

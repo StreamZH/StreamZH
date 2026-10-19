@@ -61,6 +61,15 @@ if ([Diagnostics.EventLog]::SourceExists($StreamZhServiceName)) {
     Write-Host 'event log source removed'
 }
 
+# StreamZH in a console window runs as you: the data folder stays private and you may change it.
+$data = $dataDir
+if (-not $data) { $data = Join-Path $env:ProgramData 'StreamZH' }
+if (Test-Path -LiteralPath $data -PathType Container) {
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+    Protect-StreamZhDataFolder $data @() @($me.User.Value)
+    Write-Host "$($me.Name): may change $data (nobody else but SYSTEM and administrators)"
+}
+
 Write-Host "`nFertig. Programm und Daten sind noch da." -ForegroundColor Green
 # Not started from here: this PowerShell runs as administrator, and StreamZH should run as your normal user.
 Write-Host 'In einer normalen PowerShell (nicht als Administrator) im Konsolenfenster starten:'

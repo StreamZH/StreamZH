@@ -58,6 +58,7 @@ var restored = new StartupRestore(PendingRestore.Apply(paths));
 
 var database = new Database(paths.DatabaseFile);
 database.Migrate();
+var dataFolderPermissions = DataFolderPermissions.Apply(paths);
 
 var config = new ConfigRepository(database);
 config.GetOrCreate(ConfigKeys.ApiKey, GeneralSettingsEndpoints.NewApiKey);
@@ -135,6 +136,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
 builder.Services.AddStreamZhAuth(paths);
+builder.Services.AddDataFolderPermissions(dataFolderPermissions);
 builder.Services.AddUserManagement();
 builder.Services.AddGeneralSettings(restored);
 builder.Services.AddSignalR();

@@ -28,8 +28,10 @@ services:
       # as root only to give /config to this user, then drops to it. Never use 0 (root).
       PUID: "1000"
       PGID: "1000"
-      # 002: new files are writable for the group (handy when Plex or another app shares the group).
-      UMASK: "002"
+      # 027 (the default): new files are readable for the group (Plex or Jellyfin in the same group can read the
+      # media), not for others. "002" makes them writable for the group too. StreamZH's own data in /config stays
+      # private either way.
+      UMASK: "027"
       TZ: "Etc/UTC"
 
     ports:

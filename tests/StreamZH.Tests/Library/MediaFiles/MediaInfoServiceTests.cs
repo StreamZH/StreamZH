@@ -76,7 +76,7 @@ public sealed class MediaInfoServiceTests : IDisposable
         Assert.Equal("x264", info.Video!.Codec);
         Assert.Equal(ImportTestBed.Mb, info.FileSize);
         var call = Assert.Single(Runner.Calls);
-        Assert.Equal(["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-probesize", "50M", path], call.Arguments);
+        Assert.Equal(["-protocol_whitelist", "file,pipe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-probesize", "50M", path], call.Arguments);
 
         _fixture = "dv-hdr10-truehd-atmos.json";
         var hdr = await Service.ProbeAsync(path, null, CancellationToken.None);
@@ -84,6 +84,7 @@ public sealed class MediaInfoServiceTests : IDisposable
         Assert.Equal(3, Runner.Calls.Count);
         Assert.Contains("-show_frames", Runner.Calls[2].Arguments);
         Assert.Contains("%+#1", Runner.Calls[2].Arguments);
+        Assert.Equal(["-protocol_whitelist", "file,pipe"], Runner.Calls[2].Arguments.Take(2));
     }
 
     [Fact]

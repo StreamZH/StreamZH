@@ -51,8 +51,8 @@ public static class GeneralSettingsEndpoints
         system.MapPost("/shutdown", (AppLifecycle lifecycle, ClaimsPrincipal user) =>
             lifecycle.Shutdown(user.Identity?.Name ?? "unknown") ? Results.Accepted() : Results.Conflict());
 
-        system.MapGet("/updates", (UpdateChecker updates) => UpdateInfo.From(updates.Last));
-        system.MapPost("/updates/check", async (UpdateChecker updates, CancellationToken ct) => UpdateInfo.From(await updates.CheckAsync(ct)));
+        system.MapGet("/updates", (UpdateChecker updates) => UpdateInfo.From(updates.Last, updates.InstallKind));
+        system.MapPost("/updates/check", async (UpdateChecker updates, CancellationToken ct) => UpdateInfo.From(await updates.CheckAsync(ct), updates.InstallKind));
 
         return app;
     }
@@ -691,18 +691,22 @@ public sealed record UpdateGeneralSettings(
 public sealed record ApiKeyResponse(string ApiKey);
 
 /// <summary>Settings → General → Updates: version, how to update this installation, last check.</summary>
-public sealed record UpdateInfo(string Version, string Mechanism, string Instructions, UpdateCheckResult LastCheck)
+/// <param name="Package">How this copy was installed: docker, windows-installer, deb, rpm or archive (<see cref="ReleaseAssets"/>).</param>
+public sealed record UpdateInfo(string Version, string Mechanism, string Package, string Instructions, UpdateCheckResult LastCheck)
 {
-    public static UpdateInfo From(UpdateCheckResult last)
+    public static UpdateInfo From(UpdateCheckResult last, string package)
     {
         var mode = SystemInfoEndpoints.RuntimeMode();
-        var (mechanism, instructions) = mode switch
+        var (mechanism, instructions) = (mode, package) switch
         {
-            "docker" => ("docker", "Pull the new image and recreate the container. Your data in /config stays."),
-            "windowsService" => ("manual", "Built-in updates are not available yet. Stop the StreamZH service, replace the program files with the new release and start the service again (tools\\Update-Local.ps1 does all three); your data stays in the data folder."),
-            "systemd" => ("manual", "Built-in updates are not available yet. Run install-linux.sh of the new release; it stops the service, replaces the program files and starts it again. Your data stays in the data folder."),
-            _ => ("manual", "Built-in updates are not available yet. Replace the program files with the new release and restart; your data stays in the data folder."),
+            ("docker", _) => ("docker", "Pull the new image and recreate the container. Your data in /config stays."),
+            (_, ReleaseAssets.WindowsInstaller) => ("manual", "Built-in updates are not available. Download the new setup and run it: it stops StreamZH, updates the program in place and starts it again. Your data and settings stay."),
+            (_, ReleaseAssets.Deb) => ("manual", "Built-in updates are not available. Install the new .deb with sudo apt install ./<file>.deb: it restarts the service and keeps your data in /var/lib/streamzh."),
+            (_, ReleaseAssets.Rpm) => ("manual", "Built-in updates are not available. Install the new .rpm with sudo dnf install ./<file>.rpm: it restarts the service and keeps your data in /var/lib/streamzh."),
+            ("windowsService", _) => ("manual", "Built-in updates are not available. Stop the StreamZH service, replace the program files with the new release and start the service again; your data stays in the data folder."),
+            ("systemd", _) => ("manual", "Built-in updates are not available. Run install-linux.sh of the new release; it stops the service, replaces the program files and starts it again. Your data stays in the data folder."),
+            _ => ("manual", "Built-in updates are not available. Stop StreamZH, replace the program files with the new release and start it again; your data stays in the data folder."),
         };
-        return new UpdateInfo(AppInfo.Version, mechanism, instructions, last);
+        return new UpdateInfo(AppInfo.Version, mechanism, package, instructions, last);
     }
 }

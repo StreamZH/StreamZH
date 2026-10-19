@@ -1,8 +1,10 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { discoverApi, discoverKeys, listLabels, type DiscoverItem, type DiscoverList, type DiscoverPage as Page } from '../api/discover'
 import type { RequestMediaType } from '../api/requests'
+import { ApiError } from '../api/client'
+import { useIsAdmin } from '../status/useOngoing'
 import { useMe, limitText } from '../api/me'
 import Icon from '../components/Icon'
 import PageHeader from '../components/PageHeader'
@@ -122,6 +124,11 @@ export default function DiscoverPage() {
     setParams(next, { replace: true })
   }
 
+  // Without a TMDB key every list fails the same way: one notice instead of an error in each row (1.0 RC).
+  const admin = useIsAdmin()
+  const first = useQuery({ queryKey: discoverKeys.list('movie', 'trending'), queryFn: () => discoverApi.list('movie', 'trending'), staleTime: 5 * 60_000 })
+  const tmdbMissing = first.error instanceof ApiError && first.error.code === 'tmdb-not-configured'
+
   const results = (search.data?.pages.flatMap((p) => p.results) ?? []).filter((r) => kind === 'all' || r.mediaType === kind)
   const types: RequestMediaType[] = kind === 'all' ? ['movie', 'series'] : [kind]
 
@@ -152,7 +159,23 @@ export default function DiscoverPage() {
         </label>
       </div>
 
-      {query ? (
+      {tmdbMissing ? (
+        <div className={`${ui.panel} ${ui.empty}`}>
+          <Icon name="compass" size={22} />
+          <h3>Discover needs TMDB</h3>
+          <p>
+            {admin
+              ? 'Add your free TMDB key, and Discover shows what is trending, popular and coming soon.'
+              : 'An admin has to add a TMDB key first. Then Discover shows what is trending, popular and coming soon.'}
+          </p>
+          {admin && (
+            <Link className={ui.primary} to="/get-started">
+              Add a TMDB key
+              <Icon name="right" size={14} />
+            </Link>
+          )}
+        </div>
+      ) : query ? (
         <section aria-label="Search results" className={styles.results}>
           <p className={styles.resultHead}>
             Results for <b>“{query}”</b>

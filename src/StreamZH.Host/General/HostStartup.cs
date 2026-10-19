@@ -8,7 +8,10 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Data.Sqlite;
+using StreamZH.Core;
 using StreamZH.Data;
+using StreamZH.Host.Logging;
+using StreamZH.Host.Service;
 
 namespace StreamZH.Host.General;
 
@@ -189,6 +192,14 @@ public static class HostStartup
             var lastGood = running.Previous ?? new HostValues(
                 HostSettings.AllAddresses, HostSettings.DefaultPort, running.Values.UrlBase, false, HostSettings.DefaultSslPort, null, null);
             next = new RestartState(running.Run, lastGood, true, $"Could not listen on {addresses}: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            // 1.0 RC: the first start (StartupCheck found the port free a moment ago) or addresses from --urls: one clear
+            // line and an exit code, no new attempt.
+            var problem = StartupCheck.Problem(StartupCheck.Endpoints(running.Addresses), running.Override)
+                ?? ("Could not start", $"StreamZH could not start: {ex.Message}");
+            StartupCheck.Report(problem.Summary, problem.Message, app.Services.GetRequiredService<AppPaths>(), logs as FileLoggerProvider, app.Services.GetService<ServiceSession>());
         }
         finally
         {

@@ -1,76 +1,63 @@
 # StreamZH Roadmap
 
-Two big steps: a **private test version** that runs next to the existing stack on the
-home server, then a **public release** when the repository goes open source.
+StreamZH replaces Radarr, Sonarr, Prowlarr, SABnzbd, a torrent client, Recyclarr and Requestrr with one application.
+This page shows where it stands and what comes next. Plans change; the [issues](https://github.com/cloudzh/streamzh/issues)
+are the place to discuss them. What changed in each version is in the [changelog](../CHANGELOG.md).
 
-## Track 1: Private test version (0.x, repo private)
+## Where StreamZH stands: 1.0 release candidate
 
-Scope: Movies and Series, Usenet only. Goal: StreamZH can replace Radarr, Sonarr,
-SABnzbd and the indexer setup on the CloudZH home server.
+Movies and series, from search to a playable file, with Usenet and torrents:
 
-| Version | Phase | Content | Done when |
-|---|---|---|---|
-| 0.1 ✅ | Foundation | Solution, CI, Docker image, config dir, SQLite + migrations, Owner login, API key, settings API, log file, React shell with CloudZH look | Container starts, login works, empty Home page |
-| 0.2 ✅ | Metadata & Library | TMDB client, add movie / series, root folders, disk scan, import of an existing library (match folders to TMDB) | Existing movie and TV folders show up in Library |
-| 0.3 ✅ | Parser & Profiles | Port release-name, quality and language parser incl. test fixtures; quality profiles; decision engine | Parser test suite green, releases ranked correctly |
-| 0.4 ✅ | Indexers & Search | Newznab client, capabilities, manual search (interactive), automatic search for missing items; 0.4.1: indexer catalog, query/grab limits, VIP expiry, indexer search/stats/history, import from Prowlarr (replaces Prowlarr) | Manual search shows ranked releases |
-| 0.5 ✅ | Download Engine | NZB parser, NNTP pool with backup servers, yEnc, assembly, par2 verify/repair, unpack | A real NZB downloads, repairs and unpacks |
-| 0.6 ✅ | Import & Settings | Import + rename, blocklist + retry, Plex/Jellyfin/Emby/Kodi and notifications, NFO and artwork; settings areas like Radarr/Sonarr/SABnzbd (Media Management, Indexers with release profiles and RSS sync, Downloads with categories/switches/schedule, Connect, Metadata, General with host/security/proxy/backups, UI) and System pages | Grab → playable file in Plex without manual steps |
-| 0.7 ✅ | Automation | Wanted (missing, cutoff unmet) and calendar with iCal feed, library mass editor and Organize (rename folders and files) with undo, bulk file renamer (rules, filters, regex, TMDB episode titles), import lists (TMDB, Trakt, Plex watchlist, RSS, StreamZH), Activity paging and filters, Windows service and systemd service | Runs unattended for two weeks |
-| 0.7.1 ✅ | Design | The CloudZH look: palette (light and dark), fonts, icons, sidebar with groups, search or jump to (Ctrl K), top bar with downloads (percent and time left), splash screen with the animated logo, page transitions; every page restyled; simple file renamer | StreamZH visibly belongs to the CloudZH family |
-| 0.8 ✅ | Custom Formats & TRaSH | Custom formats like Radarr/Sonarr (all condition types, scores in profiles, minimum score, upgrade until score, quality groups, {Custom Formats} token, import/export), TRaSH Guides sync built in (templates incl. German profiles, cf-groups, quality sizes, daily sync keeping own scores), recyclarr.yml import, Windows tray icon | A TRaSH profile ranks real releases like Radarr with the same profile |
-| 0.8.1 ✅ | Titles, numbering, media info | Alternative titles (TMDB titles and translations, own titles, used for matching and search), series type Standard/Daily/Anime with absolute numbering and TheXEM scene numbering, media info via ffprobe (installed like par2/7-Zip) with MediaInfo naming tokens and audio languages, small import/renamer fixes | German release names and anime releases match like in Sonarr/Radarr |
-| 0.9 ✅ | Migration | Migration wizard (Settings → Migration): take over Radarr, Sonarr, Prowlarr and SABnzbd through their APIs, read-only: root folders, quality sizes, custom formats and scores, quality profiles (Radarr and Sonarr merged), release profiles, naming, media management, notifications, list exclusions, indexers, Usenet servers, categories, speed and schedule, movies and series with their existing files (linked, never moved), history and blocklist; path mappings, preview, dry run, report; side-by-side mode (grabs nothing automatically until you switch over); docs/MIGRATION.md and a Docker compose example | An existing Radarr/Sonarr/SABnzbd setup is taken over without re-downloading anything |
-| 0.10 ✅ | Users & Requests | User management (Owner, Admin, Friend, Requester; invites; per-user auto-approve and request limits; session checks on every request), Discover (TMDB trending/popular/upcoming/top rated, search), requests with approval, auto-approve and availability tracking, request notifications in Connect, built-in Discord bot (/movie, /tv, /requests, /link; DMs; Requestrr import) | Friends request in the web UI or on Discord and get told when it is available |
-| 0.11 ✅ | Torrent | Torznab indexers (seeders, peers, magnet, freeleech flags, minimum seeders), protocol preference with delays and pending releases, qBittorrent/Transmission/Deluge clients, built-in torrent engine (MonoTorrent), torrent tracking in Activity, import by hardlink or copy (seeding never breaks), seed goals and removal, remote path mappings, migration of torrent indexers and clients | Torrent and Usenet releases are ranked and downloaded side by side |
-| 0.12 ✅ | Security & privacy | Three independent security reviews and three verification rounds: cross-site request protection, setup code for first-run from another device, server-side sessions, login throttling, security headers, owner-only security settings, secrets encrypted at rest and never sent to a changed destination, outbound limits, protected data and program folders, storage locations (StreamZH only touches folders the owner allowed), safe torrent paths, tool hashes; privacy check of the repository | No open critical or high findings |
-| 1.0 RC | Ready to use | Installers and packages (Windows installer, Linux packages, Docker image on GHCR), first-run setup, complete documentation with screenshots | Download, configure, use |
-
-### How the test runs on the home server
-
-- Runs as its own Docker container next to the existing apps, on its own port (9797).
-- Starts with a separate test library folder, not the live `tv/` and `movies/` folders.
-- Usenet connections split with SABnzbd so the provider limit is not exceeded.
-- Switch-over only after 0.9, existing apps stay as fallback until then.
-
-## Track 2: Public release (1.0, repo public)
-
-| Block | Content |
+| Version | Content |
 |---|---|
-| Torrent | Torznab indexers, built-in torrent engine (MonoTorrent, MIT) or qBittorrent bridge, seeding rules |
-| More media types | Music (MusicBrainz), Books; Whisparr type optional, hidden by default |
-| Discover & Requests | Request flow for Friends, replaces Requestrr; Discord bot |
-| Users & roles | Owner, Admin, Friend as in CloudZH |
-| Compatibility | Optional Sonarr/Radarr-compatible API endpoints for third-party tools |
-| UI | English only (decision 2026-10-19), mobile layout |
-| Packaging | Native installers and packages for every platform below, Docker image on GHCR, CloudZH App Store entry |
+| 0.1 – 0.3 | Foundation, TMDB library, import of existing folders, release parser, quality profiles, decision engine |
+| 0.4 | Newznab indexers, search, and Prowlarr built in (catalog, limits, stats, history, import) |
+| 0.5 | Built-in Usenet engine: download, par2 repair, unpack; Activity and the status window |
+| 0.6 | Import and rename, blocklist, Connect (media servers and notifications), settings like Radarr, Sonarr and SABnzbd, System pages |
+| 0.7 | Wanted, calendar and iCal, mass editor and Organize, file renamer, import lists, Windows and systemd services |
+| 0.8 | Custom formats, TRaSH Guides sync, Recyclarr import, Windows tray icon; alternative titles, daily and anime series, media info |
+| 0.9 | Migration wizard for Radarr, Sonarr, Prowlarr and SABnzbd, side-by-side mode |
+| 0.10 | Users and roles, invites, Discover, requests, built-in Discord bot |
+| 0.11 | Torrents: Torznab, qBittorrent, Transmission, Deluge, built-in torrent engine, seeding |
+| 0.12 | Security review: setup code, storage locations, owner-only settings, encrypted secrets, browser protection |
+| 1.0 RC | Installers and packages for every platform, first-run guidance, complete documentation |
 
 ## Platforms
 
-Like Sonarr and Radarr, StreamZH runs natively on every major platform, not only in
-Docker. .NET 10 builds a self-contained app per platform (no .NET install needed).
-par2 and 7-Zip are bundled with the native packages so post-processing works out of the box.
+StreamZH runs natively on every major platform, not only in Docker. The native packages are self-contained (no .NET
+install needed); par2 and 7-Zip are installed by StreamZH at the first start.
 
-| Platform | Delivery | Runs as | Data dir | Available from |
-|---|---|---|---|---|
-| Linux x64 / arm64 | `.tar.gz` + install script (systemd unit, `tools/install-linux.sh`) | systemd service | `/var/lib/streamzh` | 0.1 (CI build), script 0.7 |
-| Docker | Image on GHCR (amd64, arm64) | Container | `/config` | 0.1 |
-| Windows x64 | Installer (Inno Setup) + portable `.zip` | Windows service or tray app | `C:\ProgramData\StreamZH` | 0.1 (CI build), service scripts 0.7 (`tools/Install-Service.ps1`), installer later |
-| macOS (Apple Silicon, Intel) | `.app` in `.zip` | Login item | `~/Library/Application Support/StreamZH` | 1.0 |
-| NAS (Synology, QNAP, Unraid, TrueNAS) | Docker image + Unraid template, Synology package later | Container / package | `/config` | 1.0 |
-| CloudZH | App Store entry, preconfigured | Container | managed by CloudZH | 1.0 |
-| FreeBSD | not planned: .NET has no official FreeBSD support | | | |
+| Platform | Delivery | Runs as | Data folder |
+|---|---|---|---|
+| Windows x64 | Installer and portable zip | Windows service with tray icon, or tray icon only | `C:\ProgramData\StreamZH` |
+| Linux x64, arm64 | `.deb`, `.rpm`, `.tar.gz` with install script | systemd service | `/var/lib/streamzh` |
+| Docker (amd64, arm64) | Image on GHCR | Container | `/config` |
+| macOS (Apple silicon, Intel) | zip, not notarized yet | Program | `~/Library/Application Support/StreamZH` |
+| FreeBSD | not planned: .NET has no official FreeBSD support | | |
 
-The in-app updater (download, verify signature, restart) follows in 1.0 for the native
-packages; Docker updates by pulling the new image.
+## Next
 
-### Checklist before the repository goes public
+Not promised, roughly in order:
+
+| Topic | Content |
+|---|---|
+| Updates | An in-app updater for the native packages (download, verify signature, restart); signed Windows and macOS builds |
+| NAS | Unraid template and other NAS app store entries; a Synology package later |
+| UI | Mobile layout polish (the interface stays English only) |
+| More media types | Music (MusicBrainz) and books on the same engine |
+| Compatibility | Optional Sonarr/Radarr-compatible API endpoints for third-party tools |
+| Database | PostgreSQL as an alternative to SQLite for large installations |
+| CloudZH | An App Store entry in CloudZH, preconfigured |
+
+## Before the repository goes public
 
 - [ ] Git history clean: no secrets, no private paths, no home network details
-- [ ] `README.md` with screenshots and demo data ("John Doe")
+- [x] `README.md` with screenshots and demo data ("John Doe"), see [docs/images](images/README.md)
 - [ ] `LICENSE` (GPL-3.0), `NOTICE.md` complete for all ported code
-- [ ] `CONTRIBUTING.md`, `SECURITY.md`, issue and PR templates
+- [x] `CONTRIBUTING.md`, `SECURITY.md`, issue and PR templates
+- [x] `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, user guide and installation guide
 - [ ] Decide CLA yes/no
 - [ ] Community channel (GitHub Discussions and/or Discord)
 - [ ] Domain and website
-- [ ] CI builds and publishes the image on tag
+- [x] CI builds and publishes the image and the packages on tag (`release.yml`; first real run with `v1.0.0-rc.1`)
+- [ ] Repository owner decided (docs and CI use `cloudzh/streamzh` until then)

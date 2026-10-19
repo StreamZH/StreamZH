@@ -38,7 +38,8 @@ public enum StatusDot
     Red,
 }
 
-public sealed record TrayState(TrayStateKind Kind, TrayStatus? Status = null, TokenProblem TokenProblem = TokenProblem.None)
+/// <param name="StartupError">1.0 RC: while not running, why the last start failed (e.g. the port is in use).</param>
+public sealed record TrayState(TrayStateKind Kind, TrayStatus? Status = null, TokenProblem TokenProblem = TokenProblem.None, StartupError? StartupError = null)
 {
     public bool IsUp => Kind is TrayStateKind.Running or TrayStateKind.Paused or TrayStateKind.NoAccess or TrayStateKind.NotResponding;
 

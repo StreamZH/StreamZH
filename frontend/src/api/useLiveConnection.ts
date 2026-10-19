@@ -1,6 +1,7 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { authQueryKey } from '../auth/auth'
 import { withBase } from '../lib/urlBase'
 import { appHeaders } from './client'
 import { downloadKeys, type DownloadProgressItem, type LiveProgress } from './downloads'
@@ -118,7 +119,13 @@ export function useLiveConnection(enabled = true): boolean {
       setConnected(true)
       void queryClient.invalidateQueries()
     })
-    connection.onclose(() => setConnected(false))
+    // The server closes the connection when the sign-in it was opened with ends (sign-out, role change, disabled user;
+    // 0.12). Ask whether this browser is still signed in: if not, the sign-in page appears, and the next sign-in opens a
+    // new connection with the groups of the current role.
+    connection.onclose(() => {
+      setConnected(false)
+      void queryClient.invalidateQueries({ queryKey: authQueryKey })
+    })
 
     connection
       .start()

@@ -61,7 +61,8 @@ public sealed class M003_Profiles : Migration
             Value = QualityDefaults.DefaultProfileId.ToString(CultureInfo.InvariantCulture),
         });
 
-        // Existing movies and series get the default profile.
+        // Existing movies and series get the default profile. (Runs once per database: since 1.0 a new installation
+        // starts with "HD-1080p"; databases from before keep "Deutsch 1080p" and the profiles as they were seeded.)
         Alter.Table("Movies").AddColumn("QualityProfileId").AsInt32().NotNullable().WithDefaultValue(QualityDefaults.DefaultProfileId);
         Alter.Table("Series").AddColumn("QualityProfileId").AsInt32().NotNullable().WithDefaultValue(QualityDefaults.DefaultProfileId);
     }

@@ -1,33 +1,41 @@
 name: CI
 
-# Every push: build and test only (about 3 minutes).
-# Docker image and the five platform packages only when started by hand
-# (Actions -> CI -> Run workflow) or for a version tag like v0.3.0.
+# Pushes to main and pull requests: build and test (about 3 minutes), plus a check of the packaging scripts.
+# Release packages, the Docker image and the GitHub release come from release.yml (tags v*).
+# Actions are pinned to a commit (the version is in the comment); Dependabot proposes updates (.github/dependabot.yml).
 on:
   push:
     branches: [main]
-    tags: ['v*']
     paths-ignore: ['**.md', 'docs/**']
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
 
@@ -43,76 +51,35 @@ jobs:
           dotnet build StreamZH.slnx -c Release
           dotnet test StreamZH.slnx -c Release --no-build
 
-  docker:
-    needs: build
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+  packaging:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build image (no push yet)
-        uses: docker/build-push-action@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          context: .
-          file: docker/Dockerfile
-          push: false
-          load: true
-          tags: streamzh:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          persist-credentials: false
 
-      - name: Smoke test
+      - name: Shell scripts
         run: |
-          docker run -d --name streamzh -p 9797:9797 streamzh:ci
-          for i in $(seq 1 30); do curl -fs http://localhost:9797/health && break; sleep 1; done
-          curl -fs http://localhost:9797/api/v1/auth/state
-          curl -fs -o /dev/null http://localhost:9797/
-          docker logs streamzh
+          shellcheck tools/install-linux.sh docker/entrypoint.sh packaging/linux/build.sh packaging/linux/scripts/*.sh \
+            packaging/check-repository.sh
 
-  publish:
-    needs: build
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rid: [linux-x64, linux-arm64, win-x64, osx-arm64, osx-x64]
-    steps:
-      - uses: actions/checkout@v4
+      # The docs, the compose example and AppInfo.Repository name the same repository (SV4 X-01).
+      - name: Repository names
+        run: packaging/check-repository.sh
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Frontend
-        working-directory: frontend
+      - name: PowerShell scripts parse
+        shell: pwsh
         run: |
-          npm ci
-          npm run build
+          $failed = 0
+          foreach ($file in Get-ChildItem -Path tools, packaging, tests/scripts -Recurse -Filter *.ps1) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors)
+            foreach ($e in $errors) { Write-Host "::error file=$($file.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"; $failed++ }
+          }
+          exit $failed
 
-      - name: Publish ${{ matrix.rid }}
-        run: >
-          dotnet publish src/StreamZH.Host -c Release -r ${{ matrix.rid }}
-          --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:EnableCompressionInSingleFile=true -p:DebugType=none
-          -o out/StreamZH
-
-      # Windows package: the tray icon next to StreamZH.exe (framework-dependent, needs the .NET 10 Desktop Runtime).
-      - name: Tray icon
-        if: matrix.rid == 'win-x64'
-        run: >
-          dotnet publish src/StreamZH.Tray -c Release -r win-x64 --self-contained false
-          -p:PublishSingleFile=true -p:DebugType=none -o out/StreamZH
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: StreamZH-${{ matrix.rid }}
-          path: out/StreamZH
-          retention-days: 14
+      # The decisions of the service scripts that do not need Windows (data folder owner, quoting).
+      - name: PowerShell script tests
+        shell: pwsh
+        run: ./tests/scripts/ServiceHelpers.Tests.ps1

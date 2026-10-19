@@ -1,6 +1,6 @@
 # Moving from Sonarr, Radarr, Prowlarr and SABnzbd to StreamZH
 
-StreamZH 0.9 takes over an existing setup: settings, indexers, Usenet servers, download settings and the whole
+StreamZH takes over an existing setup: settings, indexers, Usenet servers, download settings and the whole
 library (movies, series, episodes, the files you already have). It does this through the **migration wizard**
 (Settings → Migration), which only *reads* the old apps through their APIs. Nothing in Sonarr, Radarr, Prowlarr or
 SABnzbd is ever changed, so you can always go back.
@@ -45,18 +45,11 @@ becomes the owner). From another device than the server (and always with Docker)
 setup code that StreamZH prints in its console and log at start (`docker logs streamzh`; also in the file `setup-code`
 in the data folder, and under "Show setup code" in the Windows tray icon).
 
+[INSTALL.md](INSTALL.md) describes every platform in detail. What matters for a migration:
+
 ### Docker (Docker Compose)
 
-Use [docker/docker-compose.example.yml](../docker/docker-compose.example.yml):
-
-```bash
-git clone https://github.com/<owner>/StreamZH.git && cd StreamZH
-cp docker/docker-compose.example.yml docker/docker-compose.yml
-nano docker/docker-compose.yml        # PUID/PGID, TZ and the media/download volumes
-docker compose -f docker/docker-compose.yml up -d --build
-```
-
-The important part are the volumes. **Mount media and downloads at the same paths the old apps use**: when
+Use the compose file of [INSTALL.md → Docker](INSTALL.md#docker-compose). The important part are the volumes. **Mount media and downloads at the same paths the old apps use**: when
 Radarr sees your movies at `/data/media/movies`, mount them at `/data/media/movies` in StreamZH as well:
 
 ```yaml
@@ -67,33 +60,24 @@ Radarr sees your movies at `/data/media/movies`, mount them at `/data/media/movi
 ```
 
 Then the wizard needs no path mappings at all. `PUID`/`PGID` should be the user that owns your media (`id -u
-johndoe`, `id -g johndoe`); StreamZH runs as that user, never as root. The container publishes only port 9797.
+johndoe`, `id -g johndoe`); StreamZH runs as that user, never as root.
 
 ### Linux (systemd service)
 
-Download the package for your machine (`StreamZH-linux-x64` or `StreamZH-linux-arm64`), unpack it and run the
-installer:
-
-```bash
-unzip StreamZH-linux-x64.zip -d StreamZH && cd StreamZH
-sudo bash install-linux.sh
-```
-
-The service runs as the system user `streamzh` (program in `/opt/streamzh`, data in `/var/lib/streamzh`). It needs
+Install the `.deb`, `.rpm` or `tar.gz` package ([INSTALL.md → Linux](INSTALL.md#linux)). The service runs as the system user `streamzh` (program in `/opt/streamzh`, data in `/var/lib/streamzh`). It needs
 read and write access to the media and download folders, for example:
 
 ```bash
 sudo setfacl -R -m u:streamzh:rwX -m d:u:streamzh:rwX /data/media /data/downloads
 ```
 
-or add it to the group that owns them: `sudo usermod -aG media streamzh`. `bash install-linux.sh --help` lists all
-options (other data folder, other user, uninstall).
+or add it to the group that owns them: `sudo usermod -aG media streamzh`.
 
 ### Windows
 
-See [README → Windows](../README.md#windows-build-install-run-as-a-service): `tools\Update-Local.ps1` builds and
-installs StreamZH, `tools\Install-Service.ps1 -Firewall` runs it as a Windows service. A service cannot see mapped
-drives (`Z:`): use UNC paths such as `\\nas\media\movies`, and `-Account` when the NAS needs a login.
+Run the installer ([INSTALL.md → Windows](INSTALL.md#windows)) and let it run StreamZH as a Windows service. A
+service cannot see mapped drives (`Z:`): use UNC paths such as `\\nas\media\movies`, and run the service as a
+user when the NAS needs a login ([INSTALL.md → The service account](INSTALL.md#the-service-account)).
 
 ## 3. Switch on the side-by-side mode
 
@@ -128,11 +112,15 @@ the other way round.
 
 - The longest matching mapping wins, so `/data/media/anime` → `/srv/anime` can live next to `/data` → `/srv/data`.
 - Mappings work on whole folder names: `/tv` matches `/tv/Show` but not `/tvshows`.
+- Every folder StreamZH uses must be inside a [storage location](SECURITY.md#storage-locations). The paths step marks
+  folders outside them; the owner allows them in one click (**Allow as storage location**).
 - The wizard's preview lists every folder the old app uses, what it becomes in StreamZH and whether StreamZH can
   see it. Fix the mappings until every folder shows as found, then preview again. **Do not take over the library
   while folders are missing**: StreamZH would not find the files.
 
 ## 5. Run the wizard, app by app
+
+![The first step of the migration wizard](images/migration.png)
 
 Before the first run, make a backup of StreamZH itself (System → Backup → Backup now): it is the easiest way back
 to a clean StreamZH.
@@ -157,18 +145,21 @@ in the old apps in the meantime.
 
 ### Recommended order
 
-1. **SABnzbd** — Usenet servers, categories, download settings.
-2. **Prowlarr** (if you use it) — indexers.
-3. **Radarr** — settings, indexers (when you have no Prowlarr), then the movies.
-4. **Sonarr** — settings, indexers, then the series.
+The wizard marks the next app to take over:
 
-Settings come before the library, so movies and series find their quality profiles, root folders and tags.
+1. **Radarr** — settings, indexers (when you have no Prowlarr), then the movies.
+2. **Sonarr** — settings, indexers, then the series.
+3. **Prowlarr** (if you use it) — indexers.
+4. **SABnzbd** — Usenet servers, categories, download settings.
+
+Within each app, settings come before the library, so movies and series find their quality profiles, root folders and
+tags. The download client part of Radarr and Sonarr shows SABnzbd's address, ready for the SABnzbd step.
 
 ### SABnzbd
 
 | Part | What is taken over |
 |---|---|
-| Usenet servers | Address, port, SSL and certificate check, user name, connections, priority (primary/backup), retention, timeout, "optional" and "required", expiry date, quota, notes. **Passwords**: SABnzbd does not hand them out — type each one in. A server without a password is added switched off; enter the password later in Settings → Usenet, or run the wizard again with it. Servers are matched by host, port and user name. |
+| Usenet servers | Address, port, SSL and certificate check, user name, connections, priority (primary/backup), retention, timeout, "optional" and "required", expiry date, quota, notes. **Passwords**: SABnzbd does not hand them out — type each one in. A server without a password is added switched off; enter the password later in Settings → Usenet servers, or run the wizard again with it. Servers are matched by host, port and user name. |
 | Categories | Folder, priority, post-processing (download only / +repair / +unpack / +delete). SABnzbd's `movies` becomes StreamZH's **movies**, `tv` its **series**; other categories (e.g. `anime`) are added with their name. `*` (the default) has no counterpart, but categories that inherit from it get its settings. |
 | Download settings | Line speed and speed limit, the incomplete/completed/NZB backup folders (through the path mappings), the scheduler (pause, resume, speed limit, server and category rules), and switches StreamZH has as well: abort jobs that cannot be completed, ignore samples, check before download, propagation delay, article tries, recursive unpack, all par2 files, only unpack verified jobs, deobfuscate, temporary folder name, pause on start, duplicate detection, encrypted RAR, queue sorting, unwanted extensions, cleanup list, minimum free space. Each setting is its own item and can be left out. |
 
@@ -179,7 +170,7 @@ downloads. The watched folder is *not* taken over while both run (both would pic
 
 | Part | What is taken over |
 |---|---|
-| Indexers | Usenet indexers with categories, priority, query and grab limits and VIP date, the same way as Indexers → Import from Prowlarr. Prowlarr hides the indexers' own API keys, so they are reached **through Prowlarr** (`http://192.168.1.10:9696/1/api`) — unless you type the indexer's own API key in the wizard: then StreamZH uses the indexer directly and keeps working without Prowlarr. An indexer with the same name in StreamZH is kept as it is. |
+| Indexers | Usenet and torrent indexers with categories, priority, query and grab limits, VIP date and seed settings, the same way as Indexers → Import from Prowlarr. Prowlarr hides the indexers' own API keys, so they are reached **through Prowlarr** (`http://192.168.1.10:9696/1/api`) — unless you type the indexer's own API key in the wizard: then StreamZH uses the indexer directly and keeps working without Prowlarr. An indexer with the same name in StreamZH is kept as it is. |
 
 ### Radarr and Sonarr
 
@@ -189,7 +180,7 @@ blocklist) are described in the wizard itself. For the indexer and downloader pa
 
 | Part | What is taken over |
 |---|---|
-| Indexers | Newznab indexers: URL, API path, categories, priority, RSS/automatic/interactive search, additional parameters. StreamZH has one indexer for movies *and* TV: the same indexer from Radarr and Sonarr (same URL) becomes **one** indexer — Radarr's categories as movie categories, Sonarr's (plus its anime categories) as TV categories. An indexer that is already in StreamZH with the same URL is updated. API keys are masked by Radarr/Sonarr: type them in; an indexer without a key is added switched off. **Skipped**: torrent indexers (torrent support follows in StreamZH 1.0), non-Newznab indexers, and indexers that come from Prowlarr (`http://prowlarr:9696/3/`) — take those over from Prowlarr instead. |
+| Indexers | Newznab and Torznab indexers: URL, API path, categories, priority, RSS/automatic/interactive search, additional parameters, and for Torznab the minimum seeders and seed goals. StreamZH has one indexer for movies *and* TV: the same indexer from Radarr and Sonarr (same URL) becomes **one** indexer — Radarr's categories as movie categories, Sonarr's (plus its anime categories) as TV categories. An indexer that is already in StreamZH with the same URL is updated. API keys are masked by Radarr/Sonarr: type them in; an indexer without a key is added switched off. **Skipped**: indexers that are neither Newznab nor Torznab, and indexers that come from Prowlarr (`http://prowlarr:9696/3/`) — take those over from Prowlarr instead. |
 | Download clients | qBittorrent, Transmission and Deluge become StreamZH download clients (address, SSL, URL base, user name, add paused, priority, "remove completed") with their **remote path mappings** (the local path mapped like your library folders; a folder StreamZH cannot see is skipped). The same client in Radarr and Sonarr (same kind, host and port) becomes **one**; a second run updates it. Passwords are masked: type them in; a client without its password is added switched off. StreamZH adds its torrents with its own category `streamzh`, so Radarr/Sonarr and StreamZH never pick up each other's torrents. Usenet downloaders create nothing (StreamZH downloads by itself); a SABnzbd client shows SABnzbd's address and category for the SABnzbd migration. Other torrent clients (rTorrent, µTorrent, …) are skipped. |
 
 ## 6. The Usenet connection limit
@@ -199,7 +190,7 @@ share that limit**: if both use 30, the provider refuses connections and downloa
 
 So the wizard gives StreamZH **half** of SABnzbd's connections while the side-by-side mode is on (option
 "Connections": *half*). SABnzbd keeps its own. Once you have stopped SABnzbd, raise StreamZH's connections to the
-full number: in Settings → Usenet, or by running the "Usenet servers" part again with *same*.
+full number: in Settings → Usenet servers, or by running the "Usenet servers" part again with *same*.
 
 SABnzbd mostly idles during the side-by-side phase (Sonarr and Radarr still send it their grabs), but a download in
 each app at the same time is enough to hit the limit — keep the halves until you switch over.
@@ -211,8 +202,8 @@ StreamZH never changes the old apps and does not take over:
 - **SABnzbd**: post-processing scripts, RSS feeds, sorters (StreamZH renames and sorts into the library by itself),
   Direct Unpack, "pause downloading during post-processing", "only get articles for the top of the queue", the global
   download quota (StreamZH has a quota per server), the watched folder (see above), the queue and the history.
-- **Prowlarr**: torrent indexers, apps and their sync, download clients, notifications, the history.
-- **Radarr/Sonarr**: torrent indexers, torrent clients other than qBittorrent, Transmission and Deluge, the torrents in the
+- **Prowlarr**: apps and their sync, download clients, notifications, the history.
+- **Radarr/Sonarr**: indexers that are neither Newznab nor Torznab, torrent clients other than qBittorrent, Transmission and Deluge, the torrents in the
   old app's queue, and whatever the preview does not list.
 - **Passwords and API keys** are taken over only where you type them in.
 
@@ -225,9 +216,9 @@ During the side-by-side phase, compare:
 
 - **Library**: the numbers of movies, series and episodes, and that existing files show as present (no "missing" for
   files Radarr/Sonarr have). Missing files almost always mean a wrong or missing path mapping.
-- **Profiles and custom formats**: Release Test (Settings → Profiles) with a few release names you know.
+- **Profiles and custom formats**: Tools → Release test with a few release names you know.
 - **Indexers**: Indexers → Test all. Indexers added without an API key are switched off — enter the keys.
-- **Usenet**: Settings → Usenet → Test for every server. Servers added without a password are switched off.
+- **Usenet**: Settings → Usenet servers → Test for every server. Servers added without a password are switched off.
 - **Search by hand**: an Interactive Search for a movie and an episode should find the releases the old apps find.
 - **A manual grab**: grab one release by hand and watch it download, unpack and import.
 
@@ -249,7 +240,7 @@ When everything looks right:
    and Sonarr, and pause SABnzbd.
 3. **Indexers through Prowlarr**: if you keep indexers that go through Prowlarr, keep Prowlarr running — or enter
    their own API keys in StreamZH (Indexers → edit) before you stop it.
-4. **Usenet connections**: raise them to your provider's full number (Settings → Usenet).
+4. **Usenet connections**: raise them to your provider's full number (Settings → Usenet servers).
 5. **Watched folder**: set it in Settings → Downloads if you used one in SABnzbd.
 6. **Switch the side-by-side mode off** (Settings → Migration). From now on StreamZH runs RSS sync and the automatic
    searches.

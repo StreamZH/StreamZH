@@ -10,7 +10,8 @@ using StreamZH.Core;
 namespace StreamZH.Host.Security;
 
 /// <summary>What the start-up check of the data folder changed and what it could not change.</summary>
-public sealed record DataFolderPermissionReport(IReadOnlyList<string> Changed, IReadOnlyList<string> Problems)
+/// <param name="OwnerProblem">Windows: the folder belongs to another person's account (<see cref="DataFolderAcl.OwnerProblem"/>); shown as a status notice.</param>
+public sealed record DataFolderPermissionReport(IReadOnlyList<string> Changed, IReadOnlyList<string> Problems, string? OwnerProblem = null)
 {
     public static DataFolderPermissionReport None { get; } = new([], []);
 }
@@ -41,11 +42,12 @@ public static class DataFolderPermissions
         ArgumentNullException.ThrowIfNull(paths);
         var changed = new List<string>();
         var problems = new List<string>();
+        string? ownerProblem = null;
         try
         {
             if (OperatingSystem.IsWindows())
             {
-                ApplyWindows(paths.DataDirectory, changed, problems);
+                ownerProblem = ApplyWindows(paths.DataDirectory, changed, problems);
             }
             else
             {
@@ -58,7 +60,7 @@ public static class DataFolderPermissions
             problems.Add($"{paths.DataDirectory}: {ex.Message}");
         }
 
-        return new DataFolderPermissionReport(changed, problems);
+        return new DataFolderPermissionReport(changed, problems, ownerProblem);
     }
 
     /// <summary>
@@ -162,16 +164,35 @@ public static class DataFolderPermissions
 
     // ---- Windows ----
 
+    /// <summary>Narrows the access list; returns the owner notice (<see cref="DataFolderAcl.OwnerProblem"/>) or null.</summary>
     [SupportedOSPlatform("windows")]
-    private static void ApplyWindows(string folder, List<string> changed, List<string> problems)
+    private static string? ApplyWindows(string folder, List<string> changed, List<string> problems)
     {
         var directory = new DirectoryInfo(folder);
-        var security = directory.GetAccessControl(AccessControlSections.Access);
+        var security = directory.GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner);
         var me = WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("The account StreamZH runs as has no SID.");
+        var ownerProblem = DataFolderAcl.OwnerProblem(folder, security.GetOwner(typeof(SecurityIdentifier))?.Value, me);
+        if (ownerProblem is not null)
+        {
+            problems.Add(ownerProblem);
+        }
+
+        // SV4 Y-01: a link in place of a secret folder (keys, Backups, …) is reported like a foreign owner.
+        var linked = DataFolderAcl.SecretFolders.Where(name =>
+        {
+            var info = new DirectoryInfo(Path.Combine(folder, name));
+            return info.Exists && (info.Attributes & FileAttributes.ReparsePoint) != 0;
+        });
+        if (DataFolderAcl.LinkProblem(folder, linked) is { } linkProblem)
+        {
+            problems.Add(linkProblem);
+            ownerProblem = ownerProblem is null ? linkProblem : ownerProblem + " " + linkProblem;
+        }
+
         var plan = DataFolderAcl.Plan(WindowsAcl.Entries(security), security.AreAccessRulesProtected, me);
         if (plan is null)
         {
-            return;
+            return ownerProblem;
         }
 
         var desired = new DirectorySecurity();
@@ -191,6 +212,8 @@ public static class DataFolderPermissions
             problems.Add($"{folder} can be read by other users of this computer, and this account may not change that ({ex.Message}). "
                          + "Run tools\\Install-Service.ps1 (or tools\\Uninstall-Service.ps1 when StreamZH runs in a console window) once as administrator.");
         }
+
+        return ownerProblem;
     }
 }
 

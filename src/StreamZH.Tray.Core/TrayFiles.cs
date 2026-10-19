@@ -86,6 +86,21 @@ public static class TrayFiles
         return new TrayConnection(dataDirectory, endpoint, known, token, problem);
     }
 
+    /// <summary>1.0 RC: why the last start failed (startup-error.json), or null; StreamZH deletes the file when it starts.</summary>
+    public static StartupError? ReadStartupError(string dataDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(dataDirectory);
+        try
+        {
+            var error = JsonSerializer.Deserialize<StartupError>(File.ReadAllText(Path.Combine(dataDirectory, TrayContract.StartupErrorFile)), Json);
+            return error is { Summary.Length: > 0, Message.Length: > 0 } ? error : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
     public static TrayEndpoint Default(string dataDirectory) => new(
         $"http://127.0.0.1:{DefaultPort}",
         $"http://localhost:{DefaultPort}/",

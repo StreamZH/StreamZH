@@ -1,6 +1,6 @@
 # StreamZH Architecture
 
-Status: draft v0.1 (17.10.2026)
+Status: 1.0 release candidate (first draft 17.10.2026)
 
 StreamZH is one application that replaces the *arr stack: Sonarr, Radarr, Lidarr,
 Readarr, Whisparr, Prowlarr, SABnzbd and a torrent client. One login, one database,
@@ -20,8 +20,7 @@ the existing apps.
    take keeps its copyright header and is listed in `NOTICE.md`.
 4. **No bundled indexer list.** Users add their own, permitted sources (Newznab/Torznab
    endpoints). Same rule as CloudZH.
-5. **English everywhere in the system** (code, API, CLI, logs, UI). German only as a
-   UI language option.
+5. **English everywhere** (code, API, CLI, logs, UI, docs; decision 2026-10-19).
 6. **Strict separation from CloudZH.** Separate repository. CloudZH talks to StreamZH
    only through the public HTTP API, so the GPL never reaches the CloudZH code.
 
@@ -34,7 +33,7 @@ the existing apps.
 | Live updates | SignalR | Queue progress, activity events, toasts |
 | Database | SQLite (default), PostgreSQL later | Zero setup for home users |
 | Data access | Dapper + FluentMigrator | Same pattern as the *arr apps, eases porting |
-| Logging | Microsoft.Extensions.Logging, file sink planned for 0.1 | Structured logs, log viewer in UI later |
+| Logging | Microsoft.Extensions.Logging with a file log in `<data>/logs` | Log viewer under System → Logs |
 | Tests | xUnit | Port *arr NUnit fixtures as xUnit theories |
 | Frontend | React 19 + TypeScript + Vite | Same family as Sonarr/Radarr UI, largest ecosystem |
 | Frontend data | TanStack Query + React Router | Caching, background refresh, routing |
@@ -44,7 +43,7 @@ the existing apps.
 External tools called as processes (not linked): `par2` (par2cmdline-turbo) for
 repair and 7-Zip for extraction. Same approach as SABnzbd. When they are missing, StreamZH
 installs pinned official releases (SHA-256 checked) into `<data>/tools` itself
-(`ToolInstaller`, Settings → Tools).
+(`ToolInstaller`, Settings → Downloads → Tools).
 
 ## Module map
 
@@ -71,7 +70,7 @@ installs pinned official releases (SHA-256 checked) into `<data>/tools` itself
 | `StreamZH.Data` | Database, migrations, repositories |
 | `StreamZH.Parsing` | Release-name parser, quality parser, language parser (port from Sonarr/Radarr) |
 | `StreamZH.Metadata` | TMDB client for movies and series, artwork cache |
-| `StreamZH.Indexers` | Newznab client (Torznab later), search, RSS sync, rate limits, capabilities |
+| `StreamZH.Indexers` | Newznab and Torznab clients, search, RSS sync, rate limits, capabilities |
 | `StreamZH.Usenet` | Download engine: NZB parser, NNTP connection pool, yEnc decoder, file assembly, par2, unpack |
 | `StreamZH.Torrent` | Built-in torrent engine (MonoTorrent): the "StreamZH" torrent client, its settings, fast resume and seed goals |
 | `StreamZH.Library` | Root folders, disk scan, import, rename, media server notifications (Plex first) |

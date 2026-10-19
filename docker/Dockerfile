@@ -1,15 +1,18 @@
-# StreamZH container image
+# StreamZH container image (linux/amd64 and linux/arm64)
 # Build from the repository root:  docker build -f docker/Dockerfile -t streamzh:dev .
-# Run:  docker run -d --name streamzh -p 9797:9797 -e PUID=1000 -e PGID=1000 -v /opt/streamzh:/config streamzh:dev
+# Run:  docker run -d --name streamzh -p 9797:9797 -e PUID=1000 -e PGID=1000 -v /srv/streamzh:/config streamzh:dev
+# Released images: ghcr.io/cloudzh/streamzh (see docs/PACKAGING.md).
 
-FROM node:24-alpine AS frontend
+# The web UI and the .NET build run on the build machine's platform; their output is the same for every target
+# (the backend is published framework-dependent and portable: managed code plus native SQLite for each platform).
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
 COPY global.json Directory.Build.props NuGet.Config ./
 COPY src/ src/
@@ -17,6 +20,15 @@ COPY --from=frontend /src/src/StreamZH.Host/wwwroot src/StreamZH.Host/wwwroot
 RUN dotnet publish src/StreamZH.Host -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="StreamZH" \
+      org.opencontainers.image.description="One app for your whole media pipeline: library, indexers, downloads, requests." \
+      org.opencontainers.image.source="https://github.com/cloudzh/streamzh" \
+      org.opencontainers.image.url="https://github.com/cloudzh/streamzh" \
+      org.opencontainers.image.documentation="https://github.com/cloudzh/streamzh/blob/main/docs/INSTALL.md" \
+      org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.vendor="StreamZH contributors" \
+      org.opencontainers.image.version="$VERSION"
 # par2 for repair, 7-Zip for unpacking (RAR, 7z, ZIP), ffmpeg for ffprobe (media info). Found on PATH, so StreamZH does
 # not install its own copies here.
 RUN apt-get update \
@@ -32,7 +44,8 @@ ENV STREAMZH_DATA=/config \
     PGID= \
     UMASK=
 VOLUME /config
-EXPOSE 9797
+# 9797: web UI and API. 51414: the built-in torrent engine's listening port for peers (TCP and UDP), when it is on.
+EXPOSE 9797 51414/tcp 51414/udp
 WORKDIR /app
 COPY --from=backend /app .
 COPY --chmod=0755 docker/entrypoint.sh /entrypoint.sh

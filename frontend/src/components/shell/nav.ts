@@ -153,6 +153,7 @@ export function titleFor(pathname: string): string {
   if (pathname.startsWith('/library/series/')) return 'Series'
   if (pathname.startsWith('/discover/')) return 'Discover'
   if (pathname === '/profile') return 'Profile'
+  if (pathname === '/get-started') return 'Get started'
   for (const hub of hubs) {
     const tab = hub.tabs.find((t) => t.to === pathname)
     if (tab && hub.prefix !== tab.to) return `${allPages.find((p) => isActive(p, pathname))?.label ?? ''} · ${tab.label}`
@@ -168,4 +169,5 @@ export const paletteTargets = [
   { to: '/settings', label: 'All settings', icon: 'sliders' as IconName, keywords: 'overview', group: 'Settings' },
   { to: '/profile', label: 'Profile', icon: 'user' as IconName, keywords: 'account password discord link', group: '' },
   { to: '/library/import', label: 'Import existing library', icon: 'folderplus' as IconName, keywords: 'add folder scan', group: 'Library' },
+  { to: '/get-started', label: 'Get started', icon: 'sparkle' as IconName, keywords: 'setup guide checklist first steps wizard', group: '' },
 ]

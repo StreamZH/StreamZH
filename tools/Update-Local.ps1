@@ -1,17 +1,21 @@
 ﻿<#
 .SYNOPSIS
-    Builds StreamZH from this repository and (re)installs it locally on Windows.
+    Builds StreamZH from this repository and (re)installs it locally on Windows (for development and testing; to just
+    use StreamZH, install it with StreamZH-<version>-win-x64-setup.exe instead).
 
 .DESCRIPTION
     git pull -> build web UI -> publish single-file StreamZH.exe -> stop running StreamZH
     -> copy to the install folder -> start it again. Your data in C:\ProgramData\StreamZH stays untouched.
 
-    Windows service: when the service StreamZH exists (C:\Repos\StreamZH\tools\Install-Service.ps1), the script stops
-    the service, installs the new StreamZH.exe, starts the service again and waits until it answers. Without the service
-    StreamZH starts in a console window as before and stops when you log off. To switch to the service, once, in a
-    PowerShell as administrator:
-        C:\Repos\StreamZH\tools\Install-Service.ps1
-    Back to the console window: C:\Repos\StreamZH\tools\Uninstall-Service.ps1
+    Windows service: when the service StreamZH exists (tools\Install-Service.ps1), the script stops the service,
+    installs the new StreamZH.exe, starts the service again and waits until it answers. Without the service StreamZH
+    starts in a console window and stops when you sign out. To switch to the service, once, in a PowerShell as
+    administrator:
+        tools\Install-Service.ps1
+    Back to the console window: tools\Uninstall-Service.ps1
+
+    Do not point -InstallDir at the folder of the Windows installer (C:\Program Files\StreamZH): only administrators
+    may change it, and the next setup would overwrite the build.
 
     Program folder: only SYSTEM, administrators and your user may change <InstallDir> (inheritance from C:\ is cut, so
     other local accounts cannot replace StreamZH.exe); everyone else may read and run it.
@@ -27,14 +31,26 @@
     official releases, SHA256 checked) into C:\ProgramData\StreamZH\tools, a few seconds after it starts,
     or with "Install" in Settings -> Tools. An existing C:\Program Files\7-Zip is used as it is.
 
-.EXAMPLE
-    C:\Repos\StreamZH\tools\Update-Local.ps1
+.PARAMETER InstallDir
+    Folder to install to (default C:\Tools\StreamZH).
+
+.PARAMETER NoPull
+    Builds the checkout as it is, without git pull.
+
+.PARAMETER NoStart
+    Installs but does not start StreamZH (nor the tray icon); a service stays stopped.
+
+.PARAMETER NoTray
+    No tray icon: not built, its "Start with Windows" entry is removed.
 
 .EXAMPLE
-    C:\Repos\StreamZH\tools\Update-Local.ps1 -NoPull -NoStart
+    .\tools\Update-Local.ps1
 
 .EXAMPLE
-    C:\Repos\StreamZH\tools\Update-Local.ps1 -NoTray
+    .\tools\Update-Local.ps1 -NoPull -NoStart
+
+.EXAMPLE
+    .\tools\Update-Local.ps1 -NoTray
 #>
 [CmdletBinding()]
 param(
@@ -56,9 +72,9 @@ function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 
 function Require([string]$command, [string]$install) {
     if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
-        Write-Host "'$command' fehlt. Installieren mit:" -ForegroundColor Yellow
+        Write-Host "'$command' is missing. Install it with:" -ForegroundColor Yellow
         Write-Host "    $install" -ForegroundColor Yellow
-        Write-Host "Danach PowerShell neu öffnen und das Skript nochmals starten." -ForegroundColor Yellow
+        Write-Host "Then open a new PowerShell and run the script again." -ForegroundColor Yellow
         exit 1
     }
 }
@@ -68,7 +84,7 @@ Require 'dotnet' 'winget install --id Microsoft.DotNet.SDK.10 -e'
 Require 'npm' 'winget install --id OpenJS.NodeJS.LTS -e'
 
 if (-not ((& dotnet --list-sdks) -match '^10\.')) {
-    Write-Host '.NET 10 SDK fehlt. Installieren mit:' -ForegroundColor Yellow
+    Write-Host 'The .NET 10 SDK is missing. Install it with:' -ForegroundColor Yellow
     Write-Host '    winget install --id Microsoft.DotNet.SDK.10 -e' -ForegroundColor Yellow
     exit 1
 }
@@ -101,7 +117,7 @@ try {
 
     $tray = -not $NoTray
     if ($tray -and -not ((& dotnet --list-runtimes) -match '^Microsoft\.WindowsDesktop\.App 10\.')) {
-        Write-Host '.NET 10 Windows Desktop Runtime fehlt, das Tray-Symbol wird nicht gebaut. Installieren mit:' -ForegroundColor Yellow
+        Write-Host 'The .NET 10 Windows Desktop Runtime is missing, the tray icon is not built. Install it with:' -ForegroundColor Yellow
         Write-Host '    winget install --id Microsoft.DotNet.DesktopRuntime.10 -e' -ForegroundColor Yellow
         $tray = $false
     }
@@ -122,8 +138,8 @@ try {
             if (Stop-StreamZhService) { Write-Host 'service stopped' } else { Write-Host 'service not running' }
         }
         catch {
-            Write-Host "Der Dienst StreamZH lässt sich nicht stoppen: $($_.Exception.Message)" -ForegroundColor Yellow
-            Write-Host 'Einmal als Administrator ausführen, danach geht es ohne Administratorrechte:' -ForegroundColor Yellow
+            Write-Host "The StreamZH service cannot be stopped: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host 'Run once as administrator; afterwards this works without administrator rights:' -ForegroundColor Yellow
             Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'" -ForegroundColor Yellow
             throw 'stopping the StreamZH service failed'
         }
@@ -150,7 +166,7 @@ try {
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 
     if ($service -and $NoStart) {
-        Write-Host "`nDer Dienst StreamZH bleibt gestoppt. Starten mit: Start-Service StreamZH" -ForegroundColor Yellow
+        Write-Host "`nThe StreamZH service stays stopped. Start it with: Start-Service StreamZH" -ForegroundColor Yellow
     } elseif ($service) {
         Step 'Start StreamZH service'
         Start-Service -Name $StreamZhServiceName
@@ -161,8 +177,8 @@ try {
         Step 'Start StreamZH'
         Start-Process -FilePath (Join-Path $InstallDir 'StreamZH.exe') -WorkingDirectory $InstallDir
         Write-Host 'http://localhost:9797'
-        Write-Host "`nStreamZH läuft im Konsolenfenster und stoppt bei der Abmeldung. Als Windows-Dienst läuft es"
-        Write-Host 'auch ohne Anmeldung weiter. Einmalig in einer PowerShell als Administrator:'
+        Write-Host "`nStreamZH runs in a console window and stops when you sign out. As a Windows service it keeps"
+        Write-Host 'running without sign-in. Once, in a PowerShell as administrator:'
         Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'"
     }
 
@@ -177,7 +193,7 @@ try {
     }
 
     $version = (Get-Item (Join-Path $InstallDir 'StreamZH.exe')).VersionInfo.ProductVersion
-    Write-Host ("`nFertig: StreamZH {0} in {1:n0} s" -f $version, $stopwatch.Elapsed.TotalSeconds) -ForegroundColor Green
+    Write-Host ("`nDone: StreamZH {0} in {1:n0} s" -f $version, $stopwatch.Elapsed.TotalSeconds) -ForegroundColor Green
 }
 finally {
     Pop-Location

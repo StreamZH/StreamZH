@@ -27,7 +27,7 @@ public sealed class WantedServiceTests : IDisposable
         var movie = new Movie
         {
             TmdbId = tmdbId, Title = title, OriginalTitle = title, SortTitle = SortTitles.For(title), Year = 2026, Status = "Post Production",
-            Monitored = monitored, QualityProfileId = QualityDefaults.DefaultProfileId, OriginalLanguageId = Language.English.Id,
+            Monitored = monitored, QualityProfileId = QualityDefaults.GermanProfileId, OriginalLanguageId = Language.English.Id,
             RootFolderId = _bed.Dune.RootFolderId, FolderPath = Path.Combine(_bed.DataDirectory, "media", title), Added = DateTime.UtcNow,
             InCinemas = inCinemas, File = file is null ? null : new MediaFile(file, 1, DateTime.UtcNow),
         };
@@ -149,7 +149,7 @@ public sealed class WantedServiceTests : IDisposable
 
         // An English file is in the wrong language for a German profile, even when upgrades are off.
         SetMovieFile(_bed.Dune, "Dune.2021.1080p.BluRay.x264-GRP.mkv");
-        _bed.Profiles.Update(_bed.Profiles.Find(QualityDefaults.DefaultProfileId)! with { UpgradeAllowed = false });
+        _bed.Profiles.Update(_bed.Profiles.Find(QualityDefaults.GermanProfileId)! with { UpgradeAllowed = false });
         var wrong = Assert.Single(_bed.Wanted().Cutoff(Movies()).Records);
         Assert.Equal([CutoffRules.ReasonLanguage], wrong.Reasons);
 
@@ -165,7 +165,7 @@ public sealed class WantedServiceTests : IDisposable
     {
         var formats = new CustomFormatRepository(_bed.Database);
         var good = formats.Add(CustomFormats.CustomFormatTestData.Movie("Good group", 0, CustomFormats.CustomFormatTestData.Title("-GOOD$")));
-        _bed.Profiles.Update(_bed.Profiles.Find(QualityDefaults.DefaultProfileId)! with
+        _bed.Profiles.Update(_bed.Profiles.Find(QualityDefaults.GermanProfileId)! with
         {
             FormatItems = [new Core.CustomFormats.ProfileFormatItem(good, 100)],
             CutoffFormatScore = 100,

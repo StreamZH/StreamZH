@@ -1,0 +1,381 @@
+name: Release
+
+# A tag v<version> (matching <Version> in Directory.Build.props) builds and tests StreamZH, builds every package, pushes
+# the Docker image to GHCR and creates a draft GitHub release with the packages, SHA256SUMS and the CHANGELOG section of
+# that version as notes. A version with a suffix (1.0.0-rc.1) becomes a pre-release and does not move "latest".
+# "Run workflow" by hand builds everything as a dry run: no image push, no release. See docs/PACKAGING.md.
+#
+# Supply chain (security review SV4): every action is pinned to a commit (Dependabot proposes updates); the image push
+# and the release run in the environment "release" (add required reviewers there); the release files and the image get
+# build provenance attestations (`gh attestation verify <file> --repo <owner/name>`).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  # nfpm builds the .deb and .rpm (https://github.com/goreleaser/nfpm); pinned and checked.
+  NFPM_VERSION: 2.47.0
+  NFPM_SHA256: 0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783
+  # Inno Setup builds the Windows installer (https://github.com/jrsoftware/issrc); pinned and checked.
+  INNO_VERSION: 6.7.0
+  INNO_SHA256: f45c7d68d1e660cf13877ec36738a5179ce72a33414f9959d35e99b68c52a697
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      release: ${{ steps.version.outputs.release }}
+      image: ${{ steps.repository.outputs.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # SV4 X-01: the update check of every installation trusts the releases of AppInfo.Repository, and the docs tell
+      # users to run ghcr.io/<AppInfo.Repository>. A release from any other repository (a fork, a renamed owner) would
+      # publish files and an image nobody's update check or compose file points to; stop before anything is built.
+      - name: Repository
+        id: repository
+        run: |
+          image=$(packaging/check-repository.sh --repository "$GITHUB_REPOSITORY")
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "Repository $GITHUB_REPOSITORY, image $image"
+
+      - name: Version
+        id: version
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)
+          release=false
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            release=true
+            if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match <Version>$version</Version> in Directory.Build.props"
+              exit 1
+            fi
+          fi
+          prerelease=false
+          case "$version" in *-*) prerelease=true ;; esac
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+          echo "StreamZH $version (pre-release: $prerelease, release: $release)"
+
+  test:
+    needs: [version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npx oxlint src
+          npm run build
+
+      - name: Backend
+        run: |
+          dotnet build StreamZH.slnx -c Release
+          dotnet test StreamZH.slnx -c Release --no-build
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wwwroot
+          path: src/StreamZH.Host/wwwroot
+          retention-days: 3
+
+  packages:
+    needs: [version, test]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: linux-arm64
+            os: ubuntu-latest
+          - rid: win-x64
+            os: windows-latest
+          # macOS on macOS: the SDK signs the program there (ad hoc), which Apple silicon requires.
+          - rid: osx-arm64
+            os: macos-latest
+          - rid: osx-x64
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: wwwroot
+          path: src/StreamZH.Host/wwwroot
+
+      - name: Publish StreamZH (${{ matrix.rid }})
+        shell: bash
+        run: >
+          dotnet publish src/StreamZH.Host -c Release -r ${{ matrix.rid }}
+          --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -o out/${{ matrix.rid }}
+
+      # The tray icon, self-contained like StreamZH.exe: no .NET Desktop Runtime needed.
+      - name: Publish the tray icon
+        if: matrix.rid == 'win-x64'
+        shell: bash
+        run: >
+          dotnet publish src/StreamZH.Tray -c Release -r win-x64
+          --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -o out/win-x64
+
+      - name: Linux packages (.tar.gz, .deb, .rpm)
+        if: startsWith(matrix.rid, 'linux-')
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/nfpm.tar.gz" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "$NFPM_SHA256  $RUNNER_TEMP/nfpm.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/nfpm.tar.gz" -C "$RUNNER_TEMP" nfpm
+          packaging/linux/build.sh --rid ${{ matrix.rid }} --input out/${{ matrix.rid }} --output dist \
+            --version "$VERSION" --nfpm "$RUNNER_TEMP/nfpm"
+
+      # The pinned Inno Setup, not whatever the runner image has (SV4 X-08).
+      - name: Windows installer and zip
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNO_VERSION.exe"
+          $tag = 'is-' + $env:INNO_VERSION.Replace('.', '_')
+          Invoke-WebRequest -UseBasicParsing -OutFile $setup -Uri "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$env:INNO_VERSION.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash
+          if ($hash -ne $env:INNO_SHA256) { throw "Inno Setup $env:INNO_VERSION has the SHA-256 $hash, expected $env:INNO_SHA256" }
+          $inno = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          $process = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"$inno`""
+          if ($process.ExitCode -ne 0) { throw "installing Inno Setup failed ($($process.ExitCode))" }
+          ./packaging/windows/build.ps1 -SourceDir out/win-x64 -OutputDir dist -Version $env:VERSION -Iscc (Join-Path $inno 'ISCC.exe')
+
+      - name: macOS zip
+        if: startsWith(matrix.rid, 'osx-')
+        run: |
+          mkdir -p dist stage/StreamZH
+          cp -R out/${{ matrix.rid }}/. stage/StreamZH/
+          cp LICENSE NOTICE.md stage/StreamZH/
+          chmod 0755 stage/StreamZH/StreamZH
+          (cd stage && zip -r -y -X "../dist/StreamZH-$VERSION-${{ matrix.rid }}.zip" StreamZH)
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: packages-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Build and smoke-test the image; nothing is pushed here (also the dry run).
+  docker:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build for the smoke test (amd64)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          build-args: VERSION=${{ env.VERSION }}
+          load: true
+          push: false
+          tags: streamzh:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          docker run -d --name streamzh -p 9797:9797 -e PUID=1000 -e PGID=1000 streamzh:smoke
+          for _ in $(seq 1 60); do curl -fs http://localhost:9797/health && break; sleep 1; done
+          echo
+          curl -fs http://localhost:9797/api/v1/auth/state | tee /dev/stderr | grep -q '"setupRequired":true'
+          curl -fs -o /dev/null http://localhost:9797/
+          docker inspect --format '{{json .Config.ExposedPorts}} {{index .Config.Labels "org.opencontainers.image.version"}}' streamzh:smoke
+          docker logs streamzh
+          docker rm -f streamzh
+
+  # Push the image (amd64, arm64) to ghcr.io/<AppInfo.Repository> and attest it. Only for a release tag, after the
+  # tests, the packages and the smoke test, in the environment "release" (required reviewers: docs/PACKAGING.md).
+  docker-push:
+    needs: [version, packages, docker]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      IMAGE: ${{ needs.version.outputs.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ needs.version.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.title=StreamZH
+            org.opencontainers.image.licenses=GPL-3.0-only
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (amd64, arm64)
+        id: push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ env.VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # `gh attestation verify oci://ghcr.io/<owner/name>:<version> --repo <owner/name>`
+      - name: Attest the image
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
+  release:
+    needs: [version, packages, docker-push]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      IMAGE: ${{ needs.version.outputs.image }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+
+      # SHA256SUMS proves a download is complete; the attestation proves this workflow in this repository built it:
+      # `gh attestation verify <file> --repo <owner/name>`.
+      - name: Attest the release files
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: dist/*
+
+      # The "## [x.y.z]" section of CHANGELOG.md (Keep a Changelog), else a short default.
+      - name: Release notes
+        run: |
+          notes=""
+          if [ -f CHANGELOG.md ]; then
+            notes=$(awk -v v="$VERSION" '
+              index($0, "## [" v "]") == 1 { found = 1; next }
+              found && (/^## \[/ || /^\[[^]]+\]: /) { exit }
+              found { print }
+            ' CHANGELOG.md)
+          fi
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            notes="StreamZH $VERSION."
+          fi
+          # The backticks below are Markdown, not command substitution.
+          # shellcheck disable=SC2016
+          {
+            printf '%s\n\n' "$notes"
+            printf '## Downloads\n\n'
+            printf -- '- Windows: `StreamZH-%s-win-x64-setup.exe` (installer) or `StreamZH-%s-win-x64.zip` (portable)\n' "$VERSION" "$VERSION"
+            printf -- '- Debian/Ubuntu: `streamzh_%s_amd64.deb` / `_arm64.deb`; Fedora/RHEL: `streamzh-%s.x86_64.rpm` / `.aarch64.rpm`; other Linux: `StreamZH-%s-linux-x64.tar.gz` / `-linux-arm64.tar.gz` with `install-linux.sh`\n' "$VERSION" "$VERSION" "$VERSION"
+            printf -- '- macOS: `StreamZH-%s-osx-arm64.zip` (Apple silicon) / `-osx-x64.zip` (Intel), not notarized\n' "$VERSION"
+            printf -- '- Docker: `docker pull %s:%s`\n\n' "$IMAGE" "$VERSION"
+            printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`, and that this repository built it with `gh attestation verify <file> --repo %s`. Installation: docs/INSTALL.md.\n' "$GITHUB_REPOSITORY"
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Draft release
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag \
+            --title "StreamZH $VERSION" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"

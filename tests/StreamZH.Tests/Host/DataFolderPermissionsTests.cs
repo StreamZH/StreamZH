@@ -221,6 +221,46 @@ public sealed class DataFolderPermissionsTests : IDisposable
         Assert.NotNull(DataFolderAcl.Plan(current[..^1], isProtected: true, OtherUser));
     }
 
+    /// <summary>SV4 X-02: a data folder created by another person's account before the install keeps that owner's WRITE_DAC.</summary>
+    [Fact]
+    public void A_data_folder_owned_by_another_user_is_reported()
+    {
+        const string folder = @"C:\ProgramData\StreamZH";
+
+        // Owners that are fine: SYSTEM, Administrators (what the scripts set), TrustedInstaller, service accounts, the
+        // account StreamZH runs as (a console window created the folder itself), and an unknown owner.
+        foreach (var owner in new[] { DataFolderAcl.LocalSystem, DataFolderAcl.Administrators, "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464", ServiceSid, null })
+        {
+            Assert.Null(DataFolderAcl.OwnerProblem(folder, owner, ServiceSid));
+        }
+
+        Assert.Null(DataFolderAcl.OwnerProblem(folder, Installer, Installer));
+        Assert.Null(DataFolderAcl.OwnerProblem(folder, Installer.ToLowerInvariant(), Installer));
+
+        // Another person's account (local, domain or Entra ID) owns the service's data folder.
+        var problem = DataFolderAcl.OwnerProblem(folder, OtherUser, ServiceSid);
+        Assert.NotNull(problem);
+        Assert.Contains(folder, problem, StringComparison.Ordinal);
+        Assert.Contains(OtherUser, problem, StringComparison.Ordinal);
+        Assert.Contains("Install-Service.ps1", problem, StringComparison.Ordinal);
+        Assert.NotNull(DataFolderAcl.OwnerProblem(folder, Installer, ServiceSid));
+        Assert.NotNull(DataFolderAcl.OwnerProblem(folder, "S-1-12-1-1111111111-2222222222-3333333333-4444444444", Installer));
+
+        // The start-up report carries it to the status window.
+        using var services = new ServiceCollection()
+            .AddSingleton(new DataFolderPermissionReport([], [problem], problem))
+            .BuildServiceProvider();
+        var notices = new List<StreamZH.Host.Status.OngoingNotice>();
+        StreamZH.Host.Status.SecurityNotices.Add(notices, services);
+        var notice = Assert.Single(notices, n => n.Key == "data-folder-owner");
+        Assert.Equal(problem, notice.Sub);
+
+        using var none = new ServiceCollection().AddSingleton(DataFolderPermissionReport.None).BuildServiceProvider();
+        notices.Clear();
+        StreamZH.Host.Status.SecurityNotices.Add(notices, none);
+        Assert.DoesNotContain(notices, n => n.Key == "data-folder-owner");
+    }
+
     [Theory]
     [InlineData(0x10000000, AclEntry.FullControl)]      // GENERIC_ALL (CREATOR OWNER in C:\ProgramData)
     [InlineData(unchecked((int)0x80000000), 0x120089)]   // GENERIC_READ

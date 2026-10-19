@@ -64,6 +64,16 @@ var config = new ConfigRepository(database);
 StorageLocationService.Load(config, paths);
 var fileLogger = builder.AddStreamZhLogging(paths, config);
 var runningHost = builder.UseStreamZhHost(config, restart);
+
+// 1.0 RC: another program on the port: one clear line and an exit code instead of a stack trace (see StartupCheck).
+if (restart is null && StartupCheck.Problem(StartupCheck.Endpoints(runningHost.Addresses), runningHost.Override) is { } portProblem)
+{
+    StartupCheck.Report(portProblem.Summary, portProblem.Message, paths, fileLogger, service);
+    fileLogger.Dispose();
+    service?.Finish();
+    return;
+}
+
 builder.UseStreamZhService(service);
 
 builder.Services.AddSingleton(paths);
@@ -132,8 +142,7 @@ builder.Services.AddAlternativeTitles();
 builder.Services.AddMigration();
 builder.Services.AddRequests();
 builder.Services.AddDiscord(builder.Configuration);
-builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddApiErrors();
 builder.Services.AddSingleton(new StartupInfo(DateTimeOffset.UtcNow));
 builder.Services.AddStreamZhAuth(paths);
 builder.Services.AddDataFolderPermissions(dataFolderPermissions);
@@ -165,6 +174,7 @@ app.MapUserManagementEndpoints();
 app.MapSystemEndpoints();
 app.MapGeneralSettingsEndpoints();
 app.MapStorageEndpoints();
+app.MapSetupGuideEndpoints();
 app.MapUiSettingsEndpoints();
 app.MapAutomationEndpoints();
 app.MapSystemInfoEndpoints();
@@ -206,8 +216,9 @@ app.MapRequestEndpoints();
 app.MapDiscordEndpoints();
 app.MapHub<EventsHub>("/hub").RequireAuthorization(AuthSchemes.AnyUserPolicy);
 
-// Unknown API routes are real 404s; everything else is client-side routing in the React app.
-app.MapFallback("/api/{**path}", () => Results.NotFound());
+// Unknown API routes are real 404s (a known route with a wrong Content-Type: 415); everything else is client-side
+// routing in the React app.
+app.MapFallback("/api/{**path}", ApiFallback.Answer);
 app.MapStreamZhIndex();
 
 app.Logger.LogInformation("{App} {Version} started, data in {DataDirectory}", AppInfo.Name, AppInfo.Version, paths.DataDirectory);

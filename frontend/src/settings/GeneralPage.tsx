@@ -774,7 +774,7 @@ function UpdatesSection() {
   const last = info?.lastCheck
 
   return (
-    <Section id="updates" title="Updates" description="StreamZH does not update itself yet. It can only tell you about a new version.">
+    <Section id="updates" title="Updates" description="StreamZH does not update itself. It tells you about a new version and which file fits this installation.">
       {info && (
         <>
           <Row label="Version">
@@ -790,6 +790,14 @@ function UpdatesSection() {
                   last.updateAvailable ? (
                     <>
                       <strong className={styles.ok}>{last.latestVersion} is available</strong>
+                      {last.assetUrl && (
+                        <>
+                          {' · '}
+                          <a href={last.assetUrl} target="_blank" rel="noreferrer noopener" title={last.assetName ?? undefined}>
+                            Download {last.assetName}
+                          </a>
+                        </>
+                      )}
                       {last.releaseUrl && (
                         <>
                           {' · '}

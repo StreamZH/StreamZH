@@ -50,8 +50,9 @@ public sealed class ProfileApiTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/v1/qualityprofiles/999")).StatusCode);
 
+        // 1.0: a new installation starts with HD-1080p (any language) as default.
         var settings = (await client.GetFromJsonAsync<ProfileSettings>("/api/v1/settings/profiles"))!;
-        Assert.Equal(DeutschHd, settings.DefaultQualityProfileId);
+        Assert.Equal(HdOnly, settings.DefaultQualityProfileId);
 
         var schema = (await client.GetFromJsonAsync<QualityProfileResource>("/api/v1/qualityprofiles/schema"))!;
         Assert.Equal(0, schema.Id);
@@ -155,6 +156,7 @@ public sealed class ProfileApiTests : IDisposable
         var client = await _factory.CreateOwnerClientAsync();
         var root = await AddRootFolderAsync(client, "movies", "Movie");
 
+        Assert.True((await client.PutAsJsonAsync("/api/v1/settings/profiles", new { defaultQualityProfileId = DeutschHd })).IsSuccessStatusCode);
         var add = await client.PostAsJsonAsync("/api/v1/movies", new { tmdbId = 438631, rootFolderId = root.Id, qualityProfileId = HdOnly });
         var movie = (await add.Content.ReadFromJsonAsync<MovieResource>())!;
         Assert.Equal(HdOnly, movie.QualityProfileId);
@@ -187,7 +189,7 @@ public sealed class ProfileApiTests : IDisposable
         var root = await AddRootFolderAsync(client, "movies", "Movie");
 
         var dune = (await (await client.PostAsJsonAsync("/api/v1/movies", new { tmdbId = 438631, rootFolderId = root.Id })).Content.ReadFromJsonAsync<MovieResource>())!;
-        Assert.Equal(DeutschHd, dune.QualityProfileId);
+        Assert.Equal(HdOnly, dune.QualityProfileId);
 
         var invalid = await client.PutAsJsonAsync("/api/v1/settings/profiles", new { defaultQualityProfileId = 999 });
         Assert.Equal(["defaultQualityProfileId"], await ErrorKeysAsync(invalid));
@@ -263,7 +265,7 @@ public sealed class ProfileApiTests : IDisposable
         await WaitForJobsAsync(client);
 
         var all = (await client.GetFromJsonAsync<MovieResource[]>("/api/v1/movies"))!;
-        Assert.Equal([("Arrival", 1), ("Dune", DeutschHd)], all.Select(m => (m.Title, m.QualityProfileId)));
+        Assert.Equal([("Arrival", 1), ("Dune", HdOnly)], all.Select(m => (m.Title, m.QualityProfileId)));
     }
 
     [Fact]

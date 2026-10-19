@@ -12,7 +12,8 @@ you for, and how to run it safely. Short version:
 ## Reporting a vulnerability
 
 Please report security problems privately through GitHub's private vulnerability reporting on
-<https://github.com/streamzh/streamzh> (Security → Report a vulnerability), not as a public issue. Include the version
+<https://github.com/cloudzh/streamzh> (Security → Report a vulnerability), not as a public issue; see
+[SECURITY.md](../SECURITY.md). Include the version
 (System → Status), how StreamZH is installed (Windows service, Linux, Docker) and the steps to reproduce. Fixes are
 released as soon as they are ready and credited in the release notes unless you prefer otherwise.
 
@@ -383,13 +384,13 @@ shut down. On Linux and macOS the file is `0600`.
 ### The program folder (Windows)
 
 Folders created below `C:\` inherit "Authenticated Users: Modify", so every local account could replace
-`StreamZH.exe` or `StreamZH.Tray.exe` in the default install folder `C:\Tools\StreamZH`, and the service (or your
-tray icon) would run that program. `tools\Update-Local.ps1` and `tools\Install-Service.ps1` therefore give the install
+`StreamZH.exe` or `StreamZH.Tray.exe` in an install folder such as `C:\Tools\StreamZH` (the default of the scripts
+before 1.0), and the service (or your tray icon) would run that program. `tools\Update-Local.ps1` and `tools\Install-Service.ps1` therefore give the install
 folder a protected access list: inheritance off, SYSTEM and Administrators full control, your user Modify (so
 `Update-Local.ps1` keeps working without administrator rights), Users and the service account read and run only.
 StreamZH checks this at every start and shows "Program folder not protected" in the status window when Users,
-Authenticated Users or Everyone may change it. Installing to `C:\Program Files\StreamZH` (`-InstallDir`) gives the
-same protection by default.
+Authenticated Users or Everyone may change it. The Windows installer installs to `C:\Program Files\StreamZH`, which
+has this protection by default.
 
 ## Outgoing connections
 

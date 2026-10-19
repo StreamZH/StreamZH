@@ -6,6 +6,7 @@ import { downloadKeys, downloadsApi, withLive, type DownloadItem } from '../api/
 import { libraryApi, queryKeys, type RootFolder } from '../api/library'
 import type { OngoingNotice } from '../api/status'
 import MigrationCard from '../migration/OverviewCard'
+import SetupCard from '../welcome/SetupCard'
 import { calendarApi, calendarKeys, wantedApi, wantedKeys, type CalendarEntry, type CalendarFilter } from '../api/wanted'
 import { addDays, dayKey } from '../calendar/dates'
 import Icon, { type IconName } from '../components/Icon'
@@ -37,7 +38,7 @@ export default function Home() {
     <div>
       <PageHeader title="Overview" lead="Your library at a glance." />
       {stats.isError && <p className={`${ui.errBox} ${styles.gap}`}>Backend not reachable: {stats.error.message}</p>}
-      <MigrationCard />
+      <SetupCard fallback={<MigrationCard />} />
 
       <div className={styles.ov}>
         <section className={styles.metrics} aria-label="Library">

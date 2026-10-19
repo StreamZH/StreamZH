@@ -4,6 +4,7 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security.Principal;
 using System.ServiceProcess;
 using StreamZH.Core;
 using StreamZH.Tray.Core;
@@ -97,6 +98,15 @@ internal sealed class StreamZhProcess(string dataDirectory)
         if (!File.Exists(HostExe))
         {
             return $"{HostExe} is missing.";
+        }
+
+        // Never as SYSTEM (SV4 X-05): StreamZH.exe would inherit this account.
+        using (var me = WindowsIdentity.GetCurrent())
+        {
+            if (TrayCommandLine.HostStartRefusal(me.User?.Value) is { } refused)
+            {
+                return refused;
+            }
         }
 
         try

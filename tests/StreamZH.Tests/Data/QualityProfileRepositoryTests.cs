@@ -26,7 +26,13 @@ public sealed class QualityProfileRepositoryTests : IDisposable
 
         Assert.Equal(["Any", "Deutsch 1080p", "Deutsch 2160p", "HD-1080p", "Ultra-HD"], profiles.All().Select(p => p.Name));
 
-        var german = profiles.Find(QualityDefaults.DefaultProfileId)!;
+        // 1.0: a new installation starts with HD-1080p in any language; Deutsch 1080p is still there.
+        var hd = profiles.Find(QualityDefaults.DefaultProfileId)!;
+        Assert.Equal("HD-1080p", hd.Name);
+        Assert.Equal(Language.Any.Id, hd.LanguageId);
+        Assert.Equal(QualityDefaults.DefaultProfileId.ToString(System.Globalization.CultureInfo.InvariantCulture), new ConfigRepository(database).Get(ConfigKeys.DefaultQualityProfileId));
+
+        var german = profiles.Find(QualityDefaults.GermanProfileId)!;
         Assert.Equal("Deutsch 1080p", german.Name);
         Assert.Equal(Language.German.Id, german.LanguageId);
         Assert.True(german.PreferDualLanguage);
@@ -47,7 +53,6 @@ public sealed class QualityProfileRepositoryTests : IDisposable
         Assert.Equal(Quality.Remux2160p.Id, ultra.CutoffQualityId);
         Assert.Equal(Language.Original.Id, ultra.LanguageId);
 
-        Assert.Equal("4", new ConfigRepository(database).Get(ConfigKeys.DefaultQualityProfileId));
 
         var definitions = new QualityDefinitionRepository(database).All();
         Assert.Equal(Quality.All.Count, definitions.Count);
@@ -85,6 +90,23 @@ public sealed class QualityProfileRepositoryTests : IDisposable
         Assert.Equal(QualityDefaults.DefaultProfileId, Assert.Single(new MovieRepository(database).All()).QualityProfileId);
         Assert.Equal(QualityDefaults.DefaultProfileId, Assert.Single(new SeriesRepository(database).All()).QualityProfileId);
         Assert.Equal(2, new QualityProfileRepository(database).UsageCount(QualityDefaults.DefaultProfileId));
+    }
+
+    /// <summary>1.0: only new installations start with HD-1080p; migrating an existing database never touches its profiles or default.</summary>
+    [Fact]
+    public void Migrating_again_keeps_the_default_and_the_profiles_of_an_existing_installation()
+    {
+        var database = Migrated();
+        var config = new ConfigRepository(database);
+        var profiles = new QualityProfileRepository(database);
+        config.Set(ConfigKeys.DefaultQualityProfileId, QualityDefaults.GermanProfileId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        profiles.Update(profiles.Find(QualityDefaults.DefaultProfileId)! with { LanguageId = Language.Original.Id });
+
+        database.Migrate();
+
+        Assert.Equal(QualityDefaults.GermanProfileId.ToString(System.Globalization.CultureInfo.InvariantCulture), config.Get(ConfigKeys.DefaultQualityProfileId));
+        Assert.Equal(Language.Original.Id, profiles.Find(QualityDefaults.DefaultProfileId)!.LanguageId);
+        Assert.Equal(5, profiles.Count());
     }
 
     [Fact]

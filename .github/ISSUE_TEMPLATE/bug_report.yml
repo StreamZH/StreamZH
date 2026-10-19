@@ -1,0 +1,88 @@
+name: Bug report
+description: Something in StreamZH does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please search the [existing issues](https://github.com/cloudzh/streamzh/issues) and the
+        [troubleshooting page](https://github.com/cloudzh/streamzh/blob/main/docs/guide/troubleshooting.md) first.
+
+        **Security problems do not belong here.** Report them privately: see
+        [SECURITY.md](https://github.com/cloudzh/streamzh/blob/main/SECURITY.md).
+
+        **Before you paste logs or screenshots, remove API keys, passwords, tokens, indexer and server addresses, host
+        names, e-mail addresses and anything else personal.** Never attach a backup or the database.
+  - type: input
+    id: version
+    attributes:
+      label: StreamZH version
+      description: System → Status shows it.
+      placeholder: 1.0.0-rc.1
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is StreamZH installed?
+      options:
+        - Windows installer, as a service
+        - Windows installer, tray icon only
+        - Windows portable zip
+        - Linux .deb package
+        - Linux .rpm package
+        - Linux tar.gz with install-linux.sh
+        - Docker / Docker Compose
+        - macOS zip
+        - Built from source
+        - Other (please describe below)
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      description: For Docker also the host system and NAS model, if any.
+      placeholder: Windows 11 x64 / Ubuntu 24.04 arm64 / Synology DSM 7.2 with Docker
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Only for problems in the web interface.
+      placeholder: Firefox 140 / Chrome 140 / Safari on iOS 26
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Added the movie …
+        2. Pressed Search …
+        3. Expected …, but …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: |
+        System → Logs, or the files in the `logs` folder of the data folder (`docker logs streamzh`,
+        `journalctl -u streamzh`). Set the log level to Debug (Settings → General → Logging) and reproduce the problem
+        for more detail. Paste only the relevant lines, and remove keys, passwords and personal data first.
+      render: text
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Screenshots (with personal data removed), settings that matter, a reverse proxy in front, etc.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed API keys, passwords and personal data from everything above.
+          required: true
+        - label: I searched the existing issues.
+          required: true

@@ -22,7 +22,7 @@ public static class StatusText
         switch (state.Kind)
         {
             case TrayStateKind.NotRunning:
-                return "Not running";
+                return state.StartupError is { } error ? $"Not running · {error.Summary}" : "Not running";
             case TrayStateKind.Starting:
                 return "Starting…";
             case TrayStateKind.Stopping:

@@ -1,0 +1,48 @@
+name: Feature request
+description: An idea for something StreamZH should do, or do better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please check the [roadmap](https://github.com/cloudzh/streamzh/blob/main/docs/ROADMAP.md)
+        and the [existing issues](https://github.com/cloudzh/streamzh/issues) first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The task or problem, not the solution yet. "I want to … so that …"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: How could StreamZH help?
+      description: How you imagine it. If Radarr, Sonarr, Prowlarr, SABnzbd or another tool does this, tell us how it works there.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What you do today instead, or other ways it could work.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Library (movies, series)
+        - Searching and grabbing
+        - Indexers
+        - Downloads (Usenet, torrents)
+        - Quality, custom formats, TRaSH Guides
+        - Requests, Discover, Discord bot
+        - Users and sign-in
+        - Notifications, import lists, calendar
+        - Migration from the *arr apps
+        - Installation and packaging
+        - Web interface
+        - API
+        - Other
+    validations:
+      required: true

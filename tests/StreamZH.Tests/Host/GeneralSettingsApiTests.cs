@@ -150,14 +150,37 @@ public sealed class GeneralSettingsApiTests : IDisposable
         Assert.False(info.LastCheck.UpdateAvailable);
         Assert.Contains("No update information yet", info.LastCheck.Message, StringComparison.Ordinal);
 
-        github.Release = """{"tag_name":"v99.1.0","html_url":"https://github.com/streamzh/streamzh/releases/tag/v99.1.0","published_at":"2027-01-01T00:00:00Z"}""";
+        Assert.Equal("https://api.github.com/repos/cloudzh/streamzh/releases/latest", github.LastUrl);
+        // Tests run from the build output (an archive install), or in a container (Docker: no file, pull the image).
+        Assert.Contains(info.Package, new[] { ReleaseAssets.Archive, ReleaseAssets.Docker });
+        var fits = ReleaseAssets.Suffix(ReleaseAssets.CurrentOs(), System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture, info.Package);
+
+        // The file for this platform is offered; links that leave github.com are not.
+        var suffix = fits ?? "-linux-x64.tar.gz";
+        var download = $"https://github.com/cloudzh/streamzh/releases/download/v99.1.0/StreamZH-99.1.0{suffix}";
+        github.Release = $$"""
+            {"tag_name":"v99.1.0","html_url":"https://github.com/cloudzh/streamzh/releases/tag/v99.1.0","published_at":"2027-01-01T00:00:00Z",
+             "assets":[{"name":"SHA256SUMS","browser_download_url":"https://github.com/cloudzh/streamzh/releases/download/v99.1.0/SHA256SUMS"},
+                       {"name":"StreamZH-99.1.0{{suffix}}","browser_download_url":"{{download}}"}]}
+            """;
         info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;
         Assert.True(info.LastCheck.UpdateAvailable);
         Assert.Equal("99.1.0", info.LastCheck.LatestVersion);
         Assert.Equal("api.github.com", github.LastHost);
+        Assert.Equal(fits is null ? null : $"StreamZH-99.1.0{suffix}", info.LastCheck.AssetName);
+        Assert.Equal(fits is null ? null : download, info.LastCheck.AssetUrl);
+
+        github.Release = $$"""
+            {"tag_name":"v99.1.0","html_url":"https://github.com/cloudzh/streamzh/releases/tag/v99.1.0",
+             "assets":[{"name":"StreamZH-99.1.0{{suffix}}","browser_download_url":"https://evil.example/StreamZH-99.1.0{{suffix}}"}]}
+            """;
+        info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;
+        Assert.True(info.LastCheck.UpdateAvailable);
+        Assert.Null(info.LastCheck.AssetName);
+        Assert.Null(info.LastCheck.AssetUrl);
 
         // A release whose link leaves github.com is not offered (the link becomes the "Download" button).
-        foreach (var link in new[] { "https://github.com.evil.example/x", "http://github.com/streamzh/streamzh/releases/tag/v99.2.0", "https://evil.example/StreamZH.exe" })
+        foreach (var link in new[] { "https://github.com.evil.example/x", "http://github.com/cloudzh/streamzh/releases/tag/v99.2.0", "https://evil.example/StreamZH.exe", "https://github.com/attacker/streamzh/releases/tag/v99.2.0" })
         {
             github.Release = $$"""{"tag_name":"v99.2.0","html_url":"{{link}}","published_at":"2027-01-01T00:00:00Z"}""";
             info = (await (await owner.PostAsync("/api/v1/system/updates/check", null)).Content.ReadFromJsonAsync<UpdateInfo>())!;
@@ -192,6 +215,11 @@ public sealed class GeneralSettingsApiTests : IDisposable
     [InlineData("0.6.10", "0.6.9", true)]
     [InlineData("1.0.0-beta.1", "0.9.0", true)]
     [InlineData("0.5", "0.6.0", false)]
+    [InlineData("1.0.0", "1.0.0-rc.1", true)]
+    [InlineData("1.0.0-rc.1", "1.0.0", false)]
+    [InlineData("1.0.0-rc.10", "1.0.0-rc.2", true)]
+    [InlineData("1.0.0-rc.1", "1.0.0-rc.1", false)]
+    [InlineData("1.0.0-rc.1", "1.0.0-beta.3", true)]
     public void Version_comparison(string candidate, string current, bool newer) => Assert.Equal(newer, UpdateChecker.IsNewer(candidate, current));
 
     [Fact]
@@ -320,9 +348,12 @@ public sealed class GeneralSettingsApiTests : IDisposable
 
         public string? LastHost { get; private set; }
 
+        public string? LastUrl { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastHost = request.RequestUri!.Host;
+            LastUrl = request.RequestUri.AbsoluteUri;
             return Task.FromResult(Release is null
                 ? new HttpResponseMessage(HttpStatusCode.NotFound)
                 : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Release, System.Text.Encoding.UTF8, "application/json") });

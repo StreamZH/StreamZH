@@ -21,11 +21,12 @@ export function SetupHint({ tmdbMissing, noRoot, type }: { tmdbMissing: boolean;
           Add your free TMDB API key, so StreamZH can find titles and artwork.
         </li>
         <li className={noRoot ? undefined : styles.done}>
-          Add a root folder for {type === 'Movie' ? 'movies' : 'series'}, e.g. <code>{type === 'Movie' ? 'D:\\Movies' : '/media/tv'}</code>.
+          Add a root folder for {type === 'Movie' ? 'movies' : 'series'}, e.g. <code>{type === 'Movie' ? '/data/media/Movies' : '/data/media/Series'}</code> or{' '}
+          <code>{type === 'Movie' ? 'D:\\Media\\Movies' : 'D:\\Media\\Series'}</code>.
         </li>
       </ol>
-      <Link className={`${ui.primary} ${ui.sm}`} to="/settings/media-management">
-        Open settings
+      <Link className={`${ui.primary} ${ui.sm}`} to="/get-started">
+        Get started
         <Icon name="right" size={14} />
       </Link>
     </section>

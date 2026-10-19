@@ -107,7 +107,7 @@ public sealed class MediaInfoServiceTests : IDisposable
         var target = new DecisionTargetFactory(_bed.Bed.Profiles, null, _bed.Details, _bed.Settings).ForMovie(_bed.Dune);
         Assert.Equal([Language.German, Language.English], target.ExistingLanguages);
         Assert.Equal(Quality.Hdtv1080p, target.ExistingQuality!.Quality);
-        var profile = _bed.Bed.Profiles.Find(QualityDefaults.DefaultProfileId)!;
+        var profile = _bed.Bed.Profiles.Find(QualityDefaults.GermanProfileId)!;
         Assert.True(LanguageRules.IsDualLanguage(target.ExistingLanguages, profile, Language.English));
 
         // Nothing changed: the next scan does not run ffprobe again.
@@ -229,7 +229,7 @@ public sealed class MediaInfoServiceTests : IDisposable
     {
         var formats = new CustomFormatRepository(_bed.Bed.Database);
         var germanDl = formats.Add(Movie("German DL", 0, Title(@"German\.DL")));
-        var profile = _bed.Bed.Profiles.Find(QualityDefaults.DefaultProfileId)!;
+        var profile = _bed.Bed.Profiles.Find(QualityDefaults.GermanProfileId)!;
         _bed.Bed.Profiles.Update(profile with { FormatItems = [new ProfileFormatItem(germanDl, 100)] });
         var existing = Path.Combine(MovieFolder, "Dune.2021.German.DL.1080p.BluRay.x264-GOOD.mkv");
         WithFile(Path.GetFileName(existing));

@@ -48,8 +48,12 @@ public sealed class RequestService(
 
     public const string HoldNote = "Side-by-side mode is on: StreamZH added it to the library but does not search automatically.";
 
-    // One change at a time: two admins approving the same request, or a create racing the duplicate check.
+    // One change at a time: two admins approving the same request, or a create racing the duplicate check. Held only for
+    // the database work, never while waiting for TMDB or the library (1.0 RC): a slow TMDB must not block other requests.
     private static readonly SemaphoreSlim Gate = new(1, 1);
+
+    // Adding one title to the library, per media type and TMDB id (few entries: one per requested title).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(MediaType, int), SemaphoreSlim> TitleGates = new();
 
     private DateTime Now => time.GetUtcNow().UtcDateTime;
 
@@ -253,12 +257,14 @@ public sealed class RequestService(
 
             request = request with { Status = RequestStatus.Approved, Reason = null, ItemId = null, Updated = Now };
             requests.Update(request);
-            return await ProcessAsync(request, cancellationToken);
         }
         finally
         {
             Gate.Release();
         }
+
+        // Outside the gate: adding the title waits for TMDB (up to 20 s) and must not block other requests.
+        return await ProcessAsync(request, cancellationToken);
     }
 
     /// <summary>True when the actor may see the request (admins: all; others: their own).</summary>
@@ -316,19 +322,21 @@ public sealed class RequestService(
                 Updated = Now,
             };
             requests.Update(request);
-            logger.LogInformation("Request {Id} '{Title}' approved{How}", request.Id, request.Title, automatic ? " automatically" : string.Empty);
-            await events.PublishAsync(new RequestChanged(request.Id, request.Status), cancellationToken);
-            if (!automatic)
-            {
-                await events.PublishAsync(new RequestActivity(RequestActivityKind.Approved, request.Id), cancellationToken);
-            }
-
-            return await ProcessAsync(request, cancellationToken);
         }
         finally
         {
             Gate.Release();
         }
+
+        // The request is "approved" now, so a second approval is refused; the rest runs outside the gate (TMDB, events).
+        logger.LogInformation("Request {Id} '{Title}' approved{How}", request.Id, request.Title, automatic ? " automatically" : string.Empty);
+        await events.PublishAsync(new RequestChanged(request.Id, request.Status), cancellationToken);
+        if (!automatic)
+        {
+            await events.PublishAsync(new RequestActivity(RequestActivityKind.Approved, request.Id), cancellationToken);
+        }
+
+        return await ProcessAsync(request, cancellationToken);
     }
 
     /// <summary>Adds the title to the library (or uses the one there), monitors it, searches; Processing or Failed.</summary>
@@ -336,9 +344,21 @@ public sealed class RequestService(
     {
         try
         {
-            var itemId = request.MediaType == MediaType.Movie
-                ? await AddMovieAsync(request, cancellationToken)
-                : await AddSeriesAsync(request, cancellationToken);
+            // Two requests for the same title (web and Discord) add it once: the second finds the first one's item.
+            var titleGate = TitleGates.GetOrAdd((request.MediaType, request.TmdbId), _ => new SemaphoreSlim(1, 1));
+            int itemId;
+            await titleGate.WaitAsync(cancellationToken);
+            try
+            {
+                itemId = request.MediaType == MediaType.Movie
+                    ? await AddMovieAsync(request, cancellationToken)
+                    : await AddSeriesAsync(request, cancellationToken);
+            }
+            finally
+            {
+                titleGate.Release();
+            }
+
             request = request with { Status = RequestStatus.Processing, ItemId = itemId, Reason = null, Updated = Now };
             requests.Update(request);
             await events.PublishAsync(new RequestChanged(request.Id, request.Status), cancellationToken);

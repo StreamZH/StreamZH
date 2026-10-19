@@ -1,5 +1,6 @@
-# StreamZH systemd service (sample). tools/install-linux.sh writes this file to /etc/systemd/system/streamzh.service
-# with the folders and user of its options; by hand:
+# StreamZH systemd service. The .deb and .rpm packages install this file as /usr/lib/systemd/system/streamzh.service;
+# tools/install-linux.sh writes the same to /etc/systemd/system/streamzh.service with the folders and user of its
+# options. By hand:
 #   sudo useradd --system --user-group --home-dir /var/lib/streamzh --shell /usr/sbin/nologin streamzh
 #   sudo install -d -o streamzh -g streamzh -m 0750 /var/lib/streamzh
 #   sudo cp -R <unpacked package>/. /opt/streamzh/ && sudo chmod 0755 /opt/streamzh/StreamZH

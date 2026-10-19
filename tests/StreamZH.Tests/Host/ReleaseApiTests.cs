@@ -214,7 +214,8 @@ public sealed class ReleaseApiTests : IDisposable
     private async Task<MovieResource> AddMovieAsync(HttpClient client)
     {
         var root = await AddRootFolderAsync(client, "movies", "Movie");
-        var response = await client.PostAsJsonAsync("/api/v1/movies", new { tmdbId = 438631, rootFolderId = root.Id });
+        // The German profile (the default before 1.0): these tests check its language rules.
+        var response = await client.PostAsJsonAsync("/api/v1/movies", new { tmdbId = 438631, rootFolderId = root.Id, qualityProfileId = StreamZH.Data.QualityDefaults.GermanProfileId });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<MovieResource>())!;
     }

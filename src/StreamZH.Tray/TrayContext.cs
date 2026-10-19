@@ -44,6 +44,7 @@ internal sealed class TrayContext : ApplicationContext
 
     private TrayConnection _connection;
     private TrayState _state = new(TrayStateKind.NotRunning);
+    private DateTimeOffset _shownStartupError;
     private DateTimeOffset _fastUntil = DateTimeOffset.MinValue;
     private bool _polling;
 
@@ -52,7 +53,8 @@ internal sealed class TrayContext : ApplicationContext
         _dataDirectory = TrayFiles.DataDirectory(args);
         _connection = TrayFiles.Load(_dataDirectory);
         _process = new StreamZhProcess(_dataDirectory);
-        _settings = new TraySettings(_dataDirectory);
+        var startHost = TrayCommandLine.WantsStart(args);
+        _settings = new TraySettings(_dataDirectory, startHost);
 
         _open.Font = new Font(_open.Font, FontStyle.Bold);
         _open.Click += (_, _) => OpenDashboard();
@@ -109,6 +111,13 @@ internal sealed class TrayContext : ApplicationContext
         };
 
         Apply(_state);
+
+        // "Tray only" installs (no service): StreamZH starts with the tray at sign-in.
+        if (startHost && !_process.IsService && _process.State() == ProcessState.Stopped && _process.Start() is { } problem)
+        {
+            Error(problem);
+        }
+
         _timer.Interval = (int)SlowPoll.TotalMilliseconds;
         _timer.Tick += (_, _) => Run(PollAsync);
         _timer.Start();
@@ -148,16 +157,27 @@ internal sealed class TrayContext : ApplicationContext
         try
         {
             var (run, after) = _tracker.Query;
-            var (connection, process, probe) = await Task.Run(async () =>
+            var (connection, process, probe, startupError) = await Task.Run(async () =>
             {
                 var connection = TrayFiles.Load(_dataDirectory);
                 var process = _process.State();
                 var probe = process == ProcessState.Running ? await _client.StatusAsync(connection, run, after).ConfigureAwait(false) : null;
-                return (connection, process, probe);
+                var startupError = process == ProcessState.Stopped ? TrayFiles.ReadStartupError(_dataDirectory) : null;
+                return (connection, process, probe, startupError);
             }).ConfigureAwait(true);
 
             _connection = connection;
             var state = _resolver.Resolve(process, probe, connection.TokenProblem);
+            if (state.Kind == TrayStateKind.NotRunning && startupError is not null)
+            {
+                // 1.0 RC: StreamZH could not start (e.g. the port is in use): say why, once per failed start.
+                state = state with { StartupError = startupError };
+                if (startupError.At != _shownStartupError)
+                {
+                    _shownStartupError = startupError.At;
+                    _notify.ShowBalloonTip(10000, "StreamZH could not start", StatusText.Truncate(startupError.Message, 255), ToolTipIcon.Error);
+                }
+            }
             if (state.Status is { } status)
             {
                 var finished = _tracker.Take(status);

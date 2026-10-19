@@ -46,6 +46,46 @@ public sealed class RequestServiceTests : IDisposable
         Assert.Equal(RequestActivityKind.Created, Assert.Single(_bed.Activities).Kind);
     }
 
+    /// <summary>1.0 RC: approving waits for TMDB (up to 20 s) outside the request lock, so other requests go on meanwhile.</summary>
+    [Fact]
+    public async Task A_slow_tmdb_while_approving_does_not_block_other_requests()
+    {
+        var bob = _bed.User("bob", UserRole.Requester);
+        var admin = _bed.User("admin", UserRole.Admin);
+        var dune = await _bed.Service.CreateAsync(bob, new CreateRequestInput(MediaType.Movie, Dune));
+        var arrival = await _bed.Service.CreateAsync(bob, new CreateRequestInput(MediaType.Movie, Arrival));
+
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _bed.Tmdb.BeforeMovie = id =>
+        {
+            if (id != Dune)
+            {
+                return Task.CompletedTask;
+            }
+
+            entered.TrySetResult();
+            return release.Task;
+        };
+
+        var approving = _bed.Service.ApproveAsync(admin, dune.Id);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(approving.IsCompleted);
+
+        // Meanwhile: a decline, a second approval of the same request and a new request all answer at once.
+        var declined = await _bed.Service.DeclineAsync(admin, arrival.Id, "Not now").WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(RequestStatus.Declined, declined.Status);
+        var twice = await Assert.ThrowsAsync<RequestException>(() => _bed.Service.ApproveAsync(admin, dune.Id).WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(RequestError.Conflict, twice.Error);
+        var show = await _bed.Service.CreateAsync(bob, new CreateRequestInput(MediaType.Series, Show)).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(RequestStatus.Pending, show.Status);
+
+        release.SetResult();
+        var approved = await approving.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(RequestStatus.Processing, approved.Status);
+        Assert.Equal(_bed.Movies.FindByTmdbId(Dune)!.Id, approved.ItemId);
+    }
+
     [Fact]
     public async Task A_requester_waits_for_an_admin_and_nothing_is_added()
     {

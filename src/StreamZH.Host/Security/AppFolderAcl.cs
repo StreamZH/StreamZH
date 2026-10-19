@@ -11,7 +11,8 @@ namespace StreamZH.Host.Security;
 /// <summary>
 /// 0.12 (SV2 N-02): the program folder (StreamZH.exe, StreamZH.Tray.exe, their DLLs) must not be changeable by every
 /// user of the computer, or any local account could replace the program the service and the tray icon run. Windows
-/// gives folders made below C:\ "Authenticated Users: Modify"; Update-Local.ps1 and Install-Service.ps1 cut that off.
+/// gives folders made below C:\ "Authenticated Users: Modify"; Update-Local.ps1, Install-Service.ps1 and Install-Tray.ps1
+/// cut that off, and the setup installs to C:\Program Files\StreamZH, which only administrators may change.
 /// StreamZH only checks (it does not change its own program folder) and shows a status notice; on Linux, macOS and in
 /// Docker the package manager or image owns the folder.
 /// </summary>
@@ -56,7 +57,7 @@ public static class AppFolderAcl
         var writers = BroadWriters(WindowsAcl.Entries(security));
         return writers.Count == 0
             ? null
-            : $"Every user of this computer may change {folder}, so they could replace StreamZH.exe. Run tools\\Update-Local.ps1 or tools\\Install-Service.ps1 once to protect it.";
+            : $"Every user of this computer may change {folder}, so they could replace StreamZH.exe. Install StreamZH with the setup (C:\\Program Files\\StreamZH), or run tools\\Install-Service.ps1 or tools\\Install-Tray.ps1 once as administrator to protect it.";
     }
 }
 

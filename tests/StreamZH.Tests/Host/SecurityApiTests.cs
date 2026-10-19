@@ -480,6 +480,28 @@ public sealed class SecurityApiTests : IDisposable
         Assert.False(still.Aborted);
     }
 
+    /// <summary>
+    /// 1.0 RC: hub groups are chosen when a connection opens, so a role change must not leave a connection in the old
+    /// groups. The role change ends the account's sessions, which closes its connections at once; the next connection
+    /// (after signing in again) joins the groups of the new role.
+    /// </summary>
+    [Fact]
+    public async Task A_role_change_closes_the_live_connections_of_that_account_at_once()
+    {
+        var owner = await OwnerAsync();
+        var users = _factory.Services.GetRequiredService<UserRepository>();
+        var id = users.Create("janedoe", _factory.Services.GetRequiredService<PasswordService>().Hash("long enough password"), UserRole.Requester);
+        var store = _app.Services.GetRequiredService<SessionStore>();
+        var connections = _app.Services.GetRequiredService<HubConnections>();
+        var requester = new FakeHubContext(UserClaims.Principal(users.FindById(id)!, AuthSchemes.Cookie, store.Create(id, false)));
+        connections.Add(requester);
+
+        Assert.True((await owner.PutAsJsonAsync($"/api/v1/users/{id}", new { role = "friend" })).IsSuccessStatusCode);
+
+        Assert.True(requester.Aborted);
+        Assert.Equal(0, connections.Count);
+    }
+
     // ---- S1-11: security headers ----
 
     [Fact]

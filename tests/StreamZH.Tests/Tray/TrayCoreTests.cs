@@ -247,8 +247,23 @@ public sealed class TrayCoreTests : IDisposable
         Assert.Equal($"\"{exe}\"", TrayCommandLine.RunEntry(exe, defaultData + Path.DirectorySeparatorChar, defaultData));
         var other = Path.Combine(_data, "other");
         Assert.Equal($"\"{exe}\" --data \"{other}\"", TrayCommandLine.RunEntry(exe, other, defaultData));
+        Assert.Equal($"\"{exe}\" --start", TrayCommandLine.RunEntry(exe, defaultData, defaultData, startHost: true));
+        Assert.Equal($"\"{exe}\" --data \"{other}\" --start", TrayCommandLine.RunEntry(exe, other, defaultData, startHost: true));
+        Assert.True(TrayCommandLine.WantsStart(["--data", other, "--start"]));
+        Assert.False(TrayCommandLine.WantsStart(["--data", other]));
         Assert.Equal(string.Empty, TrayCommandLine.HostArguments(defaultData, defaultData));
         Assert.Equal($"--data \"{other}\"", TrayCommandLine.HostArguments(other, defaultData));
+    }
+
+    /// <summary>SV4 X-05: a tray running as SYSTEM (silent "tray only" install by a deployment tool) never starts StreamZH.</summary>
+    [Fact]
+    public void The_tray_never_starts_streamzh_as_system()
+    {
+        Assert.Contains("SYSTEM", TrayCommandLine.HostStartRefusal("S-1-5-18"), StringComparison.Ordinal);
+        Assert.NotNull(TrayCommandLine.HostStartRefusal("s-1-5-18"));
+        Assert.Null(TrayCommandLine.HostStartRefusal("S-1-5-21-1000000001-1000000002-1000000003-1001"));
+        Assert.Null(TrayCommandLine.HostStartRefusal("S-1-5-18-1"));
+        Assert.Null(TrayCommandLine.HostStartRefusal(null));
     }
 
     [Fact]

@@ -75,7 +75,7 @@ public sealed class AutomaticSearchServiceTests : IDisposable
         var upcoming = new Movie
         {
             TmdbId = 1, Title = "Future", OriginalTitle = "Future", SortTitle = "future", Year = 2027, Status = "In Production",
-            Monitored = true, QualityProfileId = QualityDefaults.DefaultProfileId, RootFolderId = _bed.Dune.RootFolderId,
+            Monitored = true, QualityProfileId = QualityDefaults.GermanProfileId, RootFolderId = _bed.Dune.RootFolderId,
             FolderPath = Path.Combine(_bed.DataDirectory, "media", "Future"), Added = DateTime.UtcNow,
         };
         _bed.Movies.Add(upcoming);

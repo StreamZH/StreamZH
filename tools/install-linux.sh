@@ -6,12 +6,13 @@
 # Installs or updates StreamZH as a systemd service on Linux (x64 or arm64).
 #
 #   sudo bash install-linux.sh                          # from the unpacked package this script is in
-#   sudo bash install-linux.sh --from StreamZH-linux-x64.zip
-#   sudo bash install-linux.sh --from streamzh.tar.gz --port 9797
+#   sudo bash install-linux.sh --from StreamZH-1.0.0-linux-x64.tar.gz
+#   sudo bash install-linux.sh --from StreamZH-1.0.0-linux-x64.tar.gz --port 9797
 #   sudo bash install-linux.sh --uninstall              # keeps the data in /var/lib/streamzh
 #
 # Program files go to /opt/streamzh, data to /var/lib/streamzh, the service runs as the system user "streamzh".
-# Running it again with a newer package updates StreamZH; the data stays.
+# Running it again with a newer package updates StreamZH; the data stays. The .deb and .rpm packages set up the same
+# (Debian, Ubuntu, Fedora, RHEL); use this script for other distributions or without a package manager.
 
 set -euo pipefail
 
@@ -85,6 +86,15 @@ case "$port" in
 esac
 
 [ "$(id -u)" -eq 0 ] || fail "needs root: sudo bash $0 $arguments"
+
+# The .deb and .rpm packages own their program folder; updates and removal go through the package manager.
+if [ -f "$prefix/package-type" ]; then
+    managed=$(tr -d '[:space:]' < "$prefix/package-type")
+    case "$managed" in
+        deb) fail "$prefix was installed with the .deb package: update with 'sudo apt install ./streamzh_<version>_<arch>.deb', remove with 'sudo apt remove streamzh'" ;;
+        rpm) fail "$prefix was installed with the .rpm package: update with 'sudo dnf install ./streamzh-<version>.<arch>.rpm', remove with 'sudo dnf remove streamzh'" ;;
+    esac
+fi
 if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
     fail "systemd is not running on this system (in Docker use the image instead: docker/Dockerfile)"
 fi

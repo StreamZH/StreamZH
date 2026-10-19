@@ -11,8 +11,15 @@ namespace StreamZH.Data;
 /// <summary>Profiles and size limits a new installation starts with.</summary>
 public static class QualityDefaults
 {
-    /// <summary>Id of "Deutsch 1080p", the default profile after the first start.</summary>
-    public const int DefaultProfileId = 4;
+    /// <summary>
+    /// Id of "HD-1080p" (any language), the default profile of a new installation since 1.0. "Get started" asks for the
+    /// release language and switches it to the original language or to "Deutsch 1080p". Installations from before 1.0
+    /// keep their default ("Deutsch 1080p") and their profiles: migrations never change them.
+    /// </summary>
+    public const int DefaultProfileId = 2;
+
+    /// <summary>Id of "Deutsch 1080p" (German, dual language preferred), the default profile before 1.0.</summary>
+    public const int GermanProfileId = 4;
 
     /// <summary>Qualities that are never allowed in a seeded profile (pre-releases and screeners).</summary>
     private static readonly IReadOnlySet<int> NeverAllowed = new HashSet<int>
@@ -24,13 +31,13 @@ public static class QualityDefaults
     public static IReadOnlyList<QualityProfile> Profiles { get; } =
     [
         Create(1, "Any", Quality.All.Where(q => !NeverAllowed.Contains(q.Id)), Quality.Bluray1080p, Language.Any, preferDual: false),
-        Create(2, "HD-1080p",
+        Create(DefaultProfileId, "HD-1080p",
             [Quality.Hdtv1080p, Quality.WebDl1080p, Quality.WebRip1080p, Quality.Bluray1080p, Quality.Remux1080p],
-            Quality.Bluray1080p, Language.Original, preferDual: false),
+            Quality.Bluray1080p, Language.Any, preferDual: false),
         Create(3, "Ultra-HD",
             [Quality.WebDl2160p, Quality.WebRip2160p, Quality.Bluray2160p, Quality.Remux2160p],
             Quality.Remux2160p, Language.Original, preferDual: false),
-        Create(DefaultProfileId, "Deutsch 1080p",
+        Create(GermanProfileId, "Deutsch 1080p",
             [Quality.WebDl720p, Quality.WebRip720p, Quality.Bluray720p, Quality.WebDl1080p, Quality.WebRip1080p, Quality.Bluray1080p, Quality.Remux1080p],
             Quality.Bluray1080p, Language.German, preferDual: true),
         Create(5, "Deutsch 2160p",

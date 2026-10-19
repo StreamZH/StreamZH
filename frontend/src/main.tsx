@@ -49,6 +49,7 @@ import InvitePage from './users/InvitePage'
 import { inviteToken } from './users/inviteToken'
 import ProfilePage from './users/ProfilePage'
 import UsersPage from './users/UsersPage'
+import GetStartedPage from './welcome/GetStartedPage'
 import './index.css'
 
 // An invite link (/invite/<token>) opens its own page without sign-in or app shell.
@@ -71,6 +72,7 @@ createRoot(document.getElementById('root')!).render(
           <Routes>
           <Route element={<Layout />}>
             <Route index element={<Home />} />
+            <Route path="get-started" element={<GetStartedPage />} />
             <Route path="library/movies" element={<LibraryPage key="movies" type="Movie" />} />
             <Route path="library/movies/:id" element={<MovieDetail />} />
             <Route path="library/series" element={<LibraryPage key="series" type="Series" />} />

@@ -17,6 +17,7 @@ import { formatLeft } from './format'
 import HistoryTab from './HistoryTab'
 import { useDownloadAction, useToasts } from './hooks'
 import QueueTab from './QueueTab'
+import { queueTotals } from './queueTotals'
 import styles from './Activity.module.css'
 
 const tabs = [
@@ -68,10 +69,10 @@ export default function ActivityPage() {
   const data = queue.data
   const blackhole = settings.data?.client === 'blackhole'
   const items = (data?.items ?? []).map((i) => withLive(i, live, queue.dataUpdatedAt))
-  const liveNewer = live && live.at > queue.dataUpdatedAt
-  const speed = liveNewer ? Object.values(live.items).reduce((sum, i) => sum + (i.speedBps || 0), 0) : (data?.speedBps ?? 0)
+  // Usenet and torrents together; "Pause all" pauses the Usenet queue only, torrents keep running in their client.
+  const totals = queueTotals(items, data?.paused ?? false)
+  const { speed, eta } = totals
   const remaining = items.reduce((sum, i) => sum + Math.max(0, i.totalBytes - i.downloadedBytes), 0)
-  const eta = speed > 0 && remaining > 0 ? remaining / speed : null
   const lowFree = data?.freeSpaceBytes != null && data.freeSpaceBytes < lowSpace
   const count = items.length + (pending.data?.length ?? 0)
 
@@ -81,13 +82,21 @@ export default function ActivityPage() {
     <span className={styles.leadLine}>
       <span>
         <b className={ui.num}>{items.length}</b> {items.length === 1 ? 'download' : 'downloads'}
+        {totals.torrents > 0 && totals.torrents < items.length && <span className={ui.muted}> ({totals.torrents === 1 ? '1 torrent' : `${totals.torrents} torrents`})</span>}
         {remaining > 0 && <> · {formatBytes(remaining)} left</>}
       </span>
       <span className={styles.leadSep} aria-hidden="true" />
       <span>
         <Icon name="gauge" size={14} />
-        {data.paused ? 'Paused' : <b className={ui.num}>{formatSpeed(speed)}</b>}
-        {eta != null && !data.paused && <span className={ui.num}> · {formatLeft(eta)}</span>}
+        {data.paused && totals.moving === 0 ? (
+          'Paused'
+        ) : (
+          <>
+            {data.paused && <span className={ui.muted}>Usenet paused · </span>}
+            <b className={ui.num}>{formatSpeed(speed)}</b>
+          </>
+        )}
+        {eta != null && totals.moving > 0 && <span className={ui.num}> · {formatLeft(eta)}</span>}
         {data.speedLimitKBps > 0 && <span className={ui.muted}> · limit {formatSpeed(data.speedLimitKBps * 1024)}</span>}
       </span>
       {data.freeSpaceBytes != null && (

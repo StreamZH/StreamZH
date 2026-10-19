@@ -45,7 +45,7 @@ public sealed class XemServiceTests : IDisposable
         _show = new Series
         {
             TmdbId = 61459, TvdbId = TvdbId, Title = "Crystal Lake", OriginalTitle = "Crystal Lake", SortTitle = "crystal lake", Year = 2014,
-            Status = "Ended", Monitored = true, QualityProfileId = QualityDefaults.DefaultProfileId, RootFolderId = 1,
+            Status = "Ended", Monitored = true, QualityProfileId = QualityDefaults.GermanProfileId, RootFolderId = 1,
             FolderPath = Path.Combine(_bed.DataDirectory, "media", "Crystal Lake (2014)"), Added = DateTime.UtcNow, SeriesType = SeriesType.Anime,
         };
         _bed.Series.Add(_show);

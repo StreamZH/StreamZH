@@ -237,7 +237,9 @@ public sealed class OngoingService(
         // The article source knows the connections of all enabled servers; without it, look at the table.
         // Unknown (no engine installed yet): no notice.
         var servers = services.GetService<IArticleSource>() is { } source ? source.MaxConnections : EnabledUsenetServers();
-        if (servers == 0)
+        // 1.0 RC: a torrent-only setup (an enabled torrent client or the built-in engine) needs no Usenet server.
+        var torrentsOnly = services.GetService<DownloadClientRepository>()?.All().Any(c => c.Enable) == true;
+        if (servers == 0 && !torrentsOnly)
         {
             notices.Add(new OngoingNotice(
                 "no-usenet-server",

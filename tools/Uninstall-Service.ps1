@@ -4,21 +4,27 @@
 
 .DESCRIPTION
     Stops and deletes the service, its firewall rule (from Install-Service.ps1 -Firewall) and its event log source.
-    Closes the tray icon and removes its "Start with Windows" entry for your user (Update-Local.ps1 sets it up again
-    for StreamZH in a console window).
-    The program files in C:\Tools\StreamZH and your data in C:\ProgramData\StreamZH stay, so StreamZH can be started
-    in a console window again (C:\Repos\StreamZH\tools\Update-Local.ps1 does that) or installed as a service again
-    (C:\Repos\StreamZH\tools\Install-Service.ps1).
+    Closes the tray icon and removes its "Start with Windows" entry for your user (Update-Local.ps1 and Install-Tray.ps1
+    set it up again for StreamZH without a service).
+    The program files and your data in C:\ProgramData\StreamZH stay, so StreamZH can be started without a service
+    (Install-Tray.ps1, or StreamZH.exe in a console window) or installed as a service again (Install-Service.ps1).
+    The Windows installer runs this script when StreamZH is uninstalled or switched to "tray icon only".
 
 .PARAMETER InstallDir
-    Folder with StreamZH.exe (only for the hint how to start it again).
+    Folder with StreamZH.exe (only for the hint how to start it again). Empty: the folder above this tools folder when
+    StreamZH.exe is there, else C:\Tools\StreamZH.
+
+.PARAMETER NonInteractive
+    Never asks (for the installer and scripts). The script asks nothing today; the switch keeps the command lines of
+    the installer stable.
 
 .EXAMPLE
-    C:\Repos\StreamZH\tools\Uninstall-Service.ps1
+    .\Uninstall-Service.ps1
 #>
 [CmdletBinding()]
 param(
-    [string]$InstallDir = 'C:\Tools\StreamZH'
+    [string]$InstallDir = '',
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,17 +34,18 @@ function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 
 Assert-Administrator $PSCommandPath (Format-StreamZhArguments $PSBoundParameters)
 
+$InstallDir = Resolve-StreamZhInstallDir $InstallDir
 $service = Get-StreamZhService
 $dataDir = Get-StreamZhServiceDataDir
 
 Step 'Tray icon'
 if (Stop-StreamZhTray) { Write-Host 'closed' } else { Write-Host 'not running' }
 if (Unregister-StreamZhTray) { Write-Host 'start with Windows: removed' }
-# Written by the service account; StreamZH in a console window writes its own.
+# Written by the service account; StreamZH without a service writes its own.
 Remove-StreamZhTrayFiles $dataDir
 
 if (-not $service) {
-    Write-Host 'Der Dienst StreamZH ist nicht installiert.' -ForegroundColor Yellow
+    Write-Host 'The StreamZH service is not installed.' -ForegroundColor Yellow
 }
 else {
     Step 'Stop service StreamZH'
@@ -50,29 +57,32 @@ else {
     Write-Host 'removed'
 }
 
-$rule = Get-NetFirewallRule -Name 'StreamZH-HTTP' -ErrorAction SilentlyContinue
-if ($rule) {
-    $rule | Remove-NetFirewallRule
-    Write-Host 'firewall rule removed'
-}
+if (Remove-StreamZhFirewallRule) { Write-Host 'firewall rule removed' }
 
 if ([Diagnostics.EventLog]::SourceExists($StreamZhServiceName)) {
     [Diagnostics.EventLog]::DeleteEventSource($StreamZhServiceName)
     Write-Host 'event log source removed'
 }
 
-# StreamZH in a console window runs as you: the data folder stays private and you may change it.
+# StreamZH without a service runs as you: the data folder stays private (owned by Administrators) and you may change
+# it. A link or a file there is left alone.
 $data = $dataDir
 if (-not $data) { $data = Join-Path $env:ProgramData 'StreamZH' }
-if (Test-Path -LiteralPath $data -PathType Container) {
+$dataItem = Get-Item -LiteralPath $data -Force -ErrorAction SilentlyContinue
+if ($dataItem -and $dataItem.PSIsContainer -and ($dataItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
     $me = [Security.Principal.WindowsIdentity]::GetCurrent()
-    Protect-StreamZhDataFolder $data @() @($me.User.Value)
+    Protect-StreamZhDataFolder $data @() @($me.User.Value) $true
     Write-Host "$($me.Name): may change $data (nobody else but SYSTEM and administrators)"
 }
+elseif ($dataItem) {
+    Write-Host "$data is not a folder (a link or a file); its permissions were not changed." -ForegroundColor Yellow
+}
 
-Write-Host "`nFertig. Programm und Daten sind noch da." -ForegroundColor Green
+Write-Host "`nDone. Program and data are still there." -ForegroundColor Green
 # Not started from here: this PowerShell runs as administrator, and StreamZH should run as your normal user.
-Write-Host 'In einer normalen PowerShell (nicht als Administrator) im Konsolenfenster starten:'
+Write-Host 'Start StreamZH with the tray icon at sign-in (as administrator):'
+Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Tray.ps1')'"
+Write-Host 'Or in a console window, from a normal PowerShell (not as administrator):'
 Write-Host "    Start-Process '$(Join-Path $InstallDir 'StreamZH.exe')'"
-Write-Host 'Wieder als Dienst einrichten:'
+Write-Host 'Back to the service:'
 Write-Host "    & '$(Join-Path $PSScriptRoot 'Install-Service.ps1')'"

@@ -29,7 +29,7 @@ public sealed class MovieMigrationTests : IDisposable
 
         // Radarr's "German Remux" profile has no match in StreamZH; Arrival's file is not on disk.
         var arrival = plan.Items.Single(i => i.Key == "movies:329865");
-        Assert.Contains("'German Remux' is not in StreamZH; 'Deutsch 1080p' is used", arrival.Warning, StringComparison.Ordinal);
+        Assert.Contains("'German Remux' is not in StreamZH; 'HD-1080p' is used", arrival.Warning, StringComparison.Ordinal);
         Assert.Contains("Arrival.2016.German.DL.1080p.BluRay.x264-SAViOUR.mkv was not found", arrival.Warning, StringComparison.Ordinal);
         Assert.StartsWith("No file", plan.Items.Single(i => i.Key == "movies:335984").Detail, StringComparison.Ordinal);
         var unknown = plan.Items.Single(i => i.Label.StartsWith("Unbekannter", StringComparison.Ordinal));

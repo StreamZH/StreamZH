@@ -142,7 +142,7 @@ public sealed class SearchTestBed : IDisposable
         Dune = new Movie
         {
             TmdbId = 438631, ImdbId = "tt1160419", Title = "Dune", OriginalTitle = "Dune", SortTitle = "dune", Year = 2021, Runtime = 155,
-            Status = "Released", Monitored = true, QualityProfileId = QualityDefaults.DefaultProfileId, OriginalLanguageId = 1,
+            Status = "Released", Monitored = true, QualityProfileId = QualityDefaults.GermanProfileId, OriginalLanguageId = 1,
             RootFolderId = rootId, FolderPath = Path.Combine(DataDirectory, "media", "Dune (2021)"), Added = DateTime.UtcNow,
         };
         Movies.Add(Dune);
@@ -150,7 +150,7 @@ public sealed class SearchTestBed : IDisposable
         Show = new Series
         {
             TmdbId = 1396, TvdbId = 81189, ImdbId = "tt0903747", Title = "Breaking Bad", OriginalTitle = "Breaking Bad", SortTitle = "breaking bad",
-            Year = 2008, Status = "Ended", Monitored = true, QualityProfileId = QualityDefaults.DefaultProfileId, OriginalLanguageId = 1,
+            Year = 2008, Status = "Ended", Monitored = true, QualityProfileId = QualityDefaults.GermanProfileId, OriginalLanguageId = 1,
             RootFolderId = rootId, FolderPath = Path.Combine(DataDirectory, "media", "Breaking Bad (2008)"), Added = DateTime.UtcNow,
         };
         Series.Add(Show);

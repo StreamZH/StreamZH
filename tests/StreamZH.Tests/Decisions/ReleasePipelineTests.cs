@@ -69,7 +69,7 @@ public sealed class ReleasePipelineTests
                 Candidate("Dune.Part.Two.2024.German.AC3.1080p.BluRay.x264-AAA"),
                 Candidate("Dune.Part.Two.2024.German.DL.1080p.BluRay.x264-BBB"),
             ],
-            Movie(Profile(QualityDefaults.DefaultProfileId)), Definitions, Now);
+            Movie(Profile(QualityDefaults.GermanProfileId)), Definitions, Now);
 
         Assert.All(decisions, d => Assert.True(d.Accepted, string.Join(", ", d.Rejections)));
         Assert.Equal("BBB", decisions[0].Candidate.Release.ReleaseGroup);
@@ -81,7 +81,7 @@ public sealed class ReleasePipelineTests
     [InlineData("Dune.Part.Two.2024.FRENCH.1080p.WEB.h264-FR")]
     public void Deutsch_profile_rejects_releases_without_german_audio(string name)
     {
-        var decision = DecisionEngine.Evaluate([Candidate(name)], Movie(Profile(QualityDefaults.DefaultProfileId)), Definitions, Now).Single();
+        var decision = DecisionEngine.Evaluate([Candidate(name)], Movie(Profile(QualityDefaults.GermanProfileId)), Definitions, Now).Single();
 
         Assert.False(decision.Accepted);
         Assert.Contains(decision.Rejections, r => r.Code == RejectionCodes.WantedLanguage);
@@ -95,7 +95,7 @@ public sealed class ReleasePipelineTests
                 Candidate("Dune.Part.Two.2024.German.DL.2160p.UHD.BluRay.x265-UHD", 40),
                 Candidate("Dune.Part.Two.2024.German.CAM.x264-CAM", 2),
             ],
-            Movie(Profile(QualityDefaults.DefaultProfileId)), Definitions, Now);
+            Movie(Profile(QualityDefaults.GermanProfileId)), Definitions, Now);
 
         Assert.All(decisions, d => Assert.Contains(d.Rejections, r => r.Code == RejectionCodes.QualityNotWanted));
     }
@@ -103,7 +103,7 @@ public sealed class ReleasePipelineTests
     [Fact]
     public void Original_language_profile_takes_an_untagged_english_release()
     {
-        var decision = DecisionEngine.Evaluate([Candidate("Dune.Part.Two.2024.1080p.BluRay.x264-SPARKS")], Movie(Profile(2)), Definitions, Now).Single();
+        var decision = DecisionEngine.Evaluate([Candidate("Dune.Part.Two.2024.1080p.BluRay.x264-SPARKS")], Movie(Profile(2) with { LanguageId = Language.Original.Id }), Definitions, Now).Single();
 
         Assert.True(decision.Accepted, string.Join(", ", decision.Rejections));
     }
@@ -114,7 +114,7 @@ public sealed class ReleasePipelineTests
         var existing = new QualityModel(Quality.Bluray1080p);
         var decision = DecisionEngine.Evaluate(
             [Candidate("Dune.Part.Two.2024.German.DL.1080p.BluRay.x264-DETAiLS")],
-            Movie(Profile(QualityDefaults.DefaultProfileId), existing, [Language.English]), Definitions, Now).Single();
+            Movie(Profile(QualityDefaults.GermanProfileId), existing, [Language.English]), Definitions, Now).Single();
 
         Assert.True(decision.Accepted, string.Join(", ", decision.Rejections));
     }
@@ -125,7 +125,7 @@ public sealed class ReleasePipelineTests
         var existing = new QualityModel(Quality.Bluray1080p);
         var decision = DecisionEngine.Evaluate(
             [Candidate("Dune.Part.Two.2024.German.DL.1080p.BluRay.x264-OTHER")],
-            Movie(Profile(QualityDefaults.DefaultProfileId), existing, [Language.German, Language.English]), Definitions, Now).Single();
+            Movie(Profile(QualityDefaults.GermanProfileId), existing, [Language.German, Language.English]), Definitions, Now).Single();
 
         Assert.False(decision.Accepted);
     }
@@ -136,7 +136,7 @@ public sealed class ReleasePipelineTests
         var existing = new QualityModel(Quality.WebDl1080p);
         var decision = DecisionEngine.Evaluate(
             [Candidate("Dune.Part.Two.2024.German.DL.1080p.WEB.H264.PROPER-GROUP", 8)],
-            Movie(Profile(QualityDefaults.DefaultProfileId), existing, [Language.German, Language.English]), Definitions, Now).Single();
+            Movie(Profile(QualityDefaults.GermanProfileId), existing, [Language.German, Language.English]), Definitions, Now).Single();
 
         Assert.True(decision.Accepted, string.Join(", ", decision.Rejections));
     }
@@ -146,7 +146,7 @@ public sealed class ReleasePipelineTests
     {
         var decision = DecisionEngine.Evaluate(
             [Candidate("Dune.Part.Two.2024.German.DL.1080p.WEB.H264.SAMPLE-GROUP", 0.05)],
-            Movie(Profile(QualityDefaults.DefaultProfileId)), Definitions, Now).Single();
+            Movie(Profile(QualityDefaults.GermanProfileId)), Definitions, Now).Single();
 
         Assert.Contains(decision.Rejections, r => r.Code == RejectionCodes.Sample);
     }
@@ -157,7 +157,7 @@ public sealed class ReleasePipelineTests
         // WEB-1080p allows at most 100 MB per minute: 166 min → about 16.2 GB.
         var decision = DecisionEngine.Evaluate(
             [Candidate("Dune.Part.Two.2024.German.DL.1080p.WEB.H264-GROUP", 25)],
-            Movie(Profile(QualityDefaults.DefaultProfileId)), Definitions, Now).Single();
+            Movie(Profile(QualityDefaults.GermanProfileId)), Definitions, Now).Single();
 
         Assert.Contains(decision.Rejections, r => r.Code == RejectionCodes.AboveMaximumSize);
     }

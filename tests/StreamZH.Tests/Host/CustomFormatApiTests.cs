@@ -380,7 +380,7 @@ public sealed class CustomFormatApiTests : IDisposable
         var root = await client.PostAsJsonAsync("/api/v1/rootfolders", new { path, mediaType = "Movie" });
         Assert.Equal(HttpStatusCode.Created, root.StatusCode);
         var rootId = (await root.Content.ReadFromJsonAsync<RootFolderInfo>())!.Id;
-        var response = await client.PostAsJsonAsync("/api/v1/movies", new { tmdbId = 438631, rootFolderId = rootId });
+        var response = await client.PostAsJsonAsync("/api/v1/movies", new { tmdbId = 438631, rootFolderId = rootId, qualityProfileId = DeutschHd });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<MovieResource>())!;
     }

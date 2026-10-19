@@ -91,6 +91,11 @@ public class ServiceSession
     /// <summary>Program ends: no run follows. Releases a waiting <see cref="RequestStop"/>.</summary>
     public virtual void Finish() => _finished.Set();
 
+    /// <summary>StreamZH cannot start (1.0 RC, e.g. the port is in use): the service manager gets the reason and an error.</summary>
+    public virtual void Fail(string message)
+    {
+    }
+
     // Stopping a host before it has started makes its StartAsync throw; wait for ApplicationStarted (runs at once when started).
     private static void StopWhenStarted(IHostApplicationLifetime lifetime) =>
         lifetime.ApplicationStarted.Register(static state => ((IHostApplicationLifetime)state!).StopApplication(), lifetime);

@@ -194,7 +194,7 @@ public sealed class OrganizeTests : IDisposable
         _bed.ReleaseMovie(Release, $"{Release}.mkv");
         var other = new Movie
         {
-            TmdbId = 1, Title = "Dune", OriginalTitle = "Dune", SortTitle = "dune", Year = 2021, QualityProfileId = QualityDefaults.DefaultProfileId,
+            TmdbId = 1, Title = "Dune", OriginalTitle = "Dune", SortTitle = "dune", Year = 2021, QualityProfileId = QualityDefaults.GermanProfileId,
             RootFolderId = _bed.Import.Dune.RootFolderId, FolderPath = Path.Combine(_bed.Media, "Dune.2021.Other"), Added = DateTime.UtcNow,
         };
         _bed.Import.Bed.Movies.Add(other);

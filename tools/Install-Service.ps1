@@ -1,14 +1,15 @@
-﻿<#
+<#
 .SYNOPSIS
     Installs StreamZH as a Windows service (or updates the existing one) and starts it. Needs administrator rights.
 
 .DESCRIPTION
     Creates the service "StreamZH" for <InstallDir>\StreamZH.exe: starts with Windows (delayed automatic start), keeps
-    running when you log off, and Windows restarts it after a crash (after 5 s, 10 s, then every 60 s). Running the
-    script again updates the service; your data in C:\ProgramData\StreamZH stays untouched.
+    running when you sign out, and Windows restarts it after a crash (after 5 s, 10 s, then every 60 s). Running the
+    script again updates the service; your data in C:\ProgramData\StreamZH stays untouched. The Windows installer
+    (StreamZH-<version>-win-x64-setup.exe) runs this script for its "Windows service" choice.
 
-    It also lets your Windows user start and stop the service without administrator rights, so
-    C:\Repos\StreamZH\tools\Update-Local.ps1 can update it from a normal PowerShell.
+    It also lets your Windows user start and stop the service without administrator rights (the tray icon and
+    Update-Local.ps1 use that).
 
     Tray icon: a service has no window, so StreamZH.Tray.exe (next to StreamZH.exe) shows StreamZH in the notification
     area with a menu (open the dashboard, pause downloads, restart, stop, start). The script registers it to start with
@@ -17,12 +18,15 @@
     The service runs as its own virtual account "NT SERVICE\StreamZH" by default (no password needed, no rights on
     this computer beyond the folders it is given). It may change its data folder and the folders you name with -Folder
     or when the script asks (root folders, download folders); folders that every user may change (most folders on
-    other drives) work without that. -Account LocalSystem runs it as LocalSystem as before 0.12 (full control of the
-    computer: anyone who gets into StreamZH's settings could take over Windows). Running the script on a service that
-    runs as LocalSystem switches it to the virtual account unless -Account LocalSystem is given.
+    other drives) work without that. -Account LocalSystem runs it as LocalSystem (full control of the computer: anyone
+    who gets into StreamZH's settings could take over Windows). Running the script on a service that runs as
+    LocalSystem switches it to the virtual account unless -Account LocalSystem is given.
 
     The data folder becomes private: only SYSTEM, administrators, the service account and your user may open it (it
     holds the database with the API key and password hashes, the sign-in keys and the backups).
+
+    The program folder: only SYSTEM and administrators (and, outside C:\Program Files, your user, so Update-Local.ps1
+    can update it without administrator rights) may change it; the service account and Users read and run it.
 
     Things that work differently for a service:
     - Controlled folder access (Windows Security -> Ransomware protection) blocks unknown programs in protected folders
@@ -31,10 +35,9 @@
       folders. The virtual account (like LocalSystem) logs on to other computers as the computer account; for a NAS
       with its own users run the service as your user with -Account .\<user>.
 
-    Build StreamZH.exe first: C:\Repos\StreamZH\tools\Update-Local.ps1 -NoStart
-
 .PARAMETER InstallDir
-    Folder with StreamZH.exe (the same as for Update-Local.ps1).
+    Folder with StreamZH.exe. Empty: the folder above this tools folder when StreamZH.exe is there (installed or
+    unpacked package), else C:\Tools\StreamZH (where Update-Local.ps1 installs a build from source).
 
 .PARAMETER DataDir
     Data folder. Empty: C:\ProgramData\StreamZH, the same as without a service.
@@ -48,11 +51,15 @@
 
 .PARAMETER Folder
     Folders the service must read and write: root folders and download folders on this computer. The service account
-    gets "Modify" on them. Without -Folder the script asks when the service switches to the virtual account. Network
-    shares (\\nas\movies) are not changed: the NAS decides who may write there.
+    gets "Modify" on them. Without -Folder the script asks when the service switches to the virtual account (not with
+    -NonInteractive). Network shares (\\nas\movies) are not changed: the NAS decides who may write there.
+
+.PARAMETER FoldersFile
+    A UTF-8 text file with more folders for -Folder, one per line (the Windows installer passes the folders this way,
+    so no folder name is ever read as PowerShell code).
 
 .PARAMETER Firewall
-    Allows incoming connections to -Port from the private and domain network (not from public networks).
+    Allows incoming connections to -Port from private and domain networks (not from public networks).
 
 .PARAMETER Port
     Port for -Firewall. Must match Settings -> General -> Port.
@@ -66,30 +73,36 @@
 .PARAMETER NoTray
     No tray icon: removes its "Start with Windows" entry and closes it.
 
-.EXAMPLE
-    C:\Repos\StreamZH\tools\Install-Service.ps1
+.PARAMETER NonInteractive
+    Never asks (for the installer and scripts): no folder prompt; -Account with a user is refused because it needs a
+    password.
 
 .EXAMPLE
-    C:\Repos\StreamZH\tools\Install-Service.ps1 -Firewall -AllowControlledFolderAccess
+    .\Install-Service.ps1
 
 .EXAMPLE
-    C:\Repos\StreamZH\tools\Install-Service.ps1 -Folder 'D:\Media', 'D:\Downloads'
+    .\Install-Service.ps1 -Firewall -AllowControlledFolderAccess
 
 .EXAMPLE
-    C:\Repos\StreamZH\tools\Install-Service.ps1 -Account .\johndoe
+    .\Install-Service.ps1 -Folder 'D:\Media', 'D:\Downloads'
+
+.EXAMPLE
+    .\Install-Service.ps1 -Account .\johndoe
 #>
 [CmdletBinding()]
 param(
-    [string]$InstallDir = 'C:\Tools\StreamZH',
+    [string]$InstallDir = '',
     [string]$DataDir = '',
     [string]$Account = '',
     [string[]]$Folder = @(),
+    [string]$FoldersFile = '',
     [switch]$Firewall,
     [ValidateRange(1, 65535)]
     [int]$Port = 9797,
     [switch]$AllowControlledFolderAccess,
     [switch]$NoStart,
-    [switch]$NoTray
+    [switch]$NoTray,
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -210,9 +223,10 @@ function Get-AccountSid([string]$name) {
 
 Assert-Administrator $PSCommandPath (Format-StreamZhArguments $PSBoundParameters)
 
+$InstallDir = Resolve-StreamZhInstallDir $InstallDir
 $exe = Join-Path $InstallDir 'StreamZH.exe'
 if (-not (Test-Path $exe)) {
-    Hint "StreamZH.exe fehlt in $InstallDir. Zuerst bauen und installieren:"
+    Hint "StreamZH.exe is missing in $InstallDir. Install StreamZH first (setup or unpacked package), or build it from source:"
     Hint "    & '$(Join-Path $PSScriptRoot 'Update-Local.ps1')' -NoStart"
     exit 1
 }
@@ -226,8 +240,16 @@ if ($DataDir) { $binaryPath = "$binaryPath --data `"$DataDir`"" }
 $description = 'StreamZH - one app for your whole media pipeline (library, indexers, downloads). Web UI on http://localhost:9797 unless changed in Settings -> General.'
 $me = [Security.Principal.WindowsIdentity]::GetCurrent()
 
+if ($FoldersFile) {
+    $Folder = @($Folder) + @(Get-Content -LiteralPath $FoldersFile -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
 $virtualAccount = "NT SERVICE\$StreamZhServiceName"
 $service = Get-StreamZhService
+$existingInstall = Test-StreamZhInstalled
+# Before anything changes: the data folder must not be a link or another account's folder (SV4 X-02).
+try { [void](Assert-StreamZhDataFolder $data @($me.User.Value) $existingInstall) }
+catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }
 $previousAccount = ''
 if ($service) { $previousAccount = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$StreamZhServiceName'").StartName }
 
@@ -239,6 +261,10 @@ if (-not $Account) {
     $useVirtual = (-not $service) -or $previousAccount -eq 'LocalSystem' -or $previousAccount -eq $virtualAccount
 }
 elseif (-not $useLocalSystem -and -not $useVirtual) {
+    if ($NonInteractive) {
+        Write-Host "-Account $Account needs a password and cannot be used with -NonInteractive." -ForegroundColor Red
+        exit 1
+    }
     if ($Account -notmatch '[\\@]') { $Account = ".\$Account" }
     $credential = Get-Credential -UserName $Account -Message "Password of the account StreamZH runs as ($Account)"
     if (-not $credential) { exit 1 }
@@ -260,6 +286,10 @@ if ($console) {
 
 if ($service) {
     Step 'Update service StreamZH'
+    $previousExe = Get-StreamZhServiceExe
+    if ($previousExe -and -not [string]::Equals($previousExe, $exe, [StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "program: $previousExe -> $exe"
+    }
     $changes = @{ PathName = $binaryPath; DisplayName = 'StreamZH' }
     if ($credential) {
         $changes.StartName = $credential.UserName
@@ -320,23 +350,28 @@ else {
 if (Grant-ServiceControl $me.User.Value) { Write-Host "$($me.Name): may start and stop the service" }
 else { Write-Host "$($me.Name): may start and stop the service (already set)" }
 
-# The program folder: SYSTEM, administrators and you change it (updates with Update-Local.ps1 without administrator
-# rights), the service account and Users only read and run it.
-if (Protect-StreamZhInstallFolder $InstallDir $me.User.Value @($serviceSid)) {
-    Write-Host "${InstallDir}: only SYSTEM, administrators and $($me.Name) may change it; $runsAs reads and runs it"
+# The program folder: SYSTEM and administrators change it, and outside C:\Program Files also you (updates with
+# Update-Local.ps1 without administrator rights); the service account and Users only read and run it.
+$programWriter = $me.User.Value
+$writers = "SYSTEM, administrators and $($me.Name)"
+if (Test-StreamZhProgramFiles $InstallDir) {
+    $programWriter = ''
+    $writers = 'SYSTEM and administrators'
+}
+if (Protect-StreamZhInstallFolder $InstallDir $programWriter @($serviceSid)) {
+    Write-Host "${InstallDir}: only $writers may change it; $runsAs reads and runs it"
 }
 
-New-Item -ItemType Directory -Path $data -Force | Out-Null
 # The service writes a new tray token for its account when it starts.
 Remove-StreamZhTrayFiles $data
-# Private: SYSTEM, administrators, the service account (full control) and you (change, for the tray icon and a
-# StreamZH in a console window); Users, Authenticated Users and Everyone lose their access.
-Protect-StreamZhDataFolder $data @($serviceSid) @($me.User.Value)
+# Private: owned by Administrators; SYSTEM, administrators, the service account (full control) and you (change, for the
+# tray icon and a StreamZH in a console window), nobody else.
+Protect-StreamZhDataFolder $data @($serviceSid) @($me.User.Value) $existingInstall
 Write-Host "${runsAs}, $($me.Name): may change $data (nobody else but SYSTEM and administrators)"
 
 # Root folders and download folders for the service account.
 $folders = @($Folder | Where-Object { $_ })
-if ($folders.Count -eq 0 -and $switchesToVirtual -and [Environment]::UserInteractive -and $serviceSid -ne 'S-1-5-18') {
+if ($folders.Count -eq 0 -and $switchesToVirtual -and -not $NonInteractive -and [Environment]::UserInteractive -and $serviceSid -ne 'S-1-5-18') {
     Hint "`nStreamZH now runs as $virtualAccount. It may change folders that every user may change (most folders on other"
     Hint 'drives), but not the folders of your user (Videos, Downloads, Desktop, Documents).'
     Hint 'Folders StreamZH must change (root folders, download folders), separated by ";". Empty: none.'
@@ -355,34 +390,12 @@ if (-not [Diagnostics.EventLog]::SourceExists($StreamZhServiceName)) {
 
 if ($Firewall) {
     Step "Firewall: TCP $Port"
-    Get-NetFirewallRule -Name 'StreamZH-HTTP' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-    New-NetFirewallRule -Name 'StreamZH-HTTP' -DisplayName "StreamZH (TCP $Port)" -Description 'StreamZH web UI and API' `
-        -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -Profile Domain, Private | Out-Null
+    Set-StreamZhFirewallRule $Port
     Write-Host "inbound TCP $Port allowed (domain and private networks)"
 }
 
 Step 'Controlled folder access'
-$defender = $null
-try { $defender = Get-MpPreference -ErrorAction Stop } catch { $defender = $null }
-if (-not $defender) {
-    Write-Host 'Microsoft Defender is not available, nothing to do'
-}
-elseif ($defender.EnableControlledFolderAccess -eq 0) {
-    Write-Host 'off, nothing to do'
-}
-elseif (@($defender.ControlledFolderAccessAllowedApplications) -contains $exe) {
-    Write-Host "$exe is allowed"
-}
-elseif ($AllowControlledFolderAccess) {
-    Add-MpPreference -ControlledFolderAccessAllowedApplications $exe
-    Write-Host "$exe allowed"
-}
-else {
-    Hint 'Überwachter Ordnerzugriff ist eingeschaltet. Ohne Freigabe darf StreamZH nicht in geschützte Ordner'
-    Hint '(Videos, Dokumente, Bilder ...) importieren oder umbenennen. Freigeben mit:'
-    Hint "    Add-MpPreference -ControlledFolderAccessAllowedApplications '$exe'"
-    Hint 'oder dieses Skript mit -AllowControlledFolderAccess nochmals ausführen.'
-}
+Set-StreamZhControlledFolderAccess $exe ([bool]$AllowControlledFolderAccess)
 
 # Mapped drives of this user: the saved ones (HKCU:\Network; an elevated PowerShell does not see the drives of the
 # normal session) and the ones of this session.
@@ -413,12 +426,12 @@ elseif (Register-StreamZhTray $InstallDir $DataDir) {
     Write-Host "start with Windows: on (for $($me.Name))"
 }
 else {
-    Hint "StreamZH.Tray.exe fehlt in $InstallDir. Mit Update-Local.ps1 bauen, dann dieses Skript nochmals ausführen:"
+    Hint "StreamZH.Tray.exe is missing in $InstallDir. Build it with Update-Local.ps1, then run this script again:"
     Hint "    & '$(Join-Path $PSScriptRoot 'Update-Local.ps1')'"
 }
 
 if ($NoStart) {
-    Write-Host "`nDienst eingerichtet, nicht gestartet. Starten mit: Start-Service StreamZH" -ForegroundColor Green
+    Write-Host "`nService set up, not started. Start it with: Start-Service StreamZH" -ForegroundColor Green
     exit 0
 }
 
@@ -427,8 +440,8 @@ try {
     Start-Service -Name $StreamZhServiceName
 }
 catch {
-    Write-Host "Der Dienst startet nicht: $($_.Exception.Message)" -ForegroundColor Red
-    if ($credential) { Hint 'Bei -Account: Benutzername und Passwort prüfen (Microsoft-Konto: Passwort, nicht die PIN).' }
+    Write-Host "The service does not start: $($_.Exception.Message)" -ForegroundColor Red
+    if ($credential) { Hint 'With -Account: check user name and password (Microsoft account: the password, not the PIN).' }
     Write-StreamZhTroubleshooting
     exit 1
 }
@@ -437,6 +450,5 @@ $url = Wait-StreamZhReady
 if (-not $url) { exit 1 }
 Write-Host $url
 if (-not $NoTray -and (Start-StreamZhTray $InstallDir $DataDir)) { Write-Host 'tray icon started (notification area, bottom right)' }
-Write-Host "`nFertig: StreamZH läuft als Windows-Dienst, auch ohne Anmeldung." -ForegroundColor Green
-Write-Host "Updates wie bisher mit: & '$(Join-Path $PSScriptRoot 'Update-Local.ps1')'"
-Write-Host "Zurück zum Start im Konsolenfenster: & '$(Join-Path $PSScriptRoot 'Uninstall-Service.ps1')'"
+Write-Host "`nDone: StreamZH runs as a Windows service, also when nobody is signed in." -ForegroundColor Green
+Write-Host "Back to StreamZH without a service: & '$(Join-Path $PSScriptRoot 'Uninstall-Service.ps1')'"

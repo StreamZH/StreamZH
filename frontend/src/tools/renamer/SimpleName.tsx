@@ -59,7 +59,7 @@ export default function SimpleName({
 
       <p className={styles.simpleExample}>
         <span>Example</span>
-        <code>{example ?? (episode ? 'Crystal Lake - S01E01 - Sommercamp-Erinnerungen.mkv' : 'Interstellar (2014).mkv')}</code>
+        <code>{example ?? (episode ? 'The Series Title - S01E01 - Pilot.mkv' : 'Interstellar (2014).mkv')}</code>
       </p>
 
       {episode && (

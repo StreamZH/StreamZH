@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The StreamZH Authors.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using StreamZH.Core;
 using StreamZH.Data;
 
 namespace StreamZH.Library.Notifications;
@@ -399,7 +400,7 @@ public static class ConnectCatalog
             "Webhook",
             Notification,
             "Sends every event as JSON to your own URL (same layout as Radarr and Sonarr webhooks).",
-            "https://github.com/streamzh/streamzh/blob/main/docs/WEBHOOK.md",
+            AppInfo.RepositoryUrl + "/blob/main/docs/WEBHOOK.md",
             ConnectTriggers.All,
             new ConnectionTriggers(OnGrab: true, OnImport: true, OnUpgrade: true, OnRename: true, OnDownloadFailure: true),
             [

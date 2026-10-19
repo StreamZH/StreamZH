@@ -16,7 +16,7 @@ public sealed class MassEditTests : IDisposable
     [Fact]
     public async Task Monitored_and_quality_profile_change_for_all_selected()
     {
-        var other = _bed.Import.Bed.Profiles.All().First(p => p.Id != QualityDefaults.DefaultProfileId);
+        var other = _bed.Import.Bed.Profiles.All().First(p => p.Id != QualityDefaults.GermanProfileId);
 
         var result = await _bed.MassEdit().EditAsync(MediaType.Movie, [_bed.Import.Dune.Id], new MassEditChanges(Monitored: false, QualityProfileId: other.Id));
 

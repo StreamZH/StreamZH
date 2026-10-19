@@ -1,0 +1,105 @@
+# StreamZH .deb and .rpm packages, built with nfpm (https://nfpm.goreleaser.com).
+# Do not run nfpm on this file by hand: packaging/linux/build.sh sets the variables below and names the files.
+#
+#   STREAMZH_VERSION   1.0.0 or 1.0.0-rc.1 (semver; becomes 1.0.0~rc.1 in the package metadata)
+#   STREAMZH_ARCH      amd64 or arm64 (nfpm translates to x86_64/aarch64 for rpm)
+#   STREAMZH_INPUT     the published linux-x64 or linux-arm64 folder (StreamZH + wwwroot)
+#   STREAMZH_PACKAGING this folder (packaging/linux)
+#   STREAMZH_REPO      the repository root
+#
+# Layout: program /opt/streamzh (root-owned, read-only for the service), data /var/lib/streamzh (user streamzh, 0750),
+# unit /usr/lib/systemd/system/streamzh.service. Removing the package keeps the data; "apt purge" deletes it.
+name: streamzh
+arch: ${STREAMZH_ARCH}
+platform: linux
+version: ${STREAMZH_VERSION}
+version_schema: semver
+release: "1"
+section: video
+priority: optional
+maintainer: StreamZH contributors <https://github.com/cloudzh/streamzh>
+vendor: StreamZH
+homepage: https://github.com/cloudzh/streamzh
+license: GPL-3.0-only
+description: |-
+  One app for your whole media pipeline.
+  StreamZH replaces Sonarr, Radarr, Prowlarr, SABnzbd, Recyclarr and Requestrr:
+  library, indexers, search, built-in Usenet and torrent downloads, import and
+  rename, requests and notifications, with a web UI on port 9797.
+
+depends:
+  - ca-certificates
+  - tzdata
+
+overrides:
+  deb:
+    depends:
+      - ca-certificates
+      - tzdata
+      - libc6
+      - libgcc-s1 | libgcc1
+      - libstdc++6
+      - libssl3t64 | libssl3 | libssl1.1
+      - libicu78 | libicu77 | libicu76 | libicu74 | libicu72 | libicu71 | libicu70 | libicu67 | libicu66 | libicu63
+    suggests:
+      - ffmpeg
+      - par2
+      - 7zip | p7zip-full
+  rpm:
+    depends:
+      - ca-certificates
+      - tzdata
+      - glibc
+      - libstdc++
+      - openssl-libs
+      - libicu
+      - shadow-utils
+
+contents:
+  - src: ${STREAMZH_INPUT}/
+    dst: /opt/streamzh
+    type: tree
+    file_info:
+      owner: root
+      group: root
+
+  # Tells StreamZH (update check: which file fits) and install-linux.sh (hands off) how it was installed.
+  - src: ${STREAMZH_PACKAGING}/package-type.deb
+    dst: /opt/streamzh/package-type
+    packager: deb
+    file_info:
+      mode: 0644
+  - src: ${STREAMZH_PACKAGING}/package-type.rpm
+    dst: /opt/streamzh/package-type
+    packager: rpm
+    file_info:
+      mode: 0644
+
+  - src: ${STREAMZH_REPO}/docs/streamzh.service
+    dst: /usr/lib/systemd/system/streamzh.service
+    file_info:
+      mode: 0644
+
+  - src: ${STREAMZH_REPO}/LICENSE
+    dst: /usr/share/doc/streamzh/LICENSE
+    file_info:
+      mode: 0644
+  - src: ${STREAMZH_REPO}/NOTICE.md
+    dst: /usr/share/doc/streamzh/NOTICE.md
+    file_info:
+      mode: 0644
+
+scripts:
+  preinstall: ${STREAMZH_PACKAGING}/scripts/preinstall.sh
+  postinstall: ${STREAMZH_PACKAGING}/scripts/postinstall.sh
+  preremove: ${STREAMZH_PACKAGING}/scripts/preremove.sh
+  postremove: ${STREAMZH_PACKAGING}/scripts/postremove.sh
+
+deb:
+  fields:
+    Bugs: https://github.com/cloudzh/streamzh/issues
+
+rpm:
+  summary: One app for your whole media pipeline
+  group: Applications/Multimedia
+  compression: zstd

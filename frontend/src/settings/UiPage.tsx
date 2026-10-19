@@ -105,7 +105,7 @@ export default function UiPage() {
             <Row label="Theme" help="Remembered in this browser; the sun and moon button in the top bar switches it too.">
               <ThemeSwitch />
             </Row>
-            <Row label="UI language" help="German follows in a later version. Titles and descriptions follow Settings → Metadata.">
+            <Row label="UI language" help="StreamZH is in English. Movie and series titles and descriptions follow the language in Settings → Metadata.">
               <span className={styles.value}>English</span>
             </Row>
           </Section>

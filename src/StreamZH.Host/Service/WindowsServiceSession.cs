@@ -69,6 +69,13 @@ public sealed class WindowsServiceSession : ServiceSession
         _dispatcherEnded.Task.Wait(StopTimeout);
     }
 
+    /// <summary>The reason goes to the event log; the service stops with an error, so Windows can apply its recovery settings.</summary>
+    public override void Fail(string message)
+    {
+        WriteEventLog(message);
+        _handler.ExitCode = 1;
+    }
+
     /// <summary>Writes an error to the Application event log; never throws (this runs while StreamZH is failing).</summary>
     public static void WriteEventLog(string message)
     {

@@ -21,6 +21,12 @@ public static class SecurityNotices
             notices.Add(new OngoingNotice("app-folder-open", NoticeLevels.Warn, "Program folder not protected", appFolder, "/system/status", false));
         }
 
+        // 1.0 RC (SV4 X-02): the data folder belongs to another person's account (created before StreamZH was installed).
+        if (services.GetService<DataFolderPermissionReport>() is { OwnerProblem: { } dataOwner })
+        {
+            notices.Add(new OngoingNotice("data-folder-owner", NoticeLevels.Warn, "Data folder not private", dataOwner, "/system/status", false));
+        }
+
         if (services.GetService<SecuritySettings>() is not { } security || services.GetService<AccessSettings>() is not { } access)
         {
             return;

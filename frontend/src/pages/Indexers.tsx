@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useToasts } from '../activity/hooks'
 import {
   genericDefinitionKey,
@@ -49,8 +50,15 @@ export default function Indexers() {
   const indexers = useQuery({ queryKey: indexerKeys.list, queryFn: indexersApi.list, refetchInterval: 60_000 })
   // For protocol and privacy chips; the list still works when the catalog cannot be loaded.
   const definitions = useQuery({ queryKey: indexerKeys.definitions, queryFn: indexersApi.definitions, staleTime: 10 * 60_000, retry: 1 })
-  const [view, setView] = useState<View>({ kind: 'none' })
-  const close = () => setView({ kind: 'none' })
+  // Links from "Get started" (1.0 RC): ?add=1 opens the catalog, ?import=prowlarr the Prowlarr import.
+  const [params, setParams] = useSearchParams()
+  const [view, setView] = useState<View>(() =>
+    !canEdit ? { kind: 'none' } : params.get('import') === 'prowlarr' ? { kind: 'import' } : params.get('add') ? { kind: 'catalog' } : { kind: 'none' },
+  )
+  const close = () => {
+    setView({ kind: 'none' })
+    if (params.has('add') || params.has('import')) setParams({}, { replace: true })
+  }
   const { toasts, push, dismiss } = useToasts()
 
   const byKey = useMemo(() => new Map((definitions.data ?? []).map((d) => [d.key, d])), [definitions.data])

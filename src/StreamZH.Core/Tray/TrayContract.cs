@@ -16,7 +16,18 @@ public static class TrayContract
     public const string EndpointFile = "tray.json";
     public const string Header = "X-StreamZH-Tray";
     public const string ApiPath = "/api/v1/tray";
+
+    /// <summary>
+    /// 1.0 RC: written when StreamZH could not start (port in use), deleted at the next successful start; the tray shows
+    /// it while StreamZH is not running. Contents: <see cref="StartupError"/>.
+    /// </summary>
+    public const string StartupErrorFile = "startup-error.json";
 }
+
+/// <summary>Contents of startup-error.json.</summary>
+/// <param name="Summary">Short, for the tray menu and tooltip ("Port 9797 is already in use").</param>
+/// <param name="Message">The whole line StreamZH printed, with what to do.</param>
+public sealed record StartupError(string Summary, string Message, DateTimeOffset At);
 
 /// <summary>Contents of tray.json.</summary>
 /// <param name="Url">Base address on this computer including the URL base, without a trailing slash (http://127.0.0.1:9797/streamzh).</param>

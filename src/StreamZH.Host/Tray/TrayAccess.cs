@@ -112,6 +112,7 @@ public sealed partial class TrayAccess(
             var (url, dashboard) = LoopbackUrls(ServerAddresses(), running.Values);
             var endpoint = new TrayEndpoint(url, dashboard, AppInfo.Version, RunningAs.Mode, Environment.ProcessId, paths.LogDirectory, time.GetUtcNow());
             File.WriteAllText(EndpointPath, JsonSerializer.Serialize(endpoint, Json));
+            StartupCheck.Clear(paths);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or PlatformNotSupportedException)
         {

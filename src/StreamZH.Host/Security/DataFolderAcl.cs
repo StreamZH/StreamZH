@@ -129,6 +129,46 @@ public static class DataFolderAcl
     }
 
     /// <summary>
+    /// SV4 X-02: the notice text when the data folder belongs to another person's account (someone created
+    /// C:\ProgramData\StreamZH before StreamZH was installed), else null. The owner may always change the folder's
+    /// access list again, so the private access list alone does not keep them out. SYSTEM, Administrators, service
+    /// accounts and the account StreamZH runs as are fine owners; the install scripts make Administrators the owner.
+    /// </summary>
+    public static string? OwnerProblem(string folder, string? ownerSid, string processSid)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentException.ThrowIfNullOrEmpty(processSid);
+        if (ownerSid is null || !IsUserAccount(ownerSid) || string.Equals(ownerSid, processSid, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return $"The data folder {folder} belongs to another user account ({ownerSid}), which can always give itself access to the "
+               + "database and sign-in keys again. If you did not create it with that account, run tools\\Install-Service.ps1 "
+               + "(or tools\\Install-Tray.ps1) once as administrator: it makes Administrators the owner.";
+    }
+
+    /// <summary>The folders in the data folder that hold secrets (sign-in keys, backups, restores, tools StreamZH runs).</summary>
+    public static readonly string[] SecretFolders = ["keys", "Backups", "restore", "tools"];
+
+    /// <summary>
+    /// SV4 Y-01: the notice text when one of the <see cref="SecretFolders"/> is a link (junction or symbolic link), else
+    /// null. StreamZH never creates links there; someone who could write the data folder before it was protected may
+    /// have placed one to receive the sign-in keys or backups in a folder they can read.
+    /// </summary>
+    public static string? LinkProblem(string folder, IEnumerable<string> linkedNames)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(linkedNames);
+        var names = linkedNames.Where(n => SecretFolders.Contains(n, StringComparer.OrdinalIgnoreCase)).ToList();
+        return names.Count == 0
+            ? null
+            : $"In the data folder {folder}, {string.Join(", ", names)} {(names.Count == 1 ? "is a link" : "are links")} to another place. "
+              + "StreamZH never creates links there; another account may have placed them to read the sign-in keys or backups. "
+              + "Stop StreamZH, remove the links (the folders are created again) and sign in again.";
+    }
+
+    /// <summary>
     /// Who may read tray.token besides SYSTEM and the account that writes it: the user accounts the data folder grants
     /// (Install-Service.ps1 adds the installing user). Empty when there are none.
     /// </summary>

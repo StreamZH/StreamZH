@@ -1,0 +1,488 @@
+/* "Get started" (1.0 RC): the setup checklist, CloudZH panels with a numbered step list. */
+.page {
+  display: grid;
+  gap: 16px;
+  max-width: 920px;
+}
+
+/* ---- Progress ---- */
+.progress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 18px;
+}
+
+.count {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.count small {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+.progressText {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.bar {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.6s var(--ease);
+}
+
+.barDone > i {
+  background: var(--ok);
+}
+
+/* ---- Migration ---- */
+.migrate {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.migrateIcon,
+.extraIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.migrateText {
+  flex: 1;
+  min-width: 0;
+}
+
+.migrateText h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.migrateText p {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---- Steps ---- */
+.steps {
+  padding: 4px 0;
+}
+
+.steps > ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step + .step {
+  border-top: 1px solid var(--line);
+}
+
+.stepHead {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 18px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--r);
+}
+
+.stepHead:hover {
+  background: color-mix(in srgb, var(--sunk) 60%, transparent);
+}
+
+.stepHead:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.marker {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.markerNext {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.markerDone {
+  color: var(--ok);
+  border-color: transparent;
+  background: var(--ok-soft);
+}
+
+.stepTitle {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.stepSummary {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--muted);
+  transition: transform 0.2s var(--ease);
+}
+
+.open .chevron {
+  transform: rotate(180deg);
+}
+
+.stepBody {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px 64px;
+  animation: global(rise) 0.25s var(--ease) both;
+}
+
+.why {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--fg-2);
+}
+
+.why code,
+.list code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  border-radius: 99px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.form > input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.choice {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 12px 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.choice:hover {
+  border-color: var(--line-strong);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice b {
+  font-size: 13.5px;
+}
+
+.choice span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.choiceOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.allow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ok);
+}
+
+/* ---- Done ---- */
+.ready {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+
+.readyIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+/* ---- Optional extras ---- */
+.extrasHead {
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.extrasLead {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.extras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.extra {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-content: start;
+  gap: 4px 14px;
+  padding: 16px;
+  min-width: 0;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  text-decoration: none;
+  transition: transform 0.15s var(--ease), box-shadow 0.15s, border-color 0.15s;
+}
+
+.extra:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+}
+
+.extra:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.extra > .extraIcon {
+  grid-row: 1 / -1;
+}
+
+.extra h3 {
+  align-self: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.extra p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.extraState {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.extraDone {
+  color: var(--ok);
+}
+
+/* ---- Overview entry ---- */
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.cardText {
+  min-width: 0;
+}
+
+.cardText b {
+  font-size: 14px;
+}
+
+.cardText span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardSide {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cardBar {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+
+@media (max-width: 640px) {
+  .choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .extras {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stepHead {
+    grid-template-columns: 30px minmax(0, 1fr) 18px;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .stepHead > .state {
+    display: none;
+  }
+
+  .stepBody {
+    padding: 0 14px 16px;
+  }
+
+  .migrate,
+  .ready {
+    flex-wrap: wrap;
+  }
+
+  .migrate > a,
+  .ready > div:last-child {
+    width: 100%;
+  }
+
+  .card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cardSide {
+    grid-column: 1 / -1;
+  }
+}

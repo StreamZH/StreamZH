@@ -14,14 +14,44 @@ public static class TrayCommandLine
 
     public const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
-    /// <summary>The Run entry: the tray exe, plus --data when StreamZH uses another data folder than the default.</summary>
-    public static string RunEntry(string trayExe, string? dataDirectory, string defaultDataDirectory)
+    /// <summary>
+    /// "--start": when there is no service, the tray starts StreamZH.exe (minimized) if it is not running. The Windows
+    /// installer's "tray only" choice puts it in the Run entry, so StreamZH starts at sign-in without a service.
+    /// </summary>
+    public const string StartFlag = "--start";
+
+    /// <summary>The Run entry: the tray exe, plus --data when StreamZH uses another data folder than the default, plus --start.</summary>
+    public static string RunEntry(string trayExe, string? dataDirectory, string defaultDataDirectory, bool startHost = false)
     {
         ArgumentNullException.ThrowIfNull(trayExe);
         var command = Quote(trayExe);
-        return string.IsNullOrWhiteSpace(dataDirectory) || SamePath(dataDirectory, defaultDataDirectory)
-            ? command
-            : $"{command} --data {Quote(dataDirectory)}";
+        if (!string.IsNullOrWhiteSpace(dataDirectory) && !SamePath(dataDirectory, defaultDataDirectory))
+        {
+            command = $"{command} --data {Quote(dataDirectory)}";
+        }
+
+        return startHost ? $"{command} {StartFlag}" : command;
+    }
+
+    /// <summary>The SID of LocalSystem.</summary>
+    public const string LocalSystemSid = "S-1-5-18";
+
+    /// <summary>
+    /// SV4 X-05: why the tray must not start StreamZH.exe itself as the account <paramref name="accountSid"/>, or null.
+    /// A tray running as SYSTEM (a silent "tray only" install by Intune, SCCM or an RMM tool runs as SYSTEM) would start
+    /// StreamZH as LocalSystem, which 0.12 moved away from: any way from StreamZH's settings to running a program would
+    /// then control Windows.
+    /// </summary>
+    public static string? HostStartRefusal(string? accountSid) =>
+        string.Equals(accountSid, LocalSystemSid, StringComparison.OrdinalIgnoreCase)
+            ? "Not started: the tray icon runs as SYSTEM, and StreamZH must not run as SYSTEM. Install it as a Windows service (tools\\Install-Service.ps1), or sign in and start the tray icon as your user."
+            : null;
+
+    /// <summary>True when the tray was started with <see cref="StartFlag"/>.</summary>
+    public static bool WantsStart(IReadOnlyList<string> args)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+        return args.Any(a => a is StartFlag or "/start" or "-start");
     }
 
     /// <summary>The arguments for StreamZH.exe in a console window: --data only for a data folder other than the default.</summary>

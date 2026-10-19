@@ -129,6 +129,22 @@ public sealed class OngoingServiceTests : IDisposable
         Assert.Empty(Service(articleSource: source).Get().Notices);
     }
 
+    /// <summary>1.0 RC: torrents only (the built-in engine or a torrent client) is a complete setup without a Usenet server.</summary>
+    [Fact]
+    public void Torrents_only_need_no_usenet_server()
+    {
+        AddIndexer("A");
+        var source = new FakeArticleSource { MaxConnections = 0 };
+        var clients = new DownloadClientRepository(_database);
+        var id = clients.Add(new DownloadClientDefinition(
+            0, "StreamZH", DownloadClientDefinition.BuiltInTorrent, DownloadProtocol.Torrent, true, 1, new Dictionary<string, System.Text.Json.JsonElement>()));
+
+        Assert.Empty(Service(articleSource: source, clients: clients).Get().Notices);
+
+        clients.Update(clients.Find(id)! with { Enable = false });
+        Assert.Equal(["no-usenet-server"], Service(articleSource: source, clients: clients).Get().Notices.Select(n => n.Key));
+    }
+
     [Fact]
     public void Usenet_server_table_is_used_when_there_is_no_article_source()
     {
@@ -365,9 +381,14 @@ public sealed class OngoingServiceTests : IDisposable
         Assert.Empty(Service(tools: tools, installer: installer).Get().Notices);
     }
 
-    private OngoingService Service(bool withQueue = true, IArticleSource? articleSource = null, PostProcessTools? tools = null, ToolInstaller? installer = null)
+    private OngoingService Service(bool withQueue = true, IArticleSource? articleSource = null, PostProcessTools? tools = null, ToolInstaller? installer = null, DownloadClientRepository? clients = null)
     {
         var services = new ServiceCollection();
+        if (clients is not null)
+        {
+            services.AddSingleton(clients);
+        }
+
         if (withQueue)
         {
             services.AddSingleton<IDownloadQueue>(_queue);

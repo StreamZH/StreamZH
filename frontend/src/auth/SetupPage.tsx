@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import Icon from '../components/Icon'
 import ui from '../components/ui.module.css'
+import { withBase } from '../lib/urlBase'
 import { authQueryKey } from './auth'
 import Brand from './Brand'
 import PasswordInput from './PasswordInput'
@@ -21,7 +22,11 @@ export default function SetupPage({ codeRequired = false }: { codeRequired?: boo
 
   const setup = useMutation({
     mutationFn: () => api.setup(username, password, codeRequired ? setupCode : undefined),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: authQueryKey }),
+    onSuccess: () => {
+      // 1.0 RC: the new owner lands on "Get started".
+      window.history.replaceState(null, '', withBase('/get-started'))
+      return queryClient.invalidateQueries({ queryKey: authQueryKey })
+    },
     onError: () => shake(card.current),
   })
 

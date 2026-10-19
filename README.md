@@ -7,203 +7,161 @@
 
 <p align="center">One app for your whole media pipeline.</p>
 
-> **Status:** early development (0.1, private test phase). Not ready for use.
+> **Status:** 1.0 release candidate. Feedback welcome in the [issues](https://github.com/cloudzh/streamzh/issues).
 
-StreamZH replaces the *arr stack with a single application: one login, one database,
-one API, one queue.
+StreamZH finds, downloads, repairs, unpacks, renames and files your movies and series, and lets friends request
+what they want to watch. It does in **one application** what usually takes six:
 
-| Today | In StreamZH |
+| Usually | In StreamZH |
 |---|---|
-| Sonarr, Radarr (Lidarr, Readarr later) | **Library** |
-| Prowlarr | **Indexers** |
-| SABnzbd (torrent client later) | **Download Engine** |
-| Five activity tabs | **Activity**: Search → Grab → Download → Verify & Unpack → Import & Rename → Notify |
-| Five sets of quality profiles | **Profiles**: one rule set for all media types |
+| Radarr and Sonarr | **Library**: movies and series, monitoring, upgrades, renaming, calendar |
+| Prowlarr | **Indexers**: Newznab and Torznab indexers, limits, stats, search across all of them |
+| SABnzbd | **Built-in Usenet engine**: download, par2 repair, unpack |
+| A torrent client | **Built-in torrent engine**, or qBittorrent, Transmission and Deluge |
+| Recyclarr | **TRaSH Guides sync**: profiles and custom formats kept up to date |
+| Requestrr (and request apps) | **Discover and requests** for friends, with a built-in **Discord bot** |
 
-StreamZH ships no list of indexers. Add only sources you are permitted to use.
+One login, one database, one queue, one API. StreamZH runs on Windows, Linux, macOS and in Docker, is free and open
+source (GPL-3.0), and sends no analytics anywhere.
 
-## Development
+StreamZH ships no list of indexers and no content. Add only sources you are permitted to use.
 
-Requirements: [.NET 10 SDK](https://dotnet.microsoft.com/download), Node.js 22 or newer.
+<!-- Screenshots of a demo instance with example data; how they are made: docs/images/README.md. -->
+<table>
+  <tr>
+    <td><img src="docs/images/overview.png" alt="Overview with downloads, warnings and the next 7 days" width="400"></td>
+    <td><img src="docs/images/library-movies.png" alt="Movie library with on-disk, missing and downloading badges" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/activity-queue.png" alt="Activity queue: download, repair, unpack and import" width="400"></td>
+    <td><img src="docs/images/discover.png" alt="Discover and request movies and series" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/get-started.png" alt="Get started: the first-run checklist" width="400"></td>
+    <td><img src="docs/images/overview-light.png" alt="Overview in the light theme" width="400"></td>
+  </tr>
+</table>
+
+## Features
+
+- **Library**: movies and series from TMDB, monitoring per movie, series and season, standard, daily and anime
+  numbering (with TheXEM scene numbering), alternative titles, import of the folders you already have, mass editor,
+  Organize (rename and move to your naming scheme, with undo), media info from ffprobe.
+- **Search and grab**: RSS sync, automatic and interactive search, Wanted (missing and cutoff unmet), blocklist and
+  retry after failed downloads, Usenet/torrent preference with delays, a release test that explains every decision.
+- **Quality**: quality profiles with groups and cutoff, custom formats with scores (Radarr/Sonarr compatible JSON),
+  release profiles, size limits per quality, TRaSH Guides templates and daily sync, `recyclarr.yml` import.
+- **Indexers**: a catalog of known Newznab and Torznab indexers, query and grab limits, VIP expiry, health back-off,
+  search across all indexers, stats and history, one-click import from Prowlarr.
+- **Downloads**: a Usenet engine with backup servers, categories, scheduler, par2 repair and 7-Zip unpacking; a
+  torrent engine with seed goals; qBittorrent, Transmission and Deluge; remote path mappings.
+- **Requests**: Discover (trending, popular, upcoming, top rated), requests with approval or auto-approve, limits,
+  invite links, roles (Owner, Admin, Friend, Requester), a Discord bot with `/movie`, `/tv` and `/requests`.
+- **Connect**: Plex, Jellyfin, Emby and Kodi library updates; Discord, Telegram, Pushover, ntfy, Gotify, email,
+  Apprise and webhooks. Calendar with an iCal feed. Import lists from TMDB, Trakt, Plex watchlists and RSS.
+- **Moving over**: a migration wizard takes over Radarr, Sonarr, Prowlarr and SABnzbd (settings, indexers, servers and
+  the library with its files) without changing them, and a side-by-side mode lets both run until you switch over.
+- **Runs unattended**: Windows service with tray icon, systemd service, Docker image with health check, scheduled
+  backups, and a status window that says what is happening right now.
+
+## Quick start
+
+Downloads are on the [releases page](https://github.com/cloudzh/streamzh/releases). After installing, open
+**http://localhost:9797** (or `http://<server>:9797` from another device) and create the owner account.
+[docs/INSTALL.md](docs/INSTALL.md) covers every platform in detail.
+
+### Windows
+
+Run `StreamZH-<version>-win-x64-setup.exe`. It installs StreamZH to `C:\Program Files\StreamZH`, keeps your data in
+`C:\ProgramData\StreamZH`, and runs it as a Windows service with a tray icon (or with the tray icon only, if you
+prefer). A portable `StreamZH-<version>-win-x64.zip` is available as well. Details: [INSTALL.md → Windows](docs/INSTALL.md#windows).
+
+### Linux
 
 ```bash
-# Frontend (builds into src/StreamZH.Host/wwwroot)
-cd frontend
-npm install
-npm run build
-cd ..
-
-# Backend on http://localhost:9797, data in ./.devdata
-dotnet run --project src/StreamZH.Host -- --data .devdata
-# Open http://localhost:9797, create the owner account, then add a root folder
-# (the owner allows its folder as a storage location in one click) and your free
-# TMDB API key under Settings
-
-# Tests
-dotnet test
+# Debian, Ubuntu
+sudo apt install ./streamzh_<version>_amd64.deb
+# Fedora, RHEL, openSUSE
+sudo dnf install ./streamzh-<version>.x86_64.rpm
+# Any distribution with systemd
+tar -xzf StreamZH-<version>-linux-x64.tar.gz && sudo bash StreamZH-<version>-linux-x64/install-linux.sh
 ```
 
-Without a TMDB key you can point StreamZH at a TMDB stand-in for development:
-`--tmdb-url http://localhost:9800/3/`.
+For 64-bit ARM use the `arm64` / `aarch64` files.
 
-For UI work run `npm run dev` in `frontend/` (http://localhost:5173). It proxies
-`/api` and `/hub` to the backend on port 9797.
-
-### CI
-
-Every push builds and tests (about 3 minutes). The Docker image and the packages for
-Windows, Linux and macOS are built only when started by hand (Actions → CI → Run workflow)
-or for a version tag such as `v0.3.0`.
-
-## Install
-
-StreamZH runs unattended as a Windows service, a systemd service on Linux or a Docker
-container. Your data stays in the data folder in all cases (`C:\ProgramData\StreamZH`,
-`/var/lib/streamzh`, `/config`); updating only replaces the program files.
-
-Coming from Sonarr, Radarr, Prowlarr and SABnzbd? [docs/MIGRATION.md](docs/MIGRATION.md) walks through taking
-everything over, the side-by-side phase and switching over.
-
-### Windows: build, install, run as a service
-
-One command pulls the latest code, builds `StreamZH.exe`, stops the running instance,
-installs it to `C:\Tools\StreamZH` and starts it again. Data in `C:\ProgramData\StreamZH` is kept.
-
-```powershell
-C:\Repos\StreamZH\tools\Update-Local.ps1
-```
-
-Needs Git, the .NET 10 SDK and Node.js LTS (`winget install --id Microsoft.DotNet.SDK.10 -e`,
-`winget install --id OpenJS.NodeJS.LTS -e`).
-
-Started like this, StreamZH runs in a console window and stops when you log off. To run it
-as the Windows service "StreamZH" instead, run once in a PowerShell **as administrator**:
-
-```powershell
-C:\Repos\StreamZH\tools\Install-Service.ps1 -Firewall -AllowControlledFolderAccess
-```
-
-The service starts with Windows (delayed automatic start), keeps running without a login,
-and Windows restarts it after a crash (after 5 s, 10 s, then every 60 s). Restart and
-Shutdown in the web UI work as before; System → Status shows "Runs as: Windows service".
-Running the script again updates the service. From then on `Update-Local.ps1` stops the
-service, installs the new build, starts the service and waits until it answers; it needs no
-administrator rights for that (the install script allows your user to start and stop the service).
-
-| Option | Effect |
-|---|---|
-| `-Firewall` (`-Port 9797`) | Allows the port from private and domain networks |
-| `-AllowControlledFolderAccess` | Adds `StreamZH.exe` to the allowed apps of Controlled folder access (Windows Security → Ransomware protection). Without it the service cannot import into protected folders such as Videos |
-| `-Folder 'D:\Media', 'D:\Downloads'` | Lets the service account change these folders (root folders, download folders). Without it the script asks once when the service gets the virtual account |
-| `-Account .\johndoe` | Runs the service as this user (asks for the password; Microsoft account: its password, not the PIN) instead of the virtual account. Needed for a NAS share that wants a user and password. `-Account LocalSystem` runs it as LocalSystem (not recommended) |
-| `-DataDir D:\StreamZH` | Another data folder (passed as `--data`) |
-| `-NoStart` | Creates or updates the service without starting it |
-| `-NoTray` | No tray icon (removes its "Start with Windows" entry) |
-
-The service runs as its own virtual account `NT SERVICE\StreamZH`: no password, and no rights on
-the computer beyond its data folder and the folders it is given. It can change folders every user
-may change (most folders on other drives); for folders of your user (Videos, Downloads, Desktop) or
-other restricted folders, name them with `-Folder` or when the script asks. A service that ran as
-LocalSystem (before 0.12) is switched to the virtual account when you run the script again, unless you
-pass `-Account LocalSystem`. The data folder `C:\ProgramData\StreamZH` is private: only SYSTEM,
-administrators, the service account and your user may open it (StreamZH checks this at every start).
-
-Things that work differently for a service:
-
-- Mapped network drives (`Z:`) do not exist for services. Use UNC paths (`\\nas\movies`)
-  for root folders and download folders; the install script lists your mapped drives with their UNC paths.
-- The virtual account logs on to other computers as the computer account (`DOMAIN\PC$`). Use
-  `-Account .\<user>` when the NAS share needs a user and password.
-- The proxy of your Windows user does not apply to the service; set a proxy in Settings → General if you need one.
-- Logs stay in `C:\ProgramData\StreamZH\logs`. When StreamZH cannot start at all, the error is
-  also in the Windows event log (Application, source StreamZH).
-
-Back to the console window: `C:\Repos\StreamZH\tools\Uninstall-Service.ps1` (as administrator;
-program and data stay).
-
-#### Tray icon
-
-A service has no window, so `StreamZH.Tray.exe` (next to `StreamZH.exe`) shows StreamZH in the
-notification area, bottom right: a dot shows the state (green running, orange paused or warnings,
-red stopped or not answering), the tooltip the downloads (`Running · 2 downloads · 47.3 % · 12 min 05 s`).
-Double-click opens the dashboard; the right-click menu pauses and resumes downloads, restarts, stops
-and starts StreamZH, opens the logs and the data folder, and switches "Start with Windows" and the
-notifications when a download finishes or fails. `Update-Local.ps1` and `Install-Service.ps1` build it,
-let it start with Windows for your user and start it (`-NoTray` leaves it out); it works for the
-service and for the console window. It needs the .NET 10 Windows Desktop Runtime, which the .NET SDK
-includes. The tray talks to StreamZH on this computer only, with a token StreamZH writes to
-`C:\ProgramData\StreamZH\tray.token` at every start (readable only by the account StreamZH runs as and
-the user the install script set up, or your own user for the console window).
-
-### Linux: systemd service
-
-Download a Linux package (Actions → CI → artifact `StreamZH-linux-x64` or `StreamZH-linux-arm64`),
-unpack it and run the installer that comes with it:
-
-```bash
-unzip StreamZH-linux-x64.zip -d StreamZH && cd StreamZH
-sudo bash install-linux.sh
-```
-
-It creates the system user `streamzh`, installs the program to `/opt/streamzh`, the data to
-`/var/lib/streamzh`, writes `/etc/systemd/system/streamzh.service` (sample:
-[docs/streamzh.service](docs/streamzh.service)), enables and starts it. Running it again with a
-newer package updates StreamZH (`sudo bash install-linux.sh --from StreamZH-linux-x64.zip` also
-takes a `.zip` or `.tar.gz` directly). `--uninstall` removes service and program, `--purge` also
-the data. `bash install-linux.sh --help` lists all options.
-
-The service user needs read and write access to your media and download folders, for example
-`sudo setfacl -R -m u:streamzh:rwX -m d:u:streamzh:rwX /srv/media`. Logs: `journalctl -u streamzh -f`.
-StreamZH needs ICU (`sudo apt install libicu-dev`) and installs par2 and 7-Zip itself (needs `tar` and `xz`).
+StreamZH runs as the systemd service `streamzh` under its own user `streamzh`. Give that user access to your media
+folders, e.g. `sudo setfacl -R -m u:streamzh:rwX -m d:u:streamzh:rwX /data/media`. Details:
+[INSTALL.md → Linux](docs/INSTALL.md#linux).
 
 ### Docker
 
 ```bash
-docker build -f docker/Dockerfile -t streamzh:dev .
-docker run -d --name streamzh --restart unless-stopped -p 9797:9797 \
-  -e PUID=1000 -e PGID=1000 -e UMASK=027 \
-  -v /opt/streamzh:/config -v /srv/media:/media streamzh:dev
+docker run -d --name streamzh --restart unless-stopped \
+  -p 9797:9797 -p 51414:51414 -p 51414:51414/udp \
+  -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC \
+  -v /opt/streamzh/config:/config -v /data:/data \
+  ghcr.io/cloudzh/streamzh:latest
 ```
 
-Like the linuxserver.io images, `PUID`/`PGID` set the user StreamZH runs as (default: the
-image's `app` user, 1654) and `/config` is given to that user and closed to others; `--user`
-works as well. `UMASK` (default `027`) decides who may read new media files: the group yes, others
-no; `002` also lets the group change them, `022` lets everyone read them. The
-image has a health check on `/health` (port 9797 inside the container; publish another port
-with `-p`, do not change it in Settings).
+Release candidates are tagged by version only (e.g. `ghcr.io/cloudzh/streamzh:1.0.0-rc.1`). `docker logs streamzh`
+shows the one-time setup code the first page asks for. A compose file, `UMASK` and reverse proxies:
+[INSTALL.md → Docker](docs/INSTALL.md#docker).
 
-## API
+### macOS
 
-Interactive clients use the session cookie from the web UI. Scripts and CloudZH send the
-API key (Settings → API key) as header:
+Unpack `StreamZH-<version>-osx-arm64.zip` (Apple silicon) or `StreamZH-<version>-osx-x64.zip` (Intel), remove
+the download quarantine once (`xattr -dr com.apple.quarantine StreamZH`; the app is not notarized) and start
+`StreamZH/StreamZH`. Details:
+[INSTALL.md → macOS](docs/INSTALL.md#macos).
 
-```bash
-curl -H "X-Api-Key: <key>" http://localhost:9797/api/v1/system/status
-```
+## First steps
 
-The OpenAPI description is at `/api/v1/openapi.json`. `/health` needs no login.
+1. **Create the owner account.** From another device than the server, the setup page asks for the setup code that
+   StreamZH prints in its console and log.
+2. **Get started** opens next and ticks off what StreamZH still needs, most of it right on the page:
+   - **Storage locations** and **root folders**: where your movies and series live. StreamZH only touches folders
+     inside the storage locations the owner allows; the root-folder dialog adds yours in one click.
+   - **TMDB key**: free, from themoviedb.org. Titles, posters and episode lists come from there.
+   - **Release language**: any, the original language, or German; it picks the default quality profile.
+   - **Indexers** (or Import from Prowlarr) and **a download client**: your Usenet server for the built-in engine,
+     the built-in torrent engine, or your torrent client.
+3. **Add a movie or series**, or import the folders you already have.
 
-## Repository layout
+The [getting started guide](docs/guide/getting-started.md) walks through each step.
 
-| Path | Content |
-|---|---|
-| `src/StreamZH.Host` | ASP.NET Core host: API, SignalR hub, serves the web UI |
-| `src/StreamZH.Core` | Domain model, pipeline, event bus |
-| `src/StreamZH.Data` | SQLite database, migrations, repositories |
-| `src/StreamZH.Parsing` | Release-name and quality parser |
-| `src/StreamZH.Metadata` | TMDB client |
-| `src/StreamZH.Indexers` | Newznab client, search, RSS |
-| `src/StreamZH.Usenet` | Download engine: NZB, NNTP, yEnc, par2, unpack |
-| `src/StreamZH.Torrent` | Built-in torrent engine (MonoTorrent) |
-| `src/StreamZH.Library` | Import, rename, disk scan, media server notifications |
-| `src/StreamZH.Tray`, `src/StreamZH.Tray.Core` | Windows tray icon (WinForms) and its logic without UI |
-| `frontend/` | React + TypeScript web UI |
-| `tests/` | xUnit tests |
-| `docs/` | Architecture, roadmap, decisions |
+## Coming from Sonarr, Radarr, Prowlarr and SABnzbd?
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+Settings → Migration takes everything over through the old apps' APIs: settings, profiles, custom formats, indexers,
+Usenet servers, download clients, and your movies and series with the files you already have (linked where they
+are, never moved or downloaded again). The old apps are only read, never changed, and the side-by-side mode keeps
+StreamZH from grabbing anything until you switch over. See [docs/MIGRATION.md](docs/MIGRATION.md).
+
+## Documentation
+
+- [Installation](docs/INSTALL.md): Windows, Linux, Docker, macOS, reverse proxies, updates, backups
+- [User guide](docs/guide/README.md): getting started, library, searching, indexers, downloads, quality, requests,
+  users, notifications, calendar, every setting, system pages, API, troubleshooting, glossary
+- [Migration](docs/MIGRATION.md) from Radarr, Sonarr, Prowlarr and SABnzbd
+- [Security](docs/SECURITY.md): what StreamZH protects, safe deployment, the data folder
+- [Webhook payload](docs/WEBHOOK.md), [Architecture](docs/ARCHITECTURE.md), [Roadmap](docs/ROADMAP.md),
+  [Decisions](docs/DECISIONS.md), [Changelog](CHANGELOG.md)
+
+## Security in short
+
+Keep sign-in on, and reach StreamZH from the internet only through a reverse proxy with HTTPS, never by forwarding
+port 9797. A fresh installation can only be claimed from the server itself or with the setup code. Stored passwords
+and API keys are encrypted, Admins and the API key cannot change owner-only settings such as backups and tool paths,
+and StreamZH only writes inside the storage locations the owner allows. Treat backups and the data folder like
+passwords. Details in [docs/SECURITY.md](docs/SECURITY.md); report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build StreamZH
+from source, run the tests and send changes. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-[GPL-3.0](LICENSE). Code ported from Sonarr, Radarr and Prowlarr (also GPL-3.0) is
-listed in [NOTICE.md](NOTICE.md).
+StreamZH is a CloudZH product, licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only). Code
+ported from Radarr, Sonarr, Prowlarr and other projects keeps its origin and is listed in [NOTICE.md](NOTICE.md).
+StreamZH is not affiliated with these projects, with TMDB or with the TRaSH Guides.

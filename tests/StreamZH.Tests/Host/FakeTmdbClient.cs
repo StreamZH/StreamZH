@@ -26,10 +26,20 @@ public sealed class FakeTmdbClient : ITmdbClient
                 ? [new TmdbSearchResult(Show.TmdbId, Show.Title, Show.OriginalTitle, Show.Year, Show.Overview, Show.PosterPath)]
                 : []);
 
-    public Task<TmdbMovie> GetMovieAsync(int tmdbId, CancellationToken cancellationToken = default) =>
-        new[] { Dune, Arrival }.FirstOrDefault(m => m.TmdbId == tmdbId) is { } movie
-            ? Task.FromResult(movie)
+    /// <summary>When set, every movie lookup waits for this first (a slow TMDB); null answers at once.</summary>
+    public Func<int, Task>? BeforeMovie { get; set; }
+
+    public async Task<TmdbMovie> GetMovieAsync(int tmdbId, CancellationToken cancellationToken = default)
+    {
+        if (BeforeMovie is { } wait)
+        {
+            await wait(tmdbId);
+        }
+
+        return new[] { Dune, Arrival }.FirstOrDefault(m => m.TmdbId == tmdbId) is { } movie
+            ? movie
             : throw new TmdbException("Not found on TMDB.", 404);
+    }
 
     public Task<TmdbSeries> GetSeriesAsync(int tmdbId, CancellationToken cancellationToken = default) =>
         tmdbId == Show.TmdbId ? Task.FromResult(Show) : throw new TmdbException("Not found on TMDB.", 404);

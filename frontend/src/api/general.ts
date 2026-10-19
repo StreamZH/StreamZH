@@ -89,11 +89,16 @@ export interface UpdateCheck {
   releaseUrl: string | null
   updateAvailable: boolean
   message: string | null
+  /** The release file that fits this installation (platform, processor, package); null for Docker or when none fits. */
+  assetName: string | null
+  assetUrl: string | null
 }
 
 export interface UpdateInfo {
   version: string
   mechanism: 'docker' | 'manual'
+  /** How this copy was installed. */
+  package: 'docker' | 'windows-installer' | 'deb' | 'rpm' | 'archive'
   instructions: string
   lastCheck: UpdateCheck
 }

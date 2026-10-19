@@ -1,14 +1,16 @@
 # StreamZH with Docker Compose - an example to copy and adapt.
 #
-#   cp docker/docker-compose.example.yml docker/docker-compose.yml   # adapt the paths below
-#   docker compose -f docker/docker-compose.yml up -d --build
-#
-# Elsewhere (e.g. /opt/streamzh/docker-compose.yml): set build.context to your StreamZH checkout.
+#   mkdir -p /srv/streamzh && cd /srv/streamzh
+#   curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/cloudzh/streamzh/main/docker/docker-compose.example.yml
+#   (adapt the paths below)
+#   docker compose up -d
 #
 # Then open http://<your server>:9797 and create the first user. Seen from inside the container your browser is
 # "another device", so the setup page asks for the one-time setup code: `docker logs streamzh` shows it (also in
 # ./config/setup-code). See docs/SECURITY.md for safe deployment and docs/MIGRATION.md for moving over from
 # Sonarr, Radarr, Prowlarr and SABnzbd.
+#
+# Updates: `docker compose pull && docker compose up -d`. Your data in ./config stays.
 #
 # Paths: mount your media and download folders at the SAME paths inside the container as the old apps use (e.g.
 # /data/media/movies, /data/media/tv, /data/downloads). Then the migration wizard needs no path mappings and
@@ -16,10 +18,12 @@
 
 services:
   streamzh:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    image: streamzh:local
+    # Released image: ":latest" (newest release), ":1.0" (newest 1.0.x) or an exact version like ":1.0.0".
+    image: ghcr.io/cloudzh/streamzh:latest
+    # To build from a checkout instead, remove "image" above and use (paths relative to this file):
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
     container_name: streamzh
     restart: unless-stopped
 
@@ -35,9 +39,13 @@ services:
       TZ: "Etc/UTC"
 
     ports:
-      # Only the web UI/API port. To reach StreamZH only through a reverse proxy on this host, use
+      # The web UI/API port. To reach StreamZH only through a reverse proxy on this host, use
       # "127.0.0.1:9797:9797" instead. Keep 9797 inside the container (change the left number to publish another port).
       - "9797:9797"
+      # The built-in torrent engine's port for incoming peers (its "Listening port" setting). Only needed when you use
+      # it; forward it on your router for better speeds. Keep the same number on both sides and in the settings.
+      - "51414:51414/tcp"
+      - "51414:51414/udp"
 
     volumes:
       # Database, settings, logs, backups. Back this folder up.

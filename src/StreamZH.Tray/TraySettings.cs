@@ -8,8 +8,11 @@ using StreamZH.Tray.Core;
 
 namespace StreamZH.Tray;
 
-/// <summary>Per-user choices of the tray, in HKCU: "Start with Windows" (the Run entry) and "Notifications".</summary>
-internal sealed class TraySettings(string dataDirectory)
+/// <summary>
+/// Per-user choices of the tray, in HKCU: "Start with Windows" (the Run entry; keeps --start when the tray was started
+/// with it) and "Notifications".
+/// </summary>
+internal sealed class TraySettings(string dataDirectory, bool startHost)
 {
     private const string Key = @"Software\StreamZH\Tray";
     private const string NotificationsValue = "Notifications";
@@ -26,7 +29,7 @@ internal sealed class TraySettings(string dataDirectory)
             using var run = Registry.CurrentUser.CreateSubKey(TrayCommandLine.RunKey);
             if (value)
             {
-                run.SetValue(TrayCommandLine.RunValueName, TrayCommandLine.RunEntry(Environment.ProcessPath ?? Application.ExecutablePath, dataDirectory, AppPaths.Resolve().DataDirectory));
+                run.SetValue(TrayCommandLine.RunValueName, TrayCommandLine.RunEntry(Environment.ProcessPath ?? Application.ExecutablePath, dataDirectory, AppPaths.Resolve().DataDirectory, startHost));
             }
             else
             {

@@ -253,4 +253,10 @@ public static class ConfigKeys
 
     // Security (0.12, FX5): the owner's storage locations (JSON list of folders); every folder an admin sets must be inside one.
     public const string StorageLocations = "StorageLocations";
+
+    // Setup guide (1.0 RC): "true" when the owner or an admin hid the "Get started" checklist.
+    public const string SetupGuideDismissed = "SetupGuideDismissed";
+
+    // Setup guide (1.0 RC): the release language chosen in "Get started" (any, original, german).
+    public const string SetupReleaseLanguage = "SetupReleaseLanguage";
 }

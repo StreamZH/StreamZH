@@ -2,7 +2,8 @@ import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { api, ApiError } from '../api/client'
-import { downloadKeys, downloadsApi } from '../api/downloads'
+import { downloadKeys, downloadsApi, withLive } from '../api/downloads'
+import { queueTotals } from '../activity/queueTotals'
 import { libraryApi, queryKeys } from '../api/library'
 import { useLiveConnection } from '../api/useLiveConnection'
 import { authQueryKey, useAuth } from '../auth/auth'
@@ -87,27 +88,25 @@ export default function Layout() {
   })
 
   // Downloads in the top bar: overall percent from the bytes, speed and the time left from the bytes still to come.
+  // Usenet and torrents together (queueTotals): paused items and a paused Usenet queue do not count for the time left.
   const dl = useMemo(() => {
-    const items = downloads.data?.items ?? []
+    const items = (downloads.data?.items ?? []).map((i) => withLive(i, liveProgress, downloads.dataUpdatedAt))
     const active = items.filter((i) => i.status !== 'paused' && i.status !== 'queued')
     let total = 0
     let done = 0
-    let speed = 0
     for (const item of items) {
-      const liveItem = liveProgress?.items[item.id]
-      const progress = liveItem?.progress ?? item.progress
       total += item.totalBytes
-      done += item.totalBytes * progress
-      if (item.status !== 'paused') speed += liveItem?.speedBps ?? item.speedBps
+      done += item.totalBytes * item.progress
     }
+    const totals = queueTotals(items, downloads.data?.paused ?? false)
     return {
       count: items.length,
       active: active.length,
       progress: total > 0 ? done / total : 0,
-      speed,
-      eta: speed > 0 ? (total - done) / speed : Number.NaN,
+      speed: totals.speed,
+      eta: totals.eta ?? Number.NaN,
     }
-  }, [downloads.data, liveProgress])
+  }, [downloads.data, downloads.dataUpdatedAt, liveProgress])
 
   const busy = jobs.data && (jobs.data.running || jobs.data.queued > 0)
   const warnings = (ongoing?.notices ?? []).filter((n) => n.level !== 'info')

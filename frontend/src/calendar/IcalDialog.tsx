@@ -24,6 +24,8 @@ export default function IcalDialog({ onClose }: { onClose: () => void }) {
   if (movies !== series) params.set('tags', movies ? 'movies' : 'series')
   const feed = `${window.location.origin}${apiUrl('/calendar/feed.ics')}?${params}`
   const webcal = feed.replace(/^https?:/, 'webcal:')
+  // 0.12: everyone but the owner gets the API key masked.
+  const masked = general.data?.apiKey === '********'
 
   const copy = async () => {
     try {
@@ -46,6 +48,8 @@ export default function IcalDialog({ onClose }: { onClose: () => void }) {
       </p>
       {general.isError ? (
         <p className={ui.error}>{general.error.message}</p>
+      ) : masked ? (
+        <p className={styles.dialogText}>Only the owner can create the iCal link: it contains the API key, which only the owner can see.</p>
       ) : (
         <div className={styles.icalForm}>
           <div className={styles.icalRow}>
@@ -84,12 +88,16 @@ export default function IcalDialog({ onClose }: { onClose: () => void }) {
         <button type="button" className={ui.button} onClick={onClose}>
           Close
         </button>
-        <a className={ui.button} href={webcal} aria-disabled={!general.data}>
-          Open in calendar app
-        </a>
-        <button type="button" className={ui.primary} onClick={() => void copy()} disabled={!general.data}>
-          Copy iCal link
-        </button>
+        {!masked && (
+          <>
+            <a className={ui.button} href={webcal} aria-disabled={!general.data}>
+              Open in calendar app
+            </a>
+            <button type="button" className={ui.primary} onClick={() => void copy()} disabled={!general.data}>
+              Copy iCal link
+            </button>
+          </>
+        )}
       </div>
     </Modal>
   )

@@ -5,6 +5,8 @@ import { toolKeys, toolsApi, type ToolName, type ToolSettings, type ToolSource }
 import ui from '../components/ui.module.css'
 import { Pill } from '../indexers/Chips'
 import { useAdvanced } from '../lib/advancedMode'
+import { OwnerOnlyNote, ReadOnly } from '../settings/OwnerOnly'
+import { useIsOwner } from '../settings/useIsOwner'
 import { Row, SaveBar, Section, Toggle } from '../settings/SettingsKit'
 import { percent } from '../status/format'
 import styles from './Settings.module.css'
@@ -93,6 +95,7 @@ const anyInstalling = (data: ToolSettings | undefined) => !!data && (data.par2In
 export function ToolsSection() {
   const queryClient = useQueryClient()
   const advanced = useAdvanced()
+  const owner = useIsOwner()
   const [par2Path, setPar2Path] = useState<string | null>(null)
   const [sevenZipPath, setSevenZipPath] = useState<string | null>(null)
   const [ffprobePath, setFfprobePath] = useState<string | null>(null)
@@ -144,6 +147,7 @@ export function ToolsSection() {
   const manual = tools.filter((t) => !t.found && !t.installable)
 
   const fieldError = (field: string) => (save.error instanceof ApiError ? fieldErrors[field]?.[0] : undefined)
+  const nameHelp = (names: string) => `Empty: use the copy StreamZH installs or finds. The file must be named ${names}.`
 
   return (
     <Section
@@ -152,7 +156,10 @@ export function ToolsSection() {
       description={`Finished downloads are repaired with par2 and unpacked with 7-Zip; ffprobe reads the media info of video files.${tools.some((t) => t.installable) ? ' StreamZH installs them by itself when they are missing.' : ''}`}
       hiddenCount={advanced ? 0 : 4}
       footer={
-        advanced && (
+        advanced &&
+        (!owner ? (
+          <OwnerOnlyNote>Only the owner can change the tools: StreamZH runs these programs.</OwnerOnlyNote>
+        ) : (
           <SaveBar
             dirty={dirty}
             saving={save.isPending}
@@ -167,7 +174,7 @@ export function ToolsSection() {
               save.reset()
             }}
           />
-        )
+        ))
       }
     >
       <ul className={styles.toolList}>
@@ -184,7 +191,8 @@ export function ToolsSection() {
         ))}
       </ul>
       {manual.length > 0 && <ManualHint settings={data} tools={manual} />}
-      <Row label="par2 path" htmlFor="tool-par2" advanced help="Empty: use the copy StreamZH installs or finds." error={fieldError('par2Path')}>
+      <ReadOnly locked={!owner}>
+      <Row label="par2 path" htmlFor="tool-par2" advanced help={nameHelp('par2, par2.exe or par2j64.exe')} error={fieldError('par2Path')}>
         <input
           id="tool-par2"
           className={`${ui.input} ${ui.mono}`}
@@ -194,7 +202,7 @@ export function ToolsSection() {
           spellCheck={false}
         />
       </Row>
-      <Row label="7-Zip path" htmlFor="tool-7zip" advanced help="Empty: use the copy StreamZH installs or finds." error={fieldError('sevenZipPath')}>
+      <Row label="7-Zip path" htmlFor="tool-7zip" advanced help={nameHelp('7z, 7za, 7zz or 7z.exe')} error={fieldError('sevenZipPath')}>
         <input
           id="tool-7zip"
           className={`${ui.input} ${ui.mono}`}
@@ -204,7 +212,7 @@ export function ToolsSection() {
           spellCheck={false}
         />
       </Row>
-      <Row label="ffprobe path" htmlFor="tool-ffprobe" advanced help="Empty: use the copy StreamZH installs or finds." error={fieldError('ffprobePath')}>
+      <Row label="ffprobe path" htmlFor="tool-ffprobe" advanced help={nameHelp('ffprobe or ffprobe.exe')} error={fieldError('ffprobePath')}>
         <input
           id="tool-ffprobe"
           className={`${ui.input} ${ui.mono}`}
@@ -226,6 +234,7 @@ export function ToolsSection() {
       >
         <Toggle checked={auto} onChange={setAutoInstall} />
       </Row>
+      </ReadOnly>
     </Section>
   )
 }

@@ -7,7 +7,9 @@ import Icon from '../components/Icon'
 import { Skeleton } from '../components/Loader'
 import ui from '../components/ui.module.css'
 import { formatBytes, formatDateTime, relativeTime } from '../lib/format'
+import { OwnerOnlyNote } from '../settings/OwnerOnly'
 import { Section } from '../settings/SettingsKit'
+import { useIsOwner } from '../settings/useIsOwner'
 import { RestartControls } from './Restart'
 import styles from './System.module.css'
 import { SystemPage } from './SystemPage'
@@ -15,7 +17,8 @@ import { SystemPage } from './SystemPage'
 /** System → Backup (like Radarr): backups of the database and settings; download, delete, restore. */
 export default function BackupPage() {
   const queryClient = useQueryClient()
-  const list = useQuery({ queryKey: generalKeys.backups, queryFn: generalApi.backups })
+  const owner = useIsOwner()
+  const list = useQuery({ queryKey: generalKeys.backups, queryFn: generalApi.backups, enabled: owner })
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: generalKeys.backups })
     void queryClient.invalidateQueries({ queryKey: statusKeys.ongoing })
@@ -30,6 +33,16 @@ export default function BackupPage() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (file) upload.mutate(file)
+  }
+
+  if (!owner) {
+    return (
+      <SystemPage title="Backup" lead="The database with all settings, library and history, as a zip file. Your media files are not part of it.">
+        <Section id="backups" title="Backups">
+          <OwnerOnlyNote>Only the owner can make, download and restore backups: they hold every password and key.</OwnerOnlyNote>
+        </Section>
+      </SystemPage>
+    )
   }
 
   return (

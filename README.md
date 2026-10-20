@@ -162,6 +162,6 @@ from source, run the tests and send changes. Please follow the [code of conduct]
 
 ## License
 
-StreamZH is a CloudZH product, licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only). Code
+StreamZH is a [CloudZH](https://cloudzh.app) product, licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only). Code
 ported from Radarr, Sonarr, Prowlarr and other projects keeps its origin and is listed in [NOTICE.md](NOTICE.md).
 StreamZH is not affiliated with these projects, with TMDB or with the TRaSH Guides.

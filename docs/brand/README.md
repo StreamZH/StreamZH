@@ -1,6 +1,6 @@
 # StreamZH Logo
 
-StreamZH is part of the CloudZH family and uses the **same logo as CloudZH**, with «Stream» in place of «Cloud».
+StreamZH is part of the [CloudZH](https://cloudzh.app) family and uses the **same logo as CloudZH**, with «Stream» in place of «Cloud».
 Monogram geometry, colours, font and clear space follow the CloudZH brand kit. Refined for StreamZH (17.10.2026):
 monogram and letter corners softened (radius 1.5), larger wordmark (70 % instead of 58 %), tighter gap (0.24 instead of 0.42),
 larger monogram on the app icon (60 % instead of 54 %).

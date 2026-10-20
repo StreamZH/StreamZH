@@ -1731,15 +1731,20 @@ public sealed class DownloadEngine(
     private string? FindDuplicate(string title, string hash)
     {
         var key = NameKey(title);
+        HashSet<int> failed;
         lock (_lock)
         {
-            if (_items.Values.FirstOrDefault(d => d.NzbHash == hash || NameKey(d.Title) == key) is { } queued)
+            if (_items.Values.FirstOrDefault(d => d.Status != DownloadStatus.Failed && (d.NzbHash == hash || NameKey(d.Title) == key)) is { } queued)
             {
                 return $"'{queued.Title}' is in the queue";
             }
+
+            // Failed a moment ago: the database may not say so yet.
+            failed = _finishing.Values.Where(d => d.Status == DownloadStatus.Failed).Select(d => d.Id).ToHashSet();
         }
 
-        var match = repository.Summaries().FirstOrDefault(s => s.Status != DownloadStatus.Failed && (s.NzbHash == hash || NameKey(s.Title) == key));
+        var match = repository.Summaries().FirstOrDefault(s => s.Status != DownloadStatus.Failed && !failed.Contains(s.Id)
+            && (s.NzbHash == hash || NameKey(s.Title) == key));
         return match is null ? null
             : match.Status == DownloadStatus.Completed ? $"'{match.Title}' was downloaded on {match.Completed?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "an earlier day"}"
             : $"'{match.Title}' is in the queue";

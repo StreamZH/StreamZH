@@ -24,6 +24,8 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 ### Fixed
 
 - The installer's "Open StreamZH in the browser" did nothing: its PowerShell command had a syntax error.
+- Duplicate detection: grabbing a release again right after its download failed could be refused as a duplicate,
+  because the failure was not yet saved. Failed downloads never count as duplicates.
 
 ## [1.0.0-rc.1] - unreleased
 

@@ -10,7 +10,7 @@ namespace StreamZH.Tests.Parsing;
 
 public class LanguageParserTests
 {
-    // Real folder names from the owner's library: exact language lists.
+    // Real-world release folder names: exact language lists.
     [Theory]
     [InlineData("Backrooms.2026.GERMAN.TELESYNC.1080p.x264-LiNEUP", "German")]
     [InlineData("Bride.of.the.Year.2026.German.ML.EAC3.2160p.NF.WEB.H265-WAREZCX", "German,Original,English")]

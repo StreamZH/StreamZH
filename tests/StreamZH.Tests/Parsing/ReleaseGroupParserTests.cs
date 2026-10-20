@@ -9,7 +9,7 @@ namespace StreamZH.Tests.Parsing;
 
 public class ReleaseGroupParserTests
 {
-    // Real folder names from the owner's library.
+    // Real-world release folder names.
     [Theory]
     [InlineData("Backrooms.2026.GERMAN.TELESYNC.1080p.x264-LiNEUP", "LiNEUP")]
     [InlineData("Bride.of.the.Year.2026.German.ML.EAC3.2160p.NF.WEB.H265-WAREZCX", "WAREZCX")]

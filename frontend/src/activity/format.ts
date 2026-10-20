@@ -1,4 +1,4 @@
-/** Precise numbers for running downloads (the owner wants exact percent and time left). */
+/** Precise numbers for running downloads (exact percent and time left). */
 
 const pct = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 

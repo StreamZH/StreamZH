@@ -24,7 +24,7 @@ public static class AlternativeTitleRules
 
     public const int MaxTitleLength = 200;
 
-    /// <summary>German first: the owner's releases are German; German, Swiss and Austrian titles are all "de".</summary>
+    /// <summary>German first; German, Swiss and Austrian titles are all "de".</summary>
     private static readonly string[] AlwaysTranslated = ["de", "en"];
 
     /// <summary>Main language of a country, for TMDB's alternative titles (they only carry the country).</summary>

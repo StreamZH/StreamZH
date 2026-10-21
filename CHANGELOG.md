@@ -3,7 +3,21 @@
 All notable changes for users of StreamZH. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/). Versions before 1.0 were private test versions.
 
-## [1.0.0-rc.2] - unreleased
+## [1.0.0-rc.3] - unreleased
+
+### Security
+
+- **Linux service:** the systemd unit is hardened further (no devices, kernel settings, namespaces, capabilities or
+  SUID; only Unix and IP sockets). Existing installations get it with the package update; with `install-linux.sh`,
+  run the script again.
+- **Docker:** StreamZH runs with "no new privileges" after dropping root, and the image no longer contains debug
+  symbols or the unused port setting 8080 from the base image.
+
+### Changed
+
+- Release notes keep their paragraphs on one line and link to the installation guide on streamzh.com.
+
+## [1.0.0-rc.2] - 2026-10-20
 
 ### Changed
 

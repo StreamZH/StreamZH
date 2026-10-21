@@ -37,4 +37,4 @@ fi
 chmod u+rwx,g-w,o-rwx /config
 
 export HOME=/config
-exec setpriv --reuid="$uid" --regid="$gid" --clear-groups -- dotnet /app/StreamZH.dll "$@"
+exec setpriv --no-new-privs --reuid="$uid" --regid="$gid" --clear-groups -- dotnet /app/StreamZH.dll "$@"

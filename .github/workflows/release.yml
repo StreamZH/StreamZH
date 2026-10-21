@@ -361,7 +361,16 @@ jobs:
               index($0, "## [" v "]") == 1 { found = 1; next }
               found && (/^## \[/ || /^\[[^]]+\]: /) { exit }
               found { print }
-            ' CHANGELOG.md)
+            ' CHANGELOG.md | awk '
+              # GitHub keeps single line breaks in release notes: join the wrapped CHANGELOG lines again.
+              function flush() { if (buf != "") print buf; buf = "" }
+              /^```/ { flush(); fence = !fence; print; next }
+              fence { print; next }
+              /^[[:space:]]*$/ || /^#/ { flush(); print; next }
+              /^[[:space:]]*([-*]|[0-9]+\.) / { flush(); buf = $0; next }
+              { line = $0; sub(/^[[:space:]]+/, "", line); buf = (buf == "") ? $0 : buf " " line }
+              END { flush() }
+            ')
           fi
           if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
             notes="StreamZH $VERSION."
@@ -376,9 +385,9 @@ jobs:
             printf -- '- macOS: `StreamZH-%s-osx-arm64.zip` (Apple silicon) / `-osx-x64.zip` (Intel), not notarized\n' "$VERSION"
             printf -- '- Docker: `docker pull %s:%s`\n\n' "$IMAGE" "$VERSION"
             if [ "$PRIVATE_REPO" = "true" ]; then
-              printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`. Installation: docs/INSTALL.md.\n'
+              printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`. Installation: https://streamzh.com/docs/install/\n'
             else
-              printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`, and that this repository built it with `gh attestation verify <file> --repo %s`. Installation: docs/INSTALL.md.\n' "$GITHUB_REPOSITORY"
+              printf 'Check a download with `sha256sum -c SHA256SUMS --ignore-missing`, and that this repository built it with `gh attestation verify <file> --repo %s`. Installation: https://streamzh.com/docs/install/\n' "$GITHUB_REPOSITORY"
             fi
           } > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"

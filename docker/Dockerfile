@@ -17,7 +17,7 @@ WORKDIR /src
 COPY global.json Directory.Build.props NuGet.Config ./
 COPY src/ src/
 COPY --from=frontend /src/src/StreamZH.Host/wwwroot src/StreamZH.Host/wwwroot
-RUN dotnet publish src/StreamZH.Host -c Release -o /app
+RUN dotnet publish src/StreamZH.Host -c Release -o /app -p:DebugType=none
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 ARG VERSION=dev
@@ -39,7 +39,9 @@ RUN apt-get update \
 # Data in /config. The container starts as root only to give /config to PUID:PGID (default: the image's "app" user
 # 1654) and then runs StreamZH as that user; with --user it runs as that user directly. UMASK like linuxserver.io
 # (default 027: group may read new files, others not).
+# ASPNETCORE_HTTP_PORTS from the base image (8080) is cleared: StreamZH listens on 9797 itself.
 ENV STREAMZH_DATA=/config \
+    ASPNETCORE_HTTP_PORTS= \
     PUID= \
     PGID= \
     UMASK=

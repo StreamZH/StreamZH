@@ -27,3 +27,12 @@ Thumbs.db
 # Docker Compose: your own copy of the example and its data
 docker/docker-compose.yml
 docker/config/
+
+# Secrets and local settings: never commit these
+.env
+.env.*
+*.pfx
+*.p12
+*.pem
+*.key
+appsettings.*.local.json

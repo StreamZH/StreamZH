@@ -7,7 +7,7 @@
     <ProjectReference Include="../StreamZH.Usenet/StreamZH.Usenet.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="MailKit" Version="4.18.1" />
     <!-- MimeKit's own minimum (10.0.0) has a known vulnerability; pin the patched version. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />

@@ -5,7 +5,7 @@
 
 # The web UI and the .NET build run on the build machine's platform; their output is the same for every target
 # (the backend is published framework-dependent and portable: managed code plus native SQLite for each platform).
-FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:26-alpine AS frontend
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci

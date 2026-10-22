@@ -1,6 +1,6 @@
 # System
 
-The **System** pages (sidebar) show how StreamZH itself is doing.
+**System** (sidebar, Manage group) shows how StreamZH itself is doing, in the tabs Status, Tasks, Backup and Logs.
 
 ## Status
 

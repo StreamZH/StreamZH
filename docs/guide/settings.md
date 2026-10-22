@@ -5,15 +5,22 @@ Every settings page, section by section. **(Advanced)** marks settings that are 
 [owner-only settings](users.md#owner-only-settings). Defaults are given where they matter. Changes are saved per
 section with the save bar that appears at the bottom.
 
-- [Migration](#migration) · [Media Management](#media-management) · [Import lists](#import-lists) ·
-  [Profiles](#profiles) · [Custom formats](#custom-formats) · [Quality](#quality) · [Indexers](#indexers) ·
-  [Downloads](#downloads) · [Download clients](#download-clients) · [Usenet servers](#usenet-servers) ·
-  [Connect](#connect) · [Requests](#requests) · [Discord](#discord) · [Metadata](#metadata) · [Users](#users) ·
-  [General](#general) · [UI](#ui)
+**Settings** in the sidebar opens an overview of all pages; the tabs above it group them:
+
+- **Media**: [Media Management](#media-management) · [Profiles](#profiles) · [Custom formats](#custom-formats) ·
+  [Quality](#quality) · [Import lists](#import-lists) · [Metadata](#metadata)
+- **Downloads**: [Indexers](#indexers) · [Downloads](#downloads) · [Download clients](#download-clients) ·
+  [Usenet servers](#usenet-servers)
+- **Connections**: [Requests](#requests) · [Discord](#discord) · [Connect](#connect)
+- **General**: [General](#general) · [UI](#ui) · [Users](#users)
+- **Migration** (Advanced): [Migration](#migration)
 
 ## Migration
 
-Take over Radarr, Sonarr, Prowlarr and SABnzbd; see [MIGRATION.md](../MIGRATION.md).
+Take over Radarr, Sonarr, Prowlarr and SABnzbd; see [MIGRATION.md](../MIGRATION.md). The tab shows with the
+*Advanced* switch on, and by itself while the side-by-side mode is on or a migration runs. Its address
+(`/settings/migration`) always works, and **Start migration** on the Get started page (and on the Overview while the
+library is empty) leads there.
 
 | Setting | Meaning |
 |---|---|

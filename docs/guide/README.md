@@ -25,8 +25,9 @@ Short, task-oriented pages. New here? Start with **Getting started**. Installing
 
 ## Conventions
 
-- **Settings → Media Management** means: the sidebar group *Settings*, page *Media Management*. Ctrl K (Cmd K on a
-  Mac) opens "search or jump to" and finds every page by name.
+- **Settings → Media Management** means: *Settings* in the sidebar, then the tab *Media Management* in the main
+  window (Settings groups its pages in the tabs Media, Downloads, Connections and General). System, Tools, Wanted and
+  Indexers have tabs the same way. Ctrl K (Cmd K on a Mac) opens "search or jump to" and finds every page by name.
 - **Advanced**: most pages have an *Advanced* switch at the top. Expert settings are hidden until you turn it on;
   they are marked *(Advanced)* in this guide. A hidden setting with an error is always shown.
 - **Owner only**: some settings can only be changed by an owner (see [Users and roles](users.md#owner-only-settings)).

@@ -15,6 +15,15 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ### Changed
 
+- **Tidier navigation, like CloudZH.** The sidebar is down to twelve entries: Overview · Library (Movies, Series,
+  Calendar, Wanted) · Requests (Discover, Requests) · Downloads (Activity, Indexers) · Manage (Tools, Settings,
+  System). Pages that belong together are tabs in the main window: **Settings** groups its pages in Media, Downloads,
+  Connections and General (the pages of a group as a second row), **System** has Status, Tasks, Backup and Logs,
+  **Tools** has File renamer and Release test. All addresses stay the same, Ctrl K finds every page, and the tabs work
+  with the keyboard (arrow keys) and scroll sideways on a phone.
+- **Migration is for advanced use:** its Settings tab shows with the *Advanced* switch on, and by itself while the
+  side-by-side mode is on or a migration runs. **Start migration** on the Get started page (and on the Overview while
+  the library is empty) still leads there.
 - Release notes keep their paragraphs on one line and link to the installation guide on streamzh.com.
 
 ## [1.0.0-rc.2] - 2026-10-20

@@ -2,8 +2,8 @@
 
 StreamZH takes over an existing setup: settings, indexers, Usenet servers, download settings and the whole
 library (movies, series, episodes, the files you already have). It does this through the **migration wizard**
-(Settings → Migration), which only *reads* the old apps through their APIs. Nothing in Sonarr, Radarr, Prowlarr or
-SABnzbd is ever changed, so you can always go back.
+(Settings → Migration, or **Start migration** on the Get started page), which only *reads* the old apps through their
+APIs. Nothing in Sonarr, Radarr, Prowlarr or SABnzbd is ever changed, so you can always go back.
 
 The recommended way is a **side-by-side phase**: StreamZH runs next to the old apps, takes everything over, but grabs
 nothing by itself until you switch over. You compare, fix what needs fixing, and switch when you are happy.
@@ -125,7 +125,8 @@ the other way round.
 Before the first run, make a backup of StreamZH itself (System → Backup → Backup now): it is the easiest way back
 to a clean StreamZH.
 
-Settings → Migration. For each app:
+Settings → Migration. The Migration tab is for advanced use: it shows once the *Advanced* switch is on (any settings
+page, top right) and stays visible by itself while the side-by-side mode is on or a run is going. For each app:
 
 1. Choose the app, enter its address (e.g. `http://192.168.1.10:7878`) and API key, and **Test**. If the app runs
    behind a URL base, include it (`http://192.168.1.10:8080/sabnzbd`; for SABnzbd the wizard also finds it by itself).

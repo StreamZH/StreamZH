@@ -4,8 +4,8 @@ After [installing](../INSTALL.md), open **http://localhost:9797** on the server 
 another device). These steps take about ten minutes.
 
 Coming from Radarr, Sonarr, Prowlarr or SABnzbd? Do step 1, then let the [migration wizard](../MIGRATION.md) take
-over root folders, quality profiles, indexers and download clients for you (Settings → Migration, or **Start migration**
-on the Get started page).
+over root folders, quality profiles, indexers and download clients for you (**Start migration** on the Get started page,
+or Settings → Migration with the *Advanced* switch on).
 
 Right after you create the owner account, StreamZH opens the **Get started** page (`/get-started`) with steps 2 to 7
 below: storage locations, root folders, TMDB key, release language, indexers and a download client. Most of them can

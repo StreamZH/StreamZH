@@ -12,7 +12,7 @@ import styles from './Welcome.module.css'
 
 const tmdbKeyUrl = 'https://www.themoviedb.org/settings/api'
 
-const languageNames = { any: 'Any language', original: 'Original language', german: 'German', other: 'Custom' } as const
+const languageNames = { any: 'Any language', original: 'Original language' } as const
 
 function plural(count: number, one: string, many: string) {
   return `${count} ${count === 1 ? one : many}`
@@ -193,8 +193,11 @@ function summary(step: SetupStep, guide: SetupGuide): string {
         : 'Where your movies and series are kept'
     case 'tmdb':
       return step.done ? 'Connected' : 'For titles, posters and episode lists'
-    case 'language':
-      return step.done ? `${languageNames[d.releaseLanguage]}${d.defaultProfile ? ` · default profile ${d.defaultProfile}` : ''}` : 'Which audio language to download'
+    case 'language': {
+      if (!step.done) return 'Which audio language to download'
+      const language = d.releaseLanguage === 'any' || d.releaseLanguage === 'original' ? languageNames[d.releaseLanguage] : (d.releaseLanguageName ?? 'Custom')
+      return `${language}${d.defaultProfile ? ` · default profile ${d.defaultProfile}` : ''}`
+    }
     case 'indexers':
       return step.done ? plural(step.count, 'indexer', 'indexers') : 'Where StreamZH searches for releases'
     case 'downloads': {

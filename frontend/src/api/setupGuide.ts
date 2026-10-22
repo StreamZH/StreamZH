@@ -4,8 +4,20 @@ import { request } from './client'
 
 export type SetupStepKey = 'storage' | 'rootFolders' | 'tmdb' | 'language' | 'indexers' | 'downloads'
 
-/** Release language of the default quality profile: any (HD-1080p), original (HD-1080p) or german (Deutsch 1080p). */
-export type ReleaseLanguage = 'any' | 'original' | 'german'
+/**
+ * Release language of the default quality profile: any (HD-1080p), original (HD-1080p), german (Deutsch 1080p) or
+ * native, another language with its ISO 639-1 code ("<Language> 1080p", e.g. Turkish 1080p).
+ */
+export type ReleaseLanguage = 'any' | 'original' | 'german' | 'native'
+
+/** What the release language step sends: any or original, or a language by its ISO 639-1 code ("de" means Deutsch 1080p). */
+export type ReleaseLanguageChoice = { language: 'any' | 'original' } | { language: 'native'; code: string }
+
+/** A language StreamZH has a profile for: ISO 639-1 code and English name. */
+export interface LanguageOption {
+  code: string
+  name: string
+}
 
 export interface SetupStep {
   key: SetupStepKey
@@ -41,9 +53,15 @@ export interface SetupGuide {
     connections: number
     requestsEnabled: boolean
     discordEnabled: boolean
-    /** What the default quality profile asks for; "other" for a profile with another language. */
+    /** What the default quality profile asks for; "other" for a profile with a language without an ISO code. */
     releaseLanguage: ReleaseLanguage | 'other'
+    /** ISO 639-1 code of the default profile's language ("de", "tr"); null for any and original. */
+    releaseLanguageCode: string | null
+    /** Name of the default profile's language ("German", "Turkish"); null for any and original. */
+    releaseLanguageName: string | null
     defaultProfile: string | null
+    /** The user's own language (browser, else the TMDB metadata language), never English; null if none fits. */
+    suggestedLanguage: LanguageOption | null
   }
 }
 
@@ -52,6 +70,6 @@ export const setupGuideKeys = { guide: ['setup-guide'] as const }
 export const setupGuideApi = {
   get: () => request<SetupGuide>('GET', '/setup/guide'),
   dismiss: (dismissed: boolean) => request<SetupGuide>('PUT', '/setup/guide', { dismissed }),
-  /** Sets the default quality profile for this release language. */
-  language: (language: ReleaseLanguage) => request<SetupGuide>('PUT', '/setup/guide/language', { language }),
+  /** Sets the default quality profile for this release language (creates "<Language> 1080p" if needed). */
+  language: (choice: ReleaseLanguageChoice) => request<SetupGuide>('PUT', '/setup/guide/language', choice),
 }

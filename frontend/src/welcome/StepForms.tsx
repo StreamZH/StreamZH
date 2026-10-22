@@ -6,7 +6,7 @@ import { builtInImplementation, downloadClientKeys, downloadClientsApi } from '.
 import { libraryApi, queryKeys, type MediaType } from '../api/library'
 import { metadataApi, metadataKeys } from '../api/metadata'
 import { profileKeys } from '../api/profiles'
-import { setupGuideApi, setupGuideKeys, type ReleaseLanguage, type SetupGuide } from '../api/setupGuide'
+import { setupGuideApi, setupGuideKeys, type LanguageOption, type ReleaseLanguageChoice, type SetupGuide } from '../api/setupGuide'
 import { outsideStorageCode, storageApi, storageKeys } from '../api/storage'
 import { useTurnOnBuiltIn } from '../downloadClients/useBuiltIn'
 import FolderPicker from '../components/FolderPicker'
@@ -250,13 +250,55 @@ export function DownloadActions({ guide }: { guide: SetupGuide }) {
   )
 }
 
-const languages: { key: ReleaseLanguage; title: string; text: string }[] = [
-  { key: 'any', title: 'Any language', text: 'The best release in whatever language it comes.' },
-  { key: 'original', title: 'Original language', text: "The title's own language, e.g. English for most Hollywood movies." },
-  { key: 'german', title: 'German', text: 'German audio; releases with German and the original language (dual language) preferred.' },
+interface LanguageCard {
+  key: string
+  title: string
+  text: string
+  choice: ReleaseLanguageChoice
+}
+
+const anyOrOriginal: LanguageCard[] = [
+  { key: 'any', title: 'Any language', text: 'The best release in whatever language it comes.', choice: { language: 'any' } },
+  {
+    key: 'original',
+    title: 'Original language',
+    text: "The title's own language, e.g. English for most Hollywood movies.",
+    choice: { language: 'original' },
+  },
 ]
 
-/** Step 4: the release language, which picks the default quality profile (HD-1080p or Deutsch 1080p). */
+function languageCard({ code, name }: LanguageOption): LanguageCard {
+  return {
+    key: `native:${code}`,
+    title: name,
+    text: `${name} audio; releases with ${name} and the original language (dual language) preferred.`,
+    choice: { language: 'native', code },
+  }
+}
+
+/**
+ * Any, original, then the language already chosen (e.g. German on an existing installation) and the user's own
+ * language (browser, else the TMDB language; never English, which "Original language" covers for most titles).
+ */
+function languageCards(guide: SetupGuide): LanguageCard[] {
+  const d = guide.details
+  const own: LanguageOption[] = []
+  if ((d.releaseLanguage === 'german' || d.releaseLanguage === 'native') && d.releaseLanguageCode && d.releaseLanguageName) {
+    own.push({ code: d.releaseLanguageCode, name: d.releaseLanguageName })
+  }
+  if (d.suggestedLanguage && !own.some((l) => l.name === d.suggestedLanguage?.name)) own.push(d.suggestedLanguage)
+  return [...anyOrOriginal, ...own.map(languageCard)]
+}
+
+/** The card of the current choice: any, original, or the language of the default profile. */
+function chosenKey(guide: SetupGuide): string | null {
+  const d = guide.details
+  if (!guide.steps.find((s) => s.key === 'language')?.done) return null
+  if (d.releaseLanguage === 'any' || d.releaseLanguage === 'original') return d.releaseLanguage
+  return d.releaseLanguageCode && (d.releaseLanguage === 'german' || d.releaseLanguage === 'native') ? `native:${d.releaseLanguageCode}` : null
+}
+
+/** Step 4: the release language, which picks the default quality profile (HD-1080p, Deutsch 1080p or "<Language> 1080p"). */
 export function LanguageChoice({ guide }: { guide: SetupGuide }) {
   const queryClient = useQueryClient()
   const save = useMutation({
@@ -267,18 +309,18 @@ export function LanguageChoice({ guide }: { guide: SetupGuide }) {
       void queryClient.invalidateQueries({ queryKey: profileKeys.settings })
     },
   })
-  const current = guide.steps.find((s) => s.key === 'language')?.done ? guide.details.releaseLanguage : null
+  const current = chosenKey(guide)
   return (
     <>
       <div className={styles.choices} role="radiogroup" aria-label="Release language">
-        {languages.map((l) => (
+        {languageCards(guide).map((l) => (
           <button
             key={l.key}
             type="button"
             role="radio"
             aria-checked={current === l.key}
             className={`${styles.choice} ${current === l.key ? styles.choiceOn : ''}`}
-            onClick={() => save.mutate(l.key)}
+            onClick={() => save.mutate(l.choice)}
             disabled={save.isPending}
           >
             <b>{l.title}</b>

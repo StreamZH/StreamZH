@@ -257,6 +257,7 @@ public static class ConfigKeys
     // Setup guide (1.0 RC): "true" when the owner or an admin hid the "Get started" checklist.
     public const string SetupGuideDismissed = "SetupGuideDismissed";
 
-    // Setup guide (1.0 RC): the release language chosen in "Get started" (any, original, german).
+    // Setup guide (1.0 RC): the release language chosen in "Get started" (any, original, german, or the ISO 639-1 code
+    // of another language, e.g. tr).
     public const string SetupReleaseLanguage = "SetupReleaseLanguage";
 }

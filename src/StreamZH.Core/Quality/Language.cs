@@ -96,23 +96,50 @@ public sealed class Language : IEquatable<Language>
 
     public static Language FindById(int id) => ById.TryGetValue(id, out var language) ? language : Unknown;
 
-    private static readonly Dictionary<string, Language> ByIso = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["en"] = English, ["fr"] = French, ["es"] = Spanish, ["de"] = German, ["it"] = Italian, ["da"] = Danish,
-        ["nl"] = Dutch, ["ja"] = Japanese, ["is"] = Icelandic, ["zh"] = Chinese, ["cn"] = Chinese, ["ru"] = Russian,
-        ["pl"] = Polish, ["vi"] = Vietnamese, ["sv"] = Swedish, ["no"] = Norwegian, ["nb"] = Norwegian, ["nn"] = Norwegian,
-        ["fi"] = Finnish, ["tr"] = Turkish, ["pt"] = Portuguese, ["el"] = Greek, ["ko"] = Korean, ["hu"] = Hungarian,
-        ["he"] = Hebrew, ["lt"] = Lithuanian, ["cs"] = Czech, ["hi"] = Hindi, ["ro"] = Romanian, ["th"] = Thai,
-        ["bg"] = Bulgarian, ["ar"] = Arabic, ["uk"] = Ukrainian, ["fa"] = Persian, ["bn"] = Bengali, ["sk"] = Slovak,
-        ["lv"] = Latvian, ["ca"] = Catalan, ["hr"] = Croatian, ["sr"] = Serbian, ["bs"] = Bosnian, ["et"] = Estonian,
-        ["ta"] = Tamil, ["id"] = Indonesian, ["te"] = Telugu, ["mk"] = Macedonian, ["sl"] = Slovenian, ["ml"] = Malayalam,
-        ["kn"] = Kannada, ["sq"] = Albanian, ["af"] = Afrikaans, ["mr"] = Marathi, ["tl"] = Tagalog, ["ur"] = Urdu,
-        ["rm"] = Romansh, ["mn"] = Mongolian, ["ka"] = Georgian,
-    };
+    // ISO 639-1 codes as TMDB and browsers deliver them; the first code of a language is its own (IsoCode).
+    // "cn" is TMDB's code for Cantonese, filed under Chinese.
+    private static readonly (string Code, Language Language)[] IsoTable =
+    [
+        ("en", English), ("fr", French), ("es", Spanish), ("de", German), ("it", Italian), ("da", Danish),
+        ("nl", Dutch), ("ja", Japanese), ("is", Icelandic), ("zh", Chinese), ("cn", Chinese), ("ru", Russian),
+        ("pl", Polish), ("vi", Vietnamese), ("sv", Swedish), ("no", Norwegian), ("nb", Norwegian), ("nn", Norwegian),
+        ("fi", Finnish), ("tr", Turkish), ("pt", Portuguese), ("el", Greek), ("ko", Korean), ("hu", Hungarian),
+        ("he", Hebrew), ("lt", Lithuanian), ("cs", Czech), ("hi", Hindi), ("ro", Romanian), ("th", Thai),
+        ("bg", Bulgarian), ("ar", Arabic), ("uk", Ukrainian), ("fa", Persian), ("bn", Bengali), ("sk", Slovak),
+        ("lv", Latvian), ("ca", Catalan), ("hr", Croatian), ("sr", Serbian), ("bs", Bosnian), ("et", Estonian),
+        ("ta", Tamil), ("id", Indonesian), ("te", Telugu), ("mk", Macedonian), ("sl", Slovenian), ("ml", Malayalam),
+        ("kn", Kannada), ("sq", Albanian), ("af", Afrikaans), ("mr", Marathi), ("tl", Tagalog), ("ur", Urdu),
+        ("rm", Romansh), ("mn", Mongolian), ("ka", Georgian),
+    ];
+
+    private static readonly Dictionary<string, Language> ByIso =
+        IsoTable.ToDictionary(e => e.Code, e => e.Language, StringComparer.OrdinalIgnoreCase);
+
+    private static readonly Dictionary<int, string> IsoById = IsoTable
+        .GroupBy(e => e.Language.Id)
+        .ToDictionary(g => g.Key, g => g.First().Code);
 
     /// <summary>Language from an ISO 639-1 code as TMDB delivers it ("en", "de"); Unknown if not mapped.</summary>
     public static Language FromIsoCode(string? code) =>
         code is not null && ByIso.TryGetValue(code.Trim(), out var language) ? language : Unknown;
+
+    /// <summary>
+    /// Language of a BCP 47 language tag as browsers send it ("tr-TR", "de-CH", "fr"): its primary subtag (ISO 639-1);
+    /// Unknown if not mapped.
+    /// </summary>
+    public static Language FromLanguageTag(string? tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return Unknown;
+        }
+
+        var primary = tag.Trim().Split('-', '_')[0];
+        return primary.Length is 2 or 3 ? FromIsoCode(primary) : Unknown;
+    }
+
+    /// <summary>The ISO 639-1 code of this language ("tr" for Turkish); null for languages without one.</summary>
+    public string? IsoCode => IsoById.TryGetValue(Id, out var code) ? code : null;
 
     public bool Equals(Language? other) => other is not null && other.Id == Id;
 

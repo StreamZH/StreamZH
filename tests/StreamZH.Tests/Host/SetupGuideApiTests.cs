@@ -118,4 +118,126 @@ public sealed class SetupGuideApiTests : IDisposable
         var friend = await _factory.CreateUserClientAsync("friend", UserRole.Friend);
         Assert.Equal(HttpStatusCode.Forbidden, (await friend.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "any" })).StatusCode);
     }
+
+    [Fact]
+    public async Task Another_language_gets_its_own_profile_built_like_Deutsch_1080p()
+    {
+        var owner = await _factory.CreateOwnerClientAsync();
+        var profiles = _factory.Services.GetRequiredService<QualityProfileRepository>();
+        var config = _factory.Services.GetRequiredService<ConfigRepository>();
+        var before = profiles.Count();
+
+        var response = await owner.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "native", code = "tr" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var guide = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var details = guide.GetProperty("details");
+        Assert.True(Steps(guide)["language"]);
+        Assert.Equal("native", details.GetProperty("releaseLanguage").GetString());
+        Assert.Equal("tr", details.GetProperty("releaseLanguageCode").GetString());
+        Assert.Equal("Turkish", details.GetProperty("releaseLanguageName").GetString());
+        Assert.Equal("Turkish 1080p", details.GetProperty("defaultProfile").GetString());
+        Assert.Equal("tr", config.Get(ConfigKeys.SetupReleaseLanguage));
+
+        var turkish = profiles.FindByName("Turkish 1080p")!;
+        var german = profiles.Find(QualityDefaults.GermanProfileId)!;
+        Assert.Equal(before + 1, profiles.Count());
+        Assert.Equal(Language.Turkish.Id, turkish.LanguageId);
+        Assert.True(turkish.PreferDualLanguage);
+        Assert.True(turkish.UpgradeAllowed);
+        Assert.Equal(german.CutoffQualityId, turkish.CutoffQualityId);
+        Assert.Equal(german.Items, turkish.Items);
+        Assert.Equal(turkish.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), config.Get(ConfigKeys.DefaultQualityProfileId));
+
+        // Choosing it again (any spelling of the code) reuses the profile.
+        await owner.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "any" });
+        Assert.True((await owner.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "Native", code = " TR " })).IsSuccessStatusCode);
+        Assert.Equal(before + 1, profiles.Count());
+        Assert.Equal(turkish.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), config.Get(ConfigKeys.DefaultQualityProfileId));
+
+        // German as a code is the same as "german": Deutsch 1080p, no second German profile.
+        var de = await (await owner.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "native", code = "de" })).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("german", de.GetProperty("details").GetProperty("releaseLanguage").GetString());
+        Assert.Equal("de", de.GetProperty("details").GetProperty("releaseLanguageCode").GetString());
+        Assert.Equal("Deutsch 1080p", de.GetProperty("details").GetProperty("defaultProfile").GetString());
+        Assert.Equal("german", config.Get(ConfigKeys.SetupReleaseLanguage));
+        Assert.Equal(before + 1, profiles.Count());
+        Assert.Null(profiles.FindByName("German 1080p"));
+
+        // Only codes StreamZH knows: no region, no made-up code, no placeholder languages.
+        foreach (var code in new string?[] { null, "", "xx", "tr-TR", "klingon", "-1" })
+        {
+            var bad = await owner.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "native", code });
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        }
+
+        Assert.Equal(before + 1, profiles.Count());
+    }
+
+    [Fact]
+    public async Task German_still_works_and_shows_as_before()
+    {
+        var owner = await _factory.CreateOwnerClientAsync();
+        var guide = await (await owner.PutAsJsonAsync("/api/v1/setup/guide/language", new { language = "german" })).Content.ReadFromJsonAsync<JsonElement>();
+        var details = guide.GetProperty("details");
+        Assert.Equal("german", details.GetProperty("releaseLanguage").GetString());
+        Assert.Equal("German", details.GetProperty("releaseLanguageName").GetString());
+        Assert.Equal("Deutsch 1080p", details.GetProperty("defaultProfile").GetString());
+        Assert.Equal("german", _factory.Services.GetRequiredService<ConfigRepository>().Get(ConfigKeys.SetupReleaseLanguage));
+    }
+
+    [Theory]
+    [InlineData("tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7", null, "tr", "Turkish")]
+    [InlineData("fr-FR", null, "fr", "French")]
+    [InlineData("de-CH,de;q=0.9", null, "de", "German")]
+    [InlineData("en-US,en;q=0.9,pt-BR;q=0.8", null, "pt", "Portuguese")]
+    [InlineData("en;q=0.5,nb", null, "no", "Norwegian")]
+    [InlineData("en-US", "de-CH", "de", "German")]
+    [InlineData("en-US", null, null, null)]
+    [InlineData("xx-YY,en-GB", "en-US", null, null)]
+    [InlineData(null, "it-IT", "it", "Italian")]
+    public async Task The_suggested_language_comes_from_the_browser_then_the_metadata_language(
+        string? acceptLanguage, string? metadataLanguage, string? code, string? name)
+    {
+        var owner = await _factory.CreateOwnerClientAsync();
+        if (metadataLanguage is not null)
+        {
+            _factory.Services.GetRequiredService<ConfigRepository>().Set(ConfigKeys.TmdbLanguage, metadataLanguage);
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/setup/guide");
+        if (acceptLanguage is not null)
+        {
+            request.Headers.TryAddWithoutValidation("Accept-Language", acceptLanguage);
+        }
+
+        var guide = await (await owner.SendAsync(request)).Content.ReadFromJsonAsync<JsonElement>();
+        var suggested = guide.GetProperty("details").GetProperty("suggestedLanguage");
+        if (code is null)
+        {
+            Assert.Equal(JsonValueKind.Null, suggested.ValueKind);
+        }
+        else
+        {
+            Assert.Equal(code, suggested.GetProperty("code").GetString());
+            Assert.Equal(name, suggested.GetProperty("name").GetString());
+        }
+    }
+
+    [Fact]
+    public void Language_tags_map_to_known_languages_only()
+    {
+        Assert.Equal(Language.Turkish, Language.FromLanguageTag("tr-TR"));
+        Assert.Equal(Language.German, Language.FromLanguageTag("de_CH"));
+        Assert.Equal(Language.Chinese, Language.FromLanguageTag("zh-Hant-TW"));
+        Assert.Equal(Language.Unknown, Language.FromLanguageTag("x-klingon"));
+        Assert.Equal(Language.Unknown, Language.FromLanguageTag("*"));
+        Assert.Equal(Language.Unknown, Language.FromLanguageTag(null));
+        Assert.Equal("tr", Language.Turkish.IsoCode);
+        Assert.Equal("zh", Language.Chinese.IsoCode);
+        Assert.Equal("no", Language.Norwegian.IsoCode);
+        Assert.Null(Language.Flemish.IsoCode);
+        Assert.Null(Language.Original.IsoCode);
+        Assert.Equal("Deutsch 1080p", QualityDefaults.LanguageProfileName(Language.German));
+        Assert.Equal("Turkish 1080p", QualityDefaults.LanguageProfileName(Language.Turkish));
+    }
 }

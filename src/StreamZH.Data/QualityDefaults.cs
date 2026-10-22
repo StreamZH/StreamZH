@@ -21,6 +21,13 @@ public static class QualityDefaults
     /// <summary>Id of "Deutsch 1080p" (German, dual language preferred), the default profile before 1.0.</summary>
     public const int GermanProfileId = 4;
 
+    /// <summary>Name of the profile with id <see cref="GermanProfileId"/>.</summary>
+    public const string GermanProfileName = "Deutsch 1080p";
+
+    /// <summary>Qualities of "Deutsch 1080p" and of every "&lt;Language&gt; 1080p" profile: 720p and 1080p, no HDTV.</summary>
+    private static readonly Quality[] LanguageProfileQualities =
+        [Quality.WebDl720p, Quality.WebRip720p, Quality.Bluray720p, Quality.WebDl1080p, Quality.WebRip1080p, Quality.Bluray1080p, Quality.Remux1080p];
+
     /// <summary>Qualities that are never allowed in a seeded profile (pre-releases and screeners).</summary>
     private static readonly IReadOnlySet<int> NeverAllowed = new HashSet<int>
     {
@@ -37,14 +44,29 @@ public static class QualityDefaults
         Create(3, "Ultra-HD",
             [Quality.WebDl2160p, Quality.WebRip2160p, Quality.Bluray2160p, Quality.Remux2160p],
             Quality.Remux2160p, Language.Original, preferDual: false),
-        Create(GermanProfileId, "Deutsch 1080p",
-            [Quality.WebDl720p, Quality.WebRip720p, Quality.Bluray720p, Quality.WebDl1080p, Quality.WebRip1080p, Quality.Bluray1080p, Quality.Remux1080p],
-            Quality.Bluray1080p, Language.German, preferDual: true),
+        Create(GermanProfileId, GermanProfileName, LanguageProfileQualities, Quality.Bluray1080p, Language.German, preferDual: true),
         Create(5, "Deutsch 2160p",
             [Quality.WebDl1080p, Quality.WebRip1080p, Quality.Bluray1080p, Quality.Remux1080p,
              Quality.WebDl2160p, Quality.WebRip2160p, Quality.Bluray2160p, Quality.Remux2160p],
             Quality.Remux2160p, Language.German, preferDual: true),
     ];
+
+    /// <summary>
+    /// Name of the 1080p profile for one release language, chosen in "Get started": "Deutsch 1080p" for German (the
+    /// seeded profile), otherwise "&lt;Language&gt; 1080p", e.g. "Turkish 1080p".
+    /// </summary>
+    public static string LanguageProfileName(Language language)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        return language == Language.German ? GermanProfileName : $"{language.Name} 1080p";
+    }
+
+    /// <summary>
+    /// A new 1080p profile for one release language, built like "Deutsch 1080p": WEB and Blu-ray 720p/1080p, upgraded
+    /// until Bluray-1080p, releases with that language and the original language (dual language) preferred.
+    /// </summary>
+    public static QualityProfile LanguageProfile(Language language) =>
+        Create(0, LanguageProfileName(language), LanguageProfileQualities, Quality.Bluray1080p, language, preferDual: true);
 
     /// <summary>
     /// Radarr's default size limits in MB per minute: up to WEB-1080p 0 / 95 / 100, from Bluray-1080p on no upper limit.

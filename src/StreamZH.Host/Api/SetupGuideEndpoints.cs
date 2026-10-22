@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using StreamZH.Core;
+using StreamZH.Core.Decisions;
 using StreamZH.Core.Downloads;
 using StreamZH.Core.Media;
 using StreamZH.Core.Profiles;
@@ -26,7 +27,7 @@ public static class SetupGuideEndpoints
     {
         var guide = app.MapGroup("/api/v1/setup/guide").WithTags("Setup guide").RequireAuthorization(AuthSchemes.AdminPolicy);
 
-        guide.MapGet("/", (HttpContext http, IServiceProvider services) => Build(services, GeneralSettingsEndpoints.IsOwner(http.User)));
+        guide.MapGet("/", (HttpContext http, IServiceProvider services) => Build(services, GeneralSettingsEndpoints.IsOwner(http.User), http.Request));
 
         guide.MapPut("/", (SetupGuideUpdate update, HttpContext http, IServiceProvider services, ConfigRepository config) =>
         {
@@ -36,42 +37,64 @@ public static class SetupGuideEndpoints
             }
 
             config.Set(ConfigKeys.SetupGuideDismissed, dismissed ? "true" : "false");
-            return Results.Ok(Build(services, GeneralSettingsEndpoints.IsOwner(http.User)));
+            return Results.Ok(Build(services, GeneralSettingsEndpoints.IsOwner(http.User), http.Request));
         });
 
-        // The release language: sets the default quality profile (and the language of "HD-1080p" for any/original).
+        // The release language: sets the default quality profile. any/original switch "HD-1080p" to that language; a
+        // language (native + its ISO 639-1 code, or german) uses "<Language> 1080p", created like "Deutsch 1080p" when
+        // missing ("Deutsch 1080p" itself for German).
         guide.MapPut("/language", (SetupLanguageUpdate update, HttpContext http, IServiceProvider services, ConfigRepository config) =>
         {
             var choice = update.Language?.Trim().ToLowerInvariant();
-            if (choice is not (LanguageAny or LanguageOriginal or LanguageGerman))
+            Language? wanted = choice switch
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["language"] = ["Choose any, original or german."] });
+                LanguageGerman => Language.German,
+                LanguageNative => Language.FromIsoCode(update.Code) is var code && LanguageRules.IsReal(code) ? code : null,
+                _ => null,
+            };
+
+            if (choice is not (LanguageAny or LanguageOriginal or LanguageGerman or LanguageNative))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["language"] = ["Choose any, original, german or native."] });
+            }
+
+            if (choice == LanguageNative && wanted is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["code"] = ["Send the ISO 639-1 code of a language StreamZH knows, e.g. tr or fr."],
+                });
             }
 
             var repository = services.GetRequiredService<QualityProfileRepository>();
             var profiles = services.GetRequiredService<QualityProfileService>();
-            var (id, name) = choice == LanguageGerman ? (QualityDefaults.GermanProfileId, "Deutsch 1080p") : (QualityDefaults.DefaultProfileId, "HD-1080p");
-            var profile = repository.Find(id) is { } byId && byId.Name == name ? byId : repository.FindByName(name);
-            if (profile is null)
+            QualityProfile? profile;
+            if (wanted is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
+                const string name = "HD-1080p";
+                profile = repository.Find(QualityDefaults.DefaultProfileId) is { } byId && byId.Name == name ? byId : repository.FindByName(name);
+                if (profile is null)
                 {
-                    ["language"] = [$"The quality profile {name} no longer exists. Choose the default profile in Settings → Profiles."],
-                });
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["language"] = [$"The quality profile {name} no longer exists. Choose the default profile in Settings → Profiles."],
+                    });
+                }
+            }
+            else
+            {
+                profile = LanguageProfile(wanted, repository, profiles);
             }
 
-            if (choice != LanguageGerman)
+            var languageId = wanted?.Id ?? (choice == LanguageAny ? Language.Any.Id : Language.Original.Id);
+            if (profile.LanguageId != languageId)
             {
-                var language = choice == LanguageAny ? Language.Any.Id : Language.Original.Id;
-                if (profile.LanguageId != language)
-                {
-                    profile = profiles.Update(profile.Id, profile with { LanguageId = language });
-                }
+                profile = profiles.Update(profile.Id, profile with { LanguageId = languageId });
             }
 
             profiles.SetDefault(profile.Id);
-            config.Set(ConfigKeys.SetupReleaseLanguage, choice);
-            return Results.Ok(Build(services, GeneralSettingsEndpoints.IsOwner(http.User)));
+            config.Set(ConfigKeys.SetupReleaseLanguage, wanted is null ? choice : wanted == Language.German ? LanguageGerman : wanted.IsoCode!);
+            return Results.Ok(Build(services, GeneralSettingsEndpoints.IsOwner(http.User), http.Request));
         });
 
         return app;
@@ -81,16 +104,57 @@ public static class SetupGuideEndpoints
     public const string LanguageOriginal = "original";
     public const string LanguageGerman = "german";
 
-    /// <summary>What the default profile asks for: any, original, german, or other.</summary>
+    /// <summary>A specific language other than German, sent with its ISO 639-1 code (the user's own language in the web app).</summary>
+    public const string LanguageNative = "native";
+
+    /// <summary>
+    /// The 1080p profile for a release language: "Deutsch 1080p" (id 4, or by name) for German, "&lt;Language&gt; 1080p"
+    /// by name for the others. Created like "Deutsch 1080p" when it does not exist, so choosing a language twice never
+    /// adds a second profile.
+    /// </summary>
+    public static QualityProfile LanguageProfile(Language language, QualityProfileRepository repository, QualityProfileService profiles)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        ArgumentNullException.ThrowIfNull(repository);
+        ArgumentNullException.ThrowIfNull(profiles);
+        var name = QualityDefaults.LanguageProfileName(language);
+        if (language == Language.German && repository.Find(QualityDefaults.GermanProfileId) is { } german && german.Name == name)
+        {
+            return german;
+        }
+
+        return repository.FindByName(name) ?? profiles.Create(QualityDefaults.LanguageProfile(language));
+    }
+
+    /// <summary>What the default profile asks for: any, original, german, native (another language with an ISO code), or other.</summary>
     private static string ReleaseLanguage(QualityProfile? profile) => profile?.LanguageId switch
     {
         var l when l == Language.Any.Id => LanguageAny,
         var l when l == Language.Original.Id => LanguageOriginal,
         var l when l == Language.German.Id => LanguageGerman,
+        { } l when Language.FindById(l).IsoCode is not null => LanguageNative,
         _ => "other",
     };
 
-    public static SetupGuideResource Build(IServiceProvider services, bool isOwner)
+    /// <summary>
+    /// The language to offer next to any and original: the first language of the browser (Accept-Language, by
+    /// preference) that StreamZH knows and that is not English, otherwise the TMDB metadata language if it is not
+    /// English. English is left out: it is already the original language of most titles, so "Original language" covers
+    /// it. Null if nothing fits.
+    /// </summary>
+    public static Language? SuggestedLanguage(HttpRequest? request, string? metadataLanguage)
+    {
+        var browser = request?.GetTypedHeaders().AcceptLanguage
+            .Where(h => h.Quality is not 0.0)
+            .OrderByDescending(h => h.Quality ?? 1)
+            .Select(h => h.Value.Value)
+            ?? [];
+        return browser.Append(metadataLanguage)
+            .Select(Language.FromLanguageTag)
+            .FirstOrDefault(l => LanguageRules.IsReal(l) && l != Language.English && l.IsoCode is not null);
+    }
+
+    public static SetupGuideResource Build(IServiceProvider services, bool isOwner, HttpRequest? request = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         var paths = services.GetRequiredService<AppPaths>();
@@ -120,6 +184,9 @@ public static class SetupGuideEndpoints
         var languageChosen = config.Get(ConfigKeys.SetupReleaseLanguage) is { Length: > 0 }
             || defaultProfile?.Id != QualityDefaults.DefaultProfileId
             || services.GetRequiredService<QualityProfileRepository>().UsageCount(defaultProfile.Id) > 0;
+
+        var defaultLanguage = defaultProfile is null ? null : Language.FindById(defaultProfile.LanguageId) is var own && LanguageRules.IsReal(own) ? own : null;
+        var suggested = SuggestedLanguage(request, config.Get(ConfigKeys.TmdbLanguage));
 
         var movieRoots = roots.Count(r => r.MediaType == MediaType.Movie);
         var seriesRoots = roots.Count(r => r.MediaType == MediaType.Series);
@@ -157,14 +224,25 @@ public static class SetupGuideEndpoints
                 services.GetRequiredService<RequestSettings>().Values.Enabled,
                 config.Get(ConfigKeys.DiscordEnabled) == "true",
                 ReleaseLanguage(defaultProfile),
-                defaultProfile?.Name));
+                defaultLanguage?.IsoCode,
+                defaultLanguage?.Name,
+                defaultProfile?.Name,
+                suggested is null ? null : new SetupLanguageOption(suggested.IsoCode!, suggested.Name)));
     }
 }
 
 public sealed record SetupGuideUpdate(bool? Dismissed);
 
-/// <param name="Language">any (any language), original (the original language) or german (German, dual language preferred).</param>
-public sealed record SetupLanguageUpdate(string? Language);
+/// <param name="Language">
+/// any (any language), original (the original language), german (German, dual language preferred) or native (the
+/// language in <paramref name="Code"/>, dual language preferred).
+/// </param>
+/// <param name="Code">For native: the ISO 639-1 code of the language, e.g. tr; "de" is the same as german.</param>
+public sealed record SetupLanguageUpdate(string? Language, string? Code = null);
+
+/// <param name="Code">ISO 639-1 code, e.g. tr.</param>
+/// <param name="Name">English name, e.g. Turkish.</param>
+public sealed record SetupLanguageOption(string Code, string Name);
 
 /// <param name="Dismissed">The owner or an admin hid the checklist ("Hide the guide").</param>
 /// <param name="Complete">Every required step is done.</param>
@@ -189,8 +267,17 @@ public sealed record SetupGuideStep(string Key, bool Done, int Count);
 /// <param name="StorageLocations">The owner's storage locations besides the default download folder.</param>
 /// <param name="Users">Accounts, the owner included.</param>
 /// <param name="Connections">Enabled Connect entries (Plex, Jellyfin, Emby, notifications).</param>
-/// <param name="ReleaseLanguage">any, original, german, or other (a default profile with another language).</param>
+/// <param name="ReleaseLanguage">
+/// any, original, german, native (a default profile with another language that has an ISO code, see
+/// <paramref name="ReleaseLanguageCode"/>), or other.
+/// </param>
+/// <param name="ReleaseLanguageCode">ISO 639-1 code of the default profile's language ("de", "tr"); null for any and original.</param>
+/// <param name="ReleaseLanguageName">Name of the default profile's language ("German", "Turkish"); null for any and original.</param>
 /// <param name="DefaultProfile">Name of the default quality profile.</param>
+/// <param name="SuggestedLanguage">
+/// The language "Get started" offers besides any and original: the browser's (Accept-Language), else the TMDB
+/// metadata language; never English. Null if none fits.
+/// </param>
 public sealed record SetupGuideDetails(
     IReadOnlyList<string> StorageLocations,
     int MovieRootFolders,
@@ -205,4 +292,7 @@ public sealed record SetupGuideDetails(
     bool RequestsEnabled,
     bool DiscordEnabled,
     string ReleaseLanguage,
-    string? DefaultProfile);
+    string? ReleaseLanguageCode,
+    string? ReleaseLanguageName,
+    string? DefaultProfile,
+    SetupLanguageOption? SuggestedLanguage);

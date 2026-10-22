@@ -92,7 +92,7 @@ export const groups: NavGroup[] = [
   },
   {
     key: 'manage',
-    title: 'Manage',
+    title: 'Administration',
     icon: 'sliders',
     pages: [
       { to: '/tools/renamer', label: 'Tools', icon: 'wrench', hub: 'tools', keywords: 'file renamer release test' },

@@ -16,7 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 ### Changed
 
 - **Tidier navigation, like CloudZH.** The sidebar is down to twelve entries: Overview · Library (Movies, Series,
-  Calendar, Wanted) · Requests (Discover, Requests) · Downloads (Activity, Indexers) · Manage (Tools, Settings,
+  Calendar, Wanted) · Requests (Discover, Requests) · Downloads (Activity, Indexers) · Administration (Tools, Settings,
   System). Pages that belong together are tabs in the main window: **Settings** groups its pages in Media, Downloads,
   Connections and General (the pages of a group as a second row), **System** has Status, Tasks, Backup and Logs,
   **Tools** has File renamer and Release test. All addresses stay the same, Ctrl K finds every page, and the tabs work

@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { ApiError } from '../api/client'
 import { isLive, migrationApi, migrationKeys, type AutomationSettings, type MigrationRun } from '../api/migration'
 import ui from '../components/ui.module.css'
+import { useAdvanced } from '../lib/advancedMode'
 import { useIsAdmin } from '../status/useOngoing'
 
 /** GET /settings/automation (side by side) for admins; undefined while loading or when the backend does not have it. */
@@ -15,6 +16,33 @@ export function useAutomation() {
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
     refetchInterval: 60_000,
   })
+}
+
+/**
+ * True while a migration is not finished: side by side is on (StreamZH grabs nothing until the owner switches over) or a
+ * run is still going. Settings then shows Migration even without the Advanced switch. `enabled`: only ask when it matters.
+ */
+export function useMigrationUnfinished(enabled = true): boolean {
+  const admin = useIsAdmin()
+  const automation = useAutomation()
+  const runs = useQuery({
+    queryKey: migrationKeys.runs,
+    queryFn: migrationApi.runs,
+    enabled: admin && enabled,
+    staleTime: 30_000,
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
+  })
+  return !!automation.data?.hold || !!runs.data?.some(isLive)
+}
+
+/**
+ * Settings → Migration is for advanced use: it shows with the Advanced switch on, or by itself while a migration is not
+ * finished (`unfinished`). Its address works either way.
+ */
+export function useShowMigration(enabled = true): { show: boolean; unfinished: boolean } {
+  const advanced = useAdvanced()
+  const unfinished = useMigrationUnfinished(enabled)
+  return { show: advanced || unfinished, unfinished }
 }
 
 export function useSetAutomation() {

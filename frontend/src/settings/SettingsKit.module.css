@@ -391,3 +391,14 @@
 .areaGroup {
   margin: 10px 0 -4px;
 }
+
+/* one group of area cards on /settings: its title, then the cards */
+.areaSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.areaSection > .areaGroup {
+  margin: 6px 0 0;
+}

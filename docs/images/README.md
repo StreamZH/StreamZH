@@ -15,7 +15,7 @@ Size 1440 × 900, dark theme unless noted, PNG.
 | `movie-detail.png` | A movie's detail page with its file | [Library](../guide/library.md#the-detail-page) |
 | `activity-queue.png` | Activity → Queue: the pipeline strip (grab, download, verify, repair, extract, import) | README, [Downloads](../guide/downloads.md#activity) |
 | `discover.png` | Discover: trending rows with library and request states | README, [Requests](../guide/requests.md#discover) |
-| `get-started.png` | Get started with four of six steps done | README, [Getting started](../guide/getting-started.md) |
+| `get-started.png` | Get started with all six steps done | README, [Getting started](../guide/getting-started.md) |
 | `settings-profiles.png` | Settings → Profiles with the five default profiles | [Quality](../guide/quality.md#quality-profiles) |
 | `migration.png` | Settings → Migration, the first step of the wizard | [MIGRATION.md](../MIGRATION.md#5-run-the-wizard-app-by-app) |
 

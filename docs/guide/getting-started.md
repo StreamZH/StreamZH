@@ -60,7 +60,11 @@ Which audio language StreamZH looks for. The choice sets the **default quality p
 |---|---|
 | **Any language** (the default of a new installation) | *HD-1080p*: the best 1080p release in whatever language it comes |
 | **Original language** | *HD-1080p*, set to the movie's or series' own language |
-| **German** | *Deutsch 1080p*: German audio, releases with German and the original language (dual language) preferred |
+| **Your language**, e.g. *Turkish* | *Turkish 1080p*: Turkish audio, releases with Turkish and the original language (dual language) preferred. Created on first use like *Deutsch 1080p*; for German it is *Deutsch 1080p* itself |
+
+The third choice is your own language: the first language of your browser that StreamZH knows, otherwise the TMDB
+language from step 4. With an English browser there is no third choice, because *Original language* already gives
+English for most titles. A language chosen before (e.g. German) stays on the page.
 
 You can change it at any time on the page, pick another profile per movie or series, or create your own profile;
 see [Quality](quality.md).

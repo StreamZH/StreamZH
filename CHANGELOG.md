@@ -24,6 +24,11 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 - **Migration is for advanced use:** its Settings tab shows with the *Advanced* switch on, and by itself while the
   side-by-side mode is on or a migration runs. **Start migration** on the Get started page (and on the Overview while
   the library is empty) still leads there.
+- **Get started → Release language** offers your own language instead of always German: the language of your browser
+  (or the TMDB language), e.g. *Turkish* with "Turkish 1080p" as default profile, created like "Deutsch 1080p".
+  German still uses "Deutsch 1080p", and installations that chose German look the same. English browsers see *Any
+  language* and *Original language*. API: `PUT /api/v1/setup/guide/language` also takes
+  `{ "language": "native", "code": "tr" }`.
 - Release notes keep their paragraphs on one line and link to the installation guide on streamzh.com.
 
 ## [1.0.0-rc.2] - 2026-10-20

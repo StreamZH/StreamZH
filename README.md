@@ -122,7 +122,8 @@ the download quarantine once (`xattr -dr com.apple.quarantine StreamZH`; the app
    - **Storage locations** and **root folders**: where your movies and series live. StreamZH only touches folders
      inside the storage locations the owner allows; the root-folder dialog adds yours in one click.
    - **TMDB key**: free, from themoviedb.org. Titles, posters and episode lists come from there.
-   - **Release language**: any, the original language, or German; it picks the default quality profile.
+   - **Release language**: any, the original language, or your own language (e.g. German or Turkish); it picks the
+     default quality profile.
    - **Indexers** (or Import from Prowlarr) and **a download client**: your Usenet server for the built-in engine,
      the built-in torrent engine, or your torrent client.
 3. **Add a movie or series**, or import the folders you already have.

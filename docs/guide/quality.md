@@ -16,7 +16,8 @@ Which release StreamZH grabs, and when it replaces a file with a better one, is 
 Each movie and series uses one profile; new items get the **default** profile unless you choose another.
 A new installation has *Any*, *HD-1080p* (the default, any language), *Ultra-HD*, *Deutsch 1080p* and *Deutsch 2160p*.
 The **release language** step of [Get started](getting-started.md#5-release-language) switches the default to
-*HD-1080p* in the original language or to *Deutsch 1080p* (German, dual language preferred). Installations from
+*HD-1080p* in the original language, to *Deutsch 1080p* (German, dual language preferred) or to a profile built the
+same way for your own language (e.g. *Turkish 1080p*, created when you choose it). Installations from
 before 1.0 keep their profiles and their default.
 **Set as default** changes the default; **New profile** creates one.
 

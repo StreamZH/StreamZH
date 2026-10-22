@@ -63,7 +63,7 @@ export default function CommandPalette({ onClose, requester = false }: { onClose
     }
     return [
       ...paletteTargets.filter((t) => !requester || requesterMayOpen(t.to)).map((t) => ({
-        key: `page:${t.to}`,
+        key: `page:${t.to}:${t.label}`,
         label: t.label,
         hint: t.group,
         group: 'Pages',

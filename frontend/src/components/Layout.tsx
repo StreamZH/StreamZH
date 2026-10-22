@@ -18,7 +18,8 @@ import { toggleTheme, useTheme } from '../lib/theme'
 import Icon from './Icon'
 import Logo from './Logo'
 import CommandPalette from './shell/CommandPalette'
-import { groups, hubs, isActive, overview, requesterGroups, titleFor, type NavGroup, type NavPage } from './shell/nav'
+import HubTabs from './shell/HubTabs'
+import { groups, hubOf, hubPanelId, hubTabId, isActive, overview, requesterGroups, titleFor, type NavGroup, type NavPage } from './shell/nav'
 import styles from './shell/Shell.module.css'
 import ui from './ui.module.css'
 
@@ -26,10 +27,10 @@ const foldKey = 'streamzh-nav-folded'
 
 function readFolded(): string[] {
   try {
-    const value = JSON.parse(localStorage.getItem(foldKey) ?? '["settings","system"]') as unknown
-    return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : ['settings', 'system']
+    const value = JSON.parse(localStorage.getItem(foldKey) ?? '[]') as unknown
+    return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
   } catch {
-    return ['settings', 'system']
+    return []
   }
 }
 
@@ -44,9 +45,10 @@ function shortEta(seconds: number): string {
 const roleLabel = { Owner: 'Owner', Admin: 'Administrator', Friend: 'Friend', Requester: 'Requester' } as const
 
 /**
- * The StreamZH shell in the CloudZH style: sidebar with groups (red icons, guide line, foldable), the search (Ctrl K),
- * a sticky top bar with the page title, the live dot, downloads, the server state and the profile menu, hub tabs for
- * pages with sub-pages, and the page itself, which fades in after every page change.
+ * The StreamZH shell in the CloudZH style: a short sidebar with groups (red icons, guide line, foldable), the search
+ * (Ctrl K), a sticky top bar with the page title, the live dot, downloads, the server state and the profile menu, tabs
+ * in the main window for pages that belong together (Settings, System, Tools, Wanted, Indexers), and the page itself,
+ * which fades in after every page change.
  */
 export default function Layout() {
   // A requester (0.10) gets a reduced shell: Discover, Requests and the profile; no library, downloads or server state.
@@ -112,7 +114,7 @@ export default function Layout() {
   const warnings = (ongoing?.notices ?? []).filter((n) => n.level !== 'info')
   const level = !live ? 'err' : warnings.some((n) => n.level === 'error') ? 'err' : warnings.length > 0 ? 'warn' : 'ok'
   const title = titleFor(pathname)
-  const hub = hubs.find((h) => pathname === h.prefix || pathname.startsWith(`${h.prefix}/`))
+  const hub = hubOf(pathname)
 
   // Ctrl K / ⌘ K opens the search, like CloudZH.
   useEffect(() => {
@@ -185,21 +187,14 @@ export default function Layout() {
 
   const group = (g: NavGroup) => {
     const hasActive = g.pages.some((p) => isActive(p, pathname))
-    const isFolded = !!g.foldable && folded.includes(g.key) && !hasActive
+    const isFolded = folded.includes(g.key) && !hasActive
     return (
-      <div key={g.key} className={`${styles.group} ${isFolded ? styles.folded : ''}`}>
-        {g.foldable ? (
-          <button type="button" className={styles.groupHead} aria-expanded={!isFolded} onClick={() => toggleFold(g.key)}>
-            <Icon name={g.icon} size={14} />
-            <span>{g.title}</span>
-            <Icon name="down" size={14} className={styles.chev} />
-          </button>
-        ) : (
-          <div className={styles.groupHead}>
-            <Icon name={g.icon} size={14} />
-            <span>{g.title}</span>
-          </div>
-        )}
+      <div key={g.key} className={`${styles.group} ${isFolded ? styles.folded : ''}`} role="group" aria-labelledby={`navgroup-${g.key}`}>
+        <button type="button" id={`navgroup-${g.key}`} className={styles.groupHead} aria-expanded={!isFolded} onClick={() => toggleFold(g.key)}>
+          <Icon name={g.icon} size={14} />
+          <span>{g.title}</span>
+          <Icon name="down" size={14} className={styles.chev} />
+        </button>
         <div className={styles.subWrap}>
           <div className={styles.sub} {...(isFolded ? { inert: true } : {})}>
             {g.pages.map(item)}
@@ -329,18 +324,13 @@ export default function Layout() {
           />
         </header>
 
-        {hub && (
-          <nav className={styles.hubtabs} aria-label="Sub-pages">
-            {hub.tabs.map((t) => (
-              <NavLink key={t.to} to={t.to} end className={({ isActive: on }) => `${styles.hubtab} ${on ? styles.hubtabOn : ''}`}>
-                <Icon name={t.icon} size={15} />
-                {t.label}
-              </NavLink>
-            ))}
-          </nav>
-        )}
+        {hub && <HubTabs hub={hub.hub} section={hub.section} tab={hub.tab} />}
 
-        <div key={pathname} className="v-in">
+        <div
+          key={pathname}
+          className="v-in"
+          {...(hub ? { id: hubPanelId, role: 'tabpanel', 'aria-labelledby': hubTabId(hub.tab.to) } : {})}
+        >
           {requester && !requesterMayOpen(pathname) ? <Navigate to="/discover" replace /> : <Outlet />}
         </div>
       </div>

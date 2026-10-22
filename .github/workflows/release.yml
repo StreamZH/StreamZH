@@ -276,6 +276,9 @@ jobs:
             type=raw,value=latest,enable=${{ needs.version.outputs.prerelease == 'false' }}
           labels: |
             org.opencontainers.image.title=StreamZH
+            org.opencontainers.image.description=One app for your whole media pipeline: library, indexers, downloads, requests.
+            org.opencontainers.image.url=https://streamzh.com
+            org.opencontainers.image.documentation=https://streamzh.com/docs/install/
             org.opencontainers.image.licenses=GPL-3.0-only
 
       - name: Sign in to GHCR

@@ -15,7 +15,21 @@ import { formatDate, formatDateTime } from '../lib/format'
 import { Pill, PrivacyChip, ProtocolChip } from './Chips'
 import { languageName } from './labels'
 import Dialog from './Dialog'
-import { formatAgo, formatUntil, grabUsage, newznabUrl, queryUsage, rowState, usesList, vipState } from './model'
+import {
+  formatAgo,
+  formatUntil,
+  grabUsage,
+  hostOf,
+  missingApiKey,
+  newznabUrl,
+  presetAddress,
+  queryUsage,
+  rowState,
+  throughProwlarr,
+  usesList,
+  vipState,
+  withOwnAddress,
+} from './model'
 import styles from './Details.module.css'
 
 type Tab = 'details' | 'categories'
@@ -24,7 +38,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: 'categories', label: 'Categories' },
 ]
 
-/** Indexer info like Prowlarr's: what the indexer is, how StreamZH talks to it and what it can search. */
+/** Indexer info like Prowlarr's: what the indexer is, how StreamZH talks to it and what it can search, with a Test. */
 export default function IndexerDetails({
   id,
   fallback,
@@ -37,7 +51,8 @@ export default function IndexerDetails({
   /** List row shown while the details load. */
   fallback: Indexer | null
   canEdit: boolean
-  onEdit: (details: Details) => void
+  /** Opens Edit; `indexer` replaces the saved one as the form's starting point (e.g. moved to its own address). */
+  onEdit: (details: Details, indexer?: Details['indexer']) => void
   onClone: (details: Details) => void
   onClose: () => void
 }) {
@@ -53,6 +68,11 @@ export default function IndexerDetails({
       await queryClient.invalidateQueries({ queryKey: indexerKeys.all })
       onClose()
     },
+  })
+  // Tests the saved indexer with its stored key; a success stores the capabilities and ends a waiting time.
+  const test = useMutation({
+    mutationFn: (indexer: Details['indexer']) => indexersApi.test(indexer),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: indexerKeys.all }),
   })
 
   const indexer = details.data?.indexer ?? fallback
@@ -77,6 +97,18 @@ export default function IndexerDetails({
     </>
   )
 
+  const testLine = (test.isPending || test.isSuccess || test.isError) && (
+    <p className={styles.testResult} aria-live="polite">
+      {test.isPending && <span className={ui.muted}>Testing the connection…</span>}
+      {test.isSuccess && (
+        <span className={ui.ok}>
+          Connection works{test.data.categories.length > 0 ? `, ${test.data.categories.length} category groups loaded` : ''}.
+        </span>
+      )}
+      {test.isError && <span className={ui.error}>{test.error.message}</span>}
+    </p>
+  )
+
   const footer = confirmDelete ? (
     <>
       <span className={styles.confirm}>Delete {indexer?.name}?</span>
@@ -91,6 +123,7 @@ export default function IndexerDetails({
   ) : (
     <>
       {remove.error && <p className={`${ui.error} ${styles.footerError}`}>{remove.error.message}</p>}
+      {testLine}
       {canEdit && (
         <>
           <button className={ui.danger} type="button" onClick={() => setConfirmDelete(true)}>
@@ -103,9 +136,20 @@ export default function IndexerDetails({
       )}
       <span className={styles.spacer} />
       {canEdit && (
-        <button className={ui.button} type="button" disabled={!details.data} onClick={() => details.data && onEdit(details.data)}>
-          Edit
-        </button>
+        <>
+          <button
+            className={ui.button}
+            type="button"
+            disabled={!details.data || test.isPending}
+            onClick={() => details.data && test.mutate(details.data.indexer)}
+            title={details.data && missingApiKey(details.data.indexer) ? 'No API key saved yet: the test will probably fail' : undefined}
+          >
+            {test.isPending ? 'Testing…' : 'Test'}
+          </button>
+          <button className={ui.button} type="button" disabled={!details.data} onClick={() => details.data && onEdit(details.data)}>
+            Edit
+          </button>
+        </>
       )}
       <button className={canEdit ? ui.button : ui.primary} type="button" onClick={onClose}>
         Close
@@ -140,7 +184,9 @@ export default function IndexerDetails({
       <div role="tabpanel" id={`indexer-panel-${tab}`} aria-labelledby={`indexer-tab-${tab}`} className={styles.panel}>
         {details.isPending && <p className={ui.muted}>Loading…</p>}
         {details.isError && <p className={ui.error}>{details.error.message}</p>}
-        {details.data && tab === 'details' && <DetailsTab details={details.data} />}
+        {details.data && tab === 'details' && (
+          <DetailsTab details={details.data} canEdit={canEdit} onUseOwnAddress={(moved) => details.data && onEdit(details.data, moved)} />
+        )}
         {details.data && tab === 'categories' && <CategoriesTab details={details.data} />}
       </div>
     </Dialog>
@@ -179,7 +225,15 @@ function seedGoals(i: Details['indexer']): string {
   return text.charAt(0).toUpperCase() + text.slice(1) + pack
 }
 
-function DetailsTab({ details }: { details: Details }) {
+function DetailsTab({
+  details,
+  canEdit,
+  onUseOwnAddress,
+}: {
+  details: Details
+  canEdit: boolean
+  onUseOwnAddress: (indexer: Details['indexer']) => void
+}) {
   const { indexer, definition, capabilities, capabilitiesCheckedAt } = details
   const status = indexer.status
   const vip = vipState(status)
@@ -187,6 +241,9 @@ function DetailsTab({ details }: { details: Details }) {
   const uses = usesList(indexer)
   const queries = queryUsage(indexer)
   const grabs = grabUsage(indexer)
+  const viaProwlarr = throughProwlarr(indexer)
+  const own = presetAddress(definition)
+  const moved = withOwnAddress(indexer, definition)
 
   return (
     <div className={styles.sections}>
@@ -194,6 +251,28 @@ function DetailsTab({ details }: { details: Details }) {
         <p className={styles.statusNote}>
           Skipped until {formatUntil(status.disabledTill)}
           {status.lastError ? `: ${status.lastError}` : ''}
+        </p>
+      )}
+
+      {viaProwlarr && (
+        <div className={styles.warnNote} role="note">
+          <span>
+            Goes through Prowlarr at <span className={styles.mono}>{hostOf(indexer.baseUrl)}</span> instead of the indexer&apos;s own address.
+            {own
+              ? ` StreamZH can reach ${hostOf(own.baseUrl)} directly; you only need its API key.`
+              : ' If the indexer has an API of its own, enter its address and API key under Edit. Site scrapers without an API can only be searched through Prowlarr, which then has to keep running.'}
+          </span>
+          {canEdit && moved && (
+            <button className={`${ui.button} ${ui.sm}`} type="button" onClick={() => onUseOwnAddress(moved)}>
+              Use {hostOf(own!.baseUrl)}
+            </button>
+          )}
+        </div>
+      )}
+
+      {!viaProwlarr && canEdit && missingApiKey(indexer) && (
+        <p className={styles.warnNote} role="note">
+          <span>No API key saved. Most indexers need one: enter it under Edit{indexer.enable ? '' : ', then switch the indexer on'}.</span>
         </p>
       )}
 
@@ -279,7 +358,7 @@ function DetailsTab({ details }: { details: Details }) {
 }
 
 function NotChecked() {
-  return <p className={styles.empty}>Not checked yet. Open Edit and press Test to read what this indexer can search.</p>
+  return <p className={styles.empty}>Not checked yet. Press Test to read what this indexer can search.</p>
 }
 
 function CategoriesTab({ details }: { details: Details }) {

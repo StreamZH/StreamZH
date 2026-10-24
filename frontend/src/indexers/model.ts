@@ -108,3 +108,36 @@ export function newznabUrl(i: Pick<Indexer, 'baseUrl' | 'apiPath'>) {
   const path = i.apiPath ? (i.apiPath.startsWith('/') ? i.apiPath : `/${i.apiPath}`) : ''
   return `${base}${path}`
 }
+
+/**
+ * True when the indexer is reached through Prowlarr's per-indexer proxy (http://prowlarr:9696/3/) instead of the
+ * provider's own address, like imports from older versions did. Same rule as the migration wizard.
+ */
+export function throughProwlarr(i: Pick<Indexer, 'baseUrl'>): boolean {
+  try {
+    const url = new URL(i.baseUrl)
+    return /^\/\d+\/?$/.test(url.pathname) && (url.port === '9696' || url.hostname.toLowerCase().includes('prowlarr'))
+  } catch {
+    return false
+  }
+}
+
+/** The catalog preset's own address for an indexer, or null for Generic Newznab/Torznab (the user knows the address). */
+export function presetAddress(definition: IndexerDefinition | null): Pick<Indexer, 'baseUrl' | 'apiPath'> | null {
+  if (!definition || isGenericDefinition(definition.key) || definition.baseUrl === '') return null
+  return { baseUrl: definition.baseUrl, apiPath: definition.apiPath || '/api' }
+}
+
+/**
+ * The indexer moved to the provider's own address. The stored key belonged to Prowlarr (and is only ever sent to the
+ * address it was entered for), so the indexer's own key has to be entered.
+ */
+export function withOwnAddress(i: Indexer, definition: IndexerDefinition | null): Indexer | null {
+  const own = presetAddress(definition)
+  return own ? { ...i, ...own, apiKey: '' } : null
+}
+
+/** No API key saved (the key itself never reaches the browser; a saved one comes as the mask). */
+export function missingApiKey(i: Pick<Indexer, 'apiKey'>): boolean {
+  return i.apiKey === ''
+}

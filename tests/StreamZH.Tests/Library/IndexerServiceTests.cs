@@ -216,6 +216,26 @@ public sealed class IndexerServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_successful_test_of_the_saved_indexer_ends_its_waiting_time()
+    {
+        var client = new StubIndexerClient();
+        var saved = _service.Create(Valid("A") with { ApiKey = "stored-key" });
+        _service.RecordFailure(saved.Id, new IndexerException("Timeout"));
+
+        // A draft with another address does not count for the saved indexer.
+        await _service.TestAsync(saved with { BaseUrl = "https://other.example", ApiKey = "k" }, client, CancellationToken.None);
+        Assert.False(_service.Health(saved.Id).Healthy);
+
+        client.Error = new IndexerException("Incorrect user credentials", 100);
+        await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None);
+        Assert.False(_service.Health(saved.Id).Healthy);
+
+        client.Error = null;
+        await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None);
+        Assert.Equal(IndexerHealth.Ok(saved.Id), _service.Health(saved.Id));
+    }
+
+    [Fact]
     public void Schema_has_the_radarr_and_sonarr_defaults()
     {
         var schema = IndexerService.Schema();

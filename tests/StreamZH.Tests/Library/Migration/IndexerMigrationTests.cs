@@ -149,8 +149,11 @@ public sealed class IndexerMigrationTests : IAsyncLifetime
             plan.Items.Select(i => i.Action));
         Assert.Equal((true, false), (plan.Items[3].NeedsSecret, plan.Items[4].NeedsSecret));
         Assert.True(plan.Items[0].NeedsSecret);
-        Assert.Contains("through Prowlarr", plan.Items[0].Detail, StringComparison.Ordinal);
+        Assert.Contains("https://api.nzbgeek.info/api", plan.Items[0].Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("prowlarr", plan.Items[0].Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("through Prowlarr", plan.Items[4].Detail, StringComparison.Ordinal);
         Assert.False(plan.Items[5].NeedsSecret);
+        Assert.Contains(plan.Warnings!, w => w.Contains("switched off", StringComparison.Ordinal));
         Assert.Contains(plan.Warnings!, w => w.Contains("keep Prowlarr running", StringComparison.Ordinal));
 
         var request = _bed.Request(MigrationSources.Prowlarr) with
@@ -165,7 +168,9 @@ public sealed class IndexerMigrationTests : IAsyncLifetime
         var torznab = _bed.Indexers.All().Single(i => i.Name == "Some Torznab");
         Assert.Equal((Core.Downloads.DownloadProtocol.Torrent, 3, 1.5), (torznab.Protocol, torznab.MinimumSeeders, torznab.SeedRatio!.Value));
         var geek = _bed.Indexers.All().Single(i => i.Name == "NZBgeek");
-        Assert.Equal(("https://api.nzbgeek.info", "own-geek-key"), (geek.BaseUrl, geek.ApiKey));
+        Assert.Equal(("https://api.nzbgeek.info", "own-geek-key", true), (geek.BaseUrl, geek.ApiKey, geek.Enable));
+        Assert.Equal(("https://torznab.example", string.Empty, false), (torznab.BaseUrl, torznab.ApiKey, torznab.Enable));
+        Assert.Contains(report.Messages, m => m.Text.Contains("Some Torznab is switched off", StringComparison.Ordinal));
 
         // Again: everything is there already.
         var again = _bed.Run();

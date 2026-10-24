@@ -10,16 +10,21 @@ import styles from './Import.module.css'
 
 const steps = ['Connect', 'Choose', 'Done'] as const
 
-const modeText: Record<ProwlarrImportMode, { label: string; tone: 'ok' | 'info'; help: string }> = {
+const modeText: Record<ProwlarrImportMode, { label: string; tone: 'ok' | 'warn' | 'info'; help: string }> = {
   direct: {
     label: 'Direct',
     tone: 'ok',
-    help: 'StreamZH talks to the indexer itself, with the indexer’s own URL and API key read from Prowlarr.',
+    help: 'StreamZH talks to the indexer at its own address, with its own API key.',
+  },
+  needsKey: {
+    label: 'Key needed',
+    tone: 'warn',
+    help: 'StreamZH uses the indexer’s own address, but Prowlarr does not hand out API keys. Paste the key from your account page at the indexer; without it the indexer is added switched off until you enter the key under Edit.',
   },
   proxy: {
     label: 'Via Prowlarr',
     tone: 'info',
-    help: 'Prowlarr does not hand out indexer API keys. Without the indexer’s own key, StreamZH searches through Prowlarr, which then has to keep running. Paste the key from your account page at the indexer to use it directly and switch Prowlarr off.',
+    help: 'This indexer has no API of its own (Prowlarr reads the website), so it can only be searched through Prowlarr, which has to keep running.',
   },
 }
 
@@ -34,7 +39,8 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
   const [connection, setConnection] = useState<ProwlarrConnection>({ url: '', apiKey: '' })
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [ownKeys, setOwnKeys] = useState<Record<number, string>>({})
-  const modeOf = (item: ProwlarrPreviewItem): ProwlarrImportMode => (ownKeys[item.prowlarrId]?.trim() ? 'direct' : item.mode)
+  const modeOf = (item: ProwlarrPreviewItem): ProwlarrImportMode =>
+    item.mode === 'needsKey' && ownKeys[item.prowlarrId]?.trim() ? 'direct' : item.mode
   const [step, setStep] = useState<0 | 1 | 2>(0)
 
   const preview = useMutation({
@@ -185,7 +191,7 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
           </p>
           {modes.size > 0 && (
             <ul className={styles.modes}>
-              {(['direct', 'proxy'] as const)
+              {(['direct', 'needsKey', 'proxy'] as const)
                 .filter((m) => modes.has(m))
                 .map((m) => (
                   <li key={m}>
@@ -218,7 +224,7 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
                   <th>Protocol</th>
                   <th>Mode</th>
                   <th>Address</th>
-                  <th>Own API key</th>
+                  <th>API key</th>
                   <th>Note</th>
                 </tr>
               </thead>
@@ -246,20 +252,20 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
                       </td>
                       <td data-label="Mode">{enabled ? <Pill tone={modeText[modeOf(item)].tone}>{modeText[modeOf(item)].label}</Pill> : '–'}</td>
                       <td data-label="Address" className={styles.address}>
-                        {modeOf(item) === 'direct' && item.ownUrl
+                        {item.ownUrl
                           ? hostOf(item.ownUrl)
                           : item.baseUrl
                             ? `${hostOf(item.baseUrl)}${item.apiPath && item.apiPath !== '/api' ? item.apiPath : ''}`
                             : '–'}
                       </td>
-                      <td data-label="Own API key">
-                        {enabled && item.mode === 'proxy' && item.ownUrl ? (
+                      <td data-label="API key">
+                        {enabled && item.mode === 'needsKey' ? (
                           <input
                             className={`${ui.input} ${styles.keyInput}`}
                             type="password"
                             autoComplete="off"
-                            aria-label={`Own API key for ${item.name}`}
-                            placeholder={`Optional, from ${hostOf(item.ownUrl)}`}
+                            aria-label={`API key for ${item.name}`}
+                            placeholder={`From your account at ${hostOf(item.ownUrl ?? item.baseUrl)}`}
                             value={ownKeys[item.prowlarrId] ?? ''}
                             onChange={(e) => setOwnKeys((k) => ({ ...k, [item.prowlarrId]: e.target.value }))}
                           />
@@ -268,10 +274,10 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
                         )}
                       </td>
                       <td data-label="Note" className={styles.note}>
-                        {!enabled ? (
-                          <span className={styles.reason}>{item.reason ?? 'Not supported.'}</span>
-                        ) : item.alreadyExists ? (
+                        {item.alreadyExists ? (
                           <span className={styles.exists}>Already in StreamZH, skipped.</span>
+                        ) : !enabled ? (
+                          <span className={styles.reason}>{item.reason ?? 'Not supported.'}</span>
                         ) : (
                           <span className={ui.muted}>New</span>
                         )}
@@ -325,6 +331,11 @@ export default function ProwlarrImport({ onClose, onTestAll }: { onClose: () => 
                 ))}
               </ul>
             </>
+          )}
+          {importer.data.imported.some((i) => i.mode === 'needsKey') && (
+            <p className={ui.muted}>
+              Indexers marked <strong>Key needed</strong> are switched off: open each one, enter its API key under Edit, press Test and switch it on.
+            </p>
           )}
           {importer.data.imported.length > 0 && (
             <p className={ui.muted}>Test them once to load their categories and search capabilities.</p>

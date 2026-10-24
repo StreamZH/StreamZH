@@ -10,9 +10,10 @@ namespace StreamZH.Library.Migration.Indexers;
 
 /// <summary>
 /// Prowlarr's indexers (Usenet and, since 0.11, torrent) → StreamZH indexers, through the existing <see cref="ProwlarrImportService"/>
-/// (same rules as Indexers → Import from Prowlarr). Prowlarr masks the indexers' own API keys, so they are reached through Prowlarr's
-/// Newznab/Torznab proxy unless the user types the indexer's own key (<see cref="MigrationContext.Secret"/>): then the indexer
-/// is used directly and keeps working once Prowlarr is gone. An indexer with the same name is kept as it is.
+/// (same rules as Indexers → Import from Prowlarr). An indexer with an API of its own always gets the provider's address, never
+/// Prowlarr's proxy. Prowlarr masks the indexers' API keys: the user types the key (<see cref="MigrationContext.Secret"/>), or the
+/// indexer is added switched off until the key is entered in Indexers. Only scrapers without an API go through Prowlarr.
+/// An indexer with the same name is kept as it is.
 /// </summary>
 public sealed class ProwlarrIndexersSection : IMigrationSection
 {
@@ -24,7 +25,7 @@ public sealed class ProwlarrIndexersSection : IMigrationSection
 
     public string Label => "Indexers";
 
-    public string Description => "Usenet and torrent indexers with their categories, priority, limits and seed settings. Type an indexer's own API key to use it without Prowlarr.";
+    public string Description => "Usenet and torrent indexers with their own address, categories, priority, limits and seed settings. Type each indexer's API key; Prowlarr hides it.";
 
     public int Order => 350;
 
@@ -40,9 +41,14 @@ public sealed class ProwlarrIndexersSection : IMigrationSection
         var preview = await import.PreviewAsync(context.Connection.Url, context.Connection.ApiKey, cancellationToken);
         var items = preview.Select(p => Item(p, context)).ToList();
         var warnings = new List<string>();
-        if (preview.Any(p => p.Supported && !p.AlreadyExists && p.Mode == ProwlarrImportMode.Proxy && context.Secret(ItemKey(p.ProwlarrId)) is null))
+        if (preview.Any(p => p.Supported && !p.AlreadyExists && p.Mode == ProwlarrImportMode.NeedsKey && context.Secret(ItemKey(p.ProwlarrId)) is null))
         {
-            warnings.Add("Indexers without their own API key go through Prowlarr: keep Prowlarr running, or type the indexers' own API keys so StreamZH reaches them directly.");
+            warnings.Add("Prowlarr hides the indexers' API keys. Indexers without a typed key are added switched off: enter the key in Indexers → Edit, then switch them on.");
+        }
+
+        if (preview.Any(p => p.Supported && !p.AlreadyExists && p.Mode == ProwlarrImportMode.Proxy))
+        {
+            warnings.Add("Indexers without an API of their own (site scrapers) can only be searched through Prowlarr: keep Prowlarr running for them.");
         }
 
         return new MigrationSectionPlan(items, warnings);
@@ -95,9 +101,13 @@ public sealed class ProwlarrIndexersSection : IMigrationSection
                 context.Ids.Set("indexer", source.ProwlarrId, created.Id);
             }
 
-            if (created.Mode == ProwlarrImportMode.Proxy)
+            if (created.Mode == ProwlarrImportMode.NeedsKey)
             {
-                run.Info($"{created.Name} goes through Prowlarr. Enter its own API key in Indexers before you stop Prowlarr.", created.Name);
+                run.Info($"{created.Name} is switched off until you enter its API key in Indexers → Edit.", created.Name);
+            }
+            else if (created.Mode == ProwlarrImportMode.Proxy)
+            {
+                run.Info($"{created.Name} has no API of its own and goes through Prowlarr.", created.Name);
             }
         }
 
@@ -124,19 +134,17 @@ public sealed class ProwlarrIndexersSection : IMigrationSection
             return new MigrationItem(key, p.Name, MigrationAction.Link, $"{known}already in StreamZH, kept as it is");
         }
 
-        var direct = p.Mode == ProwlarrImportMode.Direct || (p.OwnUrl is not null && context.Secret(key) is not null);
-        var detail = direct
-            ? $"{known}direct: {p.OwnUrl ?? p.BaseUrl + p.ApiPath}"
-            : $"{known}through Prowlarr ({p.BaseUrl}{p.ApiPath})";
+        var needsKey = p.Mode == ProwlarrImportMode.NeedsKey;
+        var detail = p.Mode == ProwlarrImportMode.Proxy
+            ? $"{known}through Prowlarr ({p.BaseUrl}{p.ApiPath}), no API of its own"
+            : $"{known}{p.OwnUrl ?? p.BaseUrl + p.ApiPath}";
 
-        // Only an indexer whose own address Prowlarr shows can be used directly with a typed-in key.
-        var canUseOwnKey = p.Mode == ProwlarrImportMode.Proxy && p.OwnUrl is not null;
         return new MigrationItem(
             key,
             p.Name,
             MigrationAction.Create,
             detail,
-            Warning: canUseOwnKey && !direct ? "Prowlarr hides the indexer's own API key. Type it to use the indexer without Prowlarr." : null,
-            NeedsSecret: canUseOwnKey);
+            Warning: needsKey && context.Secret(key) is null ? "Prowlarr hides the API key. Type it, or the indexer is added switched off." : null,
+            NeedsSecret: needsKey);
     }
 }

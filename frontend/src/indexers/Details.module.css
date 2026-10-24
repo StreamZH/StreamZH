@@ -244,3 +244,29 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* A hint the user can act on (still through Prowlarr, API key missing): warning colours, with a button. */
+.warnNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--warn);
+  border-radius: 10px;
+  background: var(--warn-soft);
+  overflow-wrap: anywhere;
+}
+
+.warnNote > span {
+  flex: 1 1 260px;
+}
+
+.testResult {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

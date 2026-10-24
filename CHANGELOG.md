@@ -3,6 +3,23 @@
 All notable changes for users of StreamZH. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/). Versions before 1.0 were private test versions.
 
+## [Unreleased]
+
+### Changed
+
+- **Import from Prowlarr uses the provider's own address.** Every indexer with an API of its own (Newznab, Torznab)
+  gets the indexer's own URL, from Prowlarr or from the catalog when Prowlarr does not show it, never Prowlarr's
+  address (`http://prowlarr:9696/1/api`). Prowlarr hides the API keys: type them in the import or the migration
+  wizard; an indexer without a key is added switched off until its key is entered under Edit. Only site scrapers
+  without an API of their own (e.g. Cardigann trackers, NZBIndex) still go through Prowlarr. API: the import mode
+  `needsKey` is new.
+- **Test in the indexer details.** The details view has a **Test** button next to Edit; it reads the search
+  capabilities and categories right there. A successful test (here, in the list or in Edit) also ends the waiting
+  time after earlier failures.
+- **Indexers that still go through Prowlarr** (imported with an older version) are marked in their details and in
+  Edit, with **Use the indexer's own address**. Edit shows the URL without the *Advanced* switch whenever it differs
+  from the catalog address, and *Reset* restores the API path too.
+
 ## [1.0.0-rc.4] - unreleased
 
 ### Changed

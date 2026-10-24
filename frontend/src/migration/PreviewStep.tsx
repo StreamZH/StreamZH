@@ -158,11 +158,11 @@ function SectionPanel({
   sideBySide: boolean
 }) {
   const id = useId()
-  // Prowlarr's indexers work through Prowlarr without their own key: nothing is missing.
+  // Prowlarr's indexers: the secret is the indexer's API key (they are reached at their own address, never through Prowlarr).
   const optionalSecret = source.key === 'prowlarr'
   const counts = countItems(section.items, choices.excluded)
   const secrets = section.items.filter((i) => i.needsSecret && !choices.excluded.has(i.key) && i.action !== 'skip')
-  const missingSecrets = optionalSecret ? 0 : secrets.filter((i) => !choices.secrets[i.key]).length
+  const missingSecrets = secrets.filter((i) => !choices.secrets[i.key]).length
   const options = optionsOf(section.key).filter(([, o]) => advanced || !o.advanced)
   const failed = section.items.length === 0 && section.warnings.length > 0
 
@@ -178,7 +178,7 @@ function SectionPanel({
           {selected && missingSecrets > 0 && (
             <span className={`${ui.pill} ${ui.pillWarn}`}>
               <Icon name="key" size={12} />
-              {missingSecrets} {missingSecrets === 1 ? 'password' : 'passwords'}
+              {missingSecrets} {optionalSecret ? (missingSecrets === 1 ? 'API key' : 'API keys') : missingSecrets === 1 ? 'password' : 'passwords'}
             </span>
           )}
           {section.warnings.length > 0 && (
@@ -412,7 +412,7 @@ function ItemRow({
   const secret = secrets[item.key] ?? ''
   // Connections with more than one hidden field (Pushover: API key and user key).
   const multi = section === 'notifications' ? secretFields[(item.detail ?? '').split(' · ')[0].trim().toLowerCase()] : undefined
-  const firstLabel = multi?.first ?? (optionalSecret ? 'Own API key (optional)' : 'Password or API key')
+  const firstLabel = multi?.first ?? (optionalSecret ? 'API key' : 'Password or API key')
   const skip = item.action === 'skip'
   const taken = !skip && !excluded
   // Radarr/Sonarr's SABnzbd client: its address can be used for the SABnzbd step.
@@ -467,7 +467,7 @@ function ItemRow({
               type="password"
               autoComplete="new-password"
               placeholder={firstLabel}
-              aria-label={optionalSecret ? `Own API key for ${item.label} (optional)` : multi ? `${multi.first} for ${item.label}` : `Password for ${item.label}`}
+              aria-label={optionalSecret ? `API key for ${item.label}` : multi ? `${multi.first} for ${item.label}` : `Password for ${item.label}`}
               value={secret}
               onChange={(e) => onSecret(item.key, e.target.value)}
             />
@@ -487,7 +487,7 @@ function ItemRow({
               {secret
                 ? 'Stored in StreamZH like one you type into its own form.'
                 : optionalSecret
-                  ? 'Without it, the indexer works through Prowlarr.'
+                  ? 'Prowlarr does not hand it out. Without it, the indexer is added switched off until you enter it.'
                   : 'The old app does not hand it out. Without it, this is added switched off.'}
             </small>
           </span>

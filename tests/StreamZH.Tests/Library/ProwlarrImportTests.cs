@@ -18,9 +18,9 @@ public sealed class StubProwlarr : HttpMessageHandler
     public const string ApiKey = "prowlarr-key-123";
 
     /// <summary>
-    /// 1 NZBgeek (Newznab, key masked as Prowlarr always does) → proxy; 2 "Own Newznab" (key readable) → direct;
-    /// 3 "Keyless" (Newznab without key, Prowlarr sends "") → direct; 4 Torznab (torrent, key masked, seed settings) → proxy;
-    /// 5 Cardigann torrent → proxy; 6 NZBIndex (usenet scraper, no key field) → proxy.
+    /// 1 NZBgeek (Newznab, key masked as Prowlarr always does) → own address, needs key; 2 "Own Newznab" (key readable) → direct;
+    /// 3 "Keyless" (Newznab without key, Prowlarr sends "") → direct; 4 Torznab (torrent, key masked, seed settings) → own
+    /// address, needs key; 5 Cardigann torrent → proxy (no API of its own); 6 NZBIndex (usenet scraper, no key field) → proxy.
     /// </summary>
     public const string IndexerJson = """
         [
@@ -114,6 +114,9 @@ public sealed class StubProwlarr : HttpMessageHandler
 
     public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
+    /// <summary>The indexer list served; <see cref="IndexerJson"/> unless a test needs another one.</summary>
+    public string Json { get; set; } = IndexerJson;
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
@@ -123,7 +126,7 @@ public sealed class StubProwlarr : HttpMessageHandler
         }
 
         return Task.FromResult(request.RequestUri!.AbsolutePath == "/api/v1/indexer"
-            ? new HttpResponseMessage(Status) { Content = new StringContent(IndexerJson, Encoding.UTF8, "application/json") }
+            ? new HttpResponseMessage(Status) { Content = new StringContent(Json, Encoding.UTF8, "application/json") }
             : new HttpResponseMessage(HttpStatusCode.NotFound));
     }
 }
@@ -158,21 +161,22 @@ public sealed class ProwlarrImportTests : IDisposable
         Assert.Equal([1, 2, 3, 4, 5, 6], preview.Select(p => p.ProwlarrId));
 
         var geek = preview[0];
-        Assert.Equal(("NZBgeek", "usenet", "Newznab", true, false, ProwlarrImportMode.Proxy), (geek.Name, geek.Protocol, geek.Implementation, geek.Supported, geek.AlreadyExists, geek.Mode));
-        Assert.Equal(("http://prowlarr:9696/1", "/api"), (geek.BaseUrl, geek.ApiPath));
+        Assert.Equal(("NZBgeek", "usenet", "Newznab", true, false, ProwlarrImportMode.NeedsKey), (geek.Name, geek.Protocol, geek.Implementation, geek.Supported, geek.AlreadyExists, geek.Mode));
+
+        // Always the provider's own address, never Prowlarr's proxy, even though Prowlarr hides the key.
+        Assert.Equal(("https://api.nzbgeek.info", "/api"), (geek.BaseUrl, geek.ApiPath));
 
         var own = preview[1];
         Assert.Equal((ProwlarrImportMode.Direct, "https://own.example", "/newznab/api"), (own.Mode, own.BaseUrl, own.ApiPath));
 
         Assert.Equal((ProwlarrImportMode.Direct, true), (preview[2].Mode, preview[2].AlreadyExists));
 
-        // 0.11: torrent indexers come along, through Prowlarr's Torznab proxy (keys are masked).
-        Assert.All(preview.Skip(3).Take(2), p =>
-        {
-            Assert.Equal(("torrent", true, (string?)null, ProwlarrImportMode.Proxy), (p.Protocol, p.Supported, p.Reason, p.Mode));
-        });
-        Assert.Equal(("Torznab", "http://prowlarr:9696/4", "https://torznab.example/api"), (preview[3].Implementation, preview[3].BaseUrl, preview[3].OwnUrl));
-        Assert.Equal(("Cardigann", "http://prowlarr:9696/5", (string?)null), (preview[4].Implementation, preview[4].BaseUrl, preview[4].OwnUrl));
+        // 0.11: torrent indexers come along: a Torznab tracker at its own address, a scraper without an API through Prowlarr.
+        Assert.All(preview.Skip(3).Take(2), p => Assert.Equal(("torrent", true, (string?)null), (p.Protocol, p.Supported, p.Reason)));
+        Assert.Equal(("Torznab", ProwlarrImportMode.NeedsKey, "https://torznab.example", "https://torznab.example/api"),
+            (preview[3].Implementation, preview[3].Mode, preview[3].BaseUrl, preview[3].OwnUrl));
+        Assert.Equal(("Cardigann", ProwlarrImportMode.Proxy, "http://prowlarr:9696/5", (string?)null),
+            (preview[4].Implementation, preview[4].Mode, preview[4].BaseUrl, preview[4].OwnUrl));
 
         Assert.Equal((true, ProwlarrImportMode.Proxy, "http://prowlarr:9696/6"), (preview[5].Supported, preview[5].Mode, preview[5].BaseUrl));
     }
@@ -195,26 +199,27 @@ public sealed class ProwlarrImportTests : IDisposable
     }
 
     [Fact]
-    public async Task Import_creates_direct_and_proxy_indexers_and_skips_the_rest()
+    public async Task Import_uses_the_providers_address_and_skips_the_rest()
     {
         _indexers.Create(new IndexerDefinition(0, "Keyless", "Newznab", "https://x.example", "/api", "k", [2000], [], 25, true, true, true));
 
         var result = await _import.ImportAsync(Url, StubProwlarr.ApiKey, [1, 2, 3, 4, 6, 99], CancellationToken.None);
 
         Assert.Equal(
-            [("NZBgeek", ProwlarrImportMode.Proxy), ("Own Newznab", ProwlarrImportMode.Direct), ("Some Torznab", ProwlarrImportMode.Proxy), ("NZBIndex", ProwlarrImportMode.Proxy)],
+            [("NZBgeek", ProwlarrImportMode.NeedsKey), ("Own Newznab", ProwlarrImportMode.Direct), ("Some Torznab", ProwlarrImportMode.NeedsKey), ("NZBIndex", ProwlarrImportMode.Proxy)],
             result.Imported.Select(i => (i.Name, i.Mode)));
         Assert.Equal(
             [(99, "Not found in Prowlarr."), (3, "An indexer with this name already exists.")],
             result.Skipped.Select(s => (s.ProwlarrId, s.Reason)));
 
         var geek = _indexers.Find(result.Imported[0].Id)!;
-        Assert.Equal(("http://prowlarr:9696/1", "/api", StubProwlarr.ApiKey), (geek.BaseUrl, geek.ApiPath, geek.ApiKey));
+        // Prowlarr's key never goes to an indexer; without its own key the indexer waits switched off.
+        Assert.Equal(("https://api.nzbgeek.info", "/api", string.Empty), (geek.BaseUrl, geek.ApiPath, geek.ApiKey));
         Assert.Equal([2000, 2040, 2045], geek.Categories);
         Assert.Equal([5000, 5040], geek.TvCategories);
-        Assert.Equal((10, true, "nzbgeek"), (geek.Priority, geek.Enable, geek.DefinitionKey));
+        Assert.Equal((10, false, "nzbgeek"), (geek.Priority, geek.Enable, geek.DefinitionKey));
         Assert.Equal((1000, 100, IndexerLimitsUnit.Day, "2027-03-01"), (geek.QueryLimit!.Value, geek.GrabLimit!.Value, geek.LimitsUnit, geek.VipExpiration));
-        Assert.Equal(string.Empty, geek.AdditionalParameters);
+        Assert.Equal("&attrs=poster", geek.AdditionalParameters);
 
         var own = _indexers.Find(result.Imported[1].Id)!;
         Assert.Equal(("https://own.example", "/newznab/api", "own-secret"), (own.BaseUrl, own.ApiPath, own.ApiKey));
@@ -226,16 +231,39 @@ public sealed class ProwlarrImportTests : IDisposable
         Assert.Equal(IndexerCatalog.GenericNewznabKey, own.DefinitionKey);
 
         var torznab = _indexers.Find(result.Imported[2].Id)!;
-        Assert.Equal((IndexerDefinition.Torznab, Core.Downloads.DownloadProtocol.Torrent, "http://prowlarr:9696/4", "/api", StubProwlarr.ApiKey),
-            (torznab.Implementation, torznab.Protocol, torznab.BaseUrl, torznab.ApiPath, torznab.ApiKey));
+        Assert.Equal((IndexerDefinition.Torznab, Core.Downloads.DownloadProtocol.Torrent, "https://torznab.example", "/api", string.Empty, false),
+            (torznab.Implementation, torznab.Protocol, torznab.BaseUrl, torznab.ApiPath, torznab.ApiKey, torznab.Enable));
         Assert.Equal([2000, 2040], torznab.Categories);
         Assert.Equal([5000, 5040], torznab.TvCategories);
         Assert.Equal((3, 1.5, 4320, 10080), (torznab.MinimumSeeders, torznab.SeedRatio!.Value, torznab.SeedTimeMinutes!.Value, torznab.SeasonPackSeedTimeMinutes!.Value));
         Assert.Equal(IndexerCatalog.GenericTorznabKey, torznab.DefinitionKey);
 
         var scraper = _indexers.Find(result.Imported[3].Id)!;
+        Assert.Equal(("http://prowlarr:9696/6", StubProwlarr.ApiKey, true), (scraper.BaseUrl, scraper.ApiKey, scraper.Enable));
         Assert.Equal([2000], scraper.Categories);
         Assert.Equal(IndexerService.DefaultTvCategories, scraper.TvCategories);
+    }
+
+    [Fact]
+    public async Task A_preset_without_address_in_prowlarr_gets_the_catalog_address()
+    {
+        _prowlarr.Json = """
+            [
+              {
+                "id": 7, "name": "House-of-Usenet", "implementation": "Newznab", "protocol": "usenet", "enable": true, "priority": 25,
+                "fields": [ { "name": "baseUrl", "value": null }, { "name": "apiPath", "value": null }, { "name": "apiKey", "value": "********" } ],
+                "capabilities": { "categories": [ { "id": 2000, "name": "Movies", "subCategories": [] } ] }
+              }
+            ]
+            """;
+
+        var result = await _import.ImportAsync(Url, StubProwlarr.ApiKey, [7], CancellationToken.None, new Dictionary<int, string> { [7] = "hou-key" });
+
+        var imported = Assert.Single(result.Imported);
+        Assert.Equal(ProwlarrImportMode.Direct, imported.Mode);
+        var hou = _indexers.Find(imported.Id)!;
+        Assert.Equal(("https://house-of-usenet.com", "/api/v1/api", "hou-key", true, "house-of-usenet"), (hou.BaseUrl, hou.ApiPath, hou.ApiKey, hou.Enable, hou.DefinitionKey));
+        Assert.DoesNotContain("prowlarr", hou.BaseUrl, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

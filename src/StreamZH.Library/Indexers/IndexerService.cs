@@ -281,6 +281,9 @@ public sealed class IndexerService(
             if (stored is not null && ConnectionKey(stored) == ConnectionKey(normalized))
             {
                 SaveCapabilities(stored.Id, caps);
+
+                // The saved indexer works again (e.g. after its key was entered): no longer skipped.
+                RecordSuccess(stored.Id, notify: true);
             }
 
             return new IndexerTestResult(caps, null);

@@ -115,7 +115,11 @@ export interface ProwlarrConnection {
   apiKey: string
 }
 
-export type ProwlarrImportMode = 'direct' | 'proxy'
+/**
+ * direct: the provider's own address with its key. needsKey: the provider's own address, but Prowlarr hides the key, so
+ * the indexer is added switched off until the key is entered. proxy: only for scrapers without an API of their own.
+ */
+export type ProwlarrImportMode = 'direct' | 'needsKey' | 'proxy'
 
 export interface ProwlarrPreviewItem {
   prowlarrId: number
@@ -128,7 +132,7 @@ export interface ProwlarrPreviewItem {
   reason: string | null
   alreadyExists: boolean
   mode: ProwlarrImportMode
-  /** The indexer's own address (base URL + API path) when it can be used without Prowlarr given its own API key. */
+  /** The provider's own address (base URL + API path); null for scrapers without an API of their own. */
   ownUrl: string | null
 }
 

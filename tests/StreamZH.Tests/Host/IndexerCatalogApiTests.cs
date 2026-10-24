@@ -173,7 +173,8 @@ public sealed class IndexerCatalogApiTests : IDisposable
         Assert.DoesNotContain(StubProwlarr.ApiKey, body, StringComparison.Ordinal);
         Assert.DoesNotContain("own-secret", body, StringComparison.Ordinal);
         var items = JsonDocument.Parse(body).RootElement;
-        Assert.Equal("proxy", items[0].GetProperty("mode").GetString());
+        Assert.Equal("needsKey", items[0].GetProperty("mode").GetString());
+        Assert.Equal("https://api.nzbgeek.info", items[0].GetProperty("baseUrl").GetString());
         Assert.Equal("direct", items[1].GetProperty("mode").GetString());
         Assert.Equal(1, items[0].GetProperty("prowlarrId").GetInt32());
 
@@ -181,10 +182,10 @@ public sealed class IndexerCatalogApiTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, import.StatusCode);
         var result = await import.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("NZBgeek", result.GetProperty("imported")[0].GetProperty("name").GetString());
-        Assert.Equal("proxy", result.GetProperty("imported")[0].GetProperty("mode").GetString());
+        Assert.Equal("needsKey", result.GetProperty("imported")[0].GetProperty("mode").GetString());
 
-        // 0.11: the Torznab indexer comes along too (through Prowlarr).
-        Assert.Equal(("Some Torznab", "proxy"), (result.GetProperty("imported")[1].GetProperty("name").GetString(), result.GetProperty("imported")[1].GetProperty("mode").GetString()));
+        // 0.11: the Torznab indexer comes along too, at its own address.
+        Assert.Equal(("Some Torznab", "needsKey"), (result.GetProperty("imported")[1].GetProperty("name").GetString(), result.GetProperty("imported")[1].GetProperty("mode").GetString()));
         Assert.Empty(result.GetProperty("skipped").EnumerateArray());
 
         var wrongKey = await client.PostAsJsonAsync("/api/v1/indexer/import/prowlarr/preview", new { url = "http://prowlarr:9696", apiKey = "wrong" });

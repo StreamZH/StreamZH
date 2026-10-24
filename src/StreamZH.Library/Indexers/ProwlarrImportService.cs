@@ -16,13 +16,23 @@ namespace StreamZH.Library.Indexers;
 [JsonConverter(typeof(JsonStringEnumConverter<ProwlarrImportMode>))]
 public enum ProwlarrImportMode
 {
-    /// <summary>The indexer's own URL and API key could be read from Prowlarr.</summary>
+    /// <summary>The indexer's own URL with its own API key (read from Prowlarr or typed in).</summary>
     [JsonStringEnumMemberName("direct")]
     Direct,
 
-    /// <summary>Through Prowlarr's Newznab/Torznab proxy (http://prowlarr:9696/{id}/api with Prowlarr's API key).</summary>
+    /// <summary>
+    /// Only for indexers without an API of their own (site scrapers like Cardigann or NZBIndex): Prowlarr's Newznab/Torznab
+    /// proxy (http://prowlarr:9696/{id}/api with Prowlarr's API key) is the only way to search them.
+    /// </summary>
     [JsonStringEnumMemberName("proxy")]
     Proxy,
+
+    /// <summary>
+    /// The indexer's own URL, but Prowlarr hides the API key: the indexer is added switched off until its key is entered.
+    /// StreamZH never routes an indexer with an API of its own through Prowlarr.
+    /// </summary>
+    [JsonStringEnumMemberName("needsKey")]
+    NeedsKey,
 }
 
 /// <summary>One Prowlarr indexer as it would be imported. API keys are never part of it.</summary>
@@ -47,9 +57,10 @@ public sealed record ProwlarrImportResult(IReadOnlyList<ProwlarrImported> Import
 
 /// <summary>
 /// Reads the indexers of a Prowlarr instance (GET /api/v1/indexer with X-Api-Key) and creates matching Newznab (Usenet) and,
-/// since 0.11, Torznab (torrent) indexers. Prowlarr masks API keys in its API ("********"), so usually the indexers are
-/// reached through Prowlarr's proxy (it answers Torznab for torrent indexers); when the key is readable (or the indexer
-/// has none), a Newznab or Generic Torznab indexer is used directly. Torrent indexers take Prowlarr's seed settings
+/// since 0.11, Torznab (torrent) indexers. An indexer with an API of its own always gets the provider's own address (from
+/// Prowlarr, or from the catalog when Prowlarr does not show it), never Prowlarr's proxy. Prowlarr masks API keys in its API
+/// ("********"): such an indexer is added switched off until its key is entered (in the import or later under Edit). Only
+/// indexers without an API of their own (site scrapers) go through Prowlarr. Torrent indexers take Prowlarr's seed settings
 /// (minimum seeders, seed ratio, seed time, season pack seed time) along.
 /// </summary>
 public sealed class ProwlarrImportService(HttpClient http, IndexerService indexers, ILogger<ProwlarrImportService> logger)
@@ -219,19 +230,21 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
     private static (ProwlarrIndexerPreview Preview, IndexerDefinition? Definition) Plan(
         RemoteIndexer remote, string prowlarrUrl, string prowlarrKey, HashSet<string> existing, string? typedKey = null)
     {
-        var ownUrl = remote.Text("baseUrl")?.Trim().TrimEnd('/');
-        var ownKey = typedKey ?? remote.Text("apiKey");
-        var hasKeyField = remote.Fields.ContainsKey("apiKey");
         var torrent = remote.Protocol == "torrent";
-        var newznabLike = string.Equals(remote.Implementation, torrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase)
-            || remote.Fields.ContainsKey("apiPath");
-        var ownReachable = remote.Protocol is "usenet" or "torrent" && newznabLike && hasKeyField && !string.IsNullOrEmpty(ownUrl)
-            && Uri.TryCreate(ownUrl, UriKind.Absolute, out _);
-        var direct = ownReachable && ownKey != MaskedValue;
-        var mode = direct ? ProwlarrImportMode.Direct : ProwlarrImportMode.Proxy;
+        var protocol = torrent ? IndexerProtocol.Torrent : IndexerProtocol.Usenet;
+        var (ownUrl, ownPath) = OwnAddress(remote, protocol);
+        var readableKey = remote.Text("apiKey") is { } k && k != MaskedValue ? k.Trim() : null;
+        var ownKey = NonEmpty(typedKey) ?? readableKey;
+        var keyless = remote.Fields.ContainsKey("apiKey") && readableKey is { Length: 0 };
 
-        var baseUrl = direct ? ownUrl! : string.Create(CultureInfo.InvariantCulture, $"{prowlarrUrl}/{remote.Id}");
-        var apiPath = direct ? NonEmpty(remote.Text("apiPath")) ?? IndexerService.DefaultApiPath : IndexerService.DefaultApiPath;
+        // An indexer with its own API is always reached at the provider; Prowlarr's proxy only for scrapers without one.
+        var mode = ownUrl is null ? ProwlarrImportMode.Proxy
+            : ownKey is { Length: > 0 } || keyless ? ProwlarrImportMode.Direct
+            : ProwlarrImportMode.NeedsKey;
+        var proxy = mode == ProwlarrImportMode.Proxy;
+
+        var baseUrl = proxy ? string.Create(CultureInfo.InvariantCulture, $"{prowlarrUrl}/{remote.Id}") : ownUrl!;
+        var apiPath = proxy ? IndexerService.DefaultApiPath : ownPath;
 
         var (supported, reason) = remote.Protocol switch
         {
@@ -250,7 +263,7 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             reason,
             existing.Contains(remote.Name.Trim()),
             mode,
-            ownReachable ? ownUrl + (NonEmpty(remote.Text("apiPath")) ?? IndexerService.DefaultApiPath) : null);
+            ownUrl is null ? null : ownUrl + ownPath);
 
         if (!supported)
         {
@@ -267,7 +280,7 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             torrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab,
             baseUrl,
             apiPath,
-            direct ? ownKey ?? string.Empty : prowlarrKey,
+            proxy ? prowlarrKey : ownKey ?? string.Empty,
             movies.Count > 0 ? movies : IndexerService.DefaultMovieCategories,
             tv.Count > 0 ? tv : IndexerService.DefaultTvCategories,
             Math.Clamp(remote.Priority ?? IndexerService.DefaultPriority, IndexerService.MinPriority, IndexerService.MaxPriority),
@@ -275,11 +288,12 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
             EnableAutomaticSearch: remote.SupportsSearch,
             EnableInteractiveSearch: remote.SupportsSearch)
         {
-            Enable = remote.Enable,
-            DefinitionKey = IndexerCatalog.Match(remote.Name, direct ? ownUrl : null, torrent ? IndexerProtocol.Torrent : IndexerProtocol.Usenet).Key,
+            // Without its key the indexer would only fail; it is switched on once the key is entered.
+            Enable = remote.Enable && mode != ProwlarrImportMode.NeedsKey,
+            DefinitionKey = IndexerCatalog.Match(remote.Name, ownUrl, protocol).Key,
 
             // Through the proxy Prowlarr adds the indexer's extra parameters itself.
-            AdditionalParameters = direct ? remote.Text("additionalParameters")?.Trim() ?? string.Empty : string.Empty,
+            AdditionalParameters = proxy ? string.Empty : remote.Text("additionalParameters")?.Trim() ?? string.Empty,
             VipExpiration = NonEmpty(remote.Text("vipExpiration")),
             QueryLimit = remote.Number("baseSettings.queryLimit") is > 0 and var q ? q : null,
             GrabLimit = remote.Number("baseSettings.grabLimit") is > 0 and var g ? g : null,
@@ -299,6 +313,31 @@ public sealed class ProwlarrImportService(HttpClient http, IndexerService indexe
         }
 
         return (preview, definition);
+    }
+
+    /// <summary>
+    /// The provider's own API address of a Newznab/Torznab indexer: Prowlarr's baseUrl and apiPath, or the catalog entry with
+    /// the same name when Prowlarr does not show it. Null for indexers without an API of their own (Cardigann, NZBIndex, …).
+    /// </summary>
+    private static (string? Url, string ApiPath) OwnAddress(RemoteIndexer remote, IndexerProtocol protocol)
+    {
+        if (remote.Protocol is not ("usenet" or "torrent"))
+        {
+            return (null, IndexerService.DefaultApiPath);
+        }
+
+        var apiIndexer = string.Equals(remote.Implementation, protocol == IndexerProtocol.Torrent ? IndexerDefinition.Torznab : IndexerDefinition.Newznab, StringComparison.OrdinalIgnoreCase)
+            || remote.Fields.ContainsKey("apiPath");
+        var catalog = IndexerCatalog.Match(remote.Name, null, protocol);
+        var known = !IndexerCatalog.IsGeneric(catalog.Key) && catalog.BaseUrl.Length > 0 ? catalog : null;
+
+        var url = remote.Text("baseUrl")?.Trim().TrimEnd('/');
+        if (apiIndexer && Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+        {
+            return (url, NonEmpty(remote.Text("apiPath")) ?? known?.ApiPath ?? IndexerService.DefaultApiPath);
+        }
+
+        return apiIndexer && known is not null ? (known.BaseUrl.TrimEnd('/'), known.ApiPath) : (null, IndexerService.DefaultApiPath);
     }
 
     private static string? NonEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -292,3 +292,32 @@
   width: auto;
   min-width: 110px;
 }
+
+/* Still reached through Prowlarr: warning colours, with the switch to the indexer's own address. */
+.warnNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--warn);
+  border-radius: 10px;
+  background: var(--warn-soft);
+  overflow-wrap: anywhere;
+}
+
+.warnNote > span {
+  flex: 1 1 260px;
+}
+
+.infoNote {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--info);
+  border-radius: 10px;
+  background: var(--info-soft);
+  overflow-wrap: anywhere;
+}

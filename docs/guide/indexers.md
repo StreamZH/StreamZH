@@ -18,7 +18,7 @@ and loads its categories.
 |---|---|
 | Name | Shown in search results and history |
 | Enable | Off: StreamZH never uses this indexer, not even for interactive search |
-| URL | The indexer's address (catalog entries fill it in; then it is Advanced). Torznab through Jackett: the Torznab feed URL Jackett shows. Through Prowlarr: Prowlarr's per-indexer URL, with Prowlarr's API key |
+| URL | The indexer's own address (catalog entries fill it in; then it is Advanced unless it differs). Torznab through Jackett: the Torznab feed URL Jackett shows |
 | API path (Advanced) | Usually `/api` |
 | API key | From your account or profile page on the indexer's website. Stored encrypted, never shown again |
 | Additional parameters (Advanced) | Added to every request, e.g. `&extended=1` |
@@ -35,7 +35,11 @@ A failing indexer is skipped for a while (5 minutes, growing up to 24 hours afte
 later; the status window says so.
 
 **Test all** tests every enabled indexer at once. The details view of an indexer shows its search capabilities
-(search by TMDB, IMDb, TVDB id or only by text), its categories and its limits.
+(search by TMDB, IMDb, TVDB id or only by text), its categories and its limits, and has its own **Test** button. A
+successful test also ends a waiting time after earlier failures.
+
+An indexer that still goes through Prowlarr (an import from an older version) is marked in its details;
+**Use the indexer's own address** switches it to the provider's address, then enter its API key.
 
 ## Import from Prowlarr
 
@@ -43,10 +47,11 @@ later; the status window says so.
 API key from Settings → General) with their categories, priority, limits, VIP date and seed settings. Nothing
 changes in Prowlarr; indexers that are already in StreamZH are skipped.
 
-Prowlarr does not hand out the indexers' own API keys. Without them StreamZH searches **through Prowlarr**, which
-must keep running. Paste an indexer's own key (from your account page at the indexer) in the import to use it
-**directly** and switch Prowlarr off later. Test the imported indexers once to load their categories and
-capabilities.
+Every indexer with an API of its own gets the **provider's own address** (from Prowlarr, or from the catalog when
+Prowlarr does not show it), never Prowlarr's address. Prowlarr does not hand out the indexers' API keys: paste each
+key (from your account page at the indexer) in the import. An indexer without a key is added **switched off**; enter
+its key under Edit and switch it on. Only indexers without an API of their own (site scrapers) are searched through
+Prowlarr, which then has to keep running. Test the imported indexers once to load their categories and capabilities.
 
 The [migration wizard](../MIGRATION.md#prowlarr) does the same as part of a full take-over.
 

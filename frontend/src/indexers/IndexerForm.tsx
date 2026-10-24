@@ -19,7 +19,7 @@ import { AdvancedHint, AdvancedToggle } from '../lib/Advanced'
 import { advancedLabel, useAdvanced } from '../lib/advancedMode'
 import { PrivacyChip, ProtocolChip } from './Chips'
 import Dialog from './Dialog'
-import { formatUntil, hostOf } from './model'
+import { formatUntil, hostOf, throughProwlarr } from './model'
 import styles from './Form.module.css'
 
 /** Top-level categories in a Newznab range (2000 movies, 5000 TV) with their sub-categories. */
@@ -85,6 +85,7 @@ export default function IndexerForm({
   canEdit,
   onClose,
   onBack,
+  movedFromProwlarr = false,
 }: {
   indexer: Indexer
   definition: IndexerDefinition | null
@@ -93,6 +94,8 @@ export default function IndexerForm({
   onClose: () => void
   /** Shown as "Back" for a new indexer picked from the catalog. */
   onBack?: () => void
+  /** The draft was just moved from Prowlarr's proxy to the indexer's own address: entering the key switches it on. */
+  movedFromProwlarr?: boolean
 }) {
   const queryClient = useQueryClient()
   const formId = useId()
@@ -112,6 +115,17 @@ export default function IndexerForm({
   // A preset with a fixed address (not Generic Newznab).
   const fixed = preset && !isGenericDefinition(preset.key) && preset.baseUrl !== '' ? preset : null
   const torrent = (preset?.protocol ?? protocolOf(draft)) === 'torrent'
+  // A saved address other than the preset's (moved indexer, or Prowlarr's proxy) is shown without the Advanced switch.
+  const addressDiffers = fixed != null && (indexer.baseUrl !== fixed.baseUrl || (indexer.apiPath || '/api') !== (fixed.apiPath || '/api'))
+  const viaProwlarr = throughProwlarr(draft)
+  // Back to the preset's address and API path. A key saved for another address (Prowlarr's) is not sent there.
+  const resetAddress = () =>
+    fixed &&
+    update({
+      baseUrl: fixed.baseUrl,
+      apiPath: fixed.apiPath || '/api',
+      ...(draft.apiKey === maskedApiKey && indexer.baseUrl !== fixed.baseUrl ? { apiKey: '' } : {}),
+    })
 
   const done = async () => {
     await queryClient.invalidateQueries({ queryKey: indexerKeys.all })
@@ -245,6 +259,25 @@ export default function IndexerForm({
             {status.lastError ? `: ${status.lastError}` : ''}
           </p>
         )}
+        {movedFromProwlarr && !viaProwlarr && fixed && (
+          <p className={styles.infoNote} role="note">
+            Now at {hostOf(fixed.baseUrl)} instead of Prowlarr. Enter your API key from {hostOf(fixed.siteUrl ?? fixed.baseUrl)}, press Test, then Save.
+            {!indexer.enable && ' The indexer is switched on with the key.'}
+          </p>
+        )}
+        {viaProwlarr && (
+          <div className={styles.warnNote} role="note">
+            <span>
+              This URL is Prowlarr&apos;s, not the indexer&apos;s own address. StreamZH talks to indexers directly:{' '}
+              {fixed ? `use ${hostOf(fixed.baseUrl)} with your API key from the indexer.` : 'enter the indexer’s own URL and API key.'}
+            </span>
+            {canEdit && fixed && (
+              <button className={`${ui.button} ${ui.sm}`} type="button" onClick={resetAddress}>
+                Use {hostOf(fixed.baseUrl)}
+              </button>
+            )}
+          </div>
+        )}
         <fieldset className={styles.fieldset} disabled={!canEdit}>
           <Field id={id('name')} label="Name" help="Shown in search results and history." error={fieldError('name')}>
             <input
@@ -266,7 +299,7 @@ export default function IndexerForm({
             </label>
           </Field>
 
-          <Field advanced={fixed != null}
+          <Field advanced={fixed != null && !addressDiffers}
             id={id('baseUrl')}
             label="URL"
             error={fieldError('baseUrl')}
@@ -274,10 +307,10 @@ export default function IndexerForm({
               fixed ? (
                 <>
                   Preset for {fixed.name}. Change it only if the indexer moved.
-                  {draft.baseUrl !== fixed.baseUrl && (
+                  {(draft.baseUrl !== fixed.baseUrl || (draft.apiPath || '/api') !== (fixed.apiPath || '/api')) && (
                     <>
                       {' '}
-                      <button type="button" className={styles.inlineLink} onClick={() => update({ baseUrl: fixed.baseUrl })}>
+                      <button type="button" className={styles.inlineLink} onClick={resetAddress}>
                         Reset to {hostOf(fixed.baseUrl)}
                       </button>
                     </>
@@ -289,9 +322,7 @@ export default function IndexerForm({
                   <code>http://host:9696/1/</code>.
                 </>
               ) : (
-                <>
-                  The indexer&apos;s address. Through Prowlarr: <code>http://host:9696/1/</code> with Prowlarr&apos;s API key.
-                </>
+                <>The indexer&apos;s own API address, e.g. <code>https://api.indexer.example</code>, not Prowlarr&apos;s.</>
               )
             }
           >
@@ -308,7 +339,7 @@ export default function IndexerForm({
             />
           </Field>
 
-          <Field advanced
+          <Field advanced={!addressDiffers}
             id={id('apiPath')}
             label="API path"
             error={fieldError('apiPath')}
@@ -352,7 +383,10 @@ export default function IndexerForm({
               spellCheck={false}
               value={draft.apiKey}
               onFocus={(e) => draft.apiKey === maskedApiKey && e.target.select()}
-              onChange={(e) => update({ apiKey: e.target.value })}
+              onChange={(e) =>
+                // Moved from Prowlarr: the key is all that was missing, so the indexer is switched on with it.
+                update(movedFromProwlarr && !indexer.enable && e.target.value.trim() !== '' ? { apiKey: e.target.value, enable: true } : { apiKey: e.target.value })
+              }
             />
           </Field>
 

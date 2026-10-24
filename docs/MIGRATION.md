@@ -171,7 +171,7 @@ downloads. The watched folder is *not* taken over while both run (both would pic
 
 | Part | What is taken over |
 |---|---|
-| Indexers | Usenet and torrent indexers with categories, priority, query and grab limits, VIP date and seed settings, the same way as Indexers → Import from Prowlarr. Prowlarr hides the indexers' own API keys, so they are reached **through Prowlarr** (`http://192.168.1.10:9696/1/api`) — unless you type the indexer's own API key in the wizard: then StreamZH uses the indexer directly and keeps working without Prowlarr. An indexer with the same name in StreamZH is kept as it is. |
+| Indexers | Usenet and torrent indexers with categories, priority, query and grab limits, VIP date and seed settings, the same way as Indexers → Import from Prowlarr. Every indexer with an API of its own gets the **provider's own address**, never Prowlarr's. Prowlarr hides the indexers' API keys: type them in the wizard; an indexer without a key is added switched off until you enter it in Indexers → Edit. Only site scrapers without an API of their own go through Prowlarr (`http://192.168.1.10:9696/1/api`). An indexer with the same name in StreamZH is kept as it is. |
 
 ### Radarr and Sonarr
 
@@ -239,8 +239,8 @@ When everything looks right:
 
    If you want to keep them for a while, at least switch off RSS and automatic search on every indexer in Radarr
    and Sonarr, and pause SABnzbd.
-3. **Indexers through Prowlarr**: if you keep indexers that go through Prowlarr, keep Prowlarr running — or enter
-   their own API keys in StreamZH (Indexers → edit) before you stop it.
+3. **Indexer keys**: enter the API key of every indexer that is still switched off (Indexers → Edit). Only site
+   scrapers without an API of their own go through Prowlarr; keep Prowlarr running for those.
 4. **Usenet connections**: raise them to your provider's full number (Settings → Usenet servers).
 5. **Watched folder**: set it in Settings → Downloads if you used one in SABnzbd.
 6. **Switch the side-by-side mode off** (Settings → Migration). From now on StreamZH runs RSS sync and the automatic

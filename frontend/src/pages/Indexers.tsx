@@ -21,7 +21,21 @@ import Catalog from '../indexers/Catalog'
 import { Pill, PrivacyChip, ProtocolChip } from '../indexers/Chips'
 import IndexerDetails from '../indexers/IndexerDetails'
 import IndexerForm from '../indexers/IndexerForm'
-import { cloneOf, draftFromDefinition, formatUntil, grabUsage, hostOf, queryUsage, rowState, usesList, vipState, type Usage } from '../indexers/model'
+import {
+  cloneOf,
+  draftFromDefinition,
+  formatUntil,
+  grabUsage,
+  hostOf,
+  missingApiKey,
+  presetAddress,
+  queryUsage,
+  rowState,
+  throughProwlarr,
+  usesList,
+  vipState,
+  type Usage,
+} from '../indexers/model'
 import ProwlarrImport from '../indexers/ProwlarrImport'
 import TestAll from '../indexers/TestAll'
 import styles from './Indexers.module.css'
@@ -35,6 +49,8 @@ type View =
       definition: IndexerDefinition | null
       capabilities?: IndexerCapabilities | null
       fromCatalog?: boolean
+      /** Opened by "Use <host>" in the details: moved away from Prowlarr's proxy, the key still has to be entered. */
+      movedFromProwlarr?: boolean
     }
   | { kind: 'details'; id: number }
   | { kind: 'testAll' }
@@ -227,6 +243,7 @@ export default function Indexers() {
           canEdit={canEdit}
           onClose={close}
           onBack={view.fromCatalog ? () => setView({ kind: 'catalog' }) : undefined}
+          movedFromProwlarr={view.movedFromProwlarr}
         />
       )}
       {view.kind === 'details' && (
@@ -235,7 +252,16 @@ export default function Indexers() {
           fallback={list.find((i) => i.id === view.id) ?? null}
           canEdit={canEdit}
           onClose={close}
-          onEdit={(d) => setView({ kind: 'form', indexer: d.indexer, definition: d.definition, capabilities: d.capabilities })}
+          onEdit={(d, moved) =>
+            // Moved to its own address: the capabilities read through Prowlarr no longer apply.
+            setView({
+              kind: 'form',
+              indexer: moved ?? d.indexer,
+              definition: d.definition,
+              capabilities: moved ? null : d.capabilities,
+              movedFromProwlarr: moved != null,
+            })
+          }
           onClone={(d) => setView({ kind: 'form', indexer: cloneOf(d.indexer), definition: d.definition, capabilities: d.capabilities })}
         />
       )}
@@ -320,6 +346,21 @@ function IndexerRow({
           {i.enable && status && !status.healthy && status.disabledTill && <Pill tone="error">Skipped until {formatUntil(status.disabledTill)}</Pill>}
           {status?.limitReached && <Pill tone="error">{status.limitReached === 'query' ? 'Query limit reached' : 'Grab limit reached'}</Pill>}
           {vip && <Pill tone={vip.tone}>{vip.text}</Pill>}
+          {throughProwlarr(i) &&
+            (presetAddress(definition) ? (
+              <Pill tone="warn" title="Reached through Prowlarr instead of the indexer's own address. Open it to switch.">
+                Via Prowlarr
+              </Pill>
+            ) : (
+              <Pill tone="info" title="Searched through Prowlarr (for site scrapers without an API of their own, Prowlarr has to keep running).">
+                Via Prowlarr
+              </Pill>
+            ))}
+          {canEdit && !i.enable && missingApiKey(i) && !throughProwlarr(i) && (
+            <Pill tone="warn" title="Enter the indexer's API key under Edit, then switch it on.">
+              API key missing
+            </Pill>
+          )}
         </div>
         {status?.lastError && (
           <p className={status.healthy ? styles.lastWarn : styles.lastError}>

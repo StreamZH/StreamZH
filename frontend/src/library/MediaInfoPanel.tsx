@@ -184,12 +184,10 @@ export function EpisodeMediaInfo({ seriesId, episodeId, label }: { seriesId: num
     setStyle(placePopover(box.current.getBoundingClientRect(), pop.current.scrollHeight))
   }, [])
 
-  // Measure before paint, and again whenever the content changes size (loading → details, re-analyse).
+  // Measure before paint, and again whenever the content changes size (loading → details, re-analyse). A position
+  // left over from an earlier opening is never painted: this runs before the browser draws the popover.
   useLayoutEffect(() => {
-    if (!open) {
-      setStyle(null)
-      return
-    }
+    if (!open) return
     place()
     const observer = new ResizeObserver(place)
     if (pop.current) observer.observe(pop.current)

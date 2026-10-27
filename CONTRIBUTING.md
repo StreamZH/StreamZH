@@ -32,7 +32,8 @@ Open http://localhost:9797, create the owner account, add a root folder (the own
 one click) and your free TMDB API key in Settings → Metadata.
 
 For work on the web interface run `npm run dev` in `frontend/` (http://localhost:5173). It proxies `/api` and `/hub`
-to the backend on port 9797, with hot reload.
+to the backend on port 9797, with hot reload. To try a UI change against another StreamZH (e.g. a test server in
+your network), set `STREAMZH_BACKEND` first, in PowerShell `$env:STREAMZH_BACKEND = "http://192.168.1.10:9797"`.
 
 ### Development switches
 

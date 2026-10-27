@@ -20,6 +20,12 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
   Edit, with **Use the indexer's own address**. Edit shows the URL without the *Advanced* switch whenever it differs
   from the catalog address, and *Reset* restores the API path too.
 
+### Fixed
+
+- **Episode media info is no longer cut off.** The media info popover in the episode list was clipped by the season
+  panel, so on the last episodes only its top edge showed. It now floats above the page, opens upwards when there is
+  more room above the button, and scrolls when it is taller than the window.
+
 ## [1.0.0-rc.4] - unreleased
 
 ### Changed

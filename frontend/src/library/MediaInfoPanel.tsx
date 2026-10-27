@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { mediaInfoApi, mediaInfoKeys, videoLine, type MediaInfoResource, type MediaInfoTarget, type MediaInfoView } from '../api/mediaInfo'
 import Icon from '../components/Icon'
@@ -142,19 +143,71 @@ function Details({ info, compact }: { info: MediaInfoView; compact: boolean }) {
   )
 }
 
+/** Phone layout: the popover sits at the bottom of the screen (CSS), so no measured position. */
+const PHONE = '(max-width: 640px)'
+const GAP = 6
+const MARGIN = 12
+
 /**
- * Episode row: a small info button with the media info in a popover (loaded when it opens).
+ * Where the popover goes: below the button, or above it when there is more room there, right-aligned to the button and
+ * kept inside the window. The height is capped by the room on the chosen side, the rest scrolls.
+ */
+function placePopover(anchor: DOMRect, height: number): CSSProperties {
+  const below = window.innerHeight - anchor.bottom - GAP - MARGIN
+  const above = anchor.top - GAP - MARGIN
+  const up = height > below && above > below
+  const room = Math.max(120, up ? above : below)
+  const right = Math.max(MARGIN, window.innerWidth - anchor.right)
+  return up
+    ? { bottom: window.innerHeight - anchor.top + GAP, right, maxHeight: room }
+    : { top: anchor.bottom + GAP, right, maxHeight: room }
+}
+
+/**
+ * Episode row: a small info button with the media info in a popover (loaded when it opens). The popover is rendered
+ * into document.body with a fixed position, so the season panel (overflow hidden) cannot cut it off.
  */
 export function EpisodeMediaInfo({ seriesId, episodeId, label }: { seriesId: number; episodeId: number; label: string }) {
   const [open, setOpen] = useState(false)
+  const [style, setStyle] = useState<CSSProperties | null>(null)
   const id = useId()
   const box = useRef<HTMLSpanElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
   const { query, analyze } = useMediaInfo({ kind: 'episode', seriesId, episodeId }, open)
+
+  const place = useCallback(() => {
+    if (!box.current || !pop.current) return
+    if (window.matchMedia(PHONE).matches) {
+      setStyle({})
+      return
+    }
+    setStyle(placePopover(box.current.getBoundingClientRect(), pop.current.scrollHeight))
+  }, [])
+
+  // Measure before paint, and again whenever the content changes size (loading → details, re-analyse).
+  useLayoutEffect(() => {
+    if (!open) {
+      setStyle(null)
+      return
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    if (pop.current) observer.observe(pop.current)
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open, place])
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (box.current?.contains(target) || pop.current?.contains(target)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -180,17 +233,26 @@ export function EpisodeMediaInfo({ seriesId, episodeId, label }: { seriesId: num
       >
         <Icon name="info" size={15} />
       </button>
-      {open && (
-        <div id={id} className={styles.popover} role="dialog" aria-label={`Media info of ${label}`}>
-          <div className={styles.popoverHead}>
-            <strong>Media info</strong>
-            {query.data && <AnalyzeButton data={query.data} pending={analyze.isPending} onClick={() => analyze.mutate()} />}
-          </div>
-          {query.isPending && <Skeleton rows={2} />}
-          {query.isError && <p className={ui.error}>{query.error.message}</p>}
-          {query.data && <MediaInfoBody data={query.data} problem={analyze.data?.problem ?? analyze.error?.message ?? null} compact />}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            id={id}
+            ref={pop}
+            className={styles.popover}
+            style={style ?? { visibility: 'hidden' }}
+            role="dialog"
+            aria-label={`Media info of ${label}`}
+          >
+            <div className={styles.popoverHead}>
+              <strong>Media info</strong>
+              {query.data && <AnalyzeButton data={query.data} pending={analyze.isPending} onClick={() => analyze.mutate()} />}
+            </div>
+            {query.isPending && <Skeleton rows={2} />}
+            {query.isError && <p className={ui.error}>{query.error.message}</p>}
+            {query.data && <MediaInfoBody data={query.data} problem={analyze.data?.problem ?? analyze.error?.message ?? null} compact />}
+          </div>,
+          document.body,
+        )}
     </span>
   )
 }

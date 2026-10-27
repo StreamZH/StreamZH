@@ -136,11 +136,12 @@
 }
 
 .popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
+  /* Rendered into document.body; top/bottom, right and max-height are set from the button's position. */
+  position: fixed;
+  z-index: 60;
   width: min(380px, calc(100vw - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px 16px 16px;
   display: grid;
   gap: 12px;
@@ -176,7 +177,6 @@
 /* Phone: the popover sits at the bottom of the screen, full width, instead of hanging off the left edge. */
 @media (max-width: 640px) {
   .popover {
-    position: fixed;
     top: auto;
     right: 16px;
     bottom: 16px;

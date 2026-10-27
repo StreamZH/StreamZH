@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { mediaInfoApi, mediaInfoKeys, videoLine, type MediaInfoResource, type MediaInfoTarget, type MediaInfoView } from '../api/mediaInfo'
@@ -149,18 +149,23 @@ const GAP = 6
 const MARGIN = 12
 
 /**
- * Where the popover goes: below the button, or above it when there is more room there, right-aligned to the button and
- * kept inside the window. The height is capped by the room on the chosen side, the rest scrolls.
+ * Puts the popover below the button, or above it when there is more room there, right-aligned to the button and kept
+ * inside the window. The height is capped by the room on the chosen side, the rest scrolls. Written straight to the
+ * element: it is a measured position, not React state, so moving it on scroll costs no render.
  */
-function placePopover(anchor: DOMRect, height: number): CSSProperties {
+function placePopover(popover: HTMLElement, anchor: DOMRect) {
+  const s = popover.style
+  if (window.matchMedia(PHONE).matches) {
+    s.top = s.bottom = s.right = s.maxHeight = ''
+    return
+  }
   const below = window.innerHeight - anchor.bottom - GAP - MARGIN
   const above = anchor.top - GAP - MARGIN
-  const up = height > below && above > below
-  const room = Math.max(120, up ? above : below)
-  const right = Math.max(MARGIN, window.innerWidth - anchor.right)
-  return up
-    ? { bottom: window.innerHeight - anchor.top + GAP, right, maxHeight: room }
-    : { top: anchor.bottom + GAP, right, maxHeight: room }
+  const up = popover.scrollHeight > below && above > below
+  s.top = up ? '' : `${anchor.bottom + GAP}px`
+  s.bottom = up ? `${window.innerHeight - anchor.top + GAP}px` : ''
+  s.right = `${Math.max(MARGIN, window.innerWidth - anchor.right)}px`
+  s.maxHeight = `${Math.max(120, up ? above : below)}px`
 }
 
 /**
@@ -169,23 +174,16 @@ function placePopover(anchor: DOMRect, height: number): CSSProperties {
  */
 export function EpisodeMediaInfo({ seriesId, episodeId, label }: { seriesId: number; episodeId: number; label: string }) {
   const [open, setOpen] = useState(false)
-  const [style, setStyle] = useState<CSSProperties | null>(null)
   const id = useId()
   const box = useRef<HTMLSpanElement>(null)
   const pop = useRef<HTMLDivElement>(null)
   const { query, analyze } = useMediaInfo({ kind: 'episode', seriesId, episodeId }, open)
 
   const place = useCallback(() => {
-    if (!box.current || !pop.current) return
-    if (window.matchMedia(PHONE).matches) {
-      setStyle({})
-      return
-    }
-    setStyle(placePopover(box.current.getBoundingClientRect(), pop.current.scrollHeight))
+    if (box.current && pop.current) placePopover(pop.current, box.current.getBoundingClientRect())
   }, [])
 
-  // Measure before paint, and again whenever the content changes size (loading → details, re-analyse). A position
-  // left over from an earlier opening is never painted: this runs before the browser draws the popover.
+  // Measure before paint, and again whenever the content changes size (loading → details, re-analyse).
   useLayoutEffect(() => {
     if (!open) return
     place()
@@ -237,7 +235,6 @@ export function EpisodeMediaInfo({ seriesId, episodeId, label }: { seriesId: num
             id={id}
             ref={pop}
             className={styles.popover}
-            style={style ?? { visibility: 'hidden' }}
             role="dialog"
             aria-label={`Media info of ${label}`}
           >

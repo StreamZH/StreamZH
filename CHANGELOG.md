@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ## [Unreleased]
 
+## [1.0.0-rc.5] - 2026-10-27
+
 ### Changed
 
 - **Import from Prowlarr uses the provider's own address.** Every indexer with an API of its own (Newznab, Torznab)

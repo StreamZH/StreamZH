@@ -276,6 +276,12 @@ public sealed class IndexerService(
                 return new IndexerTestResult(null, categoryError);
             }
 
+            if (await KeyProblemAsync(normalized, client, cancellationToken) is { } keyError)
+            {
+                logger.LogInformation("Indexer test for {Host}: {Message}", host, keyError);
+                return new IndexerTestResult(null, keyError);
+            }
+
             logger.LogInformation("Indexer test for {Host} succeeded ({Count} categories)", host, caps.Categories.Count);
             RememberTest(normalized, caps);
             if (stored is not null && ConnectionKey(stored) == ConnectionKey(normalized))
@@ -307,6 +313,34 @@ public sealed class IndexerService(
             return new IndexerTestResult(null, $"Could not connect to {host}: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Many indexers answer t=caps without looking at the API key, so a key they no longer accept passed the test while
+    /// every RSS sync and search failed with code 100. The test therefore also reads one page of the newest releases in
+    /// the indexer's categories (one API hit, like Radarr's test). Returns the problem as text, null when the key works.
+    /// StreamZH's own query limit or the indexer's request limit do not fail the test: the connection works.
+    /// </summary>
+    private static async Task<string?> KeyProblemAsync(IndexerDefinition indexer, IIndexerClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await client.FetchRecentAsync(indexer, cancellationToken);
+            return null;
+        }
+        catch (IndexerException ex) when (ex.IsLimitReached || (!ex.IsAuthError && ex.RetryAfter is not null))
+        {
+            return null;
+        }
+        catch (IndexerException ex) when (ex.IsAuthError)
+        {
+            return $"{ex.Message} {KeyHint}";
+        }
+    }
+
+    /// <summary>Hint after a refused API key in the test.</summary>
+    public const string KeyHint =
+        "The search capabilities load, but searches are refused. Copy the API key again from your account on the indexer's website "
+        + "(some indexers answer like this when the account or its API access has expired).";
 
     /// <summary>Tests every enabled indexer in parallel with its stored settings and records the outcome in its health.</summary>
     public async Task<IReadOnlyList<IndexerTestAllResult>> TestAllAsync(IIndexerClient client, CancellationToken cancellationToken)

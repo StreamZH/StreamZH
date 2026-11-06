@@ -236,6 +236,35 @@ public sealed class IndexerServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Test_fails_when_caps_load_but_the_indexer_refuses_the_key()
+    {
+        var client = new StubIndexerClient();
+        var saved = _service.Create(Valid("A") with { ApiKey = "stored-key" });
+        _service.RecordFailure(saved.Id, new IndexerException("Treasure Maps rejected the API key: Incorrect user credentials (code 100).", 100));
+
+        client.RecentError = new IndexerException("Treasure Maps rejected the API key: Incorrect user credentials (code 100).", 100);
+        var refused = await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None);
+        Assert.False(refused.Success);
+        Assert.Equal($"Treasure Maps rejected the API key: Incorrect user credentials (code 100). {IndexerService.KeyHint}", refused.Error);
+        Assert.Equal(1, client.RecentCalls);
+        Assert.False(_service.Health(saved.Id).Healthy);
+
+        // A request limit (the indexer's or StreamZH's own) is no key problem: the test passes.
+        client.RecentError = new IndexerException("Treasure Maps: request limit reached (Request limit reached).", 500, TimeSpan.FromHours(1));
+        Assert.True((await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None)).Success);
+        client.RecentError = new IndexerException("Query limit reached (100 per day)") { IsLimitReached = true };
+        Assert.True((await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None)).Success);
+
+        // Another error of the RSS call fails the test as well: the RSS sync would fail the same way.
+        client.RecentError = new HttpRequestException("Connection refused");
+        Assert.Equal("Could not connect to indexer.example: Connection refused", (await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None)).Error);
+
+        client.RecentError = null;
+        Assert.True((await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None)).Success);
+        Assert.Equal(IndexerHealth.Ok(saved.Id), _service.Health(saved.Id));
+    }
+
+    [Fact]
     public void Schema_has_the_radarr_and_sonarr_defaults()
     {
         var schema = IndexerService.Schema();

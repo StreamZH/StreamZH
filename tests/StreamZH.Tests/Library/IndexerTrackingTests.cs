@@ -99,7 +99,7 @@ public sealed class IndexerTrackingTests : IDisposable
         await Assert.ThrowsAsync<IndexerException>(() => _client.SearchAsync(indexer, Dune, CancellationToken.None));
 
         var (records, total) = _history.Page(1, 50, indexer.Id, null);
-        Assert.Equal(6, total);
+        Assert.Equal(7, total);
         var rows = records.Reverse().ToList();
 
         Assert.Equal((IndexerHistoryEventType.Query, IndexerCallSource.Automatic, true, 3), (rows[0].EventType, rows[0].Source, rows[0].Successful, rows[0].Results!.Value));
@@ -117,9 +117,12 @@ public sealed class IndexerTrackingTests : IDisposable
 
         Assert.Equal((IndexerHistoryEventType.Caps, IndexerCallSource.Test, true), (rows[4].EventType, rows[4].Source, rows[4].Successful));
 
-        Assert.False(rows[5].Successful);
-        Assert.Equal("Request limit reached", rows[5].Error);
-        Assert.Null(rows[5].Results);
+        // The test also reads one RSS page, so a refused API key shows up (rc.6)
+        Assert.Equal((IndexerHistoryEventType.Rss, IndexerCallSource.Test, true), (rows[5].EventType, rows[5].Source, rows[5].Successful));
+
+        Assert.False(rows[6].Successful);
+        Assert.Equal("Request limit reached", rows[6].Error);
+        Assert.Null(rows[6].Results);
         Assert.All(rows, r => Assert.True(r.ElapsedMs >= 0));
         Assert.Null(IndexerCallContext.Current);
     }

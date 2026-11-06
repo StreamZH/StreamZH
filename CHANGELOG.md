@@ -5,6 +5,15 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Test checks the API key.** Many indexers answer the capabilities (t=caps) without looking at the API key, so an
+  indexer whose key it no longer accepts passed **Test** ("works, 16 category groups loaded") and even left its waiting
+  time, while every RSS sync and search failed with "rejected the API key (code 100)". The test now also reads one
+  page of the newest releases in the indexer's categories (one API hit, like Radarr's test, shown in History as RSS
+  from Test). A refused key fails the test with a hint to copy the key again from the indexer's website; a request
+  limit does not fail it.
+
 ## [1.0.0-rc.5] - 2026-10-27
 
 ### Changed

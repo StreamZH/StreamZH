@@ -140,14 +140,16 @@ public sealed class IndexerCatalogApiTests : IDisposable
         }
 
         var history = await client.GetFromJsonAsync<JsonElement>($"/api/v1/indexer/history?indexerId={a}&page=1&pageSize=10");
-        Assert.Equal(2, history.GetProperty("totalRecords").GetInt32());
+        Assert.Equal(3, history.GetProperty("totalRecords").GetInt32());
         var newest = history.GetProperty("records")[0];
         Assert.Equal("query", newest.GetProperty("eventType").GetString());
         Assert.Equal("interactive", newest.GetProperty("source").GetString());
         Assert.Equal("Dune (2021)", newest.GetProperty("query").GetString());
         Assert.Equal("A", newest.GetProperty("indexer").GetString());
         Assert.Equal(3, newest.GetProperty("results").GetInt32());
-        var caps = history.GetProperty("records")[1];
+        var probe = history.GetProperty("records")[1];
+        Assert.Equal(("rss", "test"), (probe.GetProperty("eventType").GetString(), probe.GetProperty("source").GetString()));
+        var caps = history.GetProperty("records")[2];
         Assert.Equal(("caps", "test"), (caps.GetProperty("eventType").GetString(), caps.GetProperty("source").GetString()));
 
         var queries = await client.GetFromJsonAsync<JsonElement>("/api/v1/indexer/history?eventType=query");
@@ -159,7 +161,8 @@ public sealed class IndexerCatalogApiTests : IDisposable
         Assert.Equal(1, row.GetProperty("queries").GetInt32());
         Assert.Equal(0, row.GetProperty("grabs").GetInt32());
         Assert.Equal(8, stats.GetProperty("daily").GetArrayLength());
-        Assert.Equal(1, stats.GetProperty("daily")[7].GetProperty("queries").GetInt32());
+        // The search and the test's RSS page (both API hits on the indexer)
+        Assert.Equal(2, stats.GetProperty("daily")[7].GetProperty("queries").GetInt32());
         Assert.Equal(2, stats.GetProperty("indexers").GetArrayLength());
     }
 

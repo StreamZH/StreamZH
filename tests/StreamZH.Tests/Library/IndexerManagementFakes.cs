@@ -43,8 +43,16 @@ public sealed class StubIndexerClient : IIndexerClient
     public Task<IReadOnlyList<ReleaseInfo>> SearchAsync(IndexerDefinition indexer, SearchCriteria criteria, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
 
-    public Task<IReadOnlyList<ReleaseInfo>> FetchRecentAsync(IndexerDefinition indexer, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
+    /// <summary>Thrown by <see cref="FetchRecentAsync"/> (RSS) only, e.g. an indexer that lists its caps for any key.</summary>
+    public Exception? RecentError { get; set; }
+
+    public int RecentCalls { get; private set; }
+
+    public Task<IReadOnlyList<ReleaseInfo>> FetchRecentAsync(IndexerDefinition indexer, CancellationToken cancellationToken)
+    {
+        RecentCalls++;
+        return RecentError is null ? Task.FromResult<IReadOnlyList<ReleaseInfo>>([]) : Task.FromException<IReadOnlyList<ReleaseInfo>>(RecentError);
+    }
 
     public Task<byte[]> DownloadNzbAsync(IndexerDefinition indexer, ReleaseInfo release, CancellationToken cancellationToken) =>
         Task.FromResult(Array.Empty<byte>());

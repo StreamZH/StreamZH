@@ -121,6 +121,12 @@ public sealed class IndexerService(
 
     private readonly Lock _statusLock = new();
 
+    /// <summary>How long a refused key counts as a hiccup after the same key last worked (see <see cref="RecordFailure(int, Exception)"/>).</summary>
+    public static readonly TimeSpan KeyWorkedWindow = TimeSpan.FromHours(6);
+
+    // When a real call (search, RSS, grab) of the indexer last succeeded; in memory, a restart starts without it.
+    private readonly ConcurrentDictionary<int, DateTime> _keyWorked = new();
+
     // Successful tests by connection (URL, path, key), so saving right after "Test" stores the capabilities.
     private readonly ConcurrentDictionary<string, (IndexerCapabilities Caps, DateTimeOffset At)> _recentTests = new(StringComparer.Ordinal);
 
@@ -276,6 +282,13 @@ public sealed class IndexerService(
                 return new IndexerTestResult(null, categoryError);
             }
 
+            // Many Newznab indexers list their categories for any key, so t=caps alone does not prove the key: one RSS page
+            // (with the key, like every real query) does. A refused key fails the test; other trouble there leaves it to caps.
+            if (await CheckKeyWithRssAsync(normalized, client, host, cancellationToken) is { } keyError)
+            {
+                return new IndexerTestResult(null, keyError);
+            }
+
             logger.LogInformation("Indexer test for {Host} succeeded ({Count} categories)", host, caps.Categories.Count);
             RememberTest(normalized, caps);
             if (stored is not null && ConnectionKey(stored) == ConnectionKey(normalized))
@@ -305,6 +318,27 @@ public sealed class IndexerService(
         {
             logger.LogInformation("Indexer test for {Host} failed: {Message}", host, ex.Message);
             return new IndexerTestResult(null, $"Could not connect to {host}: {ex.Message}");
+        }
+    }
+
+    /// <summary>One RSS page with the key: the error text when the indexer refuses the key, otherwise null.</summary>
+    private async Task<string?> CheckKeyWithRssAsync(IndexerDefinition indexer, IIndexerClient client, string host, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await client.FetchRecentAsync(indexer, cancellationToken);
+            return null;
+        }
+        catch (IndexerException ex) when (ex.IsAuthError)
+        {
+            logger.LogInformation("Indexer test for {Host}: categories loaded, but a query with the key failed: {Message}", host, ex.Message);
+            return $"{ex.Message} The indexer lists its categories, but refuses searches with this key. Check the API key.";
+        }
+        catch (Exception ex) when (ex is IndexerException or HttpRequestException
+            || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            logger.LogInformation("Indexer test for {Host}: categories loaded, the RSS check did not finish: {Message}", host, ex.Message);
+            return null;
         }
     }
 
@@ -415,7 +449,7 @@ public sealed class IndexerService(
     }
 
     /// <summary>Back to healthy: the escalation starts from zero after the next failure.</summary>
-    public void RecordSuccess(int indexerId) => RecordSuccess(indexerId, notify: true);
+    public void RecordSuccess(int indexerId) => RecordSuccess(indexerId, notify: true, keyWorked: true);
 
     /// <summary>
     /// Escalates the back-off one level and skips the indexer until the wait is over.
@@ -424,11 +458,17 @@ public sealed class IndexerService(
     /// </summary>
     public void RecordFailure(int indexerId, Exception error) => RecordFailure(indexerId, error, notify: true);
 
-    private void RecordSuccess(int indexerId, bool notify)
+    private void RecordSuccess(int indexerId, bool notify, bool keyWorked = false)
     {
         if (indexerId <= 0)
         {
             return;
+        }
+
+        // Only real calls (search, RSS, grab) prove the key; tests leave it alone.
+        if (keyWorked)
+        {
+            _keyWorked[indexerId] = time.GetUtcNow().UtcDateTime;
         }
 
         lock (_statusLock)
@@ -464,13 +504,29 @@ public sealed class IndexerService(
             var level = previous is null || previous.EscalationLevel == 0 ? 1 : Math.Min(IndexerBackOff.MaxLevel, previous.EscalationLevel + 1);
             var initial = previous is null || previous.EscalationLevel == 0 ? now : previous.InitialFailure ?? now;
 
+            var message = error.Message;
+
+            // A refused key shortly after the same key worked is the indexer's hiccup, not a wrong key (seen with
+            // indexers that answer code 100 for a few requests and accept the next ones): pause briefly, do not escalate.
+            if (error is IndexerException { IsAuthError: true }
+                && _keyWorked.TryGetValue(indexerId, out var worked)
+                && now - worked < KeyWorkedWindow)
+            {
+                level = 1;
+                initial = previous?.InitialFailure ?? now;
+                var ago = Math.Max(1, (int)Math.Round((now - worked).TotalMinutes));
+                message += string.Create(
+                    CultureInfo.InvariantCulture,
+                    $" The same key worked {ago} min ago, so this looks like a hiccup of the indexer: StreamZH tries again in 5 minutes.");
+            }
+
             var wait = IndexerBackOff.Period(level);
             if (error is IndexerException { RetryAfter: { } retryAfter } && retryAfter > wait)
             {
                 wait = retryAfter;
             }
 
-            var message = error.Message.Length > MaxErrorLength ? error.Message[..MaxErrorLength] : error.Message;
+            message = message.Length > MaxErrorLength ? message[..MaxErrorLength] : message;
             status = new IndexerStatus(indexerId, initial, now, level, now + wait, message);
             statuses.Upsert(status);
         }

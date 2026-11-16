@@ -236,6 +236,74 @@ public sealed class IndexerServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Test_fails_when_the_indexer_lists_its_caps_but_refuses_queries_with_the_key()
+    {
+        var client = new StubIndexerClient { RecentError = new IndexerException("A rejected the API key: Incorrect user credentials (code 100).", 100) };
+        var saved = _service.Create(Valid("A") with { ApiKey = "stored-key" });
+        _service.RecordFailure(saved.Id, new IndexerException("A rejected the API key: Incorrect user credentials (code 100).", 100));
+
+        var result = await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None);
+        Assert.False(result.Success);
+        Assert.Equal(1, client.RecentCalls);
+        Assert.StartsWith("A rejected the API key: Incorrect user credentials (code 100). The indexer lists its categories", result.Error);
+
+        // The failed test does not end the waiting time.
+        Assert.False(_service.Health(saved.Id).Healthy);
+
+        // Other trouble with the RSS page leaves the verdict to t=caps.
+        client.RecentError = new IndexerException("A answered HTTP 503.");
+        Assert.True((await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None)).Success);
+        client.RecentError = new IndexerException("Query limit reached (10 per day)") { IsLimitReached = true };
+        Assert.True((await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None)).Success);
+    }
+
+    [Fact]
+    public void A_refused_key_shortly_after_it_worked_pauses_briefly_without_escalating()
+    {
+        var indexer = _service.Create(Valid("A"));
+        var refused = new IndexerException("A rejected the API key: Incorrect user credentials (code 100).", 100);
+
+        _service.RecordSuccess(indexer.Id);
+        _time.Advance(TimeSpan.FromMinutes(20));
+
+        foreach (var _ in Enumerable.Range(0, 3))
+        {
+            _service.RecordFailure(indexer.Id, refused);
+            var health = _service.Health(indexer.Id);
+            Assert.Equal(_time.Now.AddMinutes(5), health.DisabledTill);
+            Assert.Equal(1, health.EscalationLevel);
+            Assert.EndsWith("tries again in 5 minutes.", health.LastError);
+            _time.Advance(TimeSpan.FromMinutes(5));
+        }
+
+        // Long after the key last worked, a refused key escalates as before.
+        _time.Advance(IndexerService.KeyWorkedWindow);
+        _service.RecordFailure(indexer.Id, refused);
+        Assert.Equal(_time.Now.AddMinutes(15), _service.Health(indexer.Id).DisabledTill);
+        Assert.Equal(refused.Message, _service.Health(indexer.Id).LastError);
+
+        // Other errors are not affected.
+        var other = _service.Create(Valid("B"));
+        _service.RecordSuccess(other.Id);
+        _service.RecordFailure(other.Id, new IndexerException("Timeout"));
+        _service.RecordFailure(other.Id, new IndexerException("Timeout"));
+        Assert.Equal(2, _service.Health(other.Id).EscalationLevel);
+    }
+
+    [Fact]
+    public async Task A_successful_test_does_not_count_as_a_working_key()
+    {
+        var client = new StubIndexerClient();
+        var saved = _service.Create(Valid("A") with { ApiKey = "stored-key" });
+        await _service.TestAsync(saved with { ApiKey = IndexerService.MaskedApiKey }, client, CancellationToken.None);
+
+        _service.RecordFailure(saved.Id, new IndexerException("Incorrect user credentials", 100));
+        _service.RecordFailure(saved.Id, new IndexerException("Incorrect user credentials", 100));
+        Assert.Equal(2, _service.Health(saved.Id).EscalationLevel);
+        Assert.Equal("Incorrect user credentials", _service.Health(saved.Id).LastError);
+    }
+
+    [Fact]
     public void Schema_has_the_radarr_and_sonarr_defaults()
     {
         var schema = IndexerService.Schema();

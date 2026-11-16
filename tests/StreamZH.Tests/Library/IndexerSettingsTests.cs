@@ -208,7 +208,7 @@ public sealed class IndexerSettingsTests : IDisposable
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<ReleaseInfo>> FetchRecentAsync(IndexerDefinition indexer, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult<IReadOnlyList<ReleaseInfo>>([]);
 
         public Task<byte[]> DownloadNzbAsync(IndexerDefinition indexer, ReleaseInfo release, CancellationToken cancellationToken) =>
             throw new NotSupportedException();

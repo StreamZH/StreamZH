@@ -5,6 +5,16 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Indexer test checks the API key.** Many Newznab indexers list their categories (`t=caps`) for any key, so the test
+  passed while every search failed with "Incorrect user credentials (code 100)". The test now also reads one RSS page
+  with the key and fails with a clear message when the indexer refuses it.
+- **Short pause instead of a growing block after a refused key that worked shortly before.** Some indexers answer
+  code 100 for a few requests and accept the next ones with the same key. When a search, RSS sync or grab with the key
+  worked within the last 6 hours, StreamZH now pauses the indexer for 5 minutes without escalating the waiting time
+  (the message says so); a key that keeps failing escalates as before.
+
 ## [1.0.0-rc.5] - 2026-10-27
 
 ### Changed

@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2026-11-17
+
 ### Fixed
 
 - **Indexer test checks the API key.** Many Newznab indexers list their categories (`t=caps`) for any key, so the test

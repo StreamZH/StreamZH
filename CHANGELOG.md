@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ## [Unreleased]
 
+## [1.0.0-rc.7] - 2026-11-17
+
 ### Added
 
 - **Brake per indexer.** StreamZH sends at most 2 requests per second to an indexer (searches, extra result pages, RSS,

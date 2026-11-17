@@ -79,6 +79,22 @@ public sealed record IndexerDefinition(
 
     public IndexerLimitsUnit LimitsUnit { get; init; } = IndexerLimitsUnit.Day;
 
+    /// <summary>Requests StreamZH used before 1.0.0-rc.7 had no brake: an indexer gets at most this many per second unless set.</summary>
+    public const double DefaultRequestsPerSecond = 2;
+
+    public const double MaxRequestsPerSecond = 20;
+
+    /// <summary>
+    /// Most API requests (search pages, RSS, caps, NZB downloads) per second; null = <see cref="DefaultRequestsPerSecond"/>,
+    /// 0 = no brake. Many indexers block the API access of accounts that keep going over their burst limit.
+    /// </summary>
+    public double? RequestsPerSecond { get; init; }
+
+    /// <summary>Time between two requests to the indexer; null when there is no brake.</summary>
+    public TimeSpan? RequestInterval => (RequestsPerSecond ?? DefaultRequestsPerSecond) is > 0 and var rate
+        ? TimeSpan.FromSeconds(1 / Math.Min(rate, MaxRequestsPerSecond))
+        : null;
+
     /// <summary>The VIP expiration as a date; null when not set or not readable.</summary>
     public DateOnly? VipExpirationDate =>
         DateOnly.TryParseExact(VipExpiration, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;

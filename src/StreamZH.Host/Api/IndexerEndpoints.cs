@@ -241,7 +241,8 @@ public sealed record IndexerResource(
     int MinimumSeeders = 1,
     double? SeedRatio = null,
     int? SeedTimeMinutes = null,
-    int? SeasonPackSeedTimeMinutes = null)
+    int? SeasonPackSeedTimeMinutes = null,
+    double? RequestsPerSecond = null)
 {
     public static IndexerResource From(IndexerDefinition i, IndexerHealth? health, IndexerLimitStatus? limits) => new(
         i.Id,
@@ -268,7 +269,8 @@ public sealed record IndexerResource(
         i.MinimumSeeders,
         i.SeedRatio,
         i.SeedTimeMinutes,
-        i.SeasonPackSeedTimeMinutes);
+        i.SeasonPackSeedTimeMinutes,
+        i.RequestsPerSecond);
 }
 
 /// <summary>
@@ -300,7 +302,8 @@ public sealed record IndexerRequest(
     int? MinimumSeeders = null,
     double? SeedRatio = null,
     int? SeedTimeMinutes = null,
-    int? SeasonPackSeedTimeMinutes = null)
+    int? SeasonPackSeedTimeMinutes = null,
+    double? RequestsPerSecond = null)
 {
     /// <exception cref="ValidationFailedException">The limits unit is neither "day" nor "hour".</exception>
     public IndexerDefinition ToDefinition() => new(
@@ -328,6 +331,7 @@ public sealed record IndexerRequest(
         SeedRatio = SeedRatio,
         SeedTimeMinutes = SeedTimeMinutes,
         SeasonPackSeedTimeMinutes = SeasonPackSeedTimeMinutes,
+        RequestsPerSecond = RequestsPerSecond,
     };
 
     private static IndexerLimitsUnit ParseUnit(string? unit) => unit?.Trim().ToLowerInvariant() switch

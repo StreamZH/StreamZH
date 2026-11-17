@@ -678,6 +678,11 @@ public sealed class IndexerService(
             errors["grabLimit"] = ["Use 0 or more (0 or empty = unlimited)."];
         }
 
+        if (indexer.RequestsPerSecond is { } rate && (double.IsNaN(rate) || rate < 0 || rate > IndexerDefinition.MaxRequestsPerSecond || (rate > 0 && rate < 0.1)))
+        {
+            errors["requestsPerSecond"] = ["Use 0.1 to 20 requests per second (0 = no brake, empty = 2)."];
+        }
+
         return errors;
     }
 

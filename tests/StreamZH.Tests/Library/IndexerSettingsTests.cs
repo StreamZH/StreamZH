@@ -41,9 +41,12 @@ public sealed class IndexerSettingsTests : IDisposable
             QueryLimit = 100,
             GrabLimit = 0,
             LimitsUnit = IndexerLimitsUnit.Hour,
+            RequestsPerSecond = 0.5,
         });
 
         var stored = _service.Find(created.Id)!;
+        Assert.Equal(0.5, stored.RequestsPerSecond);
+        Assert.Equal(TimeSpan.FromSeconds(2), stored.RequestInterval);
         Assert.False(stored.Enable);
         Assert.Equal("nzbgeek", stored.DefinitionKey);
         Assert.Equal("&attrs=poster", stored.AdditionalParameters);
@@ -57,6 +60,8 @@ public sealed class IndexerSettingsTests : IDisposable
         Assert.Null(updated.VipExpiration);
         Assert.Null(updated.QueryLimit);
         Assert.Equal(IndexerLimitsUnit.Day, updated.LimitsUnit);
+        Assert.Equal(0.5, updated.RequestsPerSecond);
+        Assert.Null(_service.Update(created.Id, updated with { RequestsPerSecond = null }).RequestsPerSecond);
     }
 
     [Fact]
@@ -98,10 +103,11 @@ public sealed class IndexerSettingsTests : IDisposable
             VipExpiration = "next year",
             QueryLimit = -1,
             GrabLimit = -5,
+            RequestsPerSecond = 25,
         }));
 
         Assert.Equal(
-            ["additionalParameters", "definitionKey", "grabLimit", "queryLimit", "vipExpiration"],
+            ["additionalParameters", "definitionKey", "grabLimit", "queryLimit", "requestsPerSecond", "vipExpiration"],
             ex.Errors.Keys.Order(StringComparer.Ordinal));
     }
 

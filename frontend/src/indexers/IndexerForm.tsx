@@ -481,6 +481,26 @@ export default function IndexerForm({
           </Field>
 
           <Field advanced
+            id={id('requestsPerSecond')}
+            label="Requests per second"
+            error={fieldError('requestsPerSecond')}
+            help="Most requests per second to this indexer, searches, RSS and downloads together. Empty for 2, 0 for no brake. Many indexers block the API access of accounts that send too many at once."
+          >
+            <input
+              id={id('requestsPerSecond')}
+              className={`${ui.input} ${styles.number}`}
+              type="number"
+              min={0}
+              max={20}
+              step={0.1}
+              inputMode="decimal"
+              placeholder="2"
+              value={limitValue(draft.requestsPerSecond)}
+              onChange={(e) => update({ requestsPerSecond: e.target.value === '' ? null : e.target.valueAsNumber })}
+            />
+          </Field>
+
+          <Field advanced
             id={id('priority')}
             label="Indexer priority"
             error={fieldError('priority')}

@@ -27,6 +27,7 @@ public static class IndexerServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton(sp => new NewznabCapabilitiesCache(sp.GetService<TimeProvider>()));
+        services.TryAddSingleton(sp => new IndexerRequestThrottle(sp.GetService<TimeProvider>()));
         services.AddKeyedTransient<IIndexerClient>(IndexerClientKeys.Inner, (sp, _) => sp.GetRequiredService<NewznabClient>());
         services.TryAddTransient<IIndexerClient>(sp => sp.GetRequiredService<NewznabClient>());
         // Named "IIndexerClient" as in 0.4.0, so configuration by name keeps working.

@@ -3,6 +3,7 @@
 // Portions ported from Radarr (https://github.com/Radarr/Radarr) and Sonarr (https://github.com/Sonarr/Sonarr), Copyright (c) their contributors, GPL-3.0.
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -28,7 +29,8 @@ public sealed class NewznabClient(
     NewznabCapabilitiesCache capabilitiesCache,
     ILogger<NewznabClient>? logger = null,
     OutboundAddressGuard? guard = null,
-    IConfiguredServiceHosts? configuredHosts = null) : IIndexerClient
+    IConfiguredServiceHosts? configuredHosts = null,
+    IndexerRequestThrottle? throttle = null) : IIndexerClient
 {
     /// <summary>Pages per query; with 100 results per page this is Radarr's limit of 1000 results per query.</summary>
     public const int MaxPagesPerQuery = 10;
@@ -51,6 +53,7 @@ public sealed class NewznabClient(
 
     private readonly ILogger _logger = logger ?? (ILogger)NullLogger.Instance;
     private readonly OutboundAddressGuard _guard = guard ?? OutboundAddressGuard.Default;
+    private readonly IndexerRequestThrottle _throttle = throttle ?? IndexerRequestThrottle.Off;
 
     public async Task<IndexerCapabilities> GetCapabilitiesAsync(IndexerDefinition indexer, CancellationToken cancellationToken)
     {
@@ -158,7 +161,7 @@ public sealed class NewznabClient(
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await ReadLimitedAsync(indexer, response.Content, MaxApiResponseBytes, cancellationToken);
-            throw ErrorForStatus(indexer, response, errorBody, url);
+            throw Held(indexer, ErrorForStatus(indexer, response, errorBody, url));
         }
 
         var body = await ReadLimitedAsync(indexer, response.Content, MaxNzbBytes, cancellationToken);
@@ -201,7 +204,7 @@ public sealed class NewznabClient(
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await ReadLimitedAsync(indexer, response.Content, MaxApiResponseBytes, cancellationToken);
-                throw ErrorForStatus(indexer, response, errorBody, url);
+                throw Held(indexer, ErrorForStatus(indexer, response, errorBody, url));
             }
 
             var body = await ReadLimitedAsync(indexer, response.Content, TorrentFiles.MaxTorrentBytes, cancellationToken);
@@ -216,7 +219,7 @@ public sealed class NewznabClient(
                 {
                     if (NewznabRssParser.FindError(NewznabRssParser.Load(Decode(response, body))) is { } error)
                     {
-                        throw NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response));
+                        throw Held(indexer, NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response)));
                     }
                 }
                 catch (XmlException)
@@ -312,7 +315,7 @@ public sealed class NewznabClient(
 
         if (!response.IsSuccessStatusCode)
         {
-            throw ErrorForStatus(indexer, response, body, url);
+            throw Held(indexer, ErrorForStatus(indexer, response, body, url));
         }
 
         if (IsHtml(response, body))
@@ -332,7 +335,7 @@ public sealed class NewznabClient(
 
         if (NewznabRssParser.FindError(document) is { } error)
         {
-            throw NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response));
+            throw Held(indexer, NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response)));
         }
 
         return document;
@@ -348,6 +351,15 @@ public sealed class NewznabClient(
     /// </summary>
     private async Task<HttpResponseMessage> SendAsync(IndexerDefinition indexer, HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        // The brake per indexer (see IndexerRequestThrottle): one slot per request, redirects of that request included.
+        if (await _throttle.AcquireAsync(ThrottleKey(indexer), indexer.RequestInterval, cancellationToken) is { } held)
+        {
+            var seconds = Math.Max(1, (int)Math.Ceiling(held.TotalSeconds));
+            throw new IndexerException(
+                string.Create(CultureInfo.InvariantCulture, $"{indexer.Name}: request limit reached, StreamZH sends the next request in {seconds} s."),
+                retryAfter: held) { IsLimitReached = true };
+        }
+
         var response = await SendOnceAsync(indexer, request, cancellationToken);
         var current = request.RequestUri!;
         for (var hop = 0; hop < MaxRedirects && IsRedirect(response) && response.Headers.Location is { } location; hop++)
@@ -370,6 +382,25 @@ public sealed class NewznabClient(
         }
 
         return response;
+    }
+
+    /// <summary>Requests to the same indexer host share one brake, whichever indexer entry sends them (one account, one limit).</summary>
+    private static string ThrottleKey(IndexerDefinition indexer) => IndexerHost(indexer) ?? indexer.BaseUrl.Trim().ToLowerInvariant() switch
+    {
+        "" => "indexer:" + indexer.Name,
+        var url => url,
+    };
+
+    /// <summary>A request limit answer holds the host for the Retry-After time, so searches still running send nothing more.</summary>
+    private IndexerException Held(IndexerDefinition indexer, IndexerException error)
+    {
+        if (error.RetryAfter is { } retryAfter && retryAfter > TimeSpan.Zero && !error.IsAuthError)
+        {
+            _throttle.Hold(ThrottleKey(indexer), retryAfter);
+            _logger.LogWarning("{Indexer}: no more requests for {Seconds} s after: {Message}", indexer.Name, (int)retryAfter.TotalSeconds, error.Message);
+        }
+
+        return error;
     }
 
     /// <summary>The host and port of the indexer's configured URL; requests there are not restricted (0.12: another port is).</summary>
@@ -462,7 +493,7 @@ public sealed class NewznabClient(
                     var error = NewznabRssParser.FindError(XDocument.Load(reader.ReadSubtree()));
                     if (error is not null)
                     {
-                        throw NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response));
+                        throw Held(indexer, NewznabErrors.FromError(indexer, error, HasApiKey(url), RetryAfter(response)));
                     }
                 }
             }

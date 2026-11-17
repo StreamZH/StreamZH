@@ -47,6 +47,8 @@ export interface Indexer {
   /** Max NZB downloads per unit; null or 0 = unlimited. */
   grabLimit: number | null
   limitsUnit: LimitsUnit
+  /** 1.0.0-rc.7: most requests per second to the indexer; null = 2, 0 = no brake. */
+  requestsPerSecond: number | null
   status: IndexerStatus | null
   /** 0.11: Torznab indexers are torrent, everything else Usenet (computed by the server from the implementation). */
   protocol: IndexerProtocol
@@ -167,6 +169,7 @@ export function normalizeIndexer(i: Indexer): Indexer {
     queryLimit: i.queryLimit ?? null,
     grabLimit: i.grabLimit ?? null,
     limitsUnit: i.limitsUnit ?? 'day',
+    requestsPerSecond: i.requestsPerSecond ?? null,
     status: i.status ?? null,
     protocol: protocolOf(i),
     minimumSeeders: i.minimumSeeders ?? 1,

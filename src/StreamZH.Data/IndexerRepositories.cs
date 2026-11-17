@@ -36,7 +36,7 @@ public sealed class IndexerRepository(Database database)
     private const string Columns = """
         Id, Name, Implementation, BaseUrl, ApiPath, ApiKey, Categories, TvCategories, Priority,
         EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added,
-        Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit,
+        Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit, RequestsPerSecond,
         MinimumSeeders, SeedRatio, SeedTimeMinutes, SeasonPackSeedTimeMinutes
         """;
 
@@ -82,11 +82,11 @@ public sealed class IndexerRepository(Database database)
             """
             INSERT INTO Indexers (Name, Implementation, BaseUrl, ApiPath, ApiKey, Categories, TvCategories, Priority,
                 EnableRss, EnableAutomaticSearch, EnableInteractiveSearch, Added,
-                Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit,
+                Enable, DefinitionKey, AdditionalParameters, VipExpiration, QueryLimit, GrabLimit, LimitsUnit, RequestsPerSecond,
                 MinimumSeeders, SeedRatio, SeedTimeMinutes, SeasonPackSeedTimeMinutes)
             VALUES (@Name, @Implementation, @BaseUrl, @ApiPath, @ApiKey, @Categories, @TvCategories, @Priority,
                 @EnableRss, @EnableAutomaticSearch, @EnableInteractiveSearch, @Added,
-                @Enable, @DefinitionKey, @AdditionalParameters, @VipExpiration, @QueryLimit, @GrabLimit, @LimitsUnit,
+                @Enable, @DefinitionKey, @AdditionalParameters, @VipExpiration, @QueryLimit, @GrabLimit, @LimitsUnit, @RequestsPerSecond,
                 @MinimumSeeders, @SeedRatio, @SeedTimeMinutes, @SeasonPackSeedTimeMinutes);
             SELECT last_insert_rowid();
             """,
@@ -102,7 +102,7 @@ public sealed class IndexerRepository(Database database)
                 Categories = @Categories, TvCategories = @TvCategories, Priority = @Priority, EnableRss = @EnableRss,
                 EnableAutomaticSearch = @EnableAutomaticSearch, EnableInteractiveSearch = @EnableInteractiveSearch,
                 Enable = @Enable, DefinitionKey = @DefinitionKey, AdditionalParameters = @AdditionalParameters, VipExpiration = @VipExpiration,
-                QueryLimit = @QueryLimit, GrabLimit = @GrabLimit, LimitsUnit = @LimitsUnit,
+                QueryLimit = @QueryLimit, GrabLimit = @GrabLimit, LimitsUnit = @LimitsUnit, RequestsPerSecond = @RequestsPerSecond,
                 MinimumSeeders = @MinimumSeeders, SeedRatio = @SeedRatio, SeedTimeMinutes = @SeedTimeMinutes,
                 SeasonPackSeedTimeMinutes = @SeasonPackSeedTimeMinutes
             WHERE Id = @Id
@@ -164,6 +164,7 @@ public sealed class IndexerRepository(Database database)
         public long? QueryLimit { get; init; }
         public long? GrabLimit { get; init; }
         public string LimitsUnit { get; init; } = "day";
+        public double? RequestsPerSecond { get; init; }
         public long MinimumSeeders { get; init; } = 1;
         public double? SeedRatio { get; init; }
         public long? SeedTimeMinutes { get; init; }
@@ -191,6 +192,7 @@ public sealed class IndexerRepository(Database database)
             QueryLimit = i.QueryLimit,
             GrabLimit = i.GrabLimit,
             LimitsUnit = i.LimitsUnit == IndexerLimitsUnit.Hour ? "hour" : "day",
+            RequestsPerSecond = i.RequestsPerSecond,
             MinimumSeeders = i.MinimumSeeders,
             SeedRatio = i.SeedRatio,
             SeedTimeMinutes = i.SeedTimeMinutes,
@@ -218,6 +220,7 @@ public sealed class IndexerRepository(Database database)
             QueryLimit = QueryLimit is { } q ? (int)q : null,
             GrabLimit = GrabLimit is { } g ? (int)g : null,
             LimitsUnit = string.Equals(LimitsUnit, "hour", StringComparison.OrdinalIgnoreCase) ? IndexerLimitsUnit.Hour : IndexerLimitsUnit.Day,
+            RequestsPerSecond = RequestsPerSecond,
             MinimumSeeders = (int)MinimumSeeders,
             SeedRatio = SeedRatio,
             SeedTimeMinutes = SeedTimeMinutes is { } t ? (int)t : null,

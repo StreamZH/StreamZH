@@ -5,6 +5,21 @@ and versions follow [Semantic Versioning](https://semver.org/). Versions before 
 
 ## [Unreleased]
 
+## [1.0.0-rc.7] - 2026-11-17
+
+### Added
+
+- **Brake per indexer.** StreamZH sends at most 2 requests per second to an indexer (searches, extra result pages, RSS,
+  caps and downloads together), so searches running side by side no longer arrive as a burst. Many private indexers
+  allow a few requests per second and block the API access of accounts that keep going over it, which looks like a
+  refused key ("Incorrect user credentials (code 100)") until a new key is made. Adjustable per indexer under
+  Advanced → Requests per second (0 = no brake).
+
+### Fixed
+
+- **Request limit holds the whole indexer.** After HTTP 429 or a Newznab request limit answer, StreamZH sends nothing
+  more to that indexer until the Retry-After time is over, also from searches that were already running.
+
 ## [1.0.0-rc.6] - 2026-11-17
 
 ### Fixed
